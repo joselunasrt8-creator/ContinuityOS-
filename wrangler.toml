@@ -4,5 +4,5 @@ compatibility_date = "2026-04-23"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "mindshift-db"
+database_name = "mindshift-demo-prod"
 database_id = "59990401-9554-4865-a370-45259b3a120b"
