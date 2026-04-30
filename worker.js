@@ -191,6 +191,32 @@ export default {
       return json({ status: "VALID", validation_id: validationId, validated_object: validatedObject, validated_object_hash: objectHash });
     }
 
+    if (url.pathname === "/validate-pr") {
+      const body = await readJson(request);
+      if (!body) return json({ status: "NULL", result: "NULL", reasons: ["Invalid JSON"] }, 400);
+
+      const reasons = [];
+
+      if (body.repo !== "joselunasrt8-creator/mindshift-demo") {
+        reasons.push("repo must be joselunasrt8-creator/mindshift-demo");
+      }
+      if (!body.branch) {
+        reasons.push("branch must not be empty");
+      }
+      if (!body.head_sha) {
+        reasons.push("head_sha must not be empty");
+      }
+      if (!body.pr_number) {
+        reasons.push("pr_number must not be empty");
+      }
+
+      if (reasons.length > 0) {
+        return json({ status: "NULL", result: "NULL", reasons }, 403);
+      }
+
+      return json({ status: "VALID", result: "VALID" });
+    }
+
     if (url.pathname === "/execute") {
       const body = await readJson(request);
       if (!body) return json({ status: "NULL", reason: "Invalid JSON" }, 400);

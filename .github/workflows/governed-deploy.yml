@@ -11,6 +11,10 @@ on:
         description: "Validated object hash returned by MindShift"
         required: true
         type: string
+      invocation_nonce:
+        description: "MindShift invocation nonce"
+        required: true
+        type: string
 
 concurrency:
   group: governed-deploy-production
@@ -29,6 +33,7 @@ jobs:
       DEPLOY_ENVIRONMENT: production
       DECISION_ID: ${{ github.event.inputs.decision_id }}
       VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
+      INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
 
     steps:
       - name: Enforce explicit invocation inputs
@@ -40,8 +45,8 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${DECISION_ID:-}" ] || [ -z "${VALIDATED_OBJECT_HASH:-}" ]; then
-            echo "Missing required inputs: decision_id and validated_object_hash."
+          if [ -z "${DECISION_ID:-}" ] || [ -z "${VALIDATED_OBJECT_HASH:-}" ] || [ -z "${INVOCATION_NONCE:-}" ]; then
+            echo "Missing required inputs: decision_id, validated_object_hash, and invocation_nonce."
             exit 1
           fi
 
@@ -74,8 +79,9 @@ jobs:
             -d "$(jq -n \
               --arg decision_id "$DECISION_ID" \
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
               --arg environment "$DEPLOY_ENVIRONMENT" \
-              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, environment: $environment}')")
+              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment}')")
 
           VALIDATION_STATUS=$(jq -r '.status // empty' validate.json)
           VALIDATION_RESULT=$(jq -r '.result // empty' validate.json)

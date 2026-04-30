@@ -18,6 +18,7 @@ type Env = {
   GITHUB_TOKEN: string
   GITHUB_OWNER: string
   GITHUB_REPO: string
+  PREPARE_DEPLOY_API_KEY: string
 }
 
 type GithubDeployTarget = {
@@ -66,6 +67,16 @@ function missingDbBinding(env: Env): string | null {
   }
 
   return null
+}
+
+function hasValidPrepareDeployApiKey(request: Request, env: Env): boolean {
+  const expectedApiKey = env.PREPARE_DEPLOY_API_KEY
+  if (!expectedApiKey) {
+    return false
+  }
+
+  const providedApiKey = request.headers.get("X-API-Key")
+  return providedApiKey === expectedApiKey
 }
 
 function ensureDeployConstraints(constraints: Record<string, unknown>) {
@@ -217,6 +228,104 @@ async function buildValidation(aeo: any, authority: any) {
     message,
     created_at: new Date().toISOString()
   }
+}
+
+
+
+async function ensureInvocationRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS invocation_registry (
+    decision_id TEXT NOT NULL,
+    validated_object_hash TEXT NOT NULL,
+    invocation_nonce TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    consumed_at TEXT,
+    PRIMARY KEY (decision_id, validated_object_hash, invocation_nonce)
+  )`).run()
+}
+
+async function createInvocationAuthority(env: Env, decisionId: string, validatedObjectHash: string) {
+  await ensureInvocationRegistry(env)
+  const invocationNonce = crypto.randomUUID()
+  await env.DB.prepare(`INSERT INTO invocation_registry (decision_id, validated_object_hash, invocation_nonce, status, created_at, consumed_at)
+    VALUES (?1, ?2, ?3, 'ACTIVE', ?4, NULL)`)
+    .bind(decisionId, validatedObjectHash, invocationNonce, new Date().toISOString())
+    .run()
+  return invocationNonce
+}
+
+async function findLatestActiveInvocationNonce(env: Env, decisionId: string, validatedObjectHash: string) {
+  await ensureInvocationRegistry(env)
+  return env.DB.prepare(`SELECT invocation_nonce FROM invocation_registry
+    WHERE decision_id = ?1 AND validated_object_hash = ?2 AND UPPER(status) = 'ACTIVE'
+    ORDER BY created_at DESC LIMIT 1`)
+    .bind(decisionId, validatedObjectHash)
+    .first<{ invocation_nonce: string }>()
+}
+
+async function ensureInvocationAuthority(env: Env, decisionId: string, validatedObjectHash: string) {
+  const existing = await findLatestActiveInvocationNonce(env, decisionId, validatedObjectHash)
+  if (existing?.invocation_nonce) return existing.invocation_nonce
+  return createInvocationAuthority(env, decisionId, validatedObjectHash)
+}
+
+async function prepareDeployTriple(env: Env) {
+  // Prepare-only route: generate a fresh deploy authorization triple.
+  // This must not execute deployment and must not consume nonce.
+  const authority = buildAuthority({
+    owner: "prepare_deploy_endpoint",
+    intent: "deploy_production",
+    scope: { environment: "production", mode: "prepare_deploy" },
+    constraints: {
+      repo: `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`,
+      branch: "main",
+      workflow: "deploy.yml",
+      max_executions: 1
+    }
+  })
+
+  await saveAuthority(env, authority)
+
+  const target = targetFromAuthority(authority)
+  if (!target) {
+    throw new Error("Failed to derive GitHub deploy target for production authority.")
+  }
+
+  const aeo = buildAeo(authority, target)
+  await saveAeo(env, aeo)
+
+  const validation = await buildValidation(aeo, authority)
+  if (validation.result !== "VALID") {
+    throw new Error("Failed to compile a valid production deploy AEO.")
+  }
+
+  await saveValidation(env, validation)
+  const invocationNonce = await createInvocationAuthority(env, authority.decision_id, validation.validated_object_hash)
+
+  return {
+    decision_id: authority.decision_id,
+    validated_object_hash: validation.validated_object_hash,
+    invocation_nonce: invocationNonce
+  }
+}
+
+async function findInvocationAuthority(env: Env, decisionId: string, validatedObjectHash: string, invocationNonce: string) {
+  await ensureInvocationRegistry(env)
+  return env.DB.prepare(`SELECT * FROM invocation_registry
+    WHERE decision_id = ?1 AND validated_object_hash = ?2 AND invocation_nonce = ?3
+    ORDER BY created_at DESC LIMIT 1`)
+    .bind(decisionId, validatedObjectHash, invocationNonce)
+    .first<any>()
+}
+
+async function consumeInvocationAuthority(env: Env, decisionId: string, validatedObjectHash: string, invocationNonce: string) {
+  await ensureInvocationRegistry(env)
+  const result = await env.DB.prepare(`UPDATE invocation_registry
+    SET status = 'CONSUMED', consumed_at = ?4
+    WHERE decision_id = ?1 AND validated_object_hash = ?2 AND invocation_nonce = ?3 AND UPPER(status) = 'ACTIVE'`)
+    .bind(decisionId, validatedObjectHash, invocationNonce, new Date().toISOString())
+    .run()
+  return Number(result.meta?.changes || 0) > 0
 }
 
 async function findAuthorityByDecisionId(env: Env, decisionId: string) {
@@ -600,6 +709,7 @@ async function runExecuteFlow(
 
     if (execution.status === "EXECUTED") {
       await consumeAuthority(env, body.decision_id)
+      await consumeInvocationAuthority(env, body.decision_id, body.validated_object_hash!, body.invocation_nonce || "")
       return {
         code: 200,
         payload: {
@@ -746,6 +856,9 @@ async function runExecuteFlow(
 
   if (execution.status === "EXECUTED") {
     await consumeAuthority(env, execution.decision_id)
+    if (body.invocation_nonce) {
+      await consumeInvocationAuthority(env, body.decision_id || execution.decision_id, validation.payload.validated_object_hash, body.invocation_nonce)
+    }
     return {
       code: 200,
       payload: {
@@ -927,6 +1040,34 @@ async function validateAuthority(env: Env, body: any) {
   }
 
   if (body.validated_object_hash) {
+    if (!body.invocation_nonce) {
+      return {
+        ok: false,
+        code: 400,
+        payload: {
+          validation_id: validationId,
+          decision_id: body.decision_id,
+          status: "FAILED",
+          result: "INVALID",
+          message: "missing invocation_nonce"
+        }
+      }
+    }
+
+    if (body.environment && body.environment !== "production") {
+      return {
+        ok: false,
+        code: 409,
+        payload: {
+          validation_id: validationId,
+          decision_id: body.decision_id,
+          status: "FAILED",
+          result: "INVALID",
+          message: "environment must be production"
+        }
+      }
+    }
+
     const existingValidation = await findLatestValidValidationByDecisionId(env, body.decision_id)
     if (!existingValidation) {
       return {
@@ -958,18 +1099,37 @@ async function validateAuthority(env: Env, body: any) {
       }
     }
 
-    const consumed = await consumeAuthorityIfActive(env, body.decision_id)
-    if (!consumed) {
+    const invocationByHash = await env.DB.prepare(`SELECT * FROM invocation_registry WHERE decision_id = ?1 AND validated_object_hash = ?2 ORDER BY created_at DESC LIMIT 1`)
+      .bind(body.decision_id, body.validated_object_hash)
+      .first<any>()
+    if (!invocationByHash) {
       return {
         ok: false,
-        code: 409,
+        code: 404,
         payload: {
           validation_id: validationId,
           decision_id: body.decision_id,
           status: "FAILED",
           result: "INVALID",
-          error: "replay_detected"
+          message: "authority not found"
         }
+      }
+    }
+
+    const invocation = await findInvocationAuthority(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
+    if (!invocation) {
+      return {
+        ok: false,
+        code: 409,
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", message: "nonce mismatch" }
+      }
+    }
+
+    if (String(invocation.status || "").toUpperCase() !== "ACTIVE") {
+      return {
+        ok: false,
+        code: 409,
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", message: "replay detected" }
       }
     }
 
@@ -980,12 +1140,10 @@ async function validateAuthority(env: Env, body: any) {
         ...existingValidation,
         status: "VALID",
         result: "VALID",
-        message: "Exact-object validation succeeded for ACTIVE authority."
+        message: "Exact-object validation succeeded for ACTIVE authority.",
+        invocation_nonce: body.invocation_nonce
       },
-      authority: {
-        ...authority,
-        status: "CONSUMED"
-      }
+      authority
     }
   }
 
@@ -1226,8 +1384,10 @@ export default {
             "GET /github-proof-test",
             "POST /webhook",
             "POST /authority",
+            "POST /prepare-deploy",
             "POST /compile",
             "POST /validate",
+            "POST /validate-pr",
             "POST /execute",
             "POST /proof"
           ]
@@ -1257,6 +1417,33 @@ export default {
 
       return jsonResponse({ status: "ok", received: body })
     }
+
+      if (route("/prepare-deploy") && request.method === "POST") {
+        if (!hasValidPrepareDeployApiKey(request, env)) {
+          return jsonResponse({ status: "FAILED", error: "Unauthorized" }, 401)
+        }
+
+        const dbError = missingDbBinding(env)
+        if (dbError) {
+          return jsonResponse({ status: "FAILED", error: dbError }, 500)
+        }
+
+        if (!env.GITHUB_OWNER || !env.GITHUB_REPO) {
+          return jsonResponse({ status: "FAILED", error: "Missing required GitHub target config: GITHUB_OWNER and GITHUB_REPO." }, 500)
+        }
+
+        const insertCheck = await canInsertAuthority(env)
+        if (!insertCheck.ok) {
+          return jsonResponse({ status: "FAILED", error: insertCheck.error, route: "/prepare-deploy" }, 500)
+        }
+
+        try {
+          const prepared = await prepareDeployTriple(env)
+          return jsonResponse(prepared)
+        } catch (error: any) {
+          return jsonResponse({ status: "FAILED", error: error?.message || "Failed to prepare deploy invocation." }, 500)
+        }
+      }
 
       if (route("/authority") && request.method === "POST") {
         const body = await readJson(request)
@@ -1432,6 +1619,31 @@ export default {
       return jsonResponse(aeo)
     }
 
+
+    if (route("/validate-pr") && request.method === "POST") {
+      const body = await readJson(request)
+      if (!body || !isObject(body)) {
+        return jsonResponse({ status: "NULL", result: "NULL", reasons: ["Invalid JSON body"] }, 400)
+      }
+
+      const repo = String(body.repo || "")
+      const branch = String(body.branch || "")
+      const headSha = String(body.head_sha || "")
+      const prNumber = String(body.pr_number || "")
+
+      const reasons: string[] = []
+      if (repo !== "joselunasrt8-creator/mindshift-demo") reasons.push("repo must be joselunasrt8-creator/mindshift-demo")
+      if (!branch) reasons.push("branch is required")
+      if (!headSha) reasons.push("head_sha is required")
+      if (!prNumber) reasons.push("pr_number is required")
+
+      if (reasons.length === 0) {
+        return jsonResponse({ status: "VALID", result: "VALID" })
+      }
+
+      return jsonResponse({ status: "NULL", result: "NULL", reasons }, 200)
+    }
+
     if (route("/validate") && request.method === "POST") {
       const body = await readJson(request)
       if (!body) {
@@ -1567,6 +1779,22 @@ export default {
     if (route("/github-proof-test") && request.method === "GET") {
       return runGithubProofTest(env)
     }
+    if (route("/nonce-validation-test") && request.method === "GET") {
+      const authority = buildAuthority({ owner: "nonce_test", constraints: { repo: "local/repo", branch: "main", workflow: "deploy.yml", max_executions: 1 } })
+      await saveAuthority(env, authority)
+      const aeo = buildAeo(authority, targetFromAuthority(authority) as GithubDeployTarget)
+      await saveAeo(env, aeo)
+      const hash = await sha256Hex(JSON.stringify(aeo))
+      const nonce = await ensureInvocationAuthority(env, authority.decision_id, hash)
+      await saveValidation(env, await buildValidation(aeo, authority))
+      const missing = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, environment: "production" })
+      const wrong = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: "bad", environment: "production" })
+      const good = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
+      const replay = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
+      const wrongHash = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: "deadbeef", invocation_nonce: nonce, environment: "production" })
+      return jsonResponse({ missing: missing.payload, wrong: wrong.payload, good: good.payload, replay: replay.payload, wrongHash: wrongHash.payload })
+    }
+
 
     if (route("/proof") && request.method === "POST") {
       const body = await readJson(request)
