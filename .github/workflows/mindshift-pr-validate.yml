@@ -1,17 +1,9 @@
 name: mindshift-pr-validate
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -19,23 +11,36 @@ permissions:
 
 jobs:
   validate-pr:
-    name: mindshift-pr-validate   # IMPORTANT: this is the status check name
+    name: mindshift-pr-validate
     runs-on: ubuntu-latest
 
     env:
       WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
 
     steps:
-      - name: Validate PR through MindShift
+      - name: HARD FAIL — Missing secrets
         run: |
           set -euo pipefail
 
-          if [ -z "${WORKER_URL:-}" ]; then
-            echo "Missing MINDSHIFT_WORKER_URL"
+          for var in WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required secret: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
             exit 1
           fi
 
-          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      - name: VALIDATE PR — Fail closed
+        run: |
+          set -euo pipefail
 
           PAYLOAD=$(jq -n \
             --arg repo "${{ github.repository }}" \
@@ -45,17 +50,24 @@ jobs:
             --arg commit_sha "${{ github.event.pull_request.head.sha }}" \
             '{repo: $repo, pr_number: $pr_number, base_branch: $base_branch, head_branch: $head_branch, commit_sha: $commit_sha}')
 
-          STATUS_CODE=$(curl -sS -o pr-validate.json -w "%{http_code}" \
+          RESPONSE_CODE=$(curl -sS -o pr-validate.json -w "%{http_code}" \
             -X POST "$CLEAN_WORKER_URL/validate-pr" \
             -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
             -d "$PAYLOAD")
 
-          read -r RESULT STATUS < <(jq -r '[.result // "", .status // ""] | @tsv' pr-validate.json)
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — PR validation endpoint error"
+            exit 1
+          fi
 
-          if [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -gt 299 ] || [ "$RESULT" != "VALID" ] || [ "$STATUS" != "VALID" ]; then
-            echo "PR VALIDATION FAILED → MERGE BLOCKED"
+          STATUS=$(jq -r '.status // empty' pr-validate.json)
+          RESULT=$(jq -r '.result // empty' pr-validate.json)
+
+          if [ "$STATUS" != "VALID" ] || [ "$RESULT" != "VALID" ]; then
+            echo "NULL — PR validation failed"
             cat pr-validate.json
             exit 1
           fi
 
-          echo "PR VALIDATION PASSED"
+          echo "VALID — PR allowed"
