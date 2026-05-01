@@ -57,14 +57,6 @@ CREATE TABLE IF NOT EXISTS proof_registry (
   created_at TEXT NOT NULL
 );
 
-ALTER TABLE authority_registry ADD COLUMN authority_id TEXT;
-ALTER TABLE authority_registry ADD COLUMN decision_id TEXT;
-ALTER TABLE authority_registry ADD COLUMN owner TEXT;
-ALTER TABLE authority_registry ADD COLUMN intent TEXT;
-ALTER TABLE authority_registry ADD COLUMN scope TEXT;
-ALTER TABLE authority_registry ADD COLUMN constraints TEXT;
-ALTER TABLE authority_registry ADD COLUMN status TEXT;
-ALTER TABLE authority_registry ADD COLUMN created_at TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_authority_registry_decision_id
   ON authority_registry (decision_id);
