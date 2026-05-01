@@ -1137,7 +1137,7 @@ function buildProof(body: any, execution: any) {
 }
 
 async function saveProof(env: Env, proof: any) {
-  const normalizedProofReference =
+  const normalizedProofReference: Record<string, unknown> =
     typeof proof.proof_reference === "string"
       ? { source: proof.proof_reference }
       : parseJsonObject(proof.proof_reference)
@@ -2069,9 +2069,9 @@ export default {
       const hash = await sha256Hex(canonicalAeo)
       const nonce = await ensureInvocationAuthority(env, authority.decision_id, hash)
       await saveValidation(env, await buildValidation(aeo, authority))
-      const keyPair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
+      const keyPair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair
       const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", keyPair.privateKey, new TextEncoder().encode(hash)))
-      const publicSpki = new Uint8Array(await crypto.subtle.exportKey("spki", keyPair.publicKey))
+      const publicSpki = new Uint8Array(await crypto.subtle.exportKey("spki", keyPair.publicKey) as ArrayBuffer)
       const signer_public_key = bytesToPem(publicSpki, "PUBLIC KEY")
       const signature_b64 = btoa(String.fromCharCode(...signature))
       const missing = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
