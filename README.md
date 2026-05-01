@@ -128,3 +128,4 @@ Store these values in your boundary runtime persistence (D1):
 - `authority` in authority registry table (state transitions `ACTIVE -> CONSUMED`).
 - `validated_object_hash` and `executed_object_hash` in execution/transfer records, enforcing equality.
 - `proof` record keyed by `execution_id` + GitHub `run_id` + `commit_sha` + `environment`.
+# trigger
