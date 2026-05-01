@@ -54,6 +54,26 @@ async function verifyEd25519Signature(signatureB64: string, hashHex: string, pub
   }
 }
 
+function bytesToPem(bytes: Uint8Array, label: string): string {
+  const binary = String.fromCharCode(...bytes)
+  const b64 = btoa(binary)
+  const lines = b64.match(/.{1,64}/g)?.join("\n") || b64
+  return `-----BEGIN ${label}-----\n${lines}\n-----END ${label}-----`
+}
+
+async function resolveSignerPublicKeyPem(env: Env, body: any): Promise<string | null> {
+  if (typeof body?.signer_public_key === "string" && body.signer_public_key.trim()) {
+    return body.signer_public_key.trim()
+  }
+  if (body?.signer_public_key_reference && env.GOVERNED_SIGNER_PUBLIC_KEY) {
+    const configuredKeyFingerprint = await sha256Hex(env.GOVERNED_SIGNER_PUBLIC_KEY)
+    if (body.signer_public_key_reference === `sha256:${configuredKeyFingerprint}`) {
+      return env.GOVERNED_SIGNER_PUBLIC_KEY
+    }
+  }
+  return null
+}
+
 type Env = {
   DB: D1Database
   GITHUB_TOKEN: string
@@ -1240,7 +1260,7 @@ async function validateAuthority(env: Env, body: any) {
   }
 
   if (body.validated_object_hash) {
-    if (!body.canonical_deploy_aeo || !body.signature_value || !body.signer_public_key_reference) {
+    if (!body.signature_b64) {
       return {
         ok: false,
         code: 400,
@@ -1249,60 +1269,32 @@ async function validateAuthority(env: Env, body: any) {
           decision_id: body.decision_id,
           status: "FAILED",
           result: "INVALID",
-          message: "missing canonical_deploy_aeo, signature_value, or signer_public_key_reference"
+          error: "missing_signature",
+          message: "missing signature_b64"
         }
       }
     }
-    if (!env.GOVERNED_SIGNER_PUBLIC_KEY) {
+    const signerPublicKeyPem = await resolveSignerPublicKeyPem(env, body)
+    if (!signerPublicKeyPem) {
       return {
         ok: false,
         code: 500,
-        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", message: "validator signer key not configured" }
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", error: "unknown_signer", message: "signer public key is missing or unregistered" }
       }
     }
-    const configuredKeyFingerprint = await sha256Hex(env.GOVERNED_SIGNER_PUBLIC_KEY)
-    if (body.signer_public_key_reference !== `sha256:${configuredKeyFingerprint}`) {
-      return {
-        ok: false,
-        code: 409,
-        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", message: "signer key reference mismatch", error: "key_mismatch" }
-      }
-    }
-
-    const canonicalAeo = parseJsonObject(body.canonical_deploy_aeo)
-    const canonicalHash = await sha256Hex(canonicalizeJson(canonicalAeo))
-    if (canonicalHash !== body.validated_object_hash) {
-      return {
-        ok: false,
-        code: 409,
-        payload: {
-          validation_id: validationId,
-          decision_id: body.decision_id,
-          status: "FAILED",
-          result: "INVALID",
-          message: "canonical object hash mismatch",
-          error: "hash_mismatch"
+    if (body.canonical_deploy_aeo || body.canonical_object || body.canonical_payload) {
+      const canonicalAeo = parseJsonObject(body.canonical_deploy_aeo || body.canonical_object || body.canonical_payload)
+      const canonicalHash = await sha256Hex(canonicalizeJson(canonicalAeo))
+      if (canonicalHash !== body.validated_object_hash) {
+        return {
+          ok: false,
+          code: 409,
+          payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", message: "canonical object hash mismatch", error: "hash_mismatch" }
         }
       }
     }
 
-    const signedHash = typeof body.aeo_hash === "string" ? body.aeo_hash : null
-    if (signedHash && signedHash !== canonicalHash) {
-      return {
-        ok: false,
-        code: 409,
-        payload: {
-          validation_id: validationId,
-          decision_id: body.decision_id,
-          status: "FAILED",
-          result: "INVALID",
-          message: "signed hash mismatch",
-          error: "hash_mismatch"
-        }
-      }
-    }
-
-    const signatureValid = await verifyEd25519Signature(body.signature_value, canonicalHash, env.GOVERNED_SIGNER_PUBLIC_KEY)
+    const signatureValid = await verifyEd25519Signature(body.signature_b64, body.validated_object_hash, signerPublicKeyPem)
     if (!signatureValid) {
       return {
         ok: false,
@@ -1313,7 +1305,7 @@ async function validateAuthority(env: Env, body: any) {
           status: "FAILED",
           result: "INVALID",
           message: "invalid signature",
-          error: "signature_invalid"
+          error: "invalid_signature"
         }
       }
     }
@@ -1374,6 +1366,13 @@ async function validateAuthority(env: Env, body: any) {
           message: "validated_object_hash mismatch for decision_id.",
           error: "hash_mismatch"
         }
+      }
+    }
+    if (existingValidation.authority_id !== authority.authority_id) {
+      return {
+        ok: false,
+        code: 409,
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", error: "authority_mismatch", message: "validation record is not bound to this authority" }
       }
     }
 
@@ -2066,26 +2065,42 @@ export default {
       await saveAuthority(env, authority)
       const aeo = buildAeo(authority, targetFromAuthority(authority) as GithubDeployTarget)
       await saveAeo(env, aeo)
-      const hash = await sha256Hex(JSON.stringify(aeo))
+      const canonicalAeo = canonicalizeJson(aeo)
+      const hash = await sha256Hex(canonicalAeo)
       const nonce = await ensureInvocationAuthority(env, authority.decision_id, hash)
       await saveValidation(env, await buildValidation(aeo, authority))
-      const missing = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, environment: "production" })
-      const wrong = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: "bad", environment: "production" })
-      const good = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
+      const keyPair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
+      const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", keyPair.privateKey, new TextEncoder().encode(hash)))
+      const publicSpki = new Uint8Array(await crypto.subtle.exportKey("spki", keyPair.publicKey))
+      const signer_public_key = bytesToPem(publicSpki, "PUBLIC KEY")
+      const signature_b64 = btoa(String.fromCharCode(...signature))
+      const missing = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
+      const wrongSig = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, canonical_object: aeo, invocation_nonce: nonce, environment: "production", signature_b64: `${signature_b64}A`, signer_public_key })
+      const tamperedCanonical = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, canonical_object: { ...aeo, intent: "tampered" }, invocation_nonce: nonce, environment: "production", signature_b64, signer_public_key })
+      const wrongHash = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: "badbad", canonical_object: aeo, invocation_nonce: nonce, environment: "production", signature_b64, signer_public_key })
+      const wrong = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, canonical_object: aeo, invocation_nonce: "bad", environment: "production", signature_b64, signer_public_key })
+      const good = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, canonical_object: aeo, invocation_nonce: nonce, environment: "production", signature_b64, signer_public_key })
+      const replayValidation = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, canonical_object: aeo, invocation_nonce: nonce, environment: "production", signature_b64, signer_public_key })
       const authorityAfterValidate = await findAuthorityByDecisionId(env, authority.decision_id)
       const executeNoValidate = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: hash, invocation_nonce: "bad" }, { simulateSuccess: true })
       const executeGood = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: hash, invocation_nonce: nonce }, { simulateSuccess: true })
       const replayExecute = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: hash, invocation_nonce: nonce }, { simulateSuccess: true })
-      const wrongHash = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: "deadbeef", invocation_nonce: nonce }, { simulateSuccess: true })
+      const wrongHashExecute = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: "deadbeef", invocation_nonce: nonce }, { simulateSuccess: true })
+      const missingAuthority = await validateAuthority(env, { decision_id: crypto.randomUUID(), validated_object_hash: hash, canonical_object: aeo, invocation_nonce: nonce, environment: "production", signature_b64, signer_public_key })
       return jsonResponse({
-        validate_missing_nonce: missing.payload,
+        validate_missing_signature: missing.payload,
+        validate_tampered_signature: wrongSig.payload,
+        validate_tampered_canonical_object: tamperedCanonical.payload,
+        validate_wrong_hash: wrongHash.payload,
         validate_wrong_nonce: wrong.payload,
         validate_good: good.payload,
+        validate_replayed_nonce: replayValidation.payload,
+        validate_missing_authority: missingAuthority.payload,
         authority_status_after_validate: authorityAfterValidate?.status || null,
         execute_without_prior_valid_reservation_blocked: executeNoValidate.payload,
         execute_after_validate: executeGood.payload,
         replay_execute_blocked: replayExecute.payload,
-        wrong_hash_blocked: wrongHash.payload,
+        wrong_hash_blocked: wrongHashExecute.payload,
         proof_without_execution_blocked_hint: "Use POST /proof with unknown execution_id and expect 404"
       })
     }
