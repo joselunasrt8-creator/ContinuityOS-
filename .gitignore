@@ -5,3 +5,12 @@ node_modules/
 .codex/
 .wrangler/
 .wrangler/
+*.pem
+*.key
+signature.bin
+signature.b64
+aeo_hash.txt
+activation_receipt.json
+fulfillment_bundle.json
+deploy_aeo.json
+deploy_aeo.canonical.json

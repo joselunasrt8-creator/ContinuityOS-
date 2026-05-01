@@ -18,6 +18,7 @@ CANONICAL_JSON="deploy_aeo.canonical.json"
 HASH_FILE="aeo_hash.txt"
 SIG_BIN="signature.bin"
 SIG_B64="signature.b64"
+HASH_INPUT_FILE=".aeo_hash_input.txt"
 RECEIPT_JSON="activation_receipt.json"
 BUNDLE_JSON="fulfillment_bundle.json"
 
@@ -81,7 +82,7 @@ python3 <<PY
 import json
 with open("${DEPLOY_JSON}", "r", encoding="utf-8") as f:
     obj = json.load(f)
-canonical = json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+canonical = json.dumps(obj, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
 with open("${CANONICAL_JSON}", "w", encoding="utf-8") as f:
     f.write(canonical)
 PY
@@ -102,27 +103,32 @@ if [[ ! -f "$PRIVATE_KEY" || ! -f "$PUBLIC_KEY" ]]; then
   echo "🔑 Generating new Ed25519 keypair: $PRIVATE_KEY / $PUBLIC_KEY"
   openssl genpkey -algorithm Ed25519 -out "$PRIVATE_KEY"
   openssl pkey -in "$PRIVATE_KEY" -pubout -out "$PUBLIC_KEY"
+  chmod 600 "$PRIVATE_KEY"
+  chmod 644 "$PUBLIC_KEY"
 else
   echo "🔑 Using existing keypair: $PRIVATE_KEY"
 fi
 
 # 5. Sign the HASH string (matches validator model)
-printf '%s' "$AEO_HASH" | openssl pkeyutl -sign -rawin -inkey "$PRIVATE_KEY" -out "$SIG_BIN"
+printf '%s' "$AEO_HASH" > "$HASH_INPUT_FILE"
+openssl pkeyutl -sign -rawin -inkey "$PRIVATE_KEY" -in "$HASH_INPUT_FILE" -out "$SIG_BIN"
 openssl base64 -A -in "$SIG_BIN" -out "$SIG_B64"
 
 # 6. Auto-verify signature immediately
-if ! printf '%s' "$AEO_HASH" | \
-     openssl pkeyutl -verify -rawin -pubin -inkey "$PUBLIC_KEY" -sigfile "$SIG_BIN" >/dev/null 2>&1; then
+if ! openssl pkeyutl -verify -rawin -pubin -inkey "$PUBLIC_KEY" -in "$HASH_INPUT_FILE" -sigfile "$SIG_BIN" >/dev/null 2>&1; then
   echo "❌ Signature verification failed after signing!" >&2
+  rm -f "$HASH_INPUT_FILE"
   exit 1
 fi
 echo "✅ Signature verified successfully"
+rm -f "$HASH_INPUT_FILE"
 
 TIMESTAMP="$(timestamp_utc)"
 
 # 7. Generate receipt and fulfillment bundle
 python3 <<PY
 import json
+import hashlib
 from pathlib import Path
 
 decision_id = "${DECISION_ID}"
@@ -135,6 +141,7 @@ aeo_hash = Path("${HASH_FILE}").read_text(encoding="utf-8").strip()
 canonical = Path("${CANONICAL_JSON}").read_text(encoding="utf-8")
 signature_b64 = Path("${SIG_B64}").read_text(encoding="utf-8").strip()
 public_key = Path("${PUBLIC_KEY}").read_text(encoding="utf-8")
+public_key_fingerprint = hashlib.sha256(public_key.encode("utf-8")).hexdigest()
 
 receipt = {
     "activation_id": activation_id,
@@ -149,9 +156,14 @@ receipt = {
 }
 
 bundle = {
+    "decision_id": decision_id,
+    "timestamp": timestamp,
     "canonical_deploy_aeo": canonical,
     "aeo_hash": aeo_hash,
     "signature_value": signature_b64,
+    "signature_algorithm": algorithm,
+    "signer": signer,
+    "signer_public_key_reference": f"sha256:{public_key_fingerprint}",
     "signer_public_key": public_key,
     "activation_receipt": receipt
 }
@@ -173,7 +185,6 @@ echo "Generated files:"
 echo "  • $DEPLOY_JSON"
 echo "  • $CANONICAL_JSON"
 echo "  • $HASH_FILE"
-echo "  • $PRIVATE_KEY"
 echo "  • $PUBLIC_KEY"
 echo "  • $SIG_BIN"
 echo "  • $SIG_B64"
@@ -188,9 +199,11 @@ echo "  printf '%s' \"\$(cat aeo_hash.txt)\" | \\"
 echo "  openssl pkeyutl -verify -rawin -pubin -inkey $PUBLIC_KEY -sigfile $SIG_BIN"
 echo
 echo "Submit to validator (full chain):"
-echo "  curl -X POST http://localhost:3000/validate_bundle -H \"Content-Type: application/json\" --data @$BUNDLE_JSON"
-echo "  curl -X POST http://localhost:3000/validate -H \"Content-Type: application/json\" --data @$CANONICAL_JSON"
-echo "  curl -X POST http://localhost:3000/execute -H \"Content-Type: application/json\" --data @$CANONICAL_JSON"
-echo "  curl -X POST http://localhost:3000/proof-of-transfer -H \"Content-Type: application/json\" -d '{\"decision_id\":\"MS-RUNTIME-ACTIVATION-001\",\"proof_type\":\"deployment_receipt\",\"receipt\":{\"execution_id\":\"REPLACE_WITH_REAL_EXECUTION_ID\",\"object_hash\":\"$(cat "$HASH_FILE")\",\"environment_url\":\"https://api.mindshift-demo.production\"}}'"
+echo "  curl -X POST http://localhost:3000/validate -H \"Content-Type: application/json\" --data @$BUNDLE_JSON"
 echo
-echo "Your bundle is now cryptographically valid for the hash-based validator."
+echo "IMPORTANT:"
+echo "  • Generated bundle files are artifacts/proposals only."
+echo "  • They are NOT executable authority by themselves."
+echo "  • Runtime authority is granted only after governed boundary acceptance through /validate → /execute → /proof."
+echo
+echo "Bundle generation complete. Await runtime validation and governed execution."
