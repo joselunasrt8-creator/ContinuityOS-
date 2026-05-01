@@ -1,0 +1,49 @@
+name: mindshift-pr-validate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate-pr:
+    runs-on: ubuntu-latest
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+
+    steps:
+      - name: Validate PR through MindShift
+        run: |
+          set -euo pipefail
+
+          if [ -z "${WORKER_URL:-}" ]; then
+            echo "Missing MINDSHIFT_WORKER_URL"
+            exit 1
+          fi
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+
+          STATUS_CODE=$(curl -sS -o pr-validate.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/validate-pr" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ github.repository }}" \
+              --arg pr_number "${{ github.event.pull_request.number }}" \
+              --arg base_branch "${{ github.event.pull_request.base.ref }}" \
+              --arg head_branch "${{ github.event.pull_request.head.ref }}" \
+              --arg commit_sha "${{ github.event.pull_request.head.sha }}" \
+              '{repo: $repo, pr_number: $pr_number, base_branch: $base_branch, head_branch: $head_branch, commit_sha: $commit_sha}')")
+
+          RESULT=$(jq -r '.result // empty' pr-validate.json)
+          STATUS=$(jq -r '.status // empty' pr-validate.json)
+
+          if [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -gt 299 ] || [ "$RESULT" != "VALID" ] || [ "$STATUS" != "VALID" ]; then
+            echo "PR VALIDATION FAILED → MERGE BLOCKED"
+            cat pr-validate.json
+            exit 1
+          fi
+
+          echo "PR VALIDATION PASSED"
