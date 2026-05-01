@@ -646,7 +646,6 @@ async function executeGithubDeploy(
     throw new Error("Invalid workflow target: must be workflow file name")
   }
   const dispatchUrl = `https://api.github.com/repos/${dispatchRepo}/actions/workflows/${workflow}/dispatches`
-  console.log("Dispatch URL:", dispatchUrl)
 
   if (options?.simulateSuccess) {
     upstreamStatus = 204
@@ -720,7 +719,7 @@ async function findReplayExecutionByHash(env: Env, validatedObjectHash: string) 
 
 async function runExecuteFlow(
   env: Env,
-  body: { decision_id?: string; intent?: string; target?: any; validated_object_hash?: string },
+  body: { decision_id?: string; intent?: string; target?: any; validated_object_hash?: string; invocation_nonce?: string },
   options?: { simulateSuccess?: boolean }
 ) {
   if (body.validated_object_hash && body.decision_id) {

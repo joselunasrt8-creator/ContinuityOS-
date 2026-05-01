@@ -58,8 +58,7 @@ jobs:
 
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
-      - name: VALIDATE — Exact object must be approved
-        id: validate_gate
+      - name: VALIDATE — Fail closed unless exact VALID + exact hash + nonce consumed
         run: |
           set -euo pipefail
 
@@ -82,42 +81,82 @@ jobs:
           STATUS=$(jq -r '.status // empty' validate.json)
           RESULT=$(jq -r '.result // empty' validate.json)
           RETURNED_HASH=$(jq -r '.validated_object_hash // empty' validate.json)
+          RETURNED_NONCE=$(jq -r '.invocation_nonce // empty' validate.json)
 
-          if [ "$STATUS" != "VALID" ] || [ "$RESULT" != "VALID" ]; then
+          if [ "$RESULT" != "VALID" ] || [ "$STATUS" != "VALID" ]; then
             echo "NULL — Validation failed"
-            cat validate.json
             exit 1
           fi
 
-          if [ -z "$RETURNED_HASH" ]; then
-            echo "NULL — Missing validated_object_hash in response"
+          if [ -z "$RETURNED_HASH" ] || [ "$RETURNED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — Hash mismatch"
             exit 1
           fi
 
-          if [ "$RETURNED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
-            echo "NULL — Hash mismatch (object drift detected)"
+          if [ -z "$RETURNED_NONCE" ] || [ "$RETURNED_NONCE" != "$INVOCATION_NONCE" ]; then
+            echo "NULL — Invocation nonce not accepted/consumed"
             exit 1
           fi
 
-          echo "VALID — Exact object confirmed"
-
-      - name: EXECUTE — Only exact validated object allowed
+      - name: EXECUTE — Require exact validated object hash
         run: |
           set -euo pipefail
 
-          echo "Executing governed deploy..."
-          # REAL DEPLOY COMMAND HERE
-          # Example:
-          # npm run deploy
+          RESPONSE_CODE=$(curl -sS -o execute.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/execute" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg intent "deploy_production" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash}')")
 
-      - name: PROOF — Capture execution evidence
-        if: ${{ always() }}
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Execute endpoint error"
+            exit 1
+          fi
+
+          EXEC_STATUS=$(jq -r '.status // empty' execute.json)
+          EXECUTION_ID=$(jq -r '.execution_id // empty' execute.json)
+
+          if [ "$EXEC_STATUS" != "VALID" ] || [ -z "$EXECUTION_ID" ]; then
+            echo "NULL — Execution failed"
+            exit 1
+          fi
+
+          echo "EXECUTION_ID=$EXECUTION_ID" >> "$GITHUB_ENV"
+
+      - name: PROOF — Required for production completion
         run: |
           set -euo pipefail
 
-          echo "Proof-of-Transfer"
-          echo "run_id=${{ github.run_id }}"
-          echo "commit_sha=${{ github.sha }}"
+          RESPONSE_CODE=$(curl -sS -o proof.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/proof" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg execution_id "$EXECUTION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg surface "github_actions" \
+              --arg run_id "${{ github.run_id }}" \
+              --arg commit_sha "${{ github.sha }}" \
+              --arg workflow "governed-deploy.yml" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              '{execution_id: $execution_id, decision_id: $decision_id, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment}')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Proof endpoint error"
+            exit 1
+          fi
+
+          PROOF_STATUS=$(jq -r '.status // empty' proof.json)
+          PROOF_ID=$(jq -r '.proof.proof_id // .proof_id // empty' proof.json)
+
+          if [ "$PROOF_STATUS" != "VALID" ] || [ -z "$PROOF_ID" ]; then
+            echo "NULL — Missing required proof"
+            exit 1
+          fi
 
       - name: Upload artifacts
         if: ${{ always() }}
@@ -126,3 +165,5 @@ jobs:
           name: governed-deploy-records
           path: |
             validate.json
+            execute.json
+            proof.json

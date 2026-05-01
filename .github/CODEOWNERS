@@ -1,0 +1,2 @@
+# Require owned review for workflow changes.
+.github/workflows/** @joselunasrt8-creator
