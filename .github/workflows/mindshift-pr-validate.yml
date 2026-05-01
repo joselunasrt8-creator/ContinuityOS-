@@ -19,7 +19,7 @@ jobs:
       API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
 
     steps:
-      - name: HARD FAIL — Missing secrets
+      - name: HARD FAIL — Missing secrets and context
         run: |
           set -euo pipefail
 
@@ -36,18 +36,46 @@ jobs:
             exit 1
           fi
 
+          PR_NUMBER='${{ github.event.pull_request.number }}'
+          COMMIT_SHA='${{ github.event.pull_request.head.sha }}'
+          BASE_BRANCH='${{ github.event.pull_request.base.ref }}'
+          HEAD_BRANCH='${{ github.event.pull_request.head.ref }}'
+          REPO='${{ github.repository }}'
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "NULL — Missing required pull_request.number context"
+            exit 1
+          fi
+
+          if [ -z "$COMMIT_SHA" ]; then
+            echo "NULL — Missing required pull_request.head.sha context"
+            exit 1
+          fi
+
+          for field in REPO PR_NUMBER BASE_BRANCH HEAD_BRANCH COMMIT_SHA; do
+            if [ -z "${!field}" ]; then
+              echo "NULL — Empty required payload field: $field"
+              exit 1
+            fi
+          done
+
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+          echo "REPO=$REPO" >> "$GITHUB_ENV"
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          echo "BASE_BRANCH=$BASE_BRANCH" >> "$GITHUB_ENV"
+          echo "HEAD_BRANCH=$HEAD_BRANCH" >> "$GITHUB_ENV"
+          echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
 
       - name: VALIDATE PR — Fail closed
         run: |
           set -euo pipefail
 
           PAYLOAD=$(jq -n \
-            --arg repo "${{ github.repository }}" \
-            --arg pr_number "${{ github.event.pull_request.number }}" \
-            --arg base_branch "${{ github.event.pull_request.base.ref }}" \
-            --arg head_branch "${{ github.event.pull_request.head.ref }}" \
-            --arg commit_sha "${{ github.event.pull_request.head.sha }}" \
+            --arg repo "$REPO" \
+            --arg pr_number "$PR_NUMBER" \
+            --arg base_branch "$BASE_BRANCH" \
+            --arg head_branch "$HEAD_BRANCH" \
+            --arg commit_sha "$COMMIT_SHA" \
             '{repo: $repo, pr_number: $pr_number, base_branch: $base_branch, head_branch: $head_branch, commit_sha: $commit_sha}')
 
           RESPONSE_CODE=$(curl -sS -o pr-validate.json -w "%{http_code}" \
@@ -55,6 +83,9 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
             -d "$PAYLOAD")
+
+          echo "PR validation response (HTTP $RESPONSE_CODE):"
+          cat pr-validate.json
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — PR validation endpoint error"
@@ -66,7 +97,6 @@ jobs:
 
           if [ "$STATUS" != "VALID" ] || [ "$RESULT" != "VALID" ]; then
             echo "NULL — PR validation failed"
-            cat pr-validate.json
             exit 1
           fi
 
