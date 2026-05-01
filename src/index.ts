@@ -365,6 +365,102 @@ async function findLatestValidValidationByDecisionId(env: Env, decisionId: strin
     .first<any>()
 }
 
+async function findPrValidationAuthority(env: Env) {
+  return env.DB.prepare(
+    `SELECT * FROM authority_registry
+     WHERE intent = 'merge_pull_request'
+       AND UPPER(status) = 'ACTIVE'
+     ORDER BY created_at DESC
+     LIMIT 1`
+  ).first<any>()
+}
+
+async function hasPrExecutionReplay(env: Env, payload: {
+  repo: string
+  pr_number: string
+  commit_sha: string
+}) {
+  const replay = await env.DB.prepare(
+    `SELECT execution_id FROM execution_registry
+     WHERE json_extract(execution_event, '$.repo') = ?1
+       AND json_extract(execution_event, '$.pr_number') = ?2
+       AND json_extract(execution_event, '$.commit_sha') = ?3
+     ORDER BY created_at DESC
+     LIMIT 1`
+  )
+    .bind(payload.repo, payload.pr_number, payload.commit_sha)
+    .first<{ execution_id: string }>()
+
+  return Boolean(replay?.execution_id)
+}
+
+async function validatePrAgainstAuthority(
+  env: Env,
+  input: {
+    repo?: unknown
+    pr_number?: unknown
+    base_branch?: unknown
+    head_branch?: unknown
+    commit_sha?: unknown
+  }
+) {
+  const invalid = (message: string, code = 200) =>
+    ({ code, payload: { status: "FAILED", result: "INVALID", message } })
+
+  const repo = String(input.repo || "")
+  const pr_number = String(input.pr_number || "")
+  const base_branch = String(input.base_branch || "")
+  const head_branch = String(input.head_branch || "")
+  const commit_sha = String(input.commit_sha || "")
+
+  if (!repo || !pr_number || !base_branch || !head_branch || !commit_sha) {
+    return invalid("missing required fields")
+  }
+  if (base_branch !== "main") {
+    return invalid("base_branch must be main")
+  }
+
+  const expectedRepo = `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`
+  if (repo !== expectedRepo) {
+    return invalid("repo mismatch")
+  }
+
+  const authority = await findPrValidationAuthority(env)
+  if (!authority) {
+    return invalid("authority not found")
+  }
+  if (String(authority.status || "").toUpperCase() !== "ACTIVE") {
+    return invalid("authority not active")
+  }
+  if (authority.intent !== "merge_pull_request") {
+    return invalid("authority intent mismatch")
+  }
+
+  const constraints = ensureDeployConstraints(parseJsonObject(authority.constraints))
+  const scope = parseJsonObject(authority.scope)
+  const authorityBoundObjectMatches =
+    constraints.repo === repo &&
+    constraints.branch === base_branch &&
+    (typeof scope.pr_number === "undefined" || String(scope.pr_number) === pr_number)
+
+  if (!authorityBoundObjectMatches) {
+    return invalid("authority-bound object mismatch")
+  }
+
+  const replay = await hasPrExecutionReplay(env, { repo, pr_number, commit_sha })
+  if (replay) {
+    return invalid("replay detected")
+  }
+
+  return {
+    code: 200,
+    payload: {
+      status: "VALID",
+      result: "VALID"
+    }
+  }
+}
+
 async function findValidationByHashAndDecisionId(env: Env, hash: string, decisionId: string) {
   return env.DB.prepare(
     `SELECT * FROM validation_registry
@@ -1637,25 +1733,10 @@ export default {
     if (route("/validate-pr") && request.method === "POST") {
       const body = await readJson(request)
       if (!body || !isObject(body)) {
-        return jsonResponse({ status: "NULL", result: "NULL", reasons: ["Invalid JSON body"] }, 400)
+        return jsonResponse({ status: "FAILED", result: "INVALID", message: "invalid JSON body" }, 400)
       }
-
-      const repo = String(body.repo || "")
-      const branch = String(body.branch || "")
-      const headSha = String(body.head_sha || "")
-      const prNumber = String(body.pr_number || "")
-
-      const reasons: string[] = []
-      if (repo !== "joselunasrt8-creator/mindshift-demo") reasons.push("repo must be joselunasrt8-creator/mindshift-demo")
-      if (!branch) reasons.push("branch is required")
-      if (!headSha) reasons.push("head_sha is required")
-      if (!prNumber) reasons.push("pr_number is required")
-
-      if (reasons.length === 0) {
-        return jsonResponse({ status: "VALID", result: "VALID" })
-      }
-
-      return jsonResponse({ status: "NULL", result: "NULL", reasons }, 200)
+      const result = await validatePrAgainstAuthority(env, body)
+      return jsonResponse(result.payload, result.code)
     }
 
     if (route("/validate") && request.method === "POST") {
