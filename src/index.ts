@@ -475,13 +475,30 @@ async function findValidationByHashAndDecisionId(env: Env, hash: string, decisio
 }
 
 function isAuthorityUsableForExecution(authorityStatus: string | null | undefined) {
-  return ["ACTIVE"].includes((authorityStatus || "").toUpperCase())
+  return ["ACTIVE", "VALIDATED", "RESERVED"].includes((authorityStatus || "").toUpperCase())
 }
 
 async function consumeAuthority(env: Env, decisionId: string) {
   await env.DB.prepare("UPDATE authority_registry SET status = ?1 WHERE decision_id = ?2")
     .bind("CONSUMED", decisionId)
     .run()
+}
+
+async function transitionAuthorityToValidatedIfActive(env: Env, decisionId: string) {
+  await env.DB.prepare(
+    "UPDATE authority_registry SET status = 'VALIDATED' WHERE decision_id = ?1 AND UPPER(status) = 'ACTIVE'"
+  )
+    .bind(decisionId)
+    .run()
+}
+
+async function transitionAuthorityToReservedIfUsable(env: Env, decisionId: string) {
+  const result = await env.DB.prepare(
+    "UPDATE authority_registry SET status = 'RESERVED' WHERE decision_id = ?1 AND UPPER(status) IN ('ACTIVE','VALIDATED','RESERVED')"
+  )
+    .bind(decisionId)
+    .run()
+  return Number(result.meta?.changes || 0) > 0
 }
 
 async function consumeAuthorityIfActive(env: Env, decisionId: string) {
@@ -720,7 +737,7 @@ async function findReplayExecutionByHash(env: Env, validatedObjectHash: string) 
 
 async function runExecuteFlow(
   env: Env,
-  body: { decision_id?: string; intent?: string; target?: any; validated_object_hash?: string },
+  body: { decision_id?: string; intent?: string; target?: any; validated_object_hash?: string; invocation_nonce?: string },
   options?: { simulateSuccess?: boolean }
 ) {
   if (body.validated_object_hash && body.decision_id) {
@@ -768,6 +785,27 @@ async function runExecuteFlow(
       }
     }
 
+    if (!body.invocation_nonce) {
+      return {
+        code: 400,
+        payload: { status: "FAILED", result: "INVALID", error: "missing invocation_nonce" }
+      }
+    }
+
+    const invocation = await findInvocationAuthority(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
+    if (!invocation) {
+      return {
+        code: 409,
+        payload: { status: "FAILED", result: "INVALID", error: "nonce_mismatch" }
+      }
+    }
+    if (String(invocation.status || "").toUpperCase() !== "RESERVED") {
+      return {
+        code: 409,
+        payload: { status: "FAILED", result: "INVALID", error: "nonce_not_reserved_or_replayed" }
+      }
+    }
+
     const authorityTarget = targetFromAuthority(authority)
     if (!authorityTarget) {
       return {
@@ -804,8 +842,11 @@ async function runExecuteFlow(
     )
 
     if (execution.status === "EXECUTED") {
+      const consumedNonce = await consumeInvocationAuthority(env, body.decision_id, body.validated_object_hash!, body.invocation_nonce)
+      if (!consumedNonce) {
+        return { code: 409, payload: { status: "FAILED", result: "INVALID", error: "replay_detected" } }
+      }
       await consumeAuthority(env, body.decision_id)
-      await consumeInvocationAuthority(env, body.decision_id, body.validated_object_hash!, body.invocation_nonce || "")
       return {
         code: 200,
         payload: {
@@ -850,7 +891,7 @@ async function runExecuteFlow(
     }
   }
 
-  if (!validation.ok || !validation.authority) {
+    if (!validation.ok || !validation.authority) {
     return {
       code: validation.code,
       payload: {
@@ -1229,8 +1270,12 @@ async function validateAuthority(env: Env, body: any) {
       }
     }
 
-    const consumed = await consumeInvocationAuthority(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
-    if (!consumed) {
+    const reserved = await env.DB.prepare(`UPDATE invocation_registry
+      SET status = 'RESERVED'
+      WHERE decision_id = ?1 AND validated_object_hash = ?2 AND invocation_nonce = ?3 AND UPPER(status) = 'ACTIVE'`)
+      .bind(body.decision_id, body.validated_object_hash, body.invocation_nonce)
+      .run()
+    if (Number(reserved.meta?.changes || 0) <= 0) {
       return {
         ok: false,
         code: 409,
@@ -1238,10 +1283,7 @@ async function validateAuthority(env: Env, body: any) {
       }
     }
 
-    const authorityConstraints = ensureDeployConstraints(parseJsonObject(authority.constraints))
-    if (authorityConstraints.max_executions === 1) {
-      await consumeAuthority(env, body.decision_id)
-    }
+    await transitionAuthorityToReservedIfUsable(env, body.decision_id)
 
     return {
       ok: true,
@@ -1250,7 +1292,7 @@ async function validateAuthority(env: Env, body: any) {
         ...existingValidation,
         status: "VALID",
         result: "VALID",
-        message: "Exact-object validation succeeded and invocation nonce consumed.",
+        message: "Exact-object validation succeeded and invocation nonce reserved.",
         invocation_nonce: body.invocation_nonce
       },
       authority
@@ -1262,6 +1304,7 @@ async function validateAuthority(env: Env, body: any) {
 
   const validation = await buildValidation(aeo, authority)
   await saveValidation(env, validation)
+  await transitionAuthorityToValidatedIfActive(env, body.decision_id)
 
   return {
     ok: true,
@@ -1885,9 +1928,22 @@ export default {
       const missing = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, environment: "production" })
       const wrong = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: "bad", environment: "production" })
       const good = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
-      const replay = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: hash, invocation_nonce: nonce, environment: "production" })
-      const wrongHash = await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: "deadbeef", invocation_nonce: nonce, environment: "production" })
-      return jsonResponse({ missing: missing.payload, wrong: wrong.payload, good: good.payload, replay: replay.payload, wrongHash: wrongHash.payload })
+      const authorityAfterValidate = await findAuthorityByDecisionId(env, authority.decision_id)
+      const executeNoValidate = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: hash, invocation_nonce: "bad" }, { simulateSuccess: true })
+      const executeGood = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: hash, invocation_nonce: nonce }, { simulateSuccess: true })
+      const replayExecute = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: hash, invocation_nonce: nonce }, { simulateSuccess: true })
+      const wrongHash = await runExecuteFlow(env, { decision_id: authority.decision_id, intent: authority.intent, validated_object_hash: "deadbeef", invocation_nonce: nonce }, { simulateSuccess: true })
+      return jsonResponse({
+        validate_missing_nonce: missing.payload,
+        validate_wrong_nonce: wrong.payload,
+        validate_good: good.payload,
+        authority_status_after_validate: authorityAfterValidate?.status || null,
+        execute_without_prior_valid_reservation_blocked: executeNoValidate.payload,
+        execute_after_validate: executeGood.payload,
+        replay_execute_blocked: replayExecute.payload,
+        wrong_hash_blocked: wrongHash.payload,
+        proof_without_execution_blocked_hint: "Use POST /proof with unknown execution_id and expect 404"
+      })
     }
 
 
@@ -1986,3 +2042,23 @@ export default {
     }
   }
 }
+    if (!body.invocation_nonce) {
+      return {
+        code: 400,
+        payload: { status: "FAILED", result: "INVALID", error: "missing invocation_nonce" }
+      }
+    }
+
+    const invocation = await findInvocationAuthority(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
+    if (!invocation) {
+      return {
+        code: 409,
+        payload: { status: "FAILED", result: "INVALID", error: "nonce_mismatch" }
+      }
+    }
+    if (String(invocation.status || "").toUpperCase() !== "RESERVED") {
+      return {
+        code: 409,
+        payload: { status: "FAILED", result: "INVALID", error: "nonce_not_reserved_or_replayed" }
+      }
+    }
