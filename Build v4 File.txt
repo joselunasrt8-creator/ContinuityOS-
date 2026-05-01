@@ -1,0 +1,225 @@
+MODE B — STRUCTURED ARTIFACT  
+Artifact Type: Tool Stack — PDF-Ready Export  
+Layer: Infrastructure → Runtime → Execution Boundary  
+Status: Non-Operative  
+
+---
+
+# 📄 MindShift — Tool Stack (v4 Runtime)
+
+---
+
+## 1. CORE STACK (CURRENT)
+
+### Execution Boundary Runtime
+- **Cloudflare Workers**  
+  - hosted execution boundary  
+  - exposes:
+    - `/authority`
+    - `/compile`
+    - `/validate`
+    - `/execute`
+    - `/proof`
+
+Role:  
+non-bypassable control point before reality change  
+
+---
+
+### Language + Runtime
+- **TypeScript**
+
+Role:  
+single unified language across runtime logic, validation, adapters, and APIs  
+
+---
+
+### Deployment Layer
+- **Wrangler CLI**
+
+Functions:
+- local dev  
+- deploy  
+- environment + secrets  
+- migrations  
+
+---
+
+### Persistence Layer
+- **Cloudflare D1 (SQLite)**  
+- or **Durable Objects**
+
+Stores:
+- authority registry  
+- AEO state  
+- execution records  
+- proof-of-transfer  
+
+Role:  
+source of truth + replay prevention  
+
+---
+
+### Security Layer
+- **Cloudflare Secrets**
+
+Examples:
+- signing keys  
+- API tokens  
+
+Role:  
+authority integrity + external system authentication  
+
+---
+
+## 2. EXECUTION SURFACES
+
+### Primary Surface (Wedge)
+- **entity["company","GitHub","software development platform"] Actions**
+
+Used for:
+- deploy execution  
+- CI/CD control  
+
+Proof:
+- run ID  
+- commit SHA  
+
+---
+
+### Secondary Surface
+- Webhooks (generic HTTP execution)
+
+Used for:
+- integrations  
+- first live execution proof  
+
+---
+
+### Optional Expansion
+- Stripe (payments)
+- database mutations
+- queue/job systems
+
+---
+
+## 3. CORE RUNTIME SERVICES
+
+Minimum required system:
+
+```text id="nrev6n"
+Authority Registry
+↓
+AEO Compiler
+↓
+Validator API
+↓
+Execution Gateway
+↓
+Proof System
+```
+
+These map directly to the canonical runtime:
+
+```text id="pmnpca"
+Authority → AEO → Ω Validator → Conduit → Reality → Proof-of-Transfer
+``` fileciteturn2file30  
+
+---
+
+## 4. API LAYER (LIVE BOUNDARY)
+
+Required endpoints:
+
+```text
+POST /authority
+POST /compile
+POST /validate
+POST /execute
+POST /proof
+```
+
+This is the deployable runtime interface fileciteturn2file22  
+
+---
+
+## 5. OPTIONAL EXTENSIONS (NEXT LAYERS)
+
+### Graph + Memory Layer
+- **entity["company","Neo4j","graph database company"]**
+
+Stores:
+- AEO history  
+- proof lineage  
+- execution patterns  
+
+---
+
+### Policy + Trust Layer
+- trust tiers  
+- permission classes (P0–P3)  
+- pre-AEO filtering  
+
+---
+
+### Proof → Learning Loop
+- Learning Record Objects (LRO)  
+- pattern extraction  
+- AEO improvement over time  
+
+---
+
+## 6. CANONICAL FLOW (STACK IN MOTION)
+
+```text id="e89trc"
+User / Agent
+↓
+Cloudflare Worker (Execution Boundary)
+↓
+Authority Registry
+↓
+AEO Compiler
+↓
+Ω Validator
+↓
+Execution Gateway
+↓
+External Surface (GitHub / Webhook)
+↓
+Proof-of-Transfer
+↓
+Registry / Storage
+```
+
+---
+
+## 7. STACK COMPRESSION
+
+```text id="v20ggz"
+Cloudflare Workers → execution boundary
+D1 / Durable Objects → state + proof
+TypeScript → runtime logic
+Wrangler → deployment
+GitHub → first execution surface
+Webhooks → generic execution surface
+```
+
+---
+
+## 8. FINAL STATEMENT
+
+```text id="x092s6"
+This stack is a pre-execution control plane that determines whether actions can exist before they reach reality
+```
+
+---
+
+## 9. EXPORT INSTRUCTIONS
+
+To generate PDF:
+
+1. Copy this document  
+2. Paste into Google Docs / Notion  
+3. File → Download → PDF  
+
+---
