@@ -19,6 +19,14 @@ jobs:
       MINDSHIFT_API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
 
     steps:
+      - name: HARD FAIL — Production input explicitly rejected
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event.pull_request.base.ref }}" = "production" ] || [ "${{ github.event.pull_request.head.ref }}" = "production" ]; then
+            echo "NULL — Production is only allowed via governed-deploy.yml"
+            exit 1
+          fi
       - name: HARD FAIL — Missing secrets and context
         env:
           EVENT_NAME: ${{ github.event_name }}
