@@ -1129,8 +1129,22 @@ async function validateAuthority(env: Env, body: any) {
       return {
         ok: false,
         code: 409,
-        payload: { validation_id: validationId, decision_id: body.decision_id, status: "FAILED", result: "INVALID", message: "replay detected" }
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "NULL", result: "INVALID", message: "replay detected" }
       }
+    }
+
+    const consumed = await consumeInvocationAuthority(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
+    if (!consumed) {
+      return {
+        ok: false,
+        code: 409,
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "NULL", result: "INVALID", message: "replay detected" }
+      }
+    }
+
+    const authorityConstraints = ensureDeployConstraints(parseJsonObject(authority.constraints))
+    if (authorityConstraints.max_executions === 1) {
+      await consumeAuthority(env, body.decision_id)
     }
 
     return {
@@ -1140,7 +1154,7 @@ async function validateAuthority(env: Env, body: any) {
         ...existingValidation,
         status: "VALID",
         result: "VALID",
-        message: "Exact-object validation succeeded for ACTIVE authority.",
+        message: "Exact-object validation succeeded and invocation nonce consumed.",
         invocation_nonce: body.invocation_nonce
       },
       authority
