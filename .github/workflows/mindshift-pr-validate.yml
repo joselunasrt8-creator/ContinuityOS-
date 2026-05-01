@@ -20,16 +20,28 @@ jobs:
 
     steps:
       - name: HARD FAIL — Missing secrets and context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
 
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "NULL — Unsupported event: $EVENT_NAME"
+            exit 1
+          fi
+
           if [ -z "${MINDSHIFT_WORKER_URL:-}" ]; then
-            echo "NULL — Missing required secret: MINDSHIFT_WORKER_URL"
+            echo "NULL — Missing required secret MINDSHIFT_WORKER_URL. Configure it in repository or organization Actions secrets."
             exit 1
           fi
 
           if [ -z "${MINDSHIFT_API_KEY:-}" ]; then
-            echo "NULL — Missing required secret: MINDSHIFT_API_KEY"
+            echo "NULL — Missing required secret MINDSHIFT_API_KEY. Configure it in repository or organization Actions secrets."
             exit 1
           fi
 
@@ -38,12 +50,6 @@ jobs:
             echo "NULL — Invalid MINDSHIFT_WORKER_URL"
             exit 1
           fi
-
-          PR_NUMBER='${{ github.event.pull_request.number }}'
-          COMMIT_SHA='${{ github.event.pull_request.head.sha }}'
-          BASE_BRANCH='${{ github.event.pull_request.base.ref }}'
-          HEAD_BRANCH='${{ github.event.pull_request.head.ref }}'
-          REPO='${{ github.repository }}'
 
           if [ -z "$PR_NUMBER" ]; then
             echo "NULL — Missing required pull_request.number context"
