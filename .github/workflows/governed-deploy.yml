@@ -58,7 +58,7 @@ jobs:
 
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
-      - name: VALIDATE — Fail closed unless exact VALID + exact hash + nonce consumed
+      - name: VALIDATE — Fail closed unless exact VALID + exact hash + nonce reserved
         run: |
           set -euo pipefail
 
@@ -94,7 +94,7 @@ jobs:
           fi
 
           if [ -z "$RETURNED_NONCE" ] || [ "$RETURNED_NONCE" != "$INVOCATION_NONCE" ]; then
-            echo "NULL — Invocation nonce not accepted/consumed"
+            echo "NULL — Invocation nonce not accepted/reserved"
             exit 1
           fi
 
@@ -110,7 +110,8 @@ jobs:
               --arg decision_id "$DECISION_ID" \
               --arg intent "deploy_production" \
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
-              '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash}')")
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Execute endpoint error"

@@ -318,11 +318,21 @@ async function findInvocationAuthority(env: Env, decisionId: string, validatedOb
     .first<any>()
 }
 
+async function transitionInvocationReservedToExecuting(env: Env, decisionId: string, validatedObjectHash: string, invocationNonce: string) {
+  await ensureInvocationRegistry(env)
+  const result = await env.DB.prepare(`UPDATE invocation_registry
+    SET status = 'EXECUTING'
+    WHERE decision_id = ?1 AND validated_object_hash = ?2 AND invocation_nonce = ?3 AND UPPER(status) = 'RESERVED'`)
+    .bind(decisionId, validatedObjectHash, invocationNonce)
+    .run()
+  return Number(result.meta?.changes || 0) > 0
+}
+
 async function consumeInvocationAuthority(env: Env, decisionId: string, validatedObjectHash: string, invocationNonce: string) {
   await ensureInvocationRegistry(env)
   const result = await env.DB.prepare(`UPDATE invocation_registry
     SET status = 'CONSUMED', consumed_at = ?4
-    WHERE decision_id = ?1 AND validated_object_hash = ?2 AND invocation_nonce = ?3 AND UPPER(status) = 'ACTIVE'`)
+    WHERE decision_id = ?1 AND validated_object_hash = ?2 AND invocation_nonce = ?3 AND UPPER(status) = 'EXECUTING'`)
     .bind(decisionId, validatedObjectHash, invocationNonce, new Date().toISOString())
     .run()
   return Number(result.meta?.changes || 0) > 0
@@ -739,6 +749,14 @@ async function runExecuteFlow(
   body: { decision_id?: string; intent?: string; target?: any; validated_object_hash?: string; invocation_nonce?: string },
   options?: { simulateSuccess?: boolean }
 ) {
+  if (!body.decision_id || !body.validated_object_hash || !body.invocation_nonce) {
+    return {
+      code: 400,
+      payload: { status: "FAILED", result: "INVALID", error: "missing decision_id, validated_object_hash, or invocation_nonce" }
+    }
+  }
+
+
   if (body.validated_object_hash && body.decision_id) {
     const replayExecution = await findReplayExecutionByHash(env, body.validated_object_hash)
     if (replayExecution) {
@@ -832,6 +850,11 @@ async function runExecuteFlow(
       }
     }
 
+    const claimed = await transitionInvocationReservedToExecuting(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
+    if (!claimed) {
+      return { code: 409, payload: { status: "FAILED", result: "INVALID", error: "nonce_not_reserved_or_replayed" } }
+    }
+
     const execution = await executeGithubDeploy(
       env,
       authority,
@@ -845,7 +868,6 @@ async function runExecuteFlow(
       if (!consumedNonce) {
         return { code: 409, payload: { status: "FAILED", result: "INVALID", error: "replay_detected" } }
       }
-      await consumeAuthority(env, body.decision_id)
       return {
         code: 200,
         payload: {
@@ -991,9 +1013,9 @@ async function runExecuteFlow(
   )
 
   if (execution.status === "EXECUTED") {
-    await consumeAuthority(env, execution.decision_id)
-    if (body.invocation_nonce) {
-      await consumeInvocationAuthority(env, body.decision_id || execution.decision_id, validation.payload.validated_object_hash, body.invocation_nonce)
+    const consumedNonce = await consumeInvocationAuthority(env, body.decision_id || execution.decision_id, validation.payload.validated_object_hash, body.invocation_nonce)
+    if (!consumedNonce) {
+      return { code: 409, payload: { status: "FAILED", result: "INVALID", error: "nonce_consume_failed" } }
     }
     return {
       code: 200,
@@ -1047,7 +1069,7 @@ function buildProof(body: any, execution: any) {
     workflow: body.workflow || null,
     environment: body.environment || null,
     timestamp: new Date().toISOString(),
-    status: "RECORDED",
+    status: "PROOF_RECORDED",
     execution_status: execution.status
   }
 }
@@ -1336,12 +1358,15 @@ async function runGithubProofTest(env: Env) {
     return jsonResponse({ status: "FAILED", stage: "validate", details: validation.payload }, validation.code)
   }
 
+  const invocationNonce = await createInvocationAuthority(env, authority.decision_id, validation.payload.validated_object_hash)
+  await validateAuthority(env, { decision_id: authority.decision_id, validated_object_hash: validation.payload.validated_object_hash, invocation_nonce: invocationNonce, environment: "production" })
   const executeResult = await runExecuteFlow(
     env,
     {
       decision_id: authority.decision_id,
       intent: authority.intent,
-      validated_object_hash: validation.payload.validated_object_hash
+      validated_object_hash: validation.payload.validated_object_hash,
+      invocation_nonce: invocationNonce
     },
     { simulateSuccess: true }
   )
@@ -2041,23 +2066,3 @@ export default {
     }
   }
 }
-    if (!body.invocation_nonce) {
-      return {
-        code: 400,
-        payload: { status: "FAILED", result: "INVALID", error: "missing invocation_nonce" }
-      }
-    }
-
-    const invocation = await findInvocationAuthority(env, body.decision_id, body.validated_object_hash, body.invocation_nonce)
-    if (!invocation) {
-      return {
-        code: 409,
-        payload: { status: "FAILED", result: "INVALID", error: "nonce_mismatch" }
-      }
-    }
-    if (String(invocation.status || "").toUpperCase() !== "RESERVED") {
-      return {
-        code: 409,
-        payload: { status: "FAILED", result: "INVALID", error: "nonce_not_reserved_or_replayed" }
-      }
-    }

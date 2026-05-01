@@ -86,8 +86,7 @@ app.post('/validate', (req, res) => {
   if (signature !== computed) {
     return res.json({
       status: "NULL",
-      reason: "Invalid signature",
-      expected: computed
+      reason: "Invalid signature"
     });
   }
 
