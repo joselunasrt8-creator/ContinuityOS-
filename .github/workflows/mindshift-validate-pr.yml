@@ -74,7 +74,7 @@ jobs:
           echo "HEAD_BRANCH=$HEAD_BRANCH" >> "$GITHUB_ENV"
           echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
 
-      - name: ENSURE PR AUTHORITY — Fail closed
+      - name: ENSURE PR AUTHORITY — Fail closed (POST /authority)
         run: |
           set -euo pipefail
 
@@ -110,7 +110,7 @@ jobs:
             exit 1
           fi
 
-      - name: VALIDATE PR — Fail closed
+      - name: VALIDATE PR — Fail closed (POST /validate-pr)
         run: |
           set -euo pipefail
 
