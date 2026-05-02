@@ -27,6 +27,7 @@ jobs:
             echo "NULL — Production is only allowed via governed-deploy.yml"
             exit 1
           fi
+
       - name: HARD FAIL — Missing secrets and context
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -59,16 +60,6 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$PR_NUMBER" ]; then
-            echo "NULL — Missing required pull_request.number context"
-            exit 1
-          fi
-
-          if [ -z "$COMMIT_SHA" ]; then
-            echo "NULL — Missing required pull_request.head.sha context"
-            exit 1
-          fi
-
           for field in REPO PR_NUMBER BASE_BRANCH HEAD_BRANCH COMMIT_SHA; do
             if [ -z "${!field}" ]; then
               echo "NULL — Empty required payload field: $field"
@@ -84,7 +75,6 @@ jobs:
           echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
 
       - name: ENSURE PR AUTHORITY — Fail closed
-      - name: AUTHORITY CHECK — Merge PR intent (fail closed)
         run: |
           set -euo pipefail
 
@@ -94,13 +84,10 @@ jobs:
             --arg branch "$BASE_BRANCH" \
             '{owner: "github_workflow", intent: "merge_pull_request", scope: {pr_number: $pr_number}, constraints: {repo: $repo, branch: $branch, workflow: "governed-deploy.yml", max_executions: 1}}')
 
-          AUTHORITY_RESPONSE_CODE=$(curl -sS -o pr-authority.json -w "%{http_code}" \
-            '{owner:"github_workflow", intent:"merge_pull_request", scope:{pr_number:$pr_number}, constraints:{repo:"joselunasrt8-creator/mindshift-demo", branch:"main", workflow:"governed-deploy.yml", max_executions:1}}')
-
           echo "Authority payload:"
           echo "$AUTHORITY_PAYLOAD"
 
-          AUTHORITY_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
+          AUTHORITY_RESPONSE_CODE=$(curl -sS -o pr-authority.json -w "%{http_code}" \
             -X POST "$CLEAN_WORKER_URL/authority" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $MINDSHIFT_API_KEY" \
@@ -120,11 +107,6 @@ jobs:
 
           if [ "$AUTHORITY_STATUS" != "VALID" ] || [ -z "$AUTHORITY_ID" ] || [ -z "$DECISION_ID" ]; then
             echo "NULL — Invalid PR authority response"
-          echo "Authority response (HTTP $AUTHORITY_CODE):"
-          cat authority.json
-
-          if [ "$AUTHORITY_CODE" -lt 200 ] || [ "$AUTHORITY_CODE" -gt 299 ]; then
-            echo "NULL — Authority endpoint error"
             exit 1
           fi
 
