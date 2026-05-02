@@ -84,6 +84,7 @@ jobs:
           echo "COMMIT_SHA=$COMMIT_SHA" >> "$GITHUB_ENV"
 
       - name: ENSURE PR AUTHORITY — Fail closed
+      - name: AUTHORITY CHECK — Merge PR intent (fail closed)
         run: |
           set -euo pipefail
 
@@ -94,6 +95,12 @@ jobs:
             '{owner: "github_workflow", intent: "merge_pull_request", scope: {pr_number: $pr_number}, constraints: {repo: $repo, branch: $branch, workflow: "governed-deploy.yml", max_executions: 1}}')
 
           AUTHORITY_RESPONSE_CODE=$(curl -sS -o pr-authority.json -w "%{http_code}" \
+            '{owner:"github_workflow", intent:"merge_pull_request", scope:{pr_number:$pr_number}, constraints:{repo:"joselunasrt8-creator/mindshift-demo", branch:"main", workflow:"governed-deploy.yml", max_executions:1}}')
+
+          echo "Authority payload:"
+          echo "$AUTHORITY_PAYLOAD"
+
+          AUTHORITY_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
             -X POST "$CLEAN_WORKER_URL/authority" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $MINDSHIFT_API_KEY" \
@@ -113,6 +120,11 @@ jobs:
 
           if [ "$AUTHORITY_STATUS" != "VALID" ] || [ -z "$AUTHORITY_ID" ] || [ -z "$DECISION_ID" ]; then
             echo "NULL — Invalid PR authority response"
+          echo "Authority response (HTTP $AUTHORITY_CODE):"
+          cat authority.json
+
+          if [ "$AUTHORITY_CODE" -lt 200 ] || [ "$AUTHORITY_CODE" -gt 299 ]; then
+            echo "NULL — Authority endpoint error"
             exit 1
           fi
 
