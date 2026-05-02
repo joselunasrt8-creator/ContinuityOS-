@@ -141,6 +141,14 @@ function hasValidPrepareDeployApiKey(request: Request, env: Env): boolean {
   return providedApiKey === expectedApiKey
 }
 
+function requireApiKey(request: Request, env: Env): Response | null {
+  if (!hasValidPrepareDeployApiKey(request, env)) {
+    return jsonResponse({ status: "FAILED", error: "Unauthorized" }, 401)
+  }
+
+  return null
+}
+
 function ensureDeployConstraints(constraints: Record<string, unknown>) {
   return {
     ...constraints,
@@ -341,7 +349,7 @@ async function prepareDeployTriple(env: Env) {
     constraints: {
       repo: `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`,
       branch: "main",
-      workflow: "deploy.yml",
+      workflow: "governed-deploy.yml",
       max_executions: 1
     }
   })
@@ -1466,7 +1474,7 @@ async function runGithubProofTest(env: Env) {
     constraints: {
       repo: `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`,
       branch: "main",
-      workflow: "deploy.yml",
+      workflow: "governed-deploy.yml",
       max_executions: 1
     }
   })
@@ -1531,7 +1539,7 @@ async function runReplayTest(env: Env) {
     constraints: {
       repo: "local/replay-test",
       branch: "main",
-      workflow: "deploy.yml",
+      workflow: "governed-deploy.yml",
       max_executions: 1
     }
   })
@@ -1691,16 +1699,22 @@ export default {
       }
 
     if (route("/records/authorities") && request.method === "GET") {
+      const authFailure = requireApiKey(request, env)
+      if (authFailure) return authFailure
       const results = await listAuthorities(env)
       return jsonResponse(results.results ?? [])
     }
 
     if (route("/records/executions") && request.method === "GET") {
+      const authFailure = requireApiKey(request, env)
+      if (authFailure) return authFailure
       const results = await listExecutions(env)
       return jsonResponse(results.results ?? [])
     }
 
     if (route("/records/proofs") && request.method === "GET") {
+      const authFailure = requireApiKey(request, env)
+      if (authFailure) return authFailure
       const results = await listProofs(env)
       return jsonResponse(results.results ?? [])
     }
@@ -1775,7 +1789,7 @@ export default {
           const constraints = {
             repo: String(target.repo || fallbackRepo),
             branch: String(target.branch || "main"),
-            workflow: String(target.workflow || "deploy.yml"),
+            workflow: String(target.workflow || "governed-deploy.yml"),
             max_executions: 1
           }
 
@@ -1968,68 +1982,8 @@ export default {
         return jsonResponse({ status: "NULL", result: "NOT_EXECUTED", error: "Missing request body" }, 400)
       }
 
-      if (body.validation_id) {
-        if (!body.webhook_url) {
-          return jsonResponse({ status: "FAILED", error: "Missing webhook_url" }, 400)
-        }
-
-        const validation = await findValidationById(env, body.validation_id)
-        if (!validation) {
-          return jsonResponse({ status: "FAILED", error: "Unknown validation_id" }, 404)
-        }
-
-        const authority = await findAuthorityById(env, validation.authority_id)
-        if (!authority) {
-          return jsonResponse({ status: "FAILED", error: "Authority not found for validation_id" }, 404)
-        }
-
-        const executionId = crypto.randomUUID()
-        const timestamp = new Date().toISOString()
-        let upstreamStatus: number | null = null
-        let status = "FAILED"
-
-        try {
-          const upstream = await fetch(String(body.webhook_url), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              validation_id: validation.validation_id,
-              authority_id: validation.authority_id,
-              decision_id: validation.decision_id,
-              validated_object_hash: validation.validated_object_hash
-            })
-          })
-          upstreamStatus = upstream.status
-          status = upstream.ok ? "EXECUTED" : "FAILED"
-        } catch {
-          status = "FAILED"
-        }
-
-        await saveExecution(env, {
-          execution_id: executionId,
-          authority_id: validation.authority_id,
-          decision_id: validation.decision_id,
-          intent: validation.intent,
-          webhook_url: String(body.webhook_url),
-          upstream_status: upstreamStatus,
-          status,
-          timestamp,
-          execution_event: {
-            system: "webhook",
-            action: "post",
-            validation_id: validation.validation_id,
-            validated_object_hash: validation.validated_object_hash
-          }
-        })
-
-        if (status !== "EXECUTED") {
-          return jsonResponse({ status: "FAILED", error: "Webhook execution failed", execution_id: executionId }, 502)
-        }
-
-        return jsonResponse({
-          status: "VALID",
-          execution_id: executionId
-        })
+      if (body.validation_id || body.webhook_url) {
+        return jsonResponse({ status: "FAILED", result: "INVALID", error: "webhook_execution_disabled" }, 403)
       }
 
       if (!body.intent) {
@@ -2054,14 +2008,20 @@ export default {
     }
 
     if (route("/replay-test") && request.method === "GET") {
+      const authFailure = requireApiKey(request, env)
+      if (authFailure) return authFailure
       return runReplayTest(env)
     }
 
     if (route("/github-proof-test") && request.method === "GET") {
+      const authFailure = requireApiKey(request, env)
+      if (authFailure) return authFailure
       return runGithubProofTest(env)
     }
     if (route("/nonce-validation-test") && request.method === "GET") {
-      const authority = buildAuthority({ owner: "nonce_test", constraints: { repo: "local/repo", branch: "main", workflow: "deploy.yml", max_executions: 1 } })
+      const authFailure = requireApiKey(request, env)
+      if (authFailure) return authFailure
+      const authority = buildAuthority({ owner: "nonce_test", constraints: { repo: "local/repo", branch: "main", workflow: "governed-deploy.yml", max_executions: 1 } })
       await saveAuthority(env, authority)
       const aeo = buildAeo(authority, targetFromAuthority(authority) as GithubDeployTarget)
       await saveAeo(env, aeo)
