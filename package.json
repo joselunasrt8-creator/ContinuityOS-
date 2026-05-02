@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "echo \"Direct deploy disabled. Use .github/workflows/governed-deploy.yml canonical chain.\" && exit 1",
     "dev": "wrangler dev --local",
     "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local",
     "test": "node --test tests/execution-lock-hardening.test.mjs"
