@@ -1,4 +1,4 @@
-name: mindshift-pr-validate
+name: mindshift-validate-pr
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   validate-pr:
-    name: mindshift-pr-validate
+    name: mindshift-validate-pr
     runs-on: ubuntu-latest
 
     env:
