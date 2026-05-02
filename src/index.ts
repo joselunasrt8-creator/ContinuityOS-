@@ -1646,6 +1646,8 @@ export default {
       const url = new URL(request.url)
       normalizedPath = `/${url.pathname.replace(/^\/+|\/+$/g, "")}`
       const route = (path: string) => normalizedPath === path || normalizedPath.endsWith(path)
+      const runtimeEnv = String((env as any).ENVIRONMENT || (env as any).NODE_ENV || "").toLowerCase()
+      const isProduction = runtimeEnv === "production"
 
       if (normalizedPath === "/" && request.method === "GET") {
         return new Response("MindShift Runtime Live")
@@ -1706,12 +1708,7 @@ export default {
     }
 
     if (route("/webhook") && request.method === "POST") {
-      const body = await readJson(request)
-      if (!body) {
-        return jsonResponse({ status: "FAILED", error: "Invalid JSON body" }, 400)
-      }
-
-      return jsonResponse({ status: "ok", received: body })
+      return jsonResponse({ status: "FAILED", error: "route_disabled", message: "Direct webhook route is disabled. Use governed /execute flow." }, isProduction ? 403 : 410)
     }
 
       if (route("/prepare-deploy") && request.method === "POST") {
@@ -1968,68 +1965,13 @@ export default {
         return jsonResponse({ status: "NULL", result: "NOT_EXECUTED", error: "Missing request body" }, 400)
       }
 
-      if (body.validation_id) {
-        if (!body.webhook_url) {
-          return jsonResponse({ status: "FAILED", error: "Missing webhook_url" }, 400)
-        }
-
-        const validation = await findValidationById(env, body.validation_id)
-        if (!validation) {
-          return jsonResponse({ status: "FAILED", error: "Unknown validation_id" }, 404)
-        }
-
-        const authority = await findAuthorityById(env, validation.authority_id)
-        if (!authority) {
-          return jsonResponse({ status: "FAILED", error: "Authority not found for validation_id" }, 404)
-        }
-
-        const executionId = crypto.randomUUID()
-        const timestamp = new Date().toISOString()
-        let upstreamStatus: number | null = null
-        let status = "FAILED"
-
-        try {
-          const upstream = await fetch(String(body.webhook_url), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              validation_id: validation.validation_id,
-              authority_id: validation.authority_id,
-              decision_id: validation.decision_id,
-              validated_object_hash: validation.validated_object_hash
-            })
-          })
-          upstreamStatus = upstream.status
-          status = upstream.ok ? "EXECUTED" : "FAILED"
-        } catch {
-          status = "FAILED"
-        }
-
-        await saveExecution(env, {
-          execution_id: executionId,
-          authority_id: validation.authority_id,
-          decision_id: validation.decision_id,
-          intent: validation.intent,
-          webhook_url: String(body.webhook_url),
-          upstream_status: upstreamStatus,
-          status,
-          timestamp,
-          execution_event: {
-            system: "webhook",
-            action: "post",
-            validation_id: validation.validation_id,
-            validated_object_hash: validation.validated_object_hash
-          }
-        })
-
-        if (status !== "EXECUTED") {
-          return jsonResponse({ status: "FAILED", error: "Webhook execution failed", execution_id: executionId }, 502)
-        }
-
+      if (body.validation_id || body.webhook_url) {
         return jsonResponse({
-          status: "VALID",
-          execution_id: executionId
-        })
+          status: "FAILED",
+          result: "NOT_EXECUTED",
+          error: "legacy_execute_path_disabled",
+          message: "Direct webhook mutation path is disabled. Use governed execution payload only."
+        }, isProduction ? 403 : 410)
       }
 
       if (!body.intent) {
