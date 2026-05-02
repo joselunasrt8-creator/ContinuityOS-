@@ -170,6 +170,7 @@ function buildAuthority(body: any) {
     intent: body.intent || "deploy_production",
     scope,
     constraints,
+    expiry: body.expiry || new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     status: "ACTIVE",
     created_at: new Date().toISOString()
   }
@@ -600,9 +601,10 @@ async function saveAuthority(env: Env, authority: any) {
       intent,
       scope,
       constraints,
+      expiry,
       status,
       created_at
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
   )
     .bind(
       authority.authority_id,
@@ -611,6 +613,7 @@ async function saveAuthority(env: Env, authority: any) {
       authority.intent,
       JSON.stringify(authority.scope),
       JSON.stringify(authority.constraints),
+      authority.expiry,
       authority.status,
       authority.created_at
     )
@@ -627,7 +630,7 @@ async function getTableColumns(env: Env, tableName: string): Promise<Set<string>
 }
 
 async function canInsertAuthority(env: Env) {
-  const required = ["authority_id", "decision_id", "owner", "intent", "scope", "constraints", "status", "created_at"]
+  const required = ["authority_id", "decision_id", "owner", "intent", "scope", "constraints", "expiry", "status", "created_at"]
   const columns = await getTableColumns(env, "authority_registry")
   if (!columns) {
     return {
@@ -1725,7 +1728,7 @@ export default {
         return jsonResponse({ status: "FAILED", error: "Invalid JSON body" }, 400)
       }
 
-      return jsonResponse({ status: "ok", received: body })
+      return jsonResponse({ status: "FAILED", error: "webhook_deploy_disabled" }, 403)
     }
 
       if (route("/prepare-deploy") && request.method === "POST") {
@@ -1826,7 +1829,16 @@ export default {
           }
 
           // Keep response minimal for governed-deploy pipeline.
-          return jsonResponse({ status: "VALID", authority_id: authorityId, decision_id: decisionId })
+        return jsonResponse({
+          decision_id: authority.decision_id,
+          owner: authority.owner,
+          intent: authority.intent,
+          scope: authority.scope,
+          constraints: authority.constraints,
+          expiry: authority.expiry,
+          status: authority.status,
+          created_at: authority.created_at
+        })
         }
 
         const authority = buildAuthority(body)
@@ -1864,9 +1876,14 @@ export default {
           )
         }
         return jsonResponse({
-          status: "VALID",
-          authority_id: authority.authority_id,
-          decision_id: authority.decision_id
+          decision_id: authority.decision_id,
+          owner: authority.owner,
+          intent: authority.intent,
+          scope: authority.scope,
+          constraints: authority.constraints,
+          expiry: authority.expiry,
+          status: authority.status,
+          created_at: authority.created_at
         })
       }
       
@@ -1926,7 +1943,9 @@ export default {
 
       const aeo = buildAeo(authority, target)
       await saveAeo(env, aeo)
-      return jsonResponse(aeo)
+      const exactAeo = { intent: aeo.intent, scope: aeo.scope, validation: aeo.validation, target: aeo.target, finality: aeo.finality }
+      const compiledHash = await sha256Hex(canonicalizeJson(exactAeo))
+      return jsonResponse({ aeo: exactAeo, validated_object_hash: compiledHash })
     }
 
 
@@ -1972,8 +1991,17 @@ export default {
         }, validation.result === "VALID" ? 200 : 409)
       }
 
+      const requiredAeoKeys = ["intent", "scope", "validation", "target", "finality"]
+      if (body.aeo && isObject(body.aeo)) {
+        const keys = Object.keys(body.aeo)
+        const hasExact = requiredAeoKeys.every((key) => keys.includes(key)) && keys.length === requiredAeoKeys.length
+        if (!hasExact) return jsonResponse({ status: "NULL" })
+      }
       const result = await validateAuthority(env, body)
-      return jsonResponse(result.payload, result.code)
+      if (result.payload?.status === "VALID" || result.payload?.result === "VALID") {
+        return jsonResponse({ status: "VALID" })
+      }
+      return jsonResponse({ status: "NULL" })
     }
 
     if (route("/execute") && request.method === "POST") {
@@ -2145,7 +2173,13 @@ export default {
       await saveProof(env, proof)
       await consumeAuthority(env, body.decision_id)
 
-      return jsonResponse(proof)
+      return jsonResponse({
+        status: "VALID",
+        proof_id: proof.proof_id,
+        execution_id: proof.execution_id,
+        validated_object_hash: parseJsonObject(proof.proof_reference).validated_object_hash,
+        executed_object_hash: parseJsonObject(proof.proof_reference).executed_object_hash || parseJsonObject(proof.proof_reference).validated_object_hash
+      })
     }
 
       return jsonResponse({ status: "FAILED", error: "Not Found" }, 404)

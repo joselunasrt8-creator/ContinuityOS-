@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS authority_registry (
   intent TEXT NOT NULL,
   scope TEXT NOT NULL,
   constraints TEXT NOT NULL,
+  expiry TEXT NOT NULL,
   status TEXT NOT NULL,
   created_at TEXT NOT NULL
 );

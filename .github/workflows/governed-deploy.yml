@@ -58,6 +58,24 @@ jobs:
 
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
+
+      - name: AUTHORITY — Create deploy authority
+        run: |
+          set -euo pipefail
+          RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}"             -X POST "$CLEAN_WORKER_URL/authority"             -H "Content-Type: application/json"             -H "X-API-Key: $API_KEY"             -d "$(jq -n --arg decision_id "$DECISION_ID" --arg owner "github_actions" --arg intent "deploy_production" '{decision_id:$decision_id,owner:$owner,intent:$intent,scope:{environment:"production"},constraints:{repo:"${{ github.repository }}",branch:"${{ github.ref_name }}",workflow:"governed-deploy.yml",max_executions:1}}')")
+          test "$RESPONSE_CODE" -ge 200 -a "$RESPONSE_CODE" -lt 300
+
+      - name: COMPILE — Create exact AEO and canonical hash
+        run: |
+          set -euo pipefail
+          RESPONSE_CODE=$(curl -sS -o compile.json -w "%{http_code}"             -X POST "$CLEAN_WORKER_URL/compile"             -H "Content-Type: application/json"             -H "X-API-Key: $API_KEY"             -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
+          test "$RESPONSE_CODE" -ge 200 -a "$RESPONSE_CODE" -lt 300
+          COMPILED_HASH=$(jq -r '.validated_object_hash // empty' compile.json)
+          if [ -z "$COMPILED_HASH" ] || [ "$COMPILED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — compile hash mismatch"
+            exit 1
+          fi
+
       - name: VALIDATE — Fail closed unless exact VALID + exact hash + nonce reserved
         run: |
           set -euo pipefail
