@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "echo 'NULL — production deploys must use the MindShift governed deploy boundary' && exit 1",
     "dev": "wrangler dev --local",
     "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local"
   },
