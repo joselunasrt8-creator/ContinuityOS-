@@ -1,0 +1,116 @@
+name: prepare-governed-deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare-governed-deploy-inputs:
+    runs-on: ubuntu-latest
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+
+    steps:
+      - name: HARD FAIL — Missing critical secrets
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit invocation allowed"
+            exit 1
+          fi
+
+          for var in WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      - name: AUTHORITY — Create deploy authority and decision
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/authority" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg owner "github_actions" \
+              --arg intent "deploy_production" \
+              '{owner:$owner,intent:$intent,scope:{environment:"production"},constraints:{repo:"${{ github.repository }}",branch:"${{ github.ref_name }}",workflow:"governed-deploy.yml",max_executions:1}}')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Authority endpoint error"
+            cat authority.json
+            exit 1
+          fi
+
+          DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
+          if [ -z "$DECISION_ID" ]; then
+            echo "NULL — Missing decision_id from authority"
+            cat authority.json
+            exit 1
+          fi
+
+          echo "DECISION_ID=$DECISION_ID" >> "$GITHUB_ENV"
+
+      - name: COMPILE — Resolve validated object hash
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o compile.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/compile" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Compile endpoint error"
+            cat compile.json
+            exit 1
+          fi
+
+          VALIDATED_OBJECT_HASH=$(jq -r '.validated_object_hash // empty' compile.json)
+          if [ -z "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — Missing validated_object_hash from compile"
+            cat compile.json
+            exit 1
+          fi
+
+          echo "VALIDATED_OBJECT_HASH=$VALIDATED_OBJECT_HASH" >> "$GITHUB_ENV"
+
+      - name: GENERATE NONCE — Prepare invocation_nonce
+        run: |
+          set -euo pipefail
+          INVOCATION_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+          echo "INVOCATION_NONCE=$INVOCATION_NONCE" >> "$GITHUB_ENV"
+
+      - name: PRINT — Manual inputs for governed-deploy.yml
+        run: |
+          set -euo pipefail
+
+          echo "decision_id=$DECISION_ID"
+          echo "validated_object_hash=$VALIDATED_OBJECT_HASH"
+          echo "invocation_nonce=$INVOCATION_NONCE"
+
+          {
+            echo "### governed-deploy.yml manual inputs"
+            echo
+            echo "- decision_id: \\`$DECISION_ID\\`"
+            echo "- validated_object_hash: \\`$VALIDATED_OBJECT_HASH\\`"
+            echo "- invocation_nonce: \\`$INVOCATION_NONCE\\`"
+          } >> "$GITHUB_STEP_SUMMARY"
