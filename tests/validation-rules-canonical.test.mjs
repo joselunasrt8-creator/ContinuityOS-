@@ -6,7 +6,7 @@ const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const workflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
 const workflowNames = readdirSync(new URL('../.github/workflows/', import.meta.url)).map((name) => name.toLowerCase())
 
-const canonicalAeoObjectPattern = /const exactAeo = \{ intent: aeo\.intent, scope: aeo\.scope, validation: aeo\.validation, target: aeo\.target, finality: aeo\.finality \}/
+const canonicalAeoObjectPattern = /const canonical_aeo = \{\s*intent: authority\.intent,\s*scope: parseJsonObject\(authority\.scope\),\s*validation: \{[\s\S]*\},\s*target,\s*finality: \{\s*proof_required: true\s*\}\s*\}/
 
 test('AEO canonical schema is exact and closed', () => {
   assert.match(source, canonicalAeoObjectPattern)
@@ -21,8 +21,15 @@ test('authority registry checks exist and require ACTIVE authority', () => {
 })
 
 test('validated object hash must equal executed object hash', () => {
+  assert.match(source, /const validated_object_hash = await sha256Hex\(canonicalizeJson\(canonicalAeo\)\)/)
+  assert.match(source, /JSON\.stringify\(canonicalAeo\)/)
   assert.match(source, /validated_object_hash: compiledHash/)
   assert.match(source, /No existing VALID validation found for decision_id and validated_object_hash/)
+})
+
+test('metadata is separated from canonical object for hashing', () => {
+  assert.match(source, /const metadata = \{\s*aeo_id: crypto\.randomUUID\(\),\s*authority_id: authority\.authority_id,\s*decision_id: authority\.decision_id,\s*status: "COMPILED",\s*created_at: new Date\(\)\.toISOString\(\)\s*\}/)
+  assert.match(source, /return \{ canonical_aeo, metadata \}/)
 })
 
 test('canonical execution path is authority -> compile -> validate -> execute -> proof', () => {

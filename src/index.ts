@@ -190,13 +190,9 @@ function buildAuthority(body: any) {
 }
 
 function buildAeo(authority: any, target: GithubDeployTarget) {
-  return {
-    aeo_id: crypto.randomUUID(),
-    authority_id: authority.authority_id,
-    decision_id: authority.decision_id,
+  const canonical_aeo = {
     intent: authority.intent,
     scope: parseJsonObject(authority.scope),
-    constraints: ensureDeployConstraints(parseJsonObject(authority.constraints)),
     validation: {
       authority_id: authority.authority_id,
       decision_id: authority.decision_id,
@@ -205,9 +201,16 @@ function buildAeo(authority: any, target: GithubDeployTarget) {
     target,
     finality: {
       proof_required: true
-    },
-    status: "COMPILED"
+    }
   }
+  const metadata = {
+    aeo_id: crypto.randomUUID(),
+    authority_id: authority.authority_id,
+    decision_id: authority.decision_id,
+    status: "COMPILED",
+    created_at: new Date().toISOString()
+  }
+  return { canonical_aeo, metadata }
 }
 
 function parseGithubTarget(input: any): GithubDeployTarget | null {
@@ -250,12 +253,14 @@ function targetFromAuthority(authority: any): GithubDeployTarget | null {
 }
 
 async function buildValidation(aeo: any, authority: any) {
-  const validated_object_hash = await sha256Hex(canonicalizeJson(aeo))
-  const constraints = ensureDeployConstraints(parseJsonObject(aeo?.constraints))
-  const target = parseJsonObject(aeo?.target)
-  const finality = parseJsonObject(aeo?.finality)
-  const validation = parseJsonObject(aeo?.validation)
-  const hasRequiredAeoFields = Boolean(aeo?.intent && aeo?.scope && aeo?.validation && aeo?.target && aeo?.finality)
+  const canonicalAeo = parseJsonObject(aeo?.canonical_aeo)
+  const metadata = parseJsonObject(aeo?.metadata)
+  const validated_object_hash = await sha256Hex(canonicalizeJson(canonicalAeo))
+  const constraints = ensureDeployConstraints(parseJsonObject(authority?.constraints))
+  const target = parseJsonObject(canonicalAeo?.target)
+  const finality = parseJsonObject(canonicalAeo?.finality)
+  const validation = parseJsonObject(canonicalAeo?.validation)
+  const hasRequiredAeoFields = Boolean(canonicalAeo?.intent && canonicalAeo?.scope && canonicalAeo?.validation && canonicalAeo?.target && canonicalAeo?.finality)
   const isAuthorityActive = Boolean(authority && String(authority.status || "").toUpperCase() === "ACTIVE")
   const hasTargetFields = Boolean(target.repo && target.branch && target.workflow)
   const constraintsMatchTarget =
@@ -265,11 +270,11 @@ async function buildValidation(aeo: any, authority: any) {
 
   const authorityBindingChecks = [
     {
-      ok: aeo?.authority_id === authority?.authority_id,
+      ok: metadata.authority_id === authority?.authority_id,
       message: "aeo.authority_id does not match authority.authority_id"
     },
     {
-      ok: aeo?.decision_id === authority?.decision_id,
+      ok: metadata.decision_id === authority?.decision_id,
       message: "aeo.decision_id does not match authority.decision_id"
     },
     {
@@ -302,10 +307,10 @@ async function buildValidation(aeo: any, authority: any) {
 
   return {
     validation_id: crypto.randomUUID(),
-    authority_id: aeo.authority_id,
-    aeo_id: aeo.aeo_id,
-    decision_id: aeo.decision_id,
-    intent: aeo.intent,
+    authority_id: metadata.authority_id,
+    aeo_id: metadata.aeo_id,
+    decision_id: metadata.decision_id,
+    intent: canonicalAeo.intent,
     validated_object_hash,
     result: isValid ? "VALID" : "NULL",
     status,
@@ -664,6 +669,8 @@ async function canInsertAuthority(env: Env) {
 }
 
 async function saveAeo(env: Env, aeo: any) {
+  const canonicalAeo = parseJsonObject(aeo?.canonical_aeo)
+  const metadata = parseJsonObject(aeo?.metadata)
   await env.DB.prepare(
     `INSERT INTO aeo_registry (
       aeo_id,
@@ -675,7 +682,15 @@ async function saveAeo(env: Env, aeo: any) {
       created_at
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
   )
-    .bind(aeo.aeo_id, aeo.authority_id, aeo.decision_id, aeo.intent, JSON.stringify(aeo), aeo.status, new Date().toISOString())
+    .bind(
+      metadata.aeo_id,
+      metadata.authority_id,
+      metadata.decision_id,
+      canonicalAeo.intent,
+      JSON.stringify(canonicalAeo),
+      metadata.status,
+      metadata.created_at || new Date().toISOString()
+    )
     .run()
 }
 
@@ -1971,8 +1986,8 @@ export default {
 
         return jsonResponse({
           status: "VALID",
-          compilation_id: aeo.aeo_id,
-          compiled_object: aeo
+          compilation_id: aeo.metadata.aeo_id,
+          compiled_object: aeo.canonical_aeo
         })
       }
 
@@ -2004,9 +2019,9 @@ export default {
 
       const aeo = buildAeo(authority, target)
       await saveAeo(env, aeo)
-      const exactAeo = { intent: aeo.intent, scope: aeo.scope, validation: aeo.validation, target: aeo.target, finality: aeo.finality }
+      const exactAeo = aeo.canonical_aeo
       const compiledHash = await sha256Hex(canonicalizeJson(exactAeo))
-      return jsonResponse({ aeo: exactAeo, validated_object_hash: compiledHash })
+      return jsonResponse({ aeo: exactAeo, metadata: aeo.metadata, validated_object_hash: compiledHash })
     }
 
 
@@ -2033,11 +2048,14 @@ export default {
 
         const compiledAeo = parseJsonObject(compiled.aeo)
         const validation = await buildValidation({
-          ...compiledAeo,
-          aeo_id: compiled.aeo_id,
-          authority_id: compiled.authority_id,
-          decision_id: compiled.decision_id,
-          intent: compiled.intent
+          canonical_aeo: compiledAeo,
+          metadata: {
+            aeo_id: compiled.aeo_id,
+            authority_id: compiled.authority_id,
+            decision_id: compiled.decision_id,
+            status: compiled.status,
+            created_at: compiled.created_at
+          }
         }, await findAuthorityById(env, compiled.authority_id))
         await saveValidation(env, validation)
 
