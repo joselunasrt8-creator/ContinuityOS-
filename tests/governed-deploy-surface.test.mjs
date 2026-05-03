@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const workflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
+const prepareWorkflow = readFileSync(new URL('../.github/workflows/prepare-governed-deploy.yml', import.meta.url), 'utf8')
 const pkg = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+const workflowNames = readdirSync(new URL('../.github/workflows/', import.meta.url))
 
 test('authority endpoint persists required fields including expiry and ACTIVE', () => {
   assert.match(source, /route\("\/authority"\)/)
@@ -14,7 +16,8 @@ test('authority endpoint persists required fields including expiry and ACTIVE', 
 })
 
 test('compile emits exact AEO + canonical hash output', () => {
-  assert.match(source, /const exactAeo = \{ intent: compiled\.canonical_aeo\.intent, scope: compiled\.canonical_aeo\.scope, validation: compiled\.canonical_aeo\.validation, target: compiled\.canonical_aeo\.target, finality: compiled\.canonical_aeo\.finality \}/)
+  assert.match(source, /function toAeoCore\(aeo: any\)/)
+  assert.match(source, /const exactAeo = toAeoCore\(aeo\)/)
   assert.match(source, /validated_object_hash: compiledHash/)
 })
 
@@ -52,8 +55,7 @@ test('proof response persists proof and hashes', () => {
   assert.match(source, /consumeAuthority\(env, body\.decision_id\)/)
 })
 
-
-test('execute is locked to governed workflow and deploy_production action', () => {
+test('execute is locked to canonical governed workflow and deploy_production action', () => {
   assert.match(source, /wrong_workflow_or_action/)
   assert.match(source, /canonicalWorkflowName\(authorityTarget\?\.workflow\) !== CANONICAL_GOVERNED_WORKFLOW/)
   assert.match(source, /authorityTarget\?\.action !== "deploy_production"/)
@@ -67,7 +69,19 @@ test('proof response includes persisted decision, run, commit, result, and times
   assert.match(source, /timestamp: proof\.timestamp/)
 })
 
-
 test('governed deploy recognizes workflow_mismatch as a known NULL validation reason', () => {
   assert.match(workflow, /workflow_mismatch/)
 })
+
+test('canonical workflow is governed-deploy.yml everywhere', () => {
+  assert.match(source, /const CANONICAL_GOVERNED_WORKFLOW = "governed-deploy\.yml"/)
+  assert.match(source, /constraints\.workflow === CANONICAL_GOVERNED_WORKFLOW/)
+  assert.match(source, /isCanonicalWorkflow\(target\.workflow\)/)
+  assert.match(source, /workflow: CANONICAL_GOVERNED_WORKFLOW/)
+})
+
+test('workflow mismatch remains fail-closed NULL reason', () => {
+  assert.match(source, /return jsonResponse\(\{ status: "NULL", reason: "workflow_mismatch"/)
+  assert.match(source, /if \(combined\.includes\("workflow"\)\) return "workflow_mismatch"/)
+})
+

@@ -6,10 +6,11 @@ const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const workflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
 const workflowNames = readdirSync(new URL('../.github/workflows/', import.meta.url)).map((name) => name.toLowerCase())
 
-const canonicalAeoObjectPattern = /const exactAeo = \{ intent: compiled\.canonical_aeo\.intent, scope: compiled\.canonical_aeo\.scope, validation: compiled\.canonical_aeo\.validation, target: compiled\.canonical_aeo\.target, finality: compiled\.canonical_aeo\.finality \}/
+const canonicalAeoObjectPattern = /const exactAeo = toAeoCore\(aeo\)/
 
 test('AEO canonical schema is exact and closed', () => {
   assert.match(source, canonicalAeoObjectPattern)
+  assert.match(source, /function toAeoCore\(aeo: any\)/)
   assert.match(source, /requiredAeoKeys = \["intent", "scope", "validation", "target", "finality"\]/)
   assert.match(source, /keys\.length === requiredAeoKeys\.length/)
 })
