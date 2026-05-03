@@ -152,10 +152,11 @@ function requireApiKey(request: Request, env: Env): Response | null {
 const CANONICAL_GOVERNED_WORKFLOW = "governed-deploy.yml"
 
 function normalizeWorkflowName(workflow: unknown): string {
-  const raw = String(workflow || "").trim()
-  if (!raw) return ""
-  const parts = raw.split("/").filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : raw
+  return String(workflow || "").trim()
+}
+
+function isCanonicalWorkflow(workflow: unknown): boolean {
+  return normalizeWorkflowName(workflow) === CANONICAL_GOVERNED_WORKFLOW
 }
 
 function ensureDeployConstraints(constraints: Record<string, unknown>) {
@@ -190,27 +191,40 @@ function buildAuthority(body: any) {
 }
 
 function buildAeo(authority: any, target: GithubDeployTarget) {
-  const canonical_aeo = {
+  const aeoCore = {
     intent: authority.intent,
     scope: parseJsonObject(authority.scope),
     validation: {
       authority_id: authority.authority_id,
       decision_id: authority.decision_id,
-      max_executions: ensureDeployConstraints(parseJsonObject(authority.constraints)).max_executions
+      max_executions: constraints.max_executions
     },
     target,
     finality: {
       proof_required: true
     }
   }
-  const metadata = {
+
+  return {
     aeo_id: crypto.randomUUID(),
     authority_id: authority.authority_id,
     decision_id: authority.decision_id,
-    status: "COMPILED",
-    created_at: new Date().toISOString()
+    ...aeoCore,
+    constraints: ensureDeployConstraints(parseJsonObject(authority.constraints)),
+    status: "COMPILED"
   }
-  return { canonical_aeo, metadata }
+
+  return { canonical_aeo, registry }
+}
+
+function toAeoCore(aeo: any) {
+  return {
+    intent: aeo.intent,
+    scope: aeo.scope,
+    validation: aeo.validation,
+    target: aeo.target,
+    finality: aeo.finality
+  }
 }
 
 function parseGithubTarget(input: any): GithubDeployTarget | null {
@@ -226,12 +240,17 @@ function parseGithubTarget(input: any): GithubDeployTarget | null {
     return null
   }
 
+  const workflow = normalizeWorkflowName(input.workflow)
+  if (!isCanonicalWorkflow(workflow)) {
+    return null
+  }
+
   return {
     system: "github_actions",
     action: "deploy_production",
     repo: String(input.repo),
     branch: String(input.branch),
-    workflow: normalizeWorkflowName(input.workflow),
+    workflow,
     inputs: input.inputs && typeof input.inputs === "object" ? input.inputs : undefined
   }
 }
@@ -253,14 +272,12 @@ function targetFromAuthority(authority: any): GithubDeployTarget | null {
 }
 
 async function buildValidation(aeo: any, authority: any) {
-  const canonicalAeo = parseJsonObject(aeo?.canonical_aeo)
-  const metadata = parseJsonObject(aeo?.metadata)
-  const validated_object_hash = await sha256Hex(canonicalizeJson(canonicalAeo))
-  const constraints = ensureDeployConstraints(parseJsonObject(authority?.constraints))
-  const target = parseJsonObject(canonicalAeo?.target)
-  const finality = parseJsonObject(canonicalAeo?.finality)
-  const validation = parseJsonObject(canonicalAeo?.validation)
-  const hasRequiredAeoFields = Boolean(canonicalAeo?.intent && canonicalAeo?.scope && canonicalAeo?.validation && canonicalAeo?.target && canonicalAeo?.finality)
+  const validated_object_hash = await sha256Hex(canonicalizeJson(toAeoCore(aeo)))
+  const constraints = ensureDeployConstraints(parseJsonObject(aeo?.constraints))
+  const target = parseJsonObject(aeo?.target)
+  const finality = parseJsonObject(aeo?.finality)
+  const validation = parseJsonObject(aeo?.validation)
+  const hasRequiredAeoFields = Boolean(aeo?.intent && aeo?.scope && aeo?.validation && aeo?.target && aeo?.finality)
   const isAuthorityActive = Boolean(authority && String(authority.status || "").toUpperCase() === "ACTIVE")
   const hasTargetFields = Boolean(target.repo && target.branch && target.workflow)
   const constraintsMatchTarget =
@@ -296,6 +313,7 @@ async function buildValidation(aeo: any, authority: any) {
     finality.proof_required === true &&
     hasTargetFields &&
     constraintsMatchTarget &&
+    workflowIsCanonical &&
     !authorityBindingFailure
 
   const status = isValid ? "VALIDATED" : "FAILED"
@@ -380,10 +398,10 @@ async function prepareDeployTriple(env: Env) {
     throw new Error("Failed to derive GitHub deploy target for production authority.")
   }
 
-  const aeo = buildAeo(authority, target)
-  await saveAeo(env, aeo)
+  const compiled = buildAeo(authority, target)
+  await saveAeo(env, compiled)
 
-  const validation = await buildValidation(aeo, authority)
+  const validation = await buildValidation({ ...compiled.canonical_aeo, ...compiled.registry }, authority)
   if (validation.result !== "VALID") {
     throw new Error("Failed to compile a valid production deploy AEO.")
   }
@@ -464,14 +482,18 @@ async function findLatestValidValidationByDecisionId(env: Env, decisionId: strin
     .first<any>()
 }
 
-async function findPrValidationAuthority(env: Env) {
+async function findPrValidationAuthority(env: Env, payload: { repo: string; base_branch: string; pr_number: string }) {
   return env.DB.prepare(
     `SELECT * FROM authority_registry
      WHERE intent = 'merge_pull_request'
        AND UPPER(status) = 'ACTIVE'
+       AND json_extract(constraints, '$.repo') = ?1
+       AND json_extract(constraints, '$.branch') = ?2
+       AND json_extract(scope, '$.pr_number') = ?3
+       AND json_extract(constraints, '$.workflow') = ?4
      ORDER BY created_at DESC
      LIMIT 1`
-  ).first<any>()
+  ).bind(payload.repo, payload.base_branch, payload.pr_number, CANONICAL_GOVERNED_WORKFLOW).first<any>()
 }
 
 async function hasPrExecutionReplay(env: Env, payload: {
@@ -524,7 +546,7 @@ async function validatePrAgainstAuthority(
     return invalid("repo mismatch")
   }
 
-  const authority = await findPrValidationAuthority(env)
+  const authority = await findPrValidationAuthority(env, { repo, base_branch, pr_number })
   if (!authority) {
     return invalid("authority not found")
   }
@@ -540,7 +562,8 @@ async function validatePrAgainstAuthority(
   const authorityBoundObjectMatches =
     constraints.repo === repo &&
     constraints.branch === base_branch &&
-    (typeof scope.pr_number === "undefined" || String(scope.pr_number) === pr_number)
+    String(scope.pr_number || "") === pr_number &&
+    canonicalWorkflowName(constraints.workflow) === CANONICAL_GOVERNED_WORKFLOW
 
   if (!authorityBoundObjectMatches) {
     return invalid("authority-bound object mismatch")
@@ -668,9 +691,7 @@ async function canInsertAuthority(env: Env) {
   return { ok: true }
 }
 
-async function saveAeo(env: Env, aeo: any) {
-  const canonicalAeo = parseJsonObject(aeo?.canonical_aeo)
-  const metadata = parseJsonObject(aeo?.metadata)
+async function saveAeo(env: Env, compiled: { canonical_aeo: any; registry: any }) {
   await env.DB.prepare(
     `INSERT INTO aeo_registry (
       aeo_id,
@@ -682,15 +703,7 @@ async function saveAeo(env: Env, aeo: any) {
       created_at
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
   )
-    .bind(
-      metadata.aeo_id,
-      metadata.authority_id,
-      metadata.decision_id,
-      canonicalAeo.intent,
-      JSON.stringify(canonicalAeo),
-      metadata.status,
-      metadata.created_at || new Date().toISOString()
-    )
+    .bind(compiled.registry.aeo_id, compiled.registry.authority_id, compiled.registry.decision_id, compiled.canonical_aeo.intent, JSON.stringify(compiled.canonical_aeo), compiled.registry.status, compiled.registry.created_at || new Date().toISOString())
     .run()
 }
 
@@ -1061,6 +1074,13 @@ async function runExecuteFlow(
     }
   }
 
+  if (!isCanonicalWorkflow(authorityTarget.workflow) || authorityTarget.action !== "deploy_production") {
+    return {
+      code: 409,
+      payload: { status: "FAILED", result: "INVALID", error: "wrong_workflow_or_action" }
+    }
+  }
+
   let target = authorityTarget
   if (body.target) {
     const requestedTarget = parseGithubTarget(body.target)
@@ -1174,7 +1194,7 @@ function buildProof(body: any, execution: any) {
     run_id: body.run_id,
     commit_sha: body.commit_sha,
     environment_url: body.environment_url || null,
-    workflow: body.workflow || null,
+    workflow: isCanonicalWorkflow(body.workflow) ? body.workflow : CANONICAL_GOVERNED_WORKFLOW,
     environment: body.environment || null,
     timestamp: new Date().toISOString(),
     status: "PROOF_RECORDED",
@@ -1981,13 +2001,13 @@ export default {
           return jsonResponse({ status: "FAILED", error: "Unable to compile due to missing authority target constraints." }, 409)
         }
 
-        const aeo = buildAeo(authority, target)
-        await saveAeo(env, aeo)
+        const compiled = buildAeo(authority, target)
+        await saveAeo(env, compiled)
 
         return jsonResponse({
           status: "VALID",
-          compilation_id: aeo.metadata.aeo_id,
-          compiled_object: aeo.canonical_aeo
+          compilation_id: compiled.registry.aeo_id,
+          compiled_object: compiled.canonical_aeo
         })
       }
 
@@ -2019,9 +2039,9 @@ export default {
 
       const aeo = buildAeo(authority, target)
       await saveAeo(env, aeo)
-      const exactAeo = aeo.canonical_aeo
+      const exactAeo = toAeoCore(aeo)
       const compiledHash = await sha256Hex(canonicalizeJson(exactAeo))
-      return jsonResponse({ aeo: exactAeo, metadata: aeo.metadata, validated_object_hash: compiledHash })
+      return jsonResponse({ aeo: exactAeo, validated_object_hash: compiledHash, registry: compiled.registry })
     }
 
 
@@ -2131,12 +2151,12 @@ export default {
       if (authFailure) return authFailure
       const authority = buildAuthority({ owner: "nonce_test", constraints: { repo: "local/repo", branch: "main", workflow: "governed-deploy.yml", max_executions: 1 } })
       await saveAuthority(env, authority)
-      const aeo = buildAeo(authority, targetFromAuthority(authority) as GithubDeployTarget)
-      await saveAeo(env, aeo)
-      const canonicalAeo = canonicalizeJson(aeo)
+      const compiled = buildAeo(authority, targetFromAuthority(authority) as GithubDeployTarget)
+      await saveAeo(env, compiled)
+      const canonicalAeo = canonicalizeJson(compiled.canonical_aeo)
       const hash = await sha256Hex(canonicalAeo)
       const nonce = await ensureInvocationAuthority(env, authority.decision_id, hash)
-      await saveValidation(env, await buildValidation(aeo, authority))
+      await saveValidation(env, await buildValidation({ ...compiled.canonical_aeo, ...compiled.registry }, authority))
       const keyPair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair
       const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", keyPair.privateKey, new TextEncoder().encode(hash)))
       const publicSpki = new Uint8Array(await crypto.subtle.exportKey("spki", keyPair.publicKey) as ArrayBuffer)
