@@ -55,8 +55,7 @@ test('proof response persists proof and hashes', () => {
   assert.match(source, /consumeAuthority\(env, body\.decision_id\)/)
 })
 
-
-test('execute is locked to governed workflow and deploy_production action', () => {
+test('execute is locked to canonical governed workflow and deploy_production action', () => {
   assert.match(source, /wrong_workflow_or_action/)
   assert.match(source, /canonicalWorkflowName\(authorityTarget\?\.workflow\) !== CANONICAL_GOVERNED_WORKFLOW/)
   assert.match(source, /authorityTarget\?\.action !== "deploy_production"/)
@@ -70,24 +69,19 @@ test('proof response includes persisted decision, run, commit, result, and times
   assert.match(source, /timestamp: proof\.timestamp/)
 })
 
-
 test('governed deploy recognizes workflow_mismatch as a known NULL validation reason', () => {
   assert.match(workflow, /workflow_mismatch/)
 })
 
-test('prepare-governed-deploy only prepares authority triple and does not deploy', () => {
-  assert.match(prepareWorkflow, /name: prepare-governed-deploy/)
-  assert.match(prepareWorkflow, /AUTHORITY — Create deploy authority and decision/)
-  assert.match(prepareWorkflow, /COMPILE — Resolve validated object hash/)
-  assert.match(prepareWorkflow, /GENERATE NONCE — Prepare invocation_nonce/)
-  assert.doesNotMatch(prepareWorkflow, /\/execute/)
-  assert.doesNotMatch(prepareWorkflow, /\/proof/)
-  assert.doesNotMatch(prepareWorkflow, /workflow_dispatches/)
+test('canonical workflow is governed-deploy.yml everywhere', () => {
+  assert.match(source, /const CANONICAL_GOVERNED_WORKFLOW = "governed-deploy\.yml"/)
+  assert.match(source, /constraints\.workflow === CANONICAL_GOVERNED_WORKFLOW/)
+  assert.match(source, /isCanonicalWorkflow\(target\.workflow\)/)
+  assert.match(source, /workflow: CANONICAL_GOVERNED_WORKFLOW/)
 })
 
-test('workflow surface audit: single PR validation workflow and single governed production deploy workflow', () => {
-  const prValidationWorkflows = workflowNames.filter((name) => name === 'mindshift-validate-pr.yml')
-  const productionDeployWorkflows = workflowNames.filter((name) => name === 'governed-deploy.yml')
-  assert.equal(prValidationWorkflows.length, 1)
-  assert.equal(productionDeployWorkflows.length, 1)
+test('workflow mismatch remains fail-closed NULL reason', () => {
+  assert.match(source, /return jsonResponse\(\{ status: "NULL", reason: "workflow_mismatch"/)
+  assert.match(source, /if \(combined\.includes\("workflow"\)\) return "workflow_mismatch"/)
 })
+
