@@ -51,3 +51,18 @@ test('proof response persists proof and hashes', () => {
   assert.match(source, /validated_object_hash/)
   assert.match(source, /consumeAuthority\(env, body\.decision_id\)/)
 })
+
+
+test('execute is locked to governed workflow and deploy_production action', () => {
+  assert.match(source, /wrong_workflow_or_action/)
+  assert.match(source, /authorityTarget\?\.workflow !== "governed-deploy\.yml"/)
+  assert.match(source, /authorityTarget\?\.action !== "deploy_production"/)
+})
+
+test('proof response includes persisted decision, run, commit, result, and timestamp fields', () => {
+  assert.match(source, /decision_id: proof\.decision_id/)
+  assert.match(source, /run_id: proof\.run_id/)
+  assert.match(source, /commit_sha: proof\.commit_sha/)
+  assert.match(source, /result: proof\.result/)
+  assert.match(source, /timestamp: proof\.timestamp/)
+})

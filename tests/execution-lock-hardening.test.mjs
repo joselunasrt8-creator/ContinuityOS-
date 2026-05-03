@@ -41,3 +41,9 @@ test('replay protection by decision+hash+nonce remains enforced', () => {
   assert.match(source, /transitionInvocationReservedToExecuting/)
   assert.match(source, /consumeInvocationAuthority/)
 })
+
+
+test('validation fails closed on scope mismatch and replay', () => {
+  assert.match(source, /message: "scope mismatch"/)
+  assert.match(source, /status: "NULL", result: "INVALID", message: "replay detected"/)
+})
