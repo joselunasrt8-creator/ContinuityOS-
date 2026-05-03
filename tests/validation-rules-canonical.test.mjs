@@ -23,14 +23,14 @@ test('authority registry checks exist and require ACTIVE authority', () => {
 
 test('validated object hash must equal executed object hash', () => {
   assert.match(source, /const validated_object_hash = await sha256Hex\(canonicalizeJson\(canonicalAeo\)\)/)
-  assert.match(source, /JSON\.stringify\(canonicalAeo\)/)
+  assert.match(source, /canonicalizeJson\(canonicalAeo\)/)
   assert.match(source, /validated_object_hash: compiledHash/)
   assert.match(source, /No existing VALID validation found for decision_id and validated_object_hash/)
 })
 
 test('metadata is separated from canonical object for hashing', () => {
-  assert.match(source, /const metadata = \{\s*aeo_id: crypto\.randomUUID\(\),\s*authority_id: authority\.authority_id,\s*decision_id: authority\.decision_id,\s*status: "COMPILED",\s*created_at: new Date\(\)\.toISOString\(\)\s*\}/)
-  assert.match(source, /return \{ canonical_aeo, metadata \}/)
+  assert.match(source, /const registry = \{\s*aeo_id: crypto\.randomUUID\(\),\s*authority_id: authority\.authority_id,\s*decision_id: authority\.decision_id,\s*constraints,\s*status: "COMPILED",\s*created_at: new Date\(\)\.toISOString\(\)\s*\}/)
+  assert.match(source, /return \{ canonical_aeo, registry \}/)
 })
 
 test('canonical execution path is authority -> compile -> validate -> execute -> proof', () => {
@@ -93,6 +93,6 @@ test('prepare-governed-deploy summary prints copyable values safely', () => {
 test('validated hash is computed from canonical AEO only (metadata excluded)', () => {
   assert.match(source, /function buildAeo\(authority: any, target: GithubDeployTarget\) \{/)
   assert.match(source, /return \{ canonical_aeo, registry \}/)
-  assert.match(source, /const validated_object_hash = await sha256Hex\(canonicalizeJson\(canonicalAeoFrom\(aeo\)\)\)/)
+  assert.match(source, /const validated_object_hash = await sha256Hex\(canonicalizeJson\(canonicalAeo\)\)/)
   assert.match(source, /JSON\.stringify\(compiled\.canonical_aeo\)/)
 })

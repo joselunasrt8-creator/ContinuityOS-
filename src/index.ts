@@ -191,7 +191,8 @@ function buildAuthority(body: any) {
 }
 
 function buildAeo(authority: any, target: GithubDeployTarget) {
-  const aeoCore = {
+  const constraints = ensureDeployConstraints(parseJsonObject(authority.constraints))
+  const canonical_aeo = {
     intent: authority.intent,
     scope: parseJsonObject(authority.scope),
     validation: {
@@ -199,19 +200,22 @@ function buildAeo(authority: any, target: GithubDeployTarget) {
       decision_id: authority.decision_id,
       max_executions: constraints.max_executions
     },
-    target,
+    target: {
+      ...target,
+      workflow: canonicalWorkflowName(target.workflow)
+    },
     finality: {
       proof_required: true
     }
   }
 
-  return {
+  const registry = {
     aeo_id: crypto.randomUUID(),
     authority_id: authority.authority_id,
     decision_id: authority.decision_id,
-    ...aeoCore,
-    constraints: ensureDeployConstraints(parseJsonObject(authority.constraints)),
-    status: "COMPILED"
+    constraints,
+    status: "COMPILED",
+    created_at: new Date().toISOString()
   }
 
   return { canonical_aeo, registry }
@@ -272,18 +276,21 @@ function targetFromAuthority(authority: any): GithubDeployTarget | null {
 }
 
 async function buildValidation(aeo: any, authority: any) {
-  const validated_object_hash = await sha256Hex(canonicalizeJson(toAeoCore(aeo)))
-  const constraints = ensureDeployConstraints(parseJsonObject(aeo?.constraints))
-  const target = parseJsonObject(aeo?.target)
-  const finality = parseJsonObject(aeo?.finality)
-  const validation = parseJsonObject(aeo?.validation)
-  const hasRequiredAeoFields = Boolean(aeo?.intent && aeo?.scope && aeo?.validation && aeo?.target && aeo?.finality)
+  const canonicalAeo = aeo?.canonical_aeo ? parseJsonObject(aeo.canonical_aeo) : toAeoCore(aeo)
+  const metadata = aeo?.metadata ? parseJsonObject(aeo.metadata) : parseJsonObject(aeo)
+  const constraints = ensureDeployConstraints(parseJsonObject(authority?.constraints))
+  const target = parseJsonObject(canonicalAeo?.target)
+  const finality = parseJsonObject(canonicalAeo?.finality)
+  const validation = parseJsonObject(canonicalAeo?.validation)
+  const validated_object_hash = await sha256Hex(canonicalizeJson(canonicalAeo))
+  const hasRequiredAeoFields = Boolean(canonicalAeo?.intent && canonicalAeo?.scope && canonicalAeo?.validation && canonicalAeo?.target && canonicalAeo?.finality)
   const isAuthorityActive = Boolean(authority && String(authority.status || "").toUpperCase() === "ACTIVE")
   const hasTargetFields = Boolean(target.repo && target.branch && target.workflow)
   const constraintsMatchTarget =
     constraints.repo === String(target.repo || "") &&
     constraints.branch === String(target.branch || "") &&
     canonicalWorkflowName(constraints.workflow) === canonicalWorkflowName(target.workflow)
+  const workflowIsCanonical = isCanonicalWorkflow(target.workflow)
 
   const authorityBindingChecks = [
     {
@@ -309,7 +316,7 @@ async function buildValidation(aeo: any, authority: any) {
     Boolean(authority) &&
     isAuthorityActive &&
     hasRequiredAeoFields &&
-    Boolean(aeo?.target) &&
+    Boolean(canonicalAeo?.target) &&
     finality.proof_required === true &&
     hasTargetFields &&
     constraintsMatchTarget &&
@@ -325,9 +332,9 @@ async function buildValidation(aeo: any, authority: any) {
 
   return {
     validation_id: crypto.randomUUID(),
-    authority_id: metadata.authority_id,
-    aeo_id: metadata.aeo_id,
-    decision_id: metadata.decision_id,
+    authority_id: String(metadata.authority_id || ""),
+    aeo_id: String(metadata.aeo_id || ""),
+    decision_id: String(metadata.decision_id || ""),
     intent: canonicalAeo.intent,
     validated_object_hash,
     result: isValid ? "VALID" : "NULL",
