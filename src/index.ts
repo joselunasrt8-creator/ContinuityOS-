@@ -191,13 +191,9 @@ function buildAuthority(body: any) {
 }
 
 function buildAeo(authority: any, target: GithubDeployTarget) {
-  return {
-    aeo_id: crypto.randomUUID(),
-    authority_id: authority.authority_id,
-    decision_id: authority.decision_id,
+  const aeoCore = {
     intent: authority.intent,
     scope: parseJsonObject(authority.scope),
-    constraints: ensureDeployConstraints(parseJsonObject(authority.constraints)),
     validation: {
       authority_id: authority.authority_id,
       decision_id: authority.decision_id,
@@ -206,8 +202,26 @@ function buildAeo(authority: any, target: GithubDeployTarget) {
     target,
     finality: {
       proof_required: true
-    },
+    }
+  }
+
+  return {
+    aeo_id: crypto.randomUUID(),
+    authority_id: authority.authority_id,
+    decision_id: authority.decision_id,
+    ...aeoCore,
+    constraints: ensureDeployConstraints(parseJsonObject(authority.constraints)),
     status: "COMPILED"
+  }
+}
+
+function toAeoCore(aeo: any) {
+  return {
+    intent: aeo.intent,
+    scope: aeo.scope,
+    validation: aeo.validation,
+    target: aeo.target,
+    finality: aeo.finality
   }
 }
 
@@ -256,7 +270,7 @@ function targetFromAuthority(authority: any): GithubDeployTarget | null {
 }
 
 async function buildValidation(aeo: any, authority: any) {
-  const validated_object_hash = await sha256Hex(canonicalizeJson(aeo))
+  const validated_object_hash = await sha256Hex(canonicalizeJson(toAeoCore(aeo)))
   const constraints = ensureDeployConstraints(parseJsonObject(aeo?.constraints))
   const target = parseJsonObject(aeo?.target)
   const finality = parseJsonObject(aeo?.finality)
@@ -466,14 +480,18 @@ async function findLatestValidValidationByDecisionId(env: Env, decisionId: strin
     .first<any>()
 }
 
-async function findPrValidationAuthority(env: Env) {
+async function findPrValidationAuthority(env: Env, payload: { repo: string; base_branch: string; pr_number: string }) {
   return env.DB.prepare(
     `SELECT * FROM authority_registry
      WHERE intent = 'merge_pull_request'
        AND UPPER(status) = 'ACTIVE'
+       AND json_extract(constraints, '$.repo') = ?1
+       AND json_extract(constraints, '$.branch') = ?2
+       AND json_extract(scope, '$.pr_number') = ?3
+       AND json_extract(constraints, '$.workflow') = ?4
      ORDER BY created_at DESC
      LIMIT 1`
-  ).first<any>()
+  ).bind(payload.repo, payload.base_branch, payload.pr_number, CANONICAL_GOVERNED_WORKFLOW).first<any>()
 }
 
 async function hasPrExecutionReplay(env: Env, payload: {
@@ -526,7 +544,7 @@ async function validatePrAgainstAuthority(
     return invalid("repo mismatch")
   }
 
-  const authority = await findPrValidationAuthority(env)
+  const authority = await findPrValidationAuthority(env, { repo, base_branch, pr_number })
   if (!authority) {
     return invalid("authority not found")
   }
@@ -542,7 +560,8 @@ async function validatePrAgainstAuthority(
   const authorityBoundObjectMatches =
     constraints.repo === repo &&
     constraints.branch === base_branch &&
-    (typeof scope.pr_number === "undefined" || String(scope.pr_number) === pr_number)
+    String(scope.pr_number || "") === pr_number &&
+    canonicalWorkflowName(constraints.workflow) === CANONICAL_GOVERNED_WORKFLOW
 
   if (!authorityBoundObjectMatches) {
     return invalid("authority-bound object mismatch")
@@ -2018,7 +2037,7 @@ export default {
 
       const aeo = buildAeo(authority, target)
       await saveAeo(env, aeo)
-      const exactAeo = { intent: aeo.intent, scope: aeo.scope, validation: aeo.validation, target: aeo.target, finality: aeo.finality }
+      const exactAeo = toAeoCore(aeo)
       const compiledHash = await sha256Hex(canonicalizeJson(exactAeo))
       return jsonResponse({ aeo: exactAeo, validated_object_hash: compiledHash })
     }

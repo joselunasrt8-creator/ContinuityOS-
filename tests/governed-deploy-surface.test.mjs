@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const workflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
+const prepareWorkflow = readFileSync(new URL('../.github/workflows/prepare-governed-deploy.yml', import.meta.url), 'utf8')
 const pkg = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+const workflowNames = readdirSync(new URL('../.github/workflows/', import.meta.url))
 
 test('authority endpoint persists required fields including expiry and ACTIVE', () => {
   assert.match(source, /route\("\/authority"\)/)
@@ -14,7 +16,8 @@ test('authority endpoint persists required fields including expiry and ACTIVE', 
 })
 
 test('compile emits exact AEO + canonical hash output', () => {
-  assert.match(source, /const exactAeo = \{ intent: aeo\.intent, scope: aeo\.scope, validation: aeo\.validation, target: aeo\.target, finality: aeo\.finality \}/)
+  assert.match(source, /function toAeoCore\(aeo: any\)/)
+  assert.match(source, /const exactAeo = toAeoCore\(aeo\)/)
   assert.match(source, /validated_object_hash: compiledHash/)
 })
 
