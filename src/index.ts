@@ -2048,7 +2048,7 @@ export default {
       await saveAeo(env, aeo)
       const exactAeo = toAeoCore(aeo)
       const compiledHash = await sha256Hex(canonicalizeJson(exactAeo))
-      return jsonResponse({ aeo: exactAeo, validated_object_hash: compiledHash, registry: compiled.registry })
+      return jsonResponse({ aeo: exactAeo, validated_object_hash: compiledHash, registry: aeo.registry })
     }
 
 
