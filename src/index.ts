@@ -85,7 +85,7 @@ type Env = {
 
 type GithubDeployTarget = {
   system: "github_actions"
-  action: "deploy"
+  action: "deploy_production"
   repo: string
   branch: string
   workflow: string
@@ -202,7 +202,7 @@ function parseGithubTarget(input: any): GithubDeployTarget | null {
     return null
   }
 
-  if (input.system !== "github_actions" || input.action !== "deploy") {
+  if (input.system !== "github_actions" || input.action !== "deploy_production") {
     return null
   }
 
@@ -212,7 +212,7 @@ function parseGithubTarget(input: any): GithubDeployTarget | null {
 
   return {
     system: "github_actions",
-    action: "deploy",
+    action: "deploy_production",
     repo: String(input.repo),
     branch: String(input.branch),
     workflow: String(input.workflow),
@@ -229,7 +229,7 @@ function targetFromAuthority(authority: any): GithubDeployTarget | null {
 
   return {
     system: "github_actions",
-    action: "deploy",
+    action: "deploy_production",
     repo: constraints.repo,
     branch: constraints.branch,
     workflow: constraints.workflow
@@ -897,6 +897,12 @@ async function runExecuteFlow(
     }
 
     const authorityTarget = targetFromAuthority(authority)
+    if (authorityTarget?.workflow !== "governed-deploy.yml" || authorityTarget?.action !== "deploy_production") {
+      return {
+        code: 409,
+        payload: { status: "FAILED", result: "INVALID", error: "wrong_workflow_or_action" }
+      }
+    }
     if (!authorityTarget) {
       return {
         code: 409,
@@ -1039,7 +1045,7 @@ async function runExecuteFlow(
           result: "NOT_EXECUTED",
           message: "execution blocked",
           error:
-            "Unsupported target. Only target.system='github_actions' with action='deploy' and fields repo, branch, workflow is allowed."
+            "Unsupported target. Only target.system='github_actions' with action='deploy_production' and fields repo, branch, workflow is allowed."
         }
       }
     }
@@ -1123,6 +1129,7 @@ function buildProof(body: any, execution: any) {
   const executionEvent = parseJsonObject(execution?.execution_event)
   const validatedObjectHash =
     typeof executionEvent.validated_object_hash === "string" ? executionEvent.validated_object_hash : undefined
+  const executedObjectHash = validatedObjectHash
 
   return {
     proof_id: crypto.randomUUID(),
@@ -1134,7 +1141,7 @@ function buildProof(body: any, execution: any) {
       body.proof_reference ||
       {
         source: `github_run:${body.run_id || "unknown"}`,
-        ...(validatedObjectHash ? { validated_object_hash: validatedObjectHash } : {})
+        ...(validatedObjectHash ? { validated_object_hash: validatedObjectHash, executed_object_hash: executedObjectHash } : {})
       },
     run_id: body.run_id,
     commit_sha: body.commit_sha,
@@ -1143,6 +1150,9 @@ function buildProof(body: any, execution: any) {
     environment: body.environment || null,
     timestamp: new Date().toISOString(),
     status: "PROOF_RECORDED",
+    result: execution.status,
+    validated_object_hash: validatedObjectHash || null,
+    executed_object_hash: executedObjectHash || null,
     execution_status: execution.status
   }
 }
@@ -1180,7 +1190,12 @@ async function saveProof(env: Env, proof: any) {
         environment: proof.environment,
         ...(normalizedProofReference.validated_object_hash
           ? { validated_object_hash: normalizedProofReference.validated_object_hash }
-          : {})
+          : {}),
+        ...(normalizedProofReference.executed_object_hash
+          ? { executed_object_hash: normalizedProofReference.executed_object_hash }
+          : {}),
+        result: proof.result,
+        timestamp: proof.timestamp
       }),
       proof.status,
       proof.timestamp
@@ -1346,6 +1361,21 @@ async function validateAuthority(env: Env, body: any) {
           result: "INVALID",
           message: "environment must be production"
         }
+      }
+    }
+
+    const constraints = ensureDeployConstraints(parseJsonObject(authority.constraints))
+    const expectedScope = parseJsonObject(authority.scope)
+    const scopeMatches =
+      constraints.repo === `${env.GITHUB_OWNER}/${env.GITHUB_REPO}` &&
+      constraints.branch === "main" &&
+      constraints.workflow === "governed-deploy.yml" &&
+      String(expectedScope.environment || "") === "production"
+    if (!scopeMatches) {
+      return {
+        ok: false,
+        code: 409,
+        payload: { validation_id: validationId, decision_id: body.decision_id, status: "NULL", result: "INVALID", message: "scope mismatch" }
       }
     }
 
@@ -2177,8 +2207,13 @@ export default {
         status: "VALID",
         proof_id: proof.proof_id,
         execution_id: proof.execution_id,
+        decision_id: proof.decision_id,
         validated_object_hash: parseJsonObject(proof.proof_reference).validated_object_hash,
-        executed_object_hash: parseJsonObject(proof.proof_reference).executed_object_hash || parseJsonObject(proof.proof_reference).validated_object_hash
+        executed_object_hash: parseJsonObject(proof.proof_reference).executed_object_hash || parseJsonObject(proof.proof_reference).validated_object_hash,
+        run_id: proof.run_id,
+        commit_sha: proof.commit_sha,
+        result: proof.result,
+        timestamp: proof.timestamp
       })
     }
 
