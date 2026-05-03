@@ -152,10 +152,11 @@ function requireApiKey(request: Request, env: Env): Response | null {
 const CANONICAL_GOVERNED_WORKFLOW = "governed-deploy.yml"
 
 function normalizeWorkflowName(workflow: unknown): string {
-  const raw = String(workflow || "").trim()
-  if (!raw) return ""
-  const parts = raw.split("/").filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : raw
+  return String(workflow || "").trim()
+}
+
+function isCanonicalWorkflow(workflow: unknown): boolean {
+  return normalizeWorkflowName(workflow) === CANONICAL_GOVERNED_WORKFLOW
 }
 
 function ensureDeployConstraints(constraints: Record<string, unknown>) {
@@ -223,12 +224,17 @@ function parseGithubTarget(input: any): GithubDeployTarget | null {
     return null
   }
 
+  const workflow = normalizeWorkflowName(input.workflow)
+  if (!isCanonicalWorkflow(workflow)) {
+    return null
+  }
+
   return {
     system: "github_actions",
     action: "deploy_production",
     repo: String(input.repo),
     branch: String(input.branch),
-    workflow: normalizeWorkflowName(input.workflow),
+    workflow,
     inputs: input.inputs && typeof input.inputs === "object" ? input.inputs : undefined
   }
 }
@@ -291,6 +297,7 @@ async function buildValidation(aeo: any, authority: any) {
     finality.proof_required === true &&
     hasTargetFields &&
     constraintsMatchTarget &&
+    workflowIsCanonical &&
     !authorityBindingFailure
 
   const status = isValid ? "VALIDATED" : "FAILED"
@@ -1046,6 +1053,13 @@ async function runExecuteFlow(
     }
   }
 
+  if (!isCanonicalWorkflow(authorityTarget.workflow) || authorityTarget.action !== "deploy_production") {
+    return {
+      code: 409,
+      payload: { status: "FAILED", result: "INVALID", error: "wrong_workflow_or_action" }
+    }
+  }
+
   let target = authorityTarget
   if (body.target) {
     const requestedTarget = parseGithubTarget(body.target)
@@ -1159,7 +1173,7 @@ function buildProof(body: any, execution: any) {
     run_id: body.run_id,
     commit_sha: body.commit_sha,
     environment_url: body.environment_url || null,
-    workflow: body.workflow || null,
+    workflow: isCanonicalWorkflow(body.workflow) ? body.workflow : CANONICAL_GOVERNED_WORKFLOW,
     environment: body.environment || null,
     timestamp: new Date().toISOString(),
     status: "PROOF_RECORDED",
