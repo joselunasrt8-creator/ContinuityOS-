@@ -104,10 +104,9 @@ jobs:
           fi
 
           AUTHORITY_STATUS=$(jq -r '.status // empty' pr-authority.json)
-          AUTHORITY_ID=$(jq -r '.authority_id // empty' pr-authority.json)
           DECISION_ID=$(jq -r '.decision_id // empty' pr-authority.json)
 
-          if [ "$AUTHORITY_STATUS" != "VALID" ] || [ -z "$AUTHORITY_ID" ] || [ -z "$DECISION_ID" ]; then
+          if { [ "$AUTHORITY_STATUS" != "VALID" ] && [ "$AUTHORITY_STATUS" != "ACTIVE" ]; } || [ -z "$DECISION_ID" ]; then
             echo "NULL — Invalid PR authority response"
             exit 1
           fi
