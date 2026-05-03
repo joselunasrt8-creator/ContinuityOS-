@@ -22,7 +22,7 @@ test('validate returns only VALID or NULL and checks exact AEO keys', () => {
   assert.match(source, /requiredAeoKeys = \["intent", "scope", "validation", "target", "finality"\]/)
   assert.match(source, /keys\.length === requiredAeoKeys\.length/)
   assert.match(source, /return jsonResponse\(\{ status: "VALID" \}\)/)
-  assert.match(source, /return jsonResponse\(\{ status: "NULL" \}\)/)
+  assert.match(source, /return jsonResponse\(\{ status: "NULL", reason: deriveValidateNullReason\(result\.payload\) \}\)/)
 })
 
 test('execute blocks without prior VALID reservation', () => {

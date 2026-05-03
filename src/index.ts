@@ -1939,7 +1939,7 @@ export default {
     if (route("/compile") && request.method === "POST") {
       const body = await readJson(request)
       if (!body) {
-        return jsonResponse({ status: "NULL", result: "NULL", error: "Missing request body" }, 400)
+        return jsonResponse({ status: "NULL", reason: "workflow_mismatch", result: "NULL", error: "Missing request body" }, 400)
       }
 
       if (body.authority_id) {
@@ -2009,7 +2009,7 @@ export default {
     if (route("/validate") && request.method === "POST") {
       const body = await readJson(request)
       if (!body) {
-        return jsonResponse({ status: "NULL", result: "NULL", error: "Missing request body" }, 400)
+        return jsonResponse({ status: "NULL", reason: "workflow_mismatch", result: "NULL", error: "Missing request body" }, 400)
       }
 
       if (body.compilation_id) {
@@ -2030,6 +2030,7 @@ export default {
 
         return jsonResponse({
           status: validation.result === "VALID" ? "VALID" : "NULL",
+          ...(validation.result === "VALID" ? {} : { reason: "workflow_mismatch" }),
           result: validation.result,
           validation_id: validation.validation_id,
           decision_id: validation.decision_id,
