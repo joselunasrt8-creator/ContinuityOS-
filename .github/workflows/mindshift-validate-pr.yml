@@ -102,19 +102,16 @@ jobs:
           fi
 
           AUTHORITY_STATUS=$(jq -r '.status // empty' pr-authority.json)
-          AUTHORITY_ID=$(jq -r '.authority_id // empty' pr-authority.json)
           DECISION_ID=$(jq -r '.decision_id // empty' pr-authority.json)
 
+          # /authority success contract: status must be ACTIVE and decision_id must be non-empty.
+          # Fail closed for all other cases.
           if [ "$AUTHORITY_STATUS" != "ACTIVE" ] || [ -z "$DECISION_ID" ]; then
-            echo "NULL — Invalid PR authority response"
+            echo "NULL — Invalid PR authority response (expected status=ACTIVE with non-empty decision_id)"
             exit 1
           fi
 
-          if [ -n "$AUTHORITY_ID" ]; then
-            echo "PR authority_id: $AUTHORITY_ID"
-          else
-            echo "PR authority_id not provided by API"
-          fi
+          echo "ACTIVE — PR authority granted with decision_id: $DECISION_ID"
 
       - name: VALIDATE PR — Fail closed (POST /validate-pr)
         run: |
