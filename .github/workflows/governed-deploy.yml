@@ -86,6 +86,11 @@ jobs:
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Validation endpoint error"
+            if [ -f validate.json ]; then
+              echo "--- validate.json ---"
+              cat validate.json
+              echo "---------------------"
+            fi
             exit 1
           fi
 
@@ -93,19 +98,46 @@ jobs:
           RESULT=$(jq -r '.result // empty' validate.json)
           RETURNED_HASH=$(jq -r '.validated_object_hash // empty' validate.json)
           RETURNED_NONCE=$(jq -r '.invocation_nonce // empty' validate.json)
+          REASON=$(jq -r '.reason // .failure_reason // empty' validate.json)
+          REASONS=$(jq -r 'if (.reasons|type)=="array" then (.reasons|join(",")) else empty end' validate.json)
 
           if [ "$RESULT" != "VALID" ] || [ "$STATUS" != "VALID" ]; then
+            if [ -z "$REASON" ] && [ -z "$REASONS" ]; then
+              echo "NULL — Validation failed without reason"
+              echo "--- validate.json ---"
+              cat validate.json
+              echo "---------------------"
+              exit 1
+            fi
+
+            if ! jq -e '[.reason, .failure_reason, (.reasons[]?)] | map(select(type=="string")) | any(. == "expired_authority" or . == "scope_mismatch" or . == "hash_mismatch" or . == "replay_detected" or . == "nonce_invalid")' validate.json >/dev/null; then
+              echo "NULL — Validation failed with unrecognized reason"
+              echo "--- validate.json ---"
+              cat validate.json
+              echo "---------------------"
+              exit 1
+            fi
+
             echo "NULL — Validation failed"
+            echo "--- validate.json ---"
+            cat validate.json
+            echo "---------------------"
             exit 1
           fi
 
           if [ -z "$RETURNED_HASH" ] || [ "$RETURNED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
             echo "NULL — Hash mismatch"
+            echo "--- validate.json ---"
+            cat validate.json
+            echo "---------------------"
             exit 1
           fi
 
           if [ -z "$RETURNED_NONCE" ] || [ "$RETURNED_NONCE" != "$INVOCATION_NONCE" ]; then
             echo "NULL — Invocation nonce not accepted/reserved"
+            echo "--- validate.json ---"
+            cat validate.json
+            echo "---------------------"
             exit 1
           fi
 
