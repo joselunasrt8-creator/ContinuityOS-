@@ -1498,6 +1498,24 @@ async function validateAuthority(env: Env, body: any) {
   }
 }
 
+function deriveValidateNullReason(payload?: { message?: string; error?: string }): string {
+  const error = String(payload?.error || "").toLowerCase()
+  const message = String(payload?.message || "").toLowerCase()
+  const combined = `${error} ${message}`
+
+  if (combined.includes("unknown_or_expired") || combined.includes("expired")) return "expired_authority"
+  if (combined.includes("scope mismatch")) return "scope_mismatch"
+  if (combined.includes("hash_mismatch") || combined.includes("hash mismatch")) return "hash_mismatch"
+  if (combined.includes("replay")) return "replay_detected"
+  if (combined.includes("nonce")) return "nonce_invalid"
+  if (combined.includes("authority not found")) return "authority_not_found"
+  if (combined.includes("not valid for execution") || combined.includes("authority already consumed")) return "authority_not_active"
+  if (combined.includes("environment")) return "environment_mismatch"
+  if (combined.includes("workflow")) return "workflow_mismatch"
+
+  return "workflow_mismatch"
+}
+
 async function runGithubProofTest(env: Env) {
   const authority = buildAuthority({
     owner: "github_proof_test",
@@ -2025,13 +2043,13 @@ export default {
       if (body.aeo && isObject(body.aeo)) {
         const keys = Object.keys(body.aeo)
         const hasExact = requiredAeoKeys.every((key) => keys.includes(key)) && keys.length === requiredAeoKeys.length
-        if (!hasExact) return jsonResponse({ status: "NULL" })
+        if (!hasExact) return jsonResponse({ status: "NULL", reason: "workflow_mismatch" })
       }
       const result = await validateAuthority(env, body)
       if (result.payload?.status === "VALID" || result.payload?.result === "VALID") {
         return jsonResponse({ status: "VALID" })
       }
-      return jsonResponse({ status: "NULL" })
+      return jsonResponse({ status: "NULL", reason: deriveValidateNullReason(result.payload) })
     }
 
     if (route("/execute") && request.method === "POST") {
