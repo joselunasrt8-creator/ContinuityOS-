@@ -110,7 +110,7 @@ jobs:
               exit 1
             fi
 
-            if ! jq -e '[.reason, .failure_reason, (.reasons[]?)] | map(select(type=="string")) | any(. == "expired_authority" or . == "scope_mismatch" or . == "hash_mismatch" or . == "replay_detected" or . == "nonce_invalid")' validate.json >/dev/null; then
+            if ! jq -e '[.reason, .failure_reason, (.reasons[]?)] | map(select(type=="string")) | any(. == "expired_authority" or . == "scope_mismatch" or . == "hash_mismatch" or . == "replay_detected" or . == "nonce_invalid" or . == "workflow_mismatch")' validate.json >/dev/null; then
               echo "NULL — Validation failed with unrecognized reason"
               echo "--- validate.json ---"
               cat validate.json

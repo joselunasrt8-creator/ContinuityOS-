@@ -149,12 +149,21 @@ function requireApiKey(request: Request, env: Env): Response | null {
   return null
 }
 
+const CANONICAL_GOVERNED_WORKFLOW = "governed-deploy.yml"
+
+function normalizeWorkflowName(workflow: unknown): string {
+  const raw = String(workflow || "").trim()
+  if (!raw) return ""
+  const parts = raw.split("/").filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : raw
+}
+
 function ensureDeployConstraints(constraints: Record<string, unknown>) {
   return {
     ...constraints,
     repo: String(constraints.repo || ""),
     branch: String(constraints.branch || ""),
-    workflow: String(constraints.workflow || ""),
+    workflow: normalizeWorkflowName(constraints.workflow),
     max_executions: Number(constraints.max_executions ?? 1)
   }
 }
@@ -215,7 +224,7 @@ function parseGithubTarget(input: any): GithubDeployTarget | null {
     action: "deploy_production",
     repo: String(input.repo),
     branch: String(input.branch),
-    workflow: String(input.workflow),
+    workflow: normalizeWorkflowName(input.workflow),
     inputs: input.inputs && typeof input.inputs === "object" ? input.inputs : undefined
   }
 }
@@ -350,7 +359,7 @@ async function prepareDeployTriple(env: Env) {
     constraints: {
       repo: `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`,
       branch: "main",
-      workflow: "governed-deploy.yml",
+      workflow: CANONICAL_GOVERNED_WORKFLOW,
       max_executions: 1
     }
   })
@@ -1369,7 +1378,7 @@ async function validateAuthority(env: Env, body: any) {
     const scopeMatches =
       constraints.repo === `${env.GITHUB_OWNER}/${env.GITHUB_REPO}` &&
       constraints.branch === "main" &&
-      constraints.workflow === "governed-deploy.yml" &&
+      constraints.workflow === CANONICAL_GOVERNED_WORKFLOW &&
       String(expectedScope.environment || "") === "production"
     if (!scopeMatches) {
       return {
@@ -1525,7 +1534,7 @@ async function runGithubProofTest(env: Env) {
     constraints: {
       repo: `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`,
       branch: "main",
-      workflow: "governed-deploy.yml",
+      workflow: CANONICAL_GOVERNED_WORKFLOW,
       max_executions: 1
     }
   })
@@ -1590,7 +1599,7 @@ async function runReplayTest(env: Env) {
     constraints: {
       repo: "local/replay-test",
       branch: "main",
-      workflow: "governed-deploy.yml",
+      workflow: CANONICAL_GOVERNED_WORKFLOW,
       max_executions: 1
     }
   })
@@ -1840,7 +1849,7 @@ export default {
           const constraints = {
             repo: String(target.repo || fallbackRepo),
             branch: String(target.branch || "main"),
-            workflow: String(target.workflow || "governed-deploy.yml"),
+            workflow: normalizeWorkflowName(target.workflow || CANONICAL_GOVERNED_WORKFLOW),
             max_executions: 1
           }
 
