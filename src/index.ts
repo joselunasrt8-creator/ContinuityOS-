@@ -44,6 +44,12 @@ async function ensureSchema(env: Env) {
   for (const s of stmts) await env.DB.prepare(s).run()
 }
 
+async function hasColumn(env: Env, table: string, column: string): Promise<boolean> {
+  const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all<any>()
+  const rows = Array.isArray(info?.results) ? info.results : []
+  return rows.some((row: any) => String(row?.name) === column)
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     await ensureSchema(env)
@@ -58,16 +64,38 @@ export default {
     }
 
     if (url.pathname === "/compile" && request.method === "POST") {
-      const b = await body(request)
-      const decision_id = String(b.decision_id || "")
-      const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1 AND status='ACTIVE'`).bind(decision_id).first<any>()
-      if (!authority) return json({ status: "NULL", reason: "no_active_authority" })
-      const constraints = JSON.parse(String(authority.constraints || "{}"))
-      const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope||"{}")), validation: { workflow: GOVERNED_WORKFLOW }, target: { repo: constraints.repo, branch: constraints.branch, workflow: constraints.workflow }, finality: { proof_required: true } })
-      if (!canonical_aeo) return json({ status: "NULL", reason: "invalid_canonical_aeo" })
-      const validated_object_hash = await sha256Hex(canonicalize(canonical_aeo))
-      await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,canonical_aeo,validated_object_hash,status,created_at) VALUES (?1,?2,?3,?4,?5,'COMPILED',?6)`).bind(crypto.randomUUID(),authority.authority_id,decision_id,JSON.stringify(canonical_aeo),validated_object_hash,new Date().toISOString()).run()
-      return json({ status: "COMPILED", decision_id, validated_object_hash, canonical_aeo })
+      try {
+        const b = await body(request)
+        const decision_id = String(b.decision_id || "")
+        if (!decision_id) return json({ status: "NULL", route: "/compile", reason: "missing_decision_id" })
+
+        const authorityHasStatus = await hasColumn(env, "authority_registry", "status")
+        const authorityHasDecision = await hasColumn(env, "authority_registry", "decision_id")
+        if (!authorityHasStatus || !authorityHasDecision) {
+          return json({ status: "NULL", route: "/compile", reason: "schema_incompatible_authority_registry" })
+        }
+        const aeoHasHash = await hasColumn(env, "aeo_registry", "validated_object_hash")
+        if (!aeoHasHash) return json({ status: "NULL", route: "/compile", reason: "schema_incompatible_aeo_registry" })
+
+        const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
+        if (!authority) return json({ status: "NULL", route: "/compile", reason: "authority_missing" })
+        if (!["ACTIVE", "VALIDATED", "RESERVED"].includes(String(authority.status || ""))) {
+          return json({ status: "NULL", route: "/compile", reason: "authority_unusable" })
+        }
+        const constraints = JSON.parse(String(authority.constraints || "{}"))
+        const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope || "{}")), validation: { workflow: GOVERNED_WORKFLOW }, target: { repo: constraints.repo, branch: constraints.branch, workflow: constraints.workflow }, finality: { proof_required: true } })
+        if (!canonical_aeo) return json({ status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" })
+        const validated_object_hash = await sha256Hex(canonicalize(canonical_aeo))
+        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,canonical_aeo,validated_object_hash,status,created_at) VALUES (?1,?2,?3,?4,?5,'COMPILED',?6)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, JSON.stringify(canonical_aeo), validated_object_hash, new Date().toISOString()).run()
+        return json({ status: "COMPILED", decision_id, validated_object_hash, canonical_aeo })
+      } catch (error: any) {
+        return json({
+          status: "FAILED",
+          route: "/compile",
+          error: String(error?.message || error || "unknown_error"),
+          reason: "compile_exception"
+        })
+      }
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {

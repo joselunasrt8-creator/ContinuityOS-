@@ -20,6 +20,14 @@ test('compile returns validated_object_hash', () => {
   assert.match(source, /validated_object_hash/)
 })
 
+test('compile is fail-closed and never throws unhandled exception', () => {
+  assert.match(source, /if \(!decision_id\) return json\(\{ status: "NULL", route: "\/compile", reason: "missing_decision_id" \}\)/)
+  assert.match(source, /reason: "schema_incompatible_authority_registry"/)
+  assert.match(source, /reason: "schema_incompatible_aeo_registry"/)
+  assert.match(source, /status: "FAILED"/)
+  assert.match(source, /reason: "compile_exception"/)
+})
+
 test('validate reserves nonce', () => {
   assert.match(source, /INSERT OR IGNORE INTO invocation_registry/)
   assert.match(source, /'RESERVED'/)
