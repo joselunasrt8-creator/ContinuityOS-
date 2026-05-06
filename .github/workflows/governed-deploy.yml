@@ -207,6 +207,7 @@ jobs:
             -d "$(jq -n \
               --arg execution_id "$EXECUTION_ID" \
               --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
               --arg surface "github_actions" \
               --arg run_id "${{ github.run_id }}" \
               --arg commit_sha "${{ github.sha }}" \
@@ -214,7 +215,7 @@ jobs:
               --arg environment "$DEPLOY_ENVIRONMENT" \
               --arg repo "$DEPLOY_REPO" \
               --arg branch "$DEPLOY_BRANCH" \
-              '{execution_id: $execution_id, decision_id: $decision_id, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
+              '{execution_id: $execution_id, decision_id: $decision_id, validated_object_hash: $validated_object_hash, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Proof endpoint error"
@@ -224,7 +225,7 @@ jobs:
           PROOF_STATUS=$(jq -r '.status // empty' proof.json)
           PROOF_ID=$(jq -r '.proof.proof_id // .proof_id // empty' proof.json)
 
-          if [ "$PROOF_STATUS" != "VALID" ] || [ -z "$PROOF_ID" ]; then
+          if [ "$PROOF_STATUS" != "PROVEN" ] || [ -z "$PROOF_ID" ]; then
             echo "NULL — Missing required proof"
             exit 1
           fi

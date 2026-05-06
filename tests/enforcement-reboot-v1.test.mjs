@@ -7,6 +7,7 @@ const migration = readFileSync(new URL('../migrations/0006_enforcement_reboot_v1
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
 const aeoRebuildMigration = readFileSync(new URL('../migrations/0007_canonical_aeo_registry_rebuild.sql', import.meta.url), 'utf8')
 const registryRebuildMigration = readFileSync(new URL('../migrations/0008_canonical_runtime_registry_rebuild.sql', import.meta.url), 'utf8')
+const governedDeployWorkflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
 
 test('runtime mutation endpoints reject unauthorized requests before body parsing or DB access', async () => {
   const { transformSync } = await import('esbuild')
@@ -100,8 +101,18 @@ test('execute rejects no validation and wrong hash and replay', () => {
 })
 
 test('proof persists and consumes authority', () => {
+  assert.match(source, /missing_validated_object_hash/)
+  assert.match(source, /AND status='EXECUTED'/)
   assert.match(source, /INSERT INTO proof_registry/)
   assert.match(source, /SET status='CONSUMED'/)
+  assert.match(source, /status:"PROVEN"/)
+  assert.match(source, /proof_id/)
+})
+
+test('governed deploy proof payload carries validated hash and expects PROVEN closure', () => {
+  assert.match(governedDeployWorkflow, /--arg validated_object_hash "\$VALIDATED_OBJECT_HASH"/)
+  assert.match(governedDeployWorkflow, /validated_object_hash: \$validated_object_hash/)
+  assert.match(governedDeployWorkflow, /"\$PROOF_STATUS" != "PROVEN"/)
 })
 
 test('schema has replay and invocation guards', () => {

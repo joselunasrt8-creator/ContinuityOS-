@@ -143,11 +143,21 @@ export default {
 
     if (url.pathname === "/proof" && request.method === "POST") {
       const b = await body(request)
-      const execution = await env.DB.prepare(`SELECT * FROM execution_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3`).bind(b.execution_id,b.decision_id,b.validated_object_hash).first<any>()
+      const execution_id = String(b.execution_id || "")
+      const decision_id = String(b.decision_id || "")
+      const validated_object_hash = String(b.validated_object_hash || "")
+      if (!execution_id) return json({ status:"NULL", result:"INVALID", reason:"missing_execution_id" })
+      if (!decision_id) return json({ status:"NULL", result:"INVALID", reason:"missing_decision_id" })
+      if (!validated_object_hash) return json({ status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" })
+      const execution = await env.DB.prepare(`SELECT * FROM execution_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 AND status='EXECUTED'`).bind(execution_id,decision_id,validated_object_hash).first<any>()
       if (!execution) return json({ status:"NULL", result:"INVALID", reason:"execution_missing" })
-      await env.DB.prepare(`INSERT INTO proof_registry (proof_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`).bind(crypto.randomUUID(),b.execution_id,b.decision_id,b.validated_object_hash,String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),new Date().toISOString()).run()
-      await env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1`).bind(b.decision_id).run()
-      return json({ status:"PROVEN", result:"OK" })
+      const authority = await env.DB.prepare(`SELECT status FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
+      if (!authority || String(authority.status) !== "EXECUTED") return json({ status:"NULL", result:"INVALID", reason:"authority_not_executed" })
+      const proof_id = crypto.randomUUID()
+      await env.DB.prepare(`INSERT INTO proof_registry (proof_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`).bind(proof_id,execution_id,decision_id,validated_object_hash,String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),new Date().toISOString()).run()
+      const consumed = await env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND status='EXECUTED'`).bind(decision_id).run()
+      if ((consumed.meta?.changes||0)===0) return json({ status:"NULL", result:"INVALID", reason:"authority_consumption_failed" })
+      return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, execution_id, decision_id, validated_object_hash } })
     }
 
     return json({ status: "NULL", reason: "not_found" }, 404)
