@@ -32,6 +32,11 @@ jobs:
       VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
       INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
       DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
 
     steps:
       - name: HARD FAIL — Missing critical inputs or secrets
@@ -53,6 +58,19 @@ jobs:
           CLEAN_WORKER_URL="${WORKER_URL%/}"
           if [ -z "$CLEAN_WORKER_URL" ]; then
             echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/$DEPLOY_WORKFLOW@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through governed-deploy.yml"
+              exit 1
+              ;;
+          esac
+
+          if [ "$DEPLOY_ENVIRONMENT" != "production" ] || [ "$DEPLOY_INTENT" != "deploy_production" ] || [ "$DEPLOY_WORKFLOW" != "governed-deploy.yml" ]; then
+            echo "NULL — Canonical production workflow binding mismatch"
             exit 1
           fi
 
@@ -82,7 +100,10 @@ jobs:
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
               --arg invocation_nonce "$INVOCATION_NONCE" \
               --arg environment "$DEPLOY_ENVIRONMENT" \
-              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment}')")
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Validation endpoint error"
@@ -151,10 +172,14 @@ jobs:
             -H "X-API-Key: $API_KEY" \
             -d "$(jq -n \
               --arg decision_id "$DECISION_ID" \
-              --arg intent "deploy_production" \
+              --arg intent "$DEPLOY_INTENT" \
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
               --arg invocation_nonce "$INVOCATION_NONCE" \
-              '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce}')")
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Execute endpoint error"
@@ -185,9 +210,11 @@ jobs:
               --arg surface "github_actions" \
               --arg run_id "${{ github.run_id }}" \
               --arg commit_sha "${{ github.sha }}" \
-              --arg workflow "governed-deploy.yml" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
               --arg environment "$DEPLOY_ENVIRONMENT" \
-              '{execution_id: $execution_id, decision_id: $decision_id, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment}')")
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              '{execution_id: $execution_id, decision_id: $decision_id, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Proof endpoint error"

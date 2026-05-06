@@ -14,6 +14,13 @@ jobs:
     env:
       WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
       API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      PREPARE_WORKFLOW: prepare-governed-deploy.yml
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
 
     steps:
       - name: HARD FAIL — Missing critical secrets
@@ -38,6 +45,19 @@ jobs:
             exit 1
           fi
 
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/$PREPARE_WORKFLOW@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through prepare-governed-deploy.yml"
+              exit 1
+              ;;
+          esac
+
+          if [ "$DEPLOY_ENVIRONMENT" != "production" ] || [ "$DEPLOY_INTENT" != "deploy_production" ] || [ "$DEPLOY_WORKFLOW" != "governed-deploy.yml" ]; then
+            echo "NULL — Canonical authority binding mismatch"
+            exit 1
+          fi
+
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
       - name: AUTHORITY — Create deploy authority and decision
@@ -51,9 +71,13 @@ jobs:
             -H "X-API-Key: $API_KEY" \
             -d "$(jq -n \
               --arg owner "github_actions" \
-              --arg intent "deploy_production" \
+              --arg intent "$DEPLOY_INTENT" \
               --arg expiry "$EXPIRY" \
-              '{owner:$owner,intent:$intent,scope:{environment:"production"},constraints:{repo:"${{ github.repository }}",branch:"${{ github.ref_name }}",workflow:"governed-deploy.yml",max_executions:1},expiry:$expiry}')")
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              '{owner:$owner,intent:$intent,scope:{environment:$environment},constraints:{repo:$repo,branch:$branch,workflow:$workflow,max_executions:1},expiry:$expiry}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Authority endpoint error"
@@ -110,17 +134,10 @@ jobs:
           echo "invocation_nonce=$INVOCATION_NONCE"
 
           {
-            printf '### governed-deploy.yml manual inputs
-
-'
-            printf '%s
-' '```text'
-            printf 'decision_id=%s
-' "$DECISION_ID"
-            printf 'validated_object_hash=%s
-' "$VALIDATED_OBJECT_HASH"
-            printf 'invocation_nonce=%s
-' "$INVOCATION_NONCE"
-            printf '%s
-' '```'
+            printf '%s\n\n' '### governed-deploy.yml manual inputs'
+            printf '%s\n' '```text'
+            printf 'decision_id=%s\n' "$DECISION_ID"
+            printf 'validated_object_hash=%s\n' "$VALIDATED_OBJECT_HASH"
+            printf 'invocation_nonce=%s\n' "$INVOCATION_NONCE"
+            printf '%s\n' '```'
           } >> "$GITHUB_STEP_SUMMARY"
