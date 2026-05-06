@@ -95,6 +95,15 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertColumns(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assertNotNull(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'invocation_registry').some((index) => index.unique === 1 && index.origin === 'pk'), 'invocation_registry must use canonical triple primary key')
+
+    assertColumns(dbPath, 'observability_registry', ['event_id', 'event_type', 'decision_id', 'authority_id', 'execution_id', 'proof_id', 'severity', 'payload', 'created_at'])
+    assertNotNull(dbPath, 'observability_registry', ['event_type', 'severity', 'payload', 'created_at'])
+    assertIndex(dbPath, 'observability_registry', 'idx_observability_decision', ['decision_id'])
+    assertIndex(dbPath, 'observability_registry', 'idx_observability_execution', ['execution_id'])
+    assertIndex(dbPath, 'observability_registry', 'idx_observability_type', ['event_type'])
+
+    assertColumns(dbPath, 'drift_registry', ['drift_id', 'drift_class', 'severity', 'decision_id', 'execution_id', 'payload', 'detected_by', 'resolution_status', 'created_at'])
+    assertNotNull(dbPath, 'drift_registry', ['drift_class', 'severity', 'payload', 'detected_by', 'resolution_status', 'created_at'])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -215,6 +224,77 @@ test('runtime lifecycle persists against migration-built canonical registries', 
     assert.equal(runSqlite([dbPath, `SELECT status FROM execution_registry WHERE decision_id='${decision_id}'`]).trim(), 'EXECUTED')
     assert.equal(runSqlite([dbPath, `SELECT environment FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), 'production')
     assert.equal(runSqlite([dbPath, `SELECT status FROM authority_registry WHERE decision_id='${decision_id}'`]).trim(), 'CONSUMED')
+    const eventTypes = runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${decision_id}' ORDER BY created_at, rowid`]).trim().split('\n')
+    assert.deepEqual(eventTypes, ['AUTHORITY_CREATED', 'AEO_COMPILED', 'VALIDATION_GRANTED', 'EXECUTION_STARTED', 'EXECUTION_COMPLETED', 'PROOF_PERSISTED', 'AUTHORITY_CONSUMED'])
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM observability_registry WHERE decision_id='${decision_id}' AND execution_id='${execution.execution_id}'`]).trim(), '3')
+    assert.match(runSqlite([dbPath, `SELECT payload FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_GRANTED'`]), /"authority_status":"RESERVED"/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('runtime telemetry records replay, hash mismatch, proof, and bypass drift', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-observability-'))
+  const dbPath = join(dir, 'observability.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  async function prepareDecision(decision_id, nonce) {
+    await post('/authority', {
+      decision_id,
+      owner: 'observability-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+    })
+    const compiled = await post('/compile', { decision_id })
+    const validation = await post('/validate', { decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: nonce, environment: 'production' })
+    assert.equal(validation.status, 'VALID')
+    return compiled
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const replayDecision = 'decision-replay-telemetry'
+    const replayCompiled = await prepareDecision(replayDecision, 'nonce-replay')
+    const replay = await post('/validate', { decision_id: replayDecision, validated_object_hash: replayCompiled.validated_object_hash, invocation_nonce: 'nonce-replay', environment: 'production' })
+    assert.equal(replay.reason, 'nonce_used')
+    assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${replayDecision}' AND event_type='REPLAY_BLOCKED'`]).trim(), 'REPLAY_BLOCKED')
+    assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${replayDecision}'`]).trim(), 'replay_drift')
+
+    const hashDecision = 'decision-hash-telemetry'
+    const hashCompiled = await prepareDecision(hashDecision, 'nonce-hash')
+    runSqlite([dbPath, `UPDATE aeo_registry SET canonical_aeo='{}' WHERE decision_id='${hashDecision}'`])
+    const hashExecution = await post('/execute', { decision_id: hashDecision, validated_object_hash: hashCompiled.validated_object_hash, invocation_nonce: 'nonce-hash' })
+    assert.equal(hashExecution.reason, 'wrong_hash')
+    assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${hashDecision}' AND event_type='HASH_MISMATCH'`]).trim(), 'HASH_MISMATCH')
+    assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${hashDecision}'`]).trim(), 'hash_drift')
+
+    const proofDecision = 'decision-proof-telemetry'
+    const proofCompiled = await prepareDecision(proofDecision, 'nonce-proof')
+    const execution = await post('/execute', { decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof' })
+    const proof = await post('/proof', { execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, workflow: 'governed-deploy.yml' })
+    assert.equal(proof.status, 'PROVEN')
+    assert.deepEqual(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${proofDecision}' AND event_type IN ('PROOF_PERSISTED','AUTHORITY_CONSUMED') ORDER BY created_at, rowid`]).trim().split('\n'), ['PROOF_PERSISTED', 'AUTHORITY_CONSUMED'])
+
+    const bypass = await worker.fetch(new Request('https://runtime.test/unmanaged-deploy', { method: 'POST', body: '{}' }), env)
+    assert.equal(bypass.status, 404)
+    assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE payload LIKE '%invalid_route_invocation%'`]).trim(), 'registry_drift')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
