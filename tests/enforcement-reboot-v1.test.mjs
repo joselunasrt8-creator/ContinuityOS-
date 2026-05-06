@@ -6,6 +6,7 @@ const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../migrations/0006_enforcement_reboot_v1.sql', import.meta.url), 'utf8')
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
 const aeoRebuildMigration = readFileSync(new URL('../migrations/0007_canonical_aeo_registry_rebuild.sql', import.meta.url), 'utf8')
+const registryRebuildMigration = readFileSync(new URL('../migrations/0008_canonical_runtime_registry_rebuild.sql', import.meta.url), 'utf8')
 
 test('runtime mutation endpoints reject unauthorized requests before body parsing or DB access', async () => {
   const { transformSync } = await import('esbuild')
@@ -122,4 +123,23 @@ test('AEO rebuild migration archives stale pre-reboot shape', () => {
   assert.match(aeoRebuildMigration, /canonical_aeo TEXT NOT NULL/)
   assert.match(aeoRebuildMigration, /validated_object_hash TEXT NOT NULL/)
   assert.match(aeoRebuildMigration, /idx_aeo_registry_decision_hash/)
+})
+
+
+test('runtime registry rebuild migration archives stale pre-reboot shapes', () => {
+  assert.match(registryRebuildMigration, /ALTER TABLE authority_registry RENAME TO authority_registry_legacy_pre_reboot/)
+  assert.match(registryRebuildMigration, /ALTER TABLE validation_registry RENAME TO validation_registry_legacy_pre_reboot/)
+  assert.match(registryRebuildMigration, /ALTER TABLE execution_registry RENAME TO execution_registry_legacy_pre_reboot/)
+  assert.match(registryRebuildMigration, /ALTER TABLE proof_registry RENAME TO proof_registry_legacy_pre_reboot/)
+  assert.match(registryRebuildMigration, /ALTER TABLE invocation_registry RENAME TO invocation_registry_legacy_pre_reboot/)
+})
+
+test('runtime registry rebuild migration restores canonical replay and proof fields', () => {
+  assert.match(registryRebuildMigration, /invocation_nonce TEXT NOT NULL/)
+  assert.match(registryRebuildMigration, /environment TEXT/)
+  assert.match(registryRebuildMigration, /run_id TEXT/)
+  assert.match(registryRebuildMigration, /commit_sha TEXT/)
+  assert.match(registryRebuildMigration, /workflow TEXT/)
+  assert.match(registryRebuildMigration, /UNIQUE\(decision_id, validated_object_hash\)/)
+  assert.match(registryRebuildMigration, /PRIMARY KEY\(decision_id, validated_object_hash, invocation_nonce\)/)
 })
