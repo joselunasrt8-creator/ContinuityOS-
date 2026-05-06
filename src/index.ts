@@ -88,7 +88,7 @@ export default {
           return json({ status: "NULL", route: "/compile", reason: "authority_unusable" })
         }
         const constraints = JSON.parse(String(authority.constraints || "{}"))
-        const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope || "{}")), validation: { workflow: GOVERNED_WORKFLOW }, target: { repo: constraints.repo, branch: constraints.branch, workflow: constraints.workflow }, finality: { proof_required: true } })
+        const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope || "{}")), validation: { workflow: GOVERNED_WORKFLOW }, target: { repo: constraints.repo, branch: constraints.branch, workflow: GOVERNED_WORKFLOW }, finality: { proof_required: true } })
         if (!canonical_aeo) return json({ status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" })
         const validated_object_hash = await sha256Hex(canonicalize(canonical_aeo))
         await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,canonical_aeo,validated_object_hash,status,created_at) VALUES (?1,?2,?3,?4,?5,'COMPILED',?6)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, JSON.stringify(canonical_aeo), validated_object_hash, new Date().toISOString()).run()
