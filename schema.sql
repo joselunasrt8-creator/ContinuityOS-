@@ -1,9 +1,9 @@
--- Cloudflare D1 schema for the Worker runtime in src/index.ts.
--- JSON-style records are stored as TEXT.
+-- Cloudflare D1 schema for the canonical Worker runtime in src/index.ts.
+-- JSON-style canonical objects are stored as TEXT.
 
 CREATE TABLE IF NOT EXISTS authority_registry (
   authority_id TEXT PRIMARY KEY,
-  decision_id TEXT NOT NULL,
+  decision_id TEXT NOT NULL UNIQUE,
   owner TEXT NOT NULL,
   intent TEXT NOT NULL,
   scope TEXT NOT NULL,
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS aeo_registry (
   aeo_id TEXT PRIMARY KEY,
   authority_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
-  intent TEXT NOT NULL,
-  aeo TEXT NOT NULL,
+  canonical_aeo TEXT NOT NULL,
+  validated_object_hash TEXT NOT NULL,
   status TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
@@ -29,46 +29,58 @@ CREATE TABLE IF NOT EXISTS aeo_registry (
 CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_id
   ON aeo_registry (decision_id);
 
+CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_hash
+  ON aeo_registry (decision_id, validated_object_hash);
+
 CREATE TABLE IF NOT EXISTS validation_registry (
   validation_id TEXT PRIMARY KEY,
-  authority_id TEXT NOT NULL,
-  aeo_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
-  intent TEXT NOT NULL,
+  validated_object_hash TEXT NOT NULL,
+  invocation_nonce TEXT NOT NULL,
+  environment TEXT,
   result TEXT NOT NULL,
+  reason TEXT,
   status TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_validation_registry_decision_id
-  ON validation_registry (decision_id);
+CREATE INDEX IF NOT EXISTS idx_validation_registry_decision_hash_nonce
+  ON validation_registry (decision_id, validated_object_hash, invocation_nonce);
 
 CREATE TABLE IF NOT EXISTS execution_registry (
   execution_id TEXT PRIMARY KEY,
-  authority_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
-  intent TEXT NOT NULL,
-  validated_object_hash TEXT,
-  webhook_url TEXT NOT NULL,
-  upstream_status INTEGER,
+  validated_object_hash TEXT NOT NULL,
+  invocation_nonce TEXT NOT NULL,
   status TEXT NOT NULL,
-  execution_event TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  UNIQUE(decision_id, validated_object_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_id
-  ON execution_registry (decision_id);
+CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_hash
+  ON execution_registry (decision_id, validated_object_hash);
 
 CREATE TABLE IF NOT EXISTS proof_registry (
   proof_id TEXT PRIMARY KEY,
   execution_id TEXT NOT NULL,
-  authority_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
-  surface TEXT NOT NULL,
-  proof_reference TEXT NOT NULL,
-  status TEXT NOT NULL,
+  validated_object_hash TEXT NOT NULL,
+  surface TEXT,
+  run_id TEXT,
+  commit_sha TEXT,
+  workflow TEXT,
+  environment TEXT,
   created_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_proof_registry_decision_id
-  ON proof_registry (decision_id);
+CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash
+  ON proof_registry (execution_id, decision_id, validated_object_hash);
+
+CREATE TABLE IF NOT EXISTS invocation_registry (
+  decision_id TEXT NOT NULL,
+  validated_object_hash TEXT NOT NULL,
+  invocation_nonce TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce)
+);
