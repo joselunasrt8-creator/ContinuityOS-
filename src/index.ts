@@ -1,4 +1,4 @@
-type Env = { DB: D1Database }
+type Env = { DB: D1Database, API_KEY?: string }
 
 type CanonicalAEO = {
   intent: string
@@ -15,7 +15,8 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
 }
 
-async function body(req: Request) { try { return await req.json() } catch { return {} } }
+async function body(req: Request): Promise<any> { try { return await req.json() } catch { return {} } }
+function authorized(req: Request, env: Env): boolean { return typeof env.API_KEY === "string" && env.API_KEY.length > 0 && req.headers.get("X-API-Key") === env.API_KEY }
 function canonicalize(v: any): string { if (Array.isArray(v)) return `[${v.map(canonicalize).join(",")}]`; if (v && typeof v === "object") return `{${Object.keys(v).sort().map(k=>`${JSON.stringify(k)}:${canonicalize(v[k])}`).join(",")}}`; return JSON.stringify(v) }
 async function sha256Hex(input: string): Promise<string> { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("") }
 
@@ -52,9 +53,13 @@ async function hasColumn(env: Env, table: string, column: string): Promise<boole
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    await ensureSchema(env)
     const url = new URL(request.url)
     if (url.pathname === "/health" && request.method === "GET") return json({ ok: true })
+
+    const mutationEndpoint = ["/authority", "/compile", "/validate", "/execute", "/proof"].includes(url.pathname) && request.method === "POST"
+    if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
+
+    await ensureSchema(env)
 
     if (url.pathname === "/authority" && request.method === "POST") {
       const b = await body(request)

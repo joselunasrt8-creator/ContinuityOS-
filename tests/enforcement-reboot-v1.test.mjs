@@ -5,6 +5,63 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../migrations/0006_enforcement_reboot_v1.sql', import.meta.url), 'utf8')
 
+test('runtime mutation endpoints reject unauthorized requests before body parsing or DB access', async () => {
+  const { transformSync } = await import('esbuild')
+  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  const mutationEndpoints = ['/authority', '/compile', '/validate', '/execute', '/proof']
+
+  for (const endpoint of mutationEndpoints) {
+    let dbTouched = false
+    const env = {
+      API_KEY: 'test-key',
+      DB: {
+        prepare() {
+          dbTouched = true
+          throw new Error('DB must not be touched before auth')
+        }
+      }
+    }
+    const response = await worker.fetch(new Request(`https://runtime.test${endpoint}`, { method: 'POST', body: '{' }), env)
+
+    assert.equal(response.status, 403)
+    assert.deepEqual(await response.json(), { status: 'NULL', reason: 'unauthorized' })
+    assert.equal(dbTouched, false)
+  }
+})
+
+test('authorized authority mutation request succeeds', async () => {
+  const { transformSync } = await import('esbuild')
+  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  let writes = 0
+  const env = {
+    API_KEY: 'test-key',
+    DB: {
+      prepare() {
+        return {
+          bind() { return this },
+          run() { writes += 1; return Promise.resolve({ meta: { changes: 1 } }) },
+          all() { return Promise.resolve({ results: [] }) },
+          first() { return Promise.resolve(null) }
+        }
+      }
+    }
+  }
+
+  const response = await worker.fetch(new Request('https://runtime.test/authority', {
+    method: 'POST',
+    headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
+    body: JSON.stringify({ decision_id: 'decision-1', owner: 'tester' })
+  }), env)
+  const payload = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(payload.decision_id, 'decision-1')
+  assert.equal(payload.owner, 'tester')
+  assert.equal(payload.status, 'ACTIVE')
+  assert.ok(writes > 0)
+})
 
 test('canonical AEO exactly five fields', () => {
   assert.match(source, /REQUIRED_AEO_KEYS = \["intent", "scope", "validation", "target", "finality"\]/)
