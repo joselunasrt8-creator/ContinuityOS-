@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../migrations/0006_enforcement_reboot_v1.sql', import.meta.url), 'utf8')
+const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
+const aeoRebuildMigration = readFileSync(new URL('../migrations/0007_canonical_aeo_registry_rebuild.sql', import.meta.url), 'utf8')
 
 test('runtime mutation endpoints reject unauthorized requests before body parsing or DB access', async () => {
   const { transformSync } = await import('esbuild')
@@ -104,4 +106,20 @@ test('proof persists and consumes authority', () => {
 test('schema has replay and invocation guards', () => {
   assert.match(migration, /UNIQUE\(decision_id, validated_object_hash\)/)
   assert.match(migration, /PRIMARY KEY\(decision_id, validated_object_hash, invocation_nonce\)/)
+})
+
+
+test('schema.sql matches canonical AEO registry expected by compile', () => {
+  assert.match(schema, /canonical_aeo TEXT NOT NULL/)
+  assert.match(schema, /validated_object_hash TEXT NOT NULL/)
+  assert.equal(schema.includes('  intent TEXT NOT NULL,\n  aeo TEXT NOT NULL,'), false)
+  assert.match(schema, /idx_aeo_registry_decision_hash/)
+})
+
+test('AEO rebuild migration archives stale pre-reboot shape', () => {
+  assert.match(aeoRebuildMigration, /ALTER TABLE aeo_registry RENAME TO aeo_registry_legacy_pre_reboot/)
+  assert.match(aeoRebuildMigration, /CREATE TABLE aeo_registry \(/)
+  assert.match(aeoRebuildMigration, /canonical_aeo TEXT NOT NULL/)
+  assert.match(aeoRebuildMigration, /validated_object_hash TEXT NOT NULL/)
+  assert.match(aeoRebuildMigration, /idx_aeo_registry_decision_hash/)
 })
