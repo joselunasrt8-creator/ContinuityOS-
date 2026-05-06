@@ -207,6 +207,8 @@ test('runtime lifecycle persists against migration-built canonical registries', 
       environment: 'production'
     })
     assert.equal(proof.status, 'PROVEN')
+    assert.ok(proof.proof_id)
+    assert.equal(proof.proof?.validated_object_hash, compiled.validated_object_hash)
 
     assert.equal(runSqlite([dbPath, `SELECT validated_object_hash FROM validation_registry WHERE decision_id='${decision_id}'`]).trim(), compiled.validated_object_hash)
     assert.equal(runSqlite([dbPath, `SELECT invocation_nonce FROM execution_registry WHERE decision_id='${decision_id}'`]).trim(), invocation_nonce)
