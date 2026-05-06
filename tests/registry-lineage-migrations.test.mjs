@@ -200,10 +200,9 @@ test('runtime lifecycle persists against migration-built canonical registries', 
       validated_object_hash: compiled.validated_object_hash,
       invocation_nonce
     })
-    assert.equal(execution.status, 'VALID')
-    assert.equal(execution.result, 'EXECUTED')
-    assert.equal(execution.execution_status, 'EXECUTED')
+    assert.equal(execution.status, 'EXECUTED')
     assert.ok(execution.execution_id)
+    assert.deepEqual(Object.keys(execution).sort(), ['execution_id', 'status'])
 
     const proof = await post('/proof', {
       execution_id: execution.execution_id,
