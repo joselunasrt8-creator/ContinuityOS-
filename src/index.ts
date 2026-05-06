@@ -212,7 +212,7 @@ export default {
       await env.DB.prepare(`UPDATE invocation_registry SET status='EXECUTED' WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3`).bind(decision_id,validated_object_hash,invocation_nonce).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='EXECUTED' WHERE decision_id=?1`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "EXECUTION_COMPLETED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce, authority_status: "EXECUTED" } })
-      return json({ status:"VALID", result:"EXECUTED", execution_status:"EXECUTED", execution_id, validated_object_hash, invocation_nonce })
+      return json({ status:"EXECUTED", execution_id })
     }
 
     if (url.pathname === "/proof" && request.method === "POST") {

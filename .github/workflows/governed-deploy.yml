@@ -76,18 +76,96 @@ jobs:
 
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
-      - name: COMPILE — Create exact AEO and canonical hash
+      - name: Save authority response
         run: |
           set -euo pipefail
-          RESPONSE_CODE=$(curl -sS -o compile.json -w "%{http_code}"             -X POST "$CLEAN_WORKER_URL/compile"             -H "Content-Type: application/json"             -H "X-API-Key: $API_KEY"             -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
-          test "$RESPONSE_CODE" -ge 200 -a "$RESPONSE_CODE" -lt 300
-          COMPILED_HASH=$(jq -r '.validated_object_hash // empty' compile.json)
-          if [ -z "$COMPILED_HASH" ] || [ "$COMPILED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
-            echo "NULL — compile hash mismatch"
+
+          RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/authority" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg owner "github_actions" \
+              --arg intent "$DEPLOY_INTENT" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --arg expiry "$(date -u -d '+1 hour' '+%Y-%m-%dT%H:%M:%SZ')" \
+              '{decision_id: $decision_id, owner: $owner, intent: $intent, scope: {environment: $environment}, constraints: {repo: $repo, branch: $branch, workflow: $workflow}, expiry: $expiry}')")
+
+          echo "AUTHORITY_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload authority artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: authority
+          path: authority.json
+
+      - name: Assert authority response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$AUTHORITY_RESPONSE_CODE" -lt 200 ] || [ "$AUTHORITY_RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Authority endpoint error"
+            cat authority.json
             exit 1
           fi
 
-      - name: VALIDATE — Fail closed unless exact VALID + exact hash + nonce reserved
+          AUTHORITY_STATUS=$(jq -r '.status // empty' authority.json)
+          AUTHORITY_DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
+
+          if [ "$AUTHORITY_STATUS" = "NULL" ] || [ "$AUTHORITY_STATUS" != "ACTIVE" ] || [ "$AUTHORITY_DECISION_ID" != "$DECISION_ID" ]; then
+            echo "NULL — Authority response is non-canonical"
+            cat authority.json
+            exit 1
+          fi
+
+      - name: Save compile response
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o compile.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/compile" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
+
+          echo "COMPILE_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload compile artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile
+          path: compile.json
+
+      - name: Assert compile response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$COMPILE_RESPONSE_CODE" -lt 200 ] || [ "$COMPILE_RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Compile endpoint error"
+            cat compile.json
+            exit 1
+          fi
+
+          COMPILE_STATUS=$(jq -r '.status // empty' compile.json)
+          COMPILED_HASH=$(jq -r '.validated_object_hash // empty' compile.json)
+
+          if [ "$COMPILE_STATUS" = "NULL" ] || [ "$COMPILE_STATUS" != "COMPILED" ]; then
+            echo "NULL — Compile response is non-canonical"
+            cat compile.json
+            exit 1
+          fi
+
+          if [ -z "$COMPILED_HASH" ] || [ "$COMPILED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — compile hash mismatch"
+            cat compile.json
+            exit 1
+          fi
+
+      - name: Save validate response
         run: |
           set -euo pipefail
 
@@ -105,13 +183,21 @@ jobs:
               --arg workflow "$DEPLOY_WORKFLOW" \
               '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
 
-          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+          echo "VALIDATE_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload validate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validate
+          path: validate.json
+
+      - name: Assert validate response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$VALIDATE_RESPONSE_CODE" -lt 200 ] || [ "$VALIDATE_RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Validation endpoint error"
-            if [ -f validate.json ]; then
-              echo "--- validate.json ---"
-              cat validate.json
-              echo "---------------------"
-            fi
+            cat validate.json
             exit 1
           fi
 
@@ -122,47 +208,37 @@ jobs:
           REASON=$(jq -r '.reason // .failure_reason // empty' validate.json)
           REASONS=$(jq -r 'if (.reasons|type)=="array" then (.reasons|join(",")) else empty end' validate.json)
 
-          if [ "$RESULT" != "VALID" ] || [ "$STATUS" != "VALID" ]; then
+          if [ "$STATUS" = "NULL" ] || [ "$RESULT" != "VALID" ] || [ "$STATUS" != "VALID" ]; then
             if [ -z "$REASON" ] && [ -z "$REASONS" ]; then
               echo "NULL — Validation failed without reason"
-              echo "--- validate.json ---"
               cat validate.json
-              echo "---------------------"
               exit 1
             fi
 
             if ! jq -e '[.reason, .failure_reason, (.reasons[]?)] | map(select(type=="string")) | any(. == "expired_authority" or . == "scope_mismatch" or . == "hash_mismatch" or . == "replay_detected" or . == "nonce_invalid" or . == "workflow_mismatch")' validate.json >/dev/null; then
               echo "NULL — Validation failed with unrecognized reason"
-              echo "--- validate.json ---"
               cat validate.json
-              echo "---------------------"
               exit 1
             fi
 
             echo "NULL — Validation failed"
-            echo "--- validate.json ---"
             cat validate.json
-            echo "---------------------"
             exit 1
           fi
 
           if [ -z "$RETURNED_HASH" ] || [ "$RETURNED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
             echo "NULL — Hash mismatch"
-            echo "--- validate.json ---"
             cat validate.json
-            echo "---------------------"
             exit 1
           fi
 
           if [ -z "$RETURNED_NONCE" ] || [ "$RETURNED_NONCE" != "$INVOCATION_NONCE" ]; then
             echo "NULL — Invocation nonce not accepted/reserved"
-            echo "--- validate.json ---"
             cat validate.json
-            echo "---------------------"
             exit 1
           fi
 
-      - name: EXECUTE — Require exact validated object hash
+      - name: Save execute response
         run: |
           set -euo pipefail
 
@@ -181,22 +257,92 @@ jobs:
               --arg workflow "$DEPLOY_WORKFLOW" \
               '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
 
-          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+          echo "EXECUTE_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload execute artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: execute
+          path: execute.json
+
+      - name: Assert execute response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$EXECUTE_RESPONSE_CODE" -lt 200 ] || [ "$EXECUTE_RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Execute endpoint error"
+            cat execute.json
             exit 1
           fi
 
           EXEC_STATUS=$(jq -r '.status // empty' execute.json)
           EXECUTION_ID=$(jq -r '.execution_id // empty' execute.json)
 
-          if [ "$EXEC_STATUS" != "VALID" ] || [ -z "$EXECUTION_ID" ]; then
-            echo "NULL — Execution failed"
+          if [ "$EXEC_STATUS" = "NULL" ] || [ "$EXEC_STATUS" != "EXECUTED" ] || [ -z "$EXECUTION_ID" ]; then
+            echo "NULL — Execution failed or response is non-canonical"
+            cat execute.json
             exit 1
           fi
 
           echo "EXECUTION_ID=$EXECUTION_ID" >> "$GITHUB_ENV"
 
-      - name: PROOF — Required for production completion
+      - name: Save replay response
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o replay.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/execute" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg intent "$DEPLOY_INTENT" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              '{decision_id: $decision_id, intent: $intent, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
+
+          echo "REPLAY_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload replay artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay
+          path: replay.json
+
+      - name: Assert replay protection response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$REPLAY_RESPONSE_CODE" -lt 200 ] || [ "$REPLAY_RESPONSE_CODE" -gt 499 ]; then
+            echo "NULL — Replay protection endpoint error"
+            cat replay.json
+            exit 1
+          fi
+
+          REPLAY_STATUS=$(jq -r '.status // empty' replay.json)
+          REPLAY_RESULT=$(jq -r '.result // empty' replay.json)
+          REPLAY_REASON=$(jq -r '.reason // empty' replay.json)
+
+          if [ "$REPLAY_STATUS" != "NULL" ] || [ "$REPLAY_RESULT" != "INVALID" ]; then
+            echo "NULL — Replay protection failed"
+            cat replay.json
+            exit 1
+          fi
+
+          case "$REPLAY_REASON" in
+            replay_detected|authority_not_reserved) ;;
+            *)
+              echo "NULL — Replay protection failed with non-canonical reason"
+              cat replay.json
+              exit 1
+              ;;
+          esac
+
+      - name: Save proof response
         run: |
           set -euo pipefail
 
@@ -217,25 +363,29 @@ jobs:
               --arg branch "$DEPLOY_BRANCH" \
               '{execution_id: $execution_id, decision_id: $decision_id, validated_object_hash: $validated_object_hash, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
 
-          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+          echo "PROOF_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof
+          path: proof.json
+
+      - name: Assert proof response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$PROOF_RESPONSE_CODE" -lt 200 ] || [ "$PROOF_RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Proof endpoint error"
+            cat proof.json
             exit 1
           fi
 
           PROOF_STATUS=$(jq -r '.status // empty' proof.json)
           PROOF_ID=$(jq -r '.proof.proof_id // .proof_id // empty' proof.json)
 
-          if [ "$PROOF_STATUS" != "PROVEN" ] || [ -z "$PROOF_ID" ]; then
-            echo "NULL — Missing required proof"
+          if [ "$PROOF_STATUS" = "NULL" ] || [ "$PROOF_STATUS" != "PROVEN" ] || [ -z "$PROOF_ID" ]; then
+            echo "NULL — Missing required proof or response is non-canonical"
+            cat proof.json
             exit 1
           fi
-
-      - name: Upload artifacts
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: governed-deploy-records
-          path: |
-            validate.json
-            execute.json
-            proof.json
