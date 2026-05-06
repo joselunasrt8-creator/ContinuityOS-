@@ -191,7 +191,9 @@ test('runtime lifecycle persists against migration-built canonical registries', 
       validated_object_hash: compiled.validated_object_hash,
       invocation_nonce
     })
-    assert.equal(execution.status, 'EXECUTED')
+    assert.equal(execution.status, 'VALID')
+    assert.equal(execution.result, 'EXECUTED')
+    assert.equal(execution.execution_status, 'EXECUTED')
     assert.ok(execution.execution_id)
 
     const proof = await post('/proof', {
@@ -208,6 +210,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
 
     assert.equal(runSqlite([dbPath, `SELECT validated_object_hash FROM validation_registry WHERE decision_id='${decision_id}'`]).trim(), compiled.validated_object_hash)
     assert.equal(runSqlite([dbPath, `SELECT invocation_nonce FROM execution_registry WHERE decision_id='${decision_id}'`]).trim(), invocation_nonce)
+    assert.equal(runSqlite([dbPath, `SELECT status FROM execution_registry WHERE decision_id='${decision_id}'`]).trim(), 'EXECUTED')
     assert.equal(runSqlite([dbPath, `SELECT environment FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), 'production')
     assert.equal(runSqlite([dbPath, `SELECT status FROM authority_registry WHERE decision_id='${decision_id}'`]).trim(), 'CONSUMED')
   } finally {
