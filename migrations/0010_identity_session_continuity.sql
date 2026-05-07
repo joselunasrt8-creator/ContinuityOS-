@@ -91,8 +91,31 @@ CREATE TABLE proof_registry (
   commit_sha TEXT,
   workflow TEXT,
   environment TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  UNIQUE(decision_id, validated_object_hash)
 );
 
 CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash
   ON proof_registry (execution_id, decision_id, validated_object_hash);
+
+CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (
+  archive_id TEXT PRIMARY KEY,
+  proof_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  execution_id TEXT NOT NULL,
+  decision_id TEXT NOT NULL,
+  validated_object_hash TEXT NOT NULL,
+  surface TEXT,
+  run_id TEXT,
+  commit_sha TEXT,
+  workflow TEXT,
+  environment TEXT,
+  created_at TEXT NOT NULL,
+  archived_at TEXT NOT NULL,
+  archive_reason TEXT NOT NULL,
+  canonical_proof_id TEXT NOT NULL,
+  UNIQUE(proof_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique
+  ON proof_registry (decision_id, validated_object_hash);

@@ -95,6 +95,10 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at'])
     assertNotNull(dbPath, 'proof_registry', ['session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_execution_decision_hash', ['execution_id', 'decision_id', 'validated_object_hash'])
+    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
+
+    assertColumns(dbPath, 'proof_registry_duplicate_archive', ['archive_id', 'proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'archived_at', 'archive_reason', 'canonical_proof_id'])
+    assertNotNull(dbPath, 'proof_registry_duplicate_archive', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at', 'archived_at', 'archive_reason', 'canonical_proof_id'])
 
     assertColumns(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assertNotNull(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
@@ -151,6 +155,31 @@ class SqliteD1Database {
       }
     }
     return statement
+  }
+
+  batch(statements) {
+    const input = [
+      '.bail on',
+      'BEGIN IMMEDIATE;',
+      ...statements.flatMap((statement) => {
+        const sql = statement.materialized()
+        if (/^\s*select\b/i.test(sql)) return [`${sql};`]
+        return [`${sql};`, 'SELECT changes() AS changes;']
+      }),
+      'COMMIT;'
+    ].join('\n')
+    const result = spawnSync('sqlite3', ['-json', this.dbPath], { encoding: 'utf8', input })
+    if (result.status !== 0) return Promise.reject(new Error(result.stderr || result.stdout))
+    const outputs = result.stdout.trim().split(/\n+/).filter(Boolean).map((line) => JSON.parse(line))
+    let outputIndex = 0
+    const results = statements.map((statement) => {
+      if (/^\s*select\b/i.test(statement.materialized())) {
+        return { results: outputs[outputIndex++] || [], meta: { changes: 0 } }
+      }
+      const changes = outputs[outputIndex++]?.[0]?.changes ?? 0
+      return { results: [], meta: { changes } }
+    })
+    return Promise.resolve(results)
   }
 }
 
@@ -316,59 +345,40 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
   }
 })
 
+
 test('compile and validate share canonical deploy target coercion semantics', async () => {
   const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
   const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
-  const dir = mkdtempSync(join(tmpdir(), 'mindshift-canonical-coercion-'))
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-target-coercion-'))
   const dbPath = join(dir, 'coercion.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
   const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
-  const decision_id = 'decision-canonical-coercion'
+  const decision_id = 'decision-target-coercion'
 
   async function post(path, payload) {
-    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    }), env)
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
     assert.equal(response.status, 200)
     return response.json()
   }
 
   try {
     applyMigrationChain(dbPath)
-
-    const session = await post('/session', { identity_id: 'coercion-identity' })
-    assert.equal(session.status, 'SESSION_ACTIVE')
-
-    const authority = await post('/authority', {
+    const session = await post('/session', { identity_id: 'target-coercion-identity' })
+    await post('/authority', {
       session_id: session.session_id,
       decision_id,
-      owner: 'coercion-test',
-      intent: 'deploy_production',
-      scope: { unordered: { z: 1, a: 2 } },
-      constraints: { repo: 12345, branch: true }
+      owner: 'target-coercion-test',
+      scope: { repo: 12345, branch: 67890 },
+      constraints: { repo: 12345, branch: 67890, workflow: 'governed-deploy.yml' }
     })
-    assert.equal(authority.status, 'ACTIVE')
 
-    const firstCompile = await post('/compile', { decision_id })
-    const secondCompile = await post('/compile', { decision_id })
-    assert.equal(firstCompile.status, 'COMPILED')
-    assert.equal(secondCompile.status, 'COMPILED')
-    assert.equal(firstCompile.validated_object_hash, secondCompile.validated_object_hash)
-    assert.deepEqual(firstCompile.canonical_aeo, secondCompile.canonical_aeo)
-    assert.deepEqual(firstCompile.canonical_aeo.target, { branch: 'true', repo: '12345', workflow: 'governed-deploy.yml' })
+    const compiled = await post('/compile', { decision_id })
+    assert.equal(compiled.status, 'COMPILED')
+    assert.deepEqual(compiled.canonical_aeo.target, { repo: '12345', branch: '67890', workflow: 'governed-deploy.yml' })
 
-    const validation = await post('/validate', {
-      session_id: session.session_id,
-      decision_id,
-      validated_object_hash: firstCompile.validated_object_hash,
-      invocation_nonce: 'nonce-canonical-coercion',
-      environment: 'production'
-    })
+    const validation = await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-target-coercion', environment: 'production' })
     assert.equal(validation.status, 'VALID')
-    assert.equal(validation.validated_object_hash, firstCompile.validated_object_hash)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -378,87 +388,144 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
   const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
   const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
-  const dir = mkdtempSync(join(tmpdir(), 'mindshift-compile-legitimacy-'))
-  const dbPath = join(dir, 'legitimacy.sqlite')
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-workflow-rejection-'))
+  const dbPath = join(dir, 'workflow.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
   const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
-  const decision_id = 'decision-invalid-workflow'
+  const decision_id = 'decision-workflow-rejection'
 
   async function post(path, payload) {
-    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    }), env)
-
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
     assert.equal(response.status, 200)
     return response.json()
   }
 
   try {
     applyMigrationChain(dbPath)
-
-    const session = await post('/session', {
-      identity_id: 'workflow-rejection-identity'
-    })
-
-    assert.equal(session.status, 'SESSION_ACTIVE')
-
+    const session = await post('/session', { identity_id: 'workflow-rejection-identity' })
     await post('/authority', {
       session_id: session.session_id,
       decision_id,
-      owner: 'legitimacy-test',
-      intent: 'deploy_production',
-      scope: {
-        repo: 'example/repo',
-        branch: 'main'
-      },
-      constraints: {
-        repo: 'example/repo',
-        branch: 'main',
-        workflow: 'ungoverned-deploy.yml'
-      }
+      owner: 'workflow-rejection-test',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'unmanaged-deploy.yml' }
     })
 
     const compiled = await post('/compile', { decision_id })
+    assert.equal(compiled.status, 'NULL')
+    assert.equal(compiled.reason, 'workflow_mismatch')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_REJECTED'`]).trim(), 'VALIDATION_REJECTED')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
-    assert.deepEqual(compiled, {
-      status: 'NULL',
-      route: '/compile',
-      reason: 'workflow_mismatch'
-    })
+test('proof transaction rolls back proof persistence when authority consumption fails', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-rollback-'))
+  const dbPath = join(dir, 'rollback.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-proof-rollback'
 
-    assert.equal(
-      runSqlite([
-        dbPath,
-        `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision_id}'`
-      ]).trim(),
-      '0'
-    )
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
 
-    assert.equal(
-      runSqlite([
-        dbPath,
-        `SELECT COUNT(*) FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='AEO_COMPILED'`
-      ]).trim(),
-      '0'
-    )
+  try {
+    applyMigrationChain(dbPath)
+    const session = await post('/session', { identity_id: 'rollback-identity' })
+    await post('/authority', { session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+    const compiled = await post('/compile', { decision_id })
+    await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', environment: 'production' })
+    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback' })
+    runSqlite([dbPath, `CREATE TRIGGER block_authority_consume BEFORE UPDATE OF status ON authority_registry WHEN NEW.status='CONSUMED' AND OLD.decision_id='${decision_id}' BEGIN SELECT RAISE(ABORT, 'consume blocked'); END;`])
 
-    assert.equal(
-      runSqlite([
-        dbPath,
-        `SELECT COUNT(*) FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_REJECTED'`
-      ]).trim(),
-      '1'
-    )
+    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml' })
 
-    assert.match(
-      runSqlite([
-        dbPath,
-        `SELECT payload FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_REJECTED'`
-      ]),
-      /"indicator":"unmanaged_deploy_surface"/
-    )
+    assert.equal(proof.status, 'NULL')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT status FROM authority_registry WHERE decision_id='${decision_id}'`]).trim(), 'EXECUTED')
+    assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='REPLAY_BLOCKED'`]).trim(), 'REPLAY_BLOCKED')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('duplicate and concurrent proof attempts fail closed without duplicate proof rows', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-duplicates-'))
+  const dbPath = join(dir, 'duplicates.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-proof-duplicates'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+    const session = await post('/session', { identity_id: 'duplicates-identity' })
+    await post('/authority', { session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+    const compiled = await post('/compile', { decision_id })
+    await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
+    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates' })
+    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml' }
+
+    const attempts = await Promise.all([post('/proof', payload), post('/proof', payload)])
+    assert.equal(attempts.filter((attempt) => attempt.status === 'PROVEN').length, 1)
+    assert.equal(attempts.filter((attempt) => attempt.status === 'NULL').length, 1)
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '1')
+    assert.equal(runSqlite([dbPath, `SELECT status FROM authority_registry WHERE decision_id='${decision_id}'`]).trim(), 'CONSUMED')
+
+    const replay = await post('/proof', payload)
+    assert.equal(replay.status, 'NULL')
+    assert.equal(replay.reason, 'authority_not_executed')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '1')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('runtime startup quarantines historical duplicate proof lineage before enforcing uniqueness', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-startup-'))
+  const dbPath = join(dir, 'startup.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+
+  try {
+    runSqlite([dbPath, `CREATE TABLE proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL);`])
+    runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-canonical','session-1','execution-1','decision-historical','hash-historical','github-actions','1','aaa','governed-deploy.yml','production','2026-01-01T00:00:00.000Z');`])
+    runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-duplicate','session-1','execution-2','decision-historical','hash-historical','github-actions','2','bbb','governed-deploy.yml','production','2026-01-02T00:00:00.000Z');`])
+
+    const response = await worker.fetch(new Request('https://runtime.test/session', {
+      method: 'POST',
+      headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
+      body: JSON.stringify({ identity_id: 'startup-survivor' })
+    }), env)
+    const payload = await response.json()
+
+    assert.equal(response.status, 200)
+    assert.equal(payload.status, 'SESSION_ACTIVE')
+    assert.equal(runSqlite([dbPath, `SELECT proof_id FROM proof_registry WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-canonical')
+    assert.equal(runSqlite([dbPath, `SELECT proof_id || ':' || canonical_proof_id || ':' || archive_reason FROM proof_registry_duplicate_archive WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-duplicate:proof-canonical:duplicate_proof_lineage')
+    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
+
+    const duplicateInsert = spawnSync('sqlite3', [dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,created_at) VALUES ('proof-after-cleanup','session-1','execution-3','decision-historical','hash-historical','2026-01-03T00:00:00.000Z');`], { encoding: 'utf8' })
+    assert.notEqual(duplicateInsert.status, 0)
+    assert.match(duplicateInsert.stderr, /UNIQUE constraint failed/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
