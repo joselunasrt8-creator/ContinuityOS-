@@ -46,11 +46,23 @@ function canonicalize(v: unknown): string {
   return JSON.stringify(normalized)
 }
 async function sha256Hex(input: string): Promise<string> { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("") }
-async function hashCanonicalAeo(canonical_aeo: CanonicalAEO): Promise<string> { return sha256Hex(canonicalize(canonical_aeo)) }
 
 function canonicalRecord(input: unknown): Record<string, unknown> {
   const normalized = normalizeCanonicalValue(isPlainRecord(input) ? input : {})
   return isPlainRecord(normalized) ? normalized : {}
+}
+
+function canonicalText(value: unknown, fallback = ""): string {
+  return value === undefined || value === null || value === "" ? fallback : String(value)
+}
+
+function canonicalDeployTarget(input: unknown): Readonly<Record<"repo" | "branch" | "workflow", string>> {
+  const constraints = canonicalRecord(input)
+  return Object.freeze({
+    repo: canonicalText(constraints.repo),
+    branch: canonicalText(constraints.branch),
+    workflow: canonicalText(constraints.workflow, GOVERNED_WORKFLOW)
+  })
 }
 
 function toCanonicalAeo(input: any): Readonly<CanonicalAEO> | null {
@@ -185,10 +197,10 @@ export default {
         if (!["ACTIVE", "VALIDATED", "RESERVED"].includes(String(authority.status || ""))) {
           return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_unusable" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
         }
-        const constraints = canonicalRecord(JSON.parse(String(authority.constraints || "{}")))
+        const target = canonicalDeployTarget(JSON.parse(String(authority.constraints || "{}")))
+        if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
         const scope = canonicalRecord(JSON.parse(String(authority.scope || "{}")))
-        const targetWorkflow = String(constraints.workflow || GOVERNED_WORKFLOW)
-        const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope, validation: { workflow: targetWorkflow }, target: { repo: String(constraints.repo || ""), branch: String(constraints.branch || ""), workflow: targetWorkflow }, finality: { proof_required: true } })
+        const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope, validation: { workflow: target.workflow }, target, finality: { proof_required: true } })
         if (!canonical_aeo) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "registry_drift" })
         const canonical_aeo_json = canonicalize(canonical_aeo)
         const validated_object_hash = await sha256Hex(canonical_aeo_json)
@@ -213,8 +225,8 @@ export default {
       if (!["ACTIVE","VALIDATED","RESERVED"].includes(String(authority.status))) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_unusable" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", authority_status: authority.status, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       const compiled = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2`).bind(decision_id, validated_object_hash).first<any>()
       if (!compiled) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_missing" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash }, drift_class: "hash_drift" })
-      const target = JSON.parse(String(compiled.canonical_aeo)).target
-      const constraints = JSON.parse(String(authority.constraints))
+      const target = canonicalDeployTarget(JSON.parse(String(compiled.canonical_aeo)).target)
+      const constraints = canonicalDeployTarget(JSON.parse(String(authority.constraints || "{}")))
       if (target.repo!==constraints.repo || target.branch!==constraints.branch || target.workflow!==constraints.workflow) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"scope_constraints_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", indicator: "non_canonical_workflow" }, drift_class: "registry_drift" })
       if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
       const insert = await env.DB.prepare(`INSERT OR IGNORE INTO invocation_registry (decision_id,validated_object_hash,invocation_nonce,status,created_at) VALUES (?1,?2,?3,'RESERVED',?4)`).bind(decision_id,validated_object_hash,invocation_nonce,new Date().toISOString()).run()

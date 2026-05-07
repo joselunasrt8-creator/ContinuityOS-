@@ -73,7 +73,8 @@ test('canonical AEO exactly five fields', () => {
 })
 
 test('metadata does not affect hash', () => {
-  assert.match(source, /sha256Hex\(canonicalize\(canonical_aeo\)\)/)
+  assert.match(source, /const canonical_aeo_json = canonicalize\(canonical_aeo\)/)
+  assert.match(source, /const validated_object_hash = await sha256Hex\(canonical_aeo_json\)/)
 })
 
 test('compile returns validated_object_hash', () => {
