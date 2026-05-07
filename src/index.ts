@@ -40,6 +40,11 @@ function normalizeCanonicalValue(v: unknown): unknown {
   return null
 }
 
+function canonicalRecord(v: unknown): Record<string, unknown> {
+  const normalized = normalizeCanonicalValue(v)
+  return isPlainRecord(normalized) ? normalized : {}
+}
+
 function canonicalize(v: unknown): string {
   const normalized = normalizeCanonicalValue(v)
   if (Array.isArray(normalized)) return `[${normalized.map(canonicalize).join(",")}]`
