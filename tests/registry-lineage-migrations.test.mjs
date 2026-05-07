@@ -315,3 +315,97 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('compile and validate share canonical deploy target coercion semantics', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-canonical-coercion-'))
+  const dbPath = join(dir, 'coercion.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-canonical-coercion'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    await post('/authority', {
+      decision_id,
+      owner: 'coercion-test',
+      intent: 'deploy_production',
+      scope: { unordered: { z: 1, a: 2 } },
+      constraints: { repo: 12345, branch: true }
+    })
+
+    const firstCompile = await post('/compile', { decision_id })
+    const secondCompile = await post('/compile', { decision_id })
+    assert.equal(firstCompile.status, 'COMPILED')
+    assert.equal(secondCompile.status, 'COMPILED')
+    assert.equal(firstCompile.validated_object_hash, secondCompile.validated_object_hash)
+    assert.deepEqual(firstCompile.canonical_aeo, secondCompile.canonical_aeo)
+    assert.deepEqual(firstCompile.canonical_aeo.target, { branch: 'true', repo: '12345', workflow: 'governed-deploy.yml' })
+
+    const validation = await post('/validate', {
+      decision_id,
+      validated_object_hash: firstCompile.validated_object_hash,
+      invocation_nonce: 'nonce-canonical-coercion',
+      environment: 'production'
+    })
+    assert.equal(validation.status, 'VALID')
+    assert.equal(validation.validated_object_hash, firstCompile.validated_object_hash)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('compile rejects non-governed workflows before persisting canonical AEOs', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-compile-legitimacy-'))
+  const dbPath = join(dir, 'legitimacy.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-invalid-workflow'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    await post('/authority', {
+      decision_id,
+      owner: 'legitimacy-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'ungoverned-deploy.yml' }
+    })
+
+    const compiled = await post('/compile', { decision_id })
+    assert.deepEqual(compiled, { status: 'NULL', route: '/compile', reason: 'workflow_mismatch' })
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='AEO_COMPILED'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_REJECTED'`]).trim(), '1')
+    assert.match(runSqlite([dbPath, `SELECT payload FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_REJECTED'`]), /"indicator":"unmanaged_deploy_surface"/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
