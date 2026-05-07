@@ -8,6 +8,7 @@ const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
 const aeoRebuildMigration = readFileSync(new URL('../migrations/0007_canonical_aeo_registry_rebuild.sql', import.meta.url), 'utf8')
 const registryRebuildMigration = readFileSync(new URL('../migrations/0008_canonical_runtime_registry_rebuild.sql', import.meta.url), 'utf8')
 const sessionContinuityMigration = readFileSync(new URL('../migrations/0010_identity_session_continuity.sql', import.meta.url), 'utf8')
+const proofAtomicityMigration = readFileSync(new URL('../migrations/0011_proof_atomicity_boundary.sql', import.meta.url), 'utf8')
 const governedDeployWorkflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
 
 test('runtime mutation endpoints reject unauthorized requests before body parsing or DB access', async () => {
@@ -143,9 +144,44 @@ test('proof persists session lineage and consumes authority', () => {
   assert.match(source, /AND status='EXECUTED'/)
   assert.match(source, /INSERT INTO proof_registry \(proof_id,session_id,execution_id/)
   assert.match(source, /proof: \{ proof_id, session_id, execution_id, decision_id, validated_object_hash \}/)
-  assert.match(source, /SET status='CONSUMED'/)
+  assert.match(source, /status='EXECUTED' THEN 'CONSUMED'/)
   assert.match(source, /status:"PROVEN"/)
   assert.match(source, /proof_id/)
+})
+
+
+test('proof atomicity boundary batches persistence with authority consumption', () => {
+  assert.match(source, /await env\.DB\.batch\(\[/)
+  assert.match(source, /INSERT INTO proof_registry \(proof_id,session_id,execution_id,decision_id,validated_object_hash/)
+  assert.match(source, /UPDATE authority_registry SET status=CASE WHEN status='EXECUTED' THEN 'CONSUMED' ELSE NULL END WHERE decision_id=\?1 AND session_id=\?2/)
+  assert.match(source, /WHERE changes\(\) != 1/)
+  assert.match(source, /reason:"authority_consumption_failed"/)
+  assert.match(source, /atomic_boundary: "rolled_back"/)
+})
+
+test('concurrent proof replay attempts fail canonically with telemetry and drift', () => {
+  assert.match(source, /function rejectProofReplay/)
+  assert.match(source, /reason: "proof_replay_detected"/)
+  assert.match(source, /event_type: "REPLAY_BLOCKED"/)
+  assert.match(source, /drift_class: "proof_drift"/)
+  assert.match(source, /duplicate_proof_lineage/)
+  assert.match(source, /SELECT proof_id FROM proof_registry WHERE execution_id=\?1 AND decision_id=\?2 AND validated_object_hash=\?3/)
+})
+
+test('proof uniqueness is enforced across schema and migrations', () => {
+  assert.match(source, /UNIQUE\(execution_id, decision_id, validated_object_hash\)/)
+  assert.match(schema, /UNIQUE\(execution_id, decision_id, validated_object_hash\)/)
+  assert.match(registryRebuildMigration, /UNIQUE\(execution_id, decision_id, validated_object_hash\)/)
+  assert.match(sessionContinuityMigration, /UNIQUE\(execution_id, decision_id, validated_object_hash\)/)
+  assert.match(proofAtomicityMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_unique_execution_lineage/)
+  assert.match(proofAtomicityMigration, /ON proof_registry \(execution_id, decision_id, validated_object_hash\)/)
+})
+
+test('proof lifecycle closure emits committed boundary telemetry only after batch success', () => {
+  assert.match(source, /event_type: "PROOF_PERSISTED"/)
+  assert.match(source, /event_type: "AUTHORITY_CONSUMED"/)
+  assert.match(source, /atomic_boundary: "committed"/)
+  assert.match(source, /return json\(\{ status:"PROVEN", result:"OK", proof_id/)
 })
 
 test('governed deploy proof payload carries session and validated hash and expects PROVEN closure', () => {

@@ -91,7 +91,8 @@ CREATE TABLE proof_registry (
   commit_sha TEXT,
   workflow TEXT,
   environment TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  UNIQUE(execution_id, decision_id, validated_object_hash)
 );
 
 CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash
