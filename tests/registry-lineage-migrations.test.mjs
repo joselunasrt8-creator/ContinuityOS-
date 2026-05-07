@@ -152,6 +152,13 @@ class SqliteD1Database {
     }
     return statement
   }
+
+  batch(statements) {
+    const sql = `BEGIN;\n${statements.map((statement) => `${statement.materialized()};`).join('\n')}\nCOMMIT;`
+    const result = spawnSync('sqlite3', [this.dbPath], { encoding: 'utf8', input: sql })
+    if (result.status !== 0) return Promise.reject(new Error(result.stderr || result.stdout))
+    return Promise.resolve(statements.map(() => ({ meta: { changes: 1 } })))
+  }
 }
 
 test('runtime lifecycle persists against migration-built canonical registries', async () => {
@@ -196,6 +203,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
 
     const invocation_nonce = 'nonce-runtime-lineage'
     const validation = await post('/validate', {
+      session_id: session.session_id,
       decision_id,
       validated_object_hash: compiled.validated_object_hash,
       invocation_nonce,
@@ -339,7 +347,10 @@ test('compile and validate share canonical deploy target coercion semantics', as
   try {
     applyMigrationChain(dbPath)
 
+    const session = await post('/session', { identity_id: 'coercion-identity' })
+
     await post('/authority', {
+      session_id: session.session_id,
       decision_id,
       owner: 'coercion-test',
       intent: 'deploy_production',
@@ -356,6 +367,7 @@ test('compile and validate share canonical deploy target coercion semantics', as
     assert.deepEqual(firstCompile.canonical_aeo.target, { branch: 'true', repo: '12345', workflow: 'governed-deploy.yml' })
 
     const validation = await post('/validate', {
+      session_id: session.session_id,
       decision_id,
       validated_object_hash: firstCompile.validated_object_hash,
       invocation_nonce: 'nonce-canonical-coercion',
@@ -391,7 +403,10 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
   try {
     applyMigrationChain(dbPath)
 
+    const session = await post('/session', { identity_id: 'legitimacy-identity' })
+
     await post('/authority', {
+      session_id: session.session_id,
       decision_id,
       owner: 'legitimacy-test',
       intent: 'deploy_production',
