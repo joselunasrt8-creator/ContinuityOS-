@@ -87,11 +87,15 @@ CREATE TABLE IF NOT EXISTS proof_registry (
   commit_sha TEXT,
   workflow TEXT,
   environment TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  UNIQUE(decision_id, validated_object_hash)
 );
 
 CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash
   ON proof_registry (execution_id, decision_id, validated_object_hash);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique
+  ON proof_registry (decision_id, validated_object_hash);
 
 CREATE TABLE IF NOT EXISTS invocation_registry (
   decision_id TEXT NOT NULL,

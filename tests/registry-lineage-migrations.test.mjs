@@ -95,6 +95,7 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at'])
     assertNotNull(dbPath, 'proof_registry', ['session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_execution_decision_hash', ['execution_id', 'decision_id', 'validated_object_hash'])
+    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
 
     assertColumns(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assertNotNull(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
@@ -151,6 +152,31 @@ class SqliteD1Database {
       }
     }
     return statement
+  }
+
+  batch(statements) {
+    const input = [
+      '.bail on',
+      'BEGIN IMMEDIATE;',
+      ...statements.flatMap((statement) => {
+        const sql = statement.materialized()
+        if (/^\s*select\b/i.test(sql)) return [`${sql};`]
+        return [`${sql};`, 'SELECT changes() AS changes;']
+      }),
+      'COMMIT;'
+    ].join('\n')
+    const result = spawnSync('sqlite3', ['-json', this.dbPath], { encoding: 'utf8', input })
+    if (result.status !== 0) return Promise.reject(new Error(result.stderr || result.stdout))
+    const outputs = result.stdout.trim().split(/\n+/).filter(Boolean).map((line) => JSON.parse(line))
+    let outputIndex = 0
+    const results = statements.map((statement) => {
+      if (/^\s*select\b/i.test(statement.materialized())) {
+        return { results: outputs[outputIndex++] || [], meta: { changes: 0 } }
+      }
+      const changes = outputs[outputIndex++]?.[0]?.changes ?? 0
+      return { results: [], meta: { changes } }
+    })
+    return Promise.resolve(results)
   }
 }
 
@@ -311,6 +337,82 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     const bypass = await worker.fetch(new Request('https://runtime.test/unmanaged-deploy', { method: 'POST', body: '{}' }), env)
     assert.equal(bypass.status, 404)
     assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE payload LIKE '%invalid_route_invocation%'`]).trim(), 'registry_drift')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('proof transaction rolls back proof persistence when authority consumption fails', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-rollback-'))
+  const dbPath = join(dir, 'rollback.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-proof-rollback'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+    const session = await post('/session', { identity_id: 'rollback-identity' })
+    await post('/authority', { session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+    const compiled = await post('/compile', { decision_id })
+    await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', environment: 'production' })
+    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback' })
+    runSqlite([dbPath, `CREATE TRIGGER block_authority_consume BEFORE UPDATE OF status ON authority_registry WHEN NEW.status='CONSUMED' AND OLD.decision_id='${decision_id}' BEGIN SELECT RAISE(ABORT, 'consume blocked'); END;`])
+
+    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml' })
+
+    assert.equal(proof.status, 'NULL')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT status FROM authority_registry WHERE decision_id='${decision_id}'`]).trim(), 'EXECUTED')
+    assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='REPLAY_BLOCKED'`]).trim(), 'REPLAY_BLOCKED')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('duplicate and concurrent proof attempts fail closed without duplicate proof rows', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-duplicates-'))
+  const dbPath = join(dir, 'duplicates.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-proof-duplicates'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+    const session = await post('/session', { identity_id: 'duplicates-identity' })
+    await post('/authority', { session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+    const compiled = await post('/compile', { decision_id })
+    await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
+    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates' })
+    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml' }
+
+    const attempts = await Promise.all([post('/proof', payload), post('/proof', payload)])
+    assert.equal(attempts.filter((attempt) => attempt.status === 'PROVEN').length, 1)
+    assert.equal(attempts.filter((attempt) => attempt.status === 'NULL').length, 1)
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '1')
+    assert.equal(runSqlite([dbPath, `SELECT status FROM authority_registry WHERE decision_id='${decision_id}'`]).trim(), 'CONSUMED')
+
+    const replay = await post('/proof', payload)
+    assert.equal(replay.status, 'NULL')
+    assert.equal(replay.reason, 'authority_not_executed')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '1')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
