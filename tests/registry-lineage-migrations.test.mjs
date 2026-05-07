@@ -345,6 +345,82 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
   }
 })
 
+
+test('compile and validate share canonical deploy target coercion semantics', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-target-coercion-'))
+  const dbPath = join(dir, 'coercion.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-target-coercion'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+    const session = await post('/session', { identity_id: 'target-coercion-identity' })
+    await post('/authority', {
+      session_id: session.session_id,
+      decision_id,
+      owner: 'target-coercion-test',
+      scope: { repo: 12345, branch: 67890 },
+      constraints: { repo: 12345, branch: 67890, workflow: 'governed-deploy.yml' }
+    })
+
+    const compiled = await post('/compile', { decision_id })
+    assert.equal(compiled.status, 'COMPILED')
+    assert.deepEqual(compiled.canonical_aeo.target, { repo: '12345', branch: '67890', workflow: 'governed-deploy.yml' })
+
+    const validation = await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-target-coercion', environment: 'production' })
+    assert.equal(validation.status, 'VALID')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('compile rejects non-governed workflows before persisting canonical AEOs', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-workflow-rejection-'))
+  const dbPath = join(dir, 'workflow.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-workflow-rejection'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+    const session = await post('/session', { identity_id: 'workflow-rejection-identity' })
+    await post('/authority', {
+      session_id: session.session_id,
+      decision_id,
+      owner: 'workflow-rejection-test',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'unmanaged-deploy.yml' }
+    })
+
+    const compiled = await post('/compile', { decision_id })
+    assert.equal(compiled.status, 'NULL')
+    assert.equal(compiled.reason, 'workflow_mismatch')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${decision_id}' AND event_type='VALIDATION_REJECTED'`]).trim(), 'VALIDATION_REJECTED')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('proof transaction rolls back proof persistence when authority consumption fails', async () => {
   const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
