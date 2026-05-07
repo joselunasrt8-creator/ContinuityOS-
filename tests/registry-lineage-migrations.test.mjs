@@ -339,13 +339,18 @@ test('compile and validate share canonical deploy target coercion semantics', as
   try {
     applyMigrationChain(dbPath)
 
-    await post('/authority', {
+    const session = await post('/session', { identity_id: 'coercion-identity' })
+    assert.equal(session.status, 'SESSION_ACTIVE')
+
+    const authority = await post('/authority', {
+      session_id: session.session_id,
       decision_id,
       owner: 'coercion-test',
       intent: 'deploy_production',
       scope: { unordered: { z: 1, a: 2 } },
       constraints: { repo: 12345, branch: true }
     })
+    assert.equal(authority.status, 'ACTIVE')
 
     const firstCompile = await post('/compile', { decision_id })
     const secondCompile = await post('/compile', { decision_id })
@@ -356,6 +361,7 @@ test('compile and validate share canonical deploy target coercion semantics', as
     assert.deepEqual(firstCompile.canonical_aeo.target, { branch: 'true', repo: '12345', workflow: 'governed-deploy.yml' })
 
     const validation = await post('/validate', {
+      session_id: session.session_id,
       decision_id,
       validated_object_hash: firstCompile.validated_object_hash,
       invocation_nonce: 'nonce-canonical-coercion',
