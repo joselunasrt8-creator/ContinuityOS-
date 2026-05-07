@@ -87,7 +87,7 @@ async function ensureSchema(env: Env) {
     `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS validation_registry (validation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, environment TEXT, result TEXT NOT NULL, reason TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS execution_registry (execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(decision_id, validated_object_hash))`,
-    `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, UNIQUE(execution_id, decision_id, validated_object_hash))`,
     `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
     `CREATE TABLE IF NOT EXISTS observability_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, severity TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_observability_decision ON observability_registry(decision_id)`,
@@ -149,6 +149,31 @@ async function rejectWithTelemetry(env: Env, response: Record<string, unknown>, 
     await recordDrift(env, { drift_class: telemetry.drift_class, severity: telemetry.severity, decision_id: telemetry.decision_id, execution_id: telemetry.execution_id, payload, detected_by: telemetry.detected_by })
   }
   return json(response)
+}
+
+async function rejectProofReplay(env: Env, context: {
+  decision_id: string
+  execution_id: string
+  proof_id?: string
+  authority_id?: string
+  validated_object_hash?: string
+  route?: string
+}) {
+  return rejectWithTelemetry(env, { status: "NULL", result: "INVALID", reason: "proof_replay_detected" }, {
+    event_type: "REPLAY_BLOCKED",
+    decision_id: context.decision_id,
+    execution_id: context.execution_id,
+    proof_id: context.proof_id,
+    authority_id: context.authority_id,
+    severity: "CRITICAL",
+    payload: {
+      route: context.route || "/proof",
+      validated_object_hash: context.validated_object_hash || null,
+      indicator: "duplicate_proof_lineage"
+    },
+    drift_class: "proof_drift",
+    detected_by: "proof_atomicity_boundary"
+  })
 }
 
 async function hasColumn(env: Env, table: string, column: string): Promise<boolean> {
@@ -320,14 +345,26 @@ export default {
       if (!session) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_session" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", session_id }, drift_class: "proof_drift" })
       if (String(execution.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", expected_session_id: execution.session_id, provided_session_id: session_id }, drift_class: "proof_drift" })
       const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
+      const existingProof = await env.DB.prepare(`SELECT proof_id FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3`).bind(execution_id,decision_id,validated_object_hash).first<any>()
+      if (existingProof) return rejectProofReplay(env, { decision_id, execution_id, proof_id: String(existingProof.proof_id || ""), authority_id: String(authority?.authority_id || ""), validated_object_hash })
       if (!authority || String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority?.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority?.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       if (String(authority.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_session_id: authority.session_id, provided_session_id: session_id }, drift_class: "authority_drift" })
       const proof_id = crypto.randomUUID()
-      await env.DB.prepare(`INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),new Date().toISOString()).run()
-      await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash } })
-      const consumed = await env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND status='EXECUTED'`).bind(decision_id).run()
-      if ((consumed.meta?.changes||0)===0) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_consumption_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof" }, drift_class: "authority_drift" })
-      await emitTelemetry(env, { event_type: "AUTHORITY_CONSUMED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", authority_status: "CONSUMED" } })
+      const created_at = new Date().toISOString()
+      const proofValues = [proof_id,session_id,execution_id,decision_id,validated_object_hash,String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),created_at]
+      try {
+        await env.DB.batch([
+          env.DB.prepare(`INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)`).bind(...proofValues),
+          env.DB.prepare(`UPDATE authority_registry SET status=CASE WHEN status='EXECUTED' THEN 'CONSUMED' ELSE NULL END WHERE decision_id=?1 AND session_id=?2`).bind(decision_id,session_id),
+          env.DB.prepare(`INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11 WHERE changes() != 1`).bind(...proofValues)
+        ])
+      } catch (_error) {
+        const replayedProof = await env.DB.prepare(`SELECT proof_id FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3`).bind(execution_id,decision_id,validated_object_hash).first<any>()
+        if (replayedProof) return rejectProofReplay(env, { decision_id, execution_id, proof_id: String(replayedProof.proof_id || ""), authority_id: String(authority.authority_id || ""), validated_object_hash })
+        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_consumption_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", atomic_boundary: "rolled_back" }, drift_class: "authority_drift", detected_by: "proof_atomicity_boundary" })
+      }
+      await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash, atomic_boundary: "committed" } })
+      await emitTelemetry(env, { event_type: "AUTHORITY_CONSUMED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", authority_status: "CONSUMED", atomic_boundary: "committed" } })
       return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, session_id, execution_id, decision_id, validated_object_hash } })
     }
 
