@@ -497,7 +497,7 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
   }
 })
 
-test('runtime startup quarantines historical duplicate proof lineage before enforcing uniqueness', async () => {
+test('runtime non-session startup quarantines historical duplicate proof lineage before enforcing uniqueness', async () => {
   const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
   const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
@@ -510,15 +510,15 @@ test('runtime startup quarantines historical duplicate proof lineage before enfo
     runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-canonical','session-1','execution-1','decision-historical','hash-historical','github-actions','1','aaa','governed-deploy.yml','production','2026-01-01T00:00:00.000Z');`])
     runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-duplicate','session-1','execution-2','decision-historical','hash-historical','github-actions','2','bbb','governed-deploy.yml','production','2026-01-02T00:00:00.000Z');`])
 
-    const response = await worker.fetch(new Request('https://runtime.test/session', {
+    const response = await worker.fetch(new Request('https://runtime.test/authority', {
       method: 'POST',
       headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
-      body: JSON.stringify({ identity_id: 'startup-survivor' })
+      body: JSON.stringify({ session_id: 'missing-session' })
     }), env)
     const payload = await response.json()
 
     assert.equal(response.status, 200)
-    assert.equal(payload.status, 'SESSION_ACTIVE')
+    assert.deepEqual(payload, { status: 'NULL', reason: 'invalid_session' })
     assert.equal(runSqlite([dbPath, `SELECT proof_id FROM proof_registry WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-canonical')
     assert.equal(runSqlite([dbPath, `SELECT proof_id || ':' || canonical_proof_id || ':' || archive_reason FROM proof_registry_duplicate_archive WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-duplicate:proof-canonical:duplicate_proof_lineage')
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
