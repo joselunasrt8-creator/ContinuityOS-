@@ -1,0 +1,168 @@
+{
+  "version": "1.0",
+  "status": "planning_only_non_enforcing",
+  "purpose": "Map runtime mutation surfaces before additional runtime enforcement expansion.",
+  "core_invariant": "validated_object == executed_object",
+  "failure_condition": "NULL",
+  "runtime_surfaces": [
+    {
+      "surface_id": "authority_issuance",
+      "surface_type": "authority_generation",
+      "entrypoint": "/authority",
+      "required_authority": "root_governance_authority",
+      "required_AEO": "AUTHORITY_ISSUANCE_AEO",
+      "required_validation": [
+        "identity_continuity",
+        "authority_scope_validation",
+        "replay_unused",
+        "policy_validation"
+      ],
+      "required_proof": [
+        "authority_hash",
+        "authority_lineage",
+        "issuance_timestamp"
+      ],
+      "replay_semantics": "single_use_authority_consumption",
+      "drift_checks": [
+        "authority_drift",
+        "policy_drift"
+      ],
+      "observability": [
+        "authority_registry",
+        "issuance_logs"
+      ],
+      "execution_boundary": "authority_boundary",
+      "bypass_risk": "direct_authority_creation",
+      "enforcement_status": "planned"
+    },
+    {
+      "surface_id": "aeo_compilation",
+      "surface_type": "object_compilation",
+      "entrypoint": "/compile",
+      "required_authority": "bound_authority",
+      "required_AEO": "COMPILE_AEO",
+      "required_validation": [
+        "schema_validation",
+        "scope_validation",
+        "constraint_validation"
+      ],
+      "required_proof": [
+        "compiled_hash",
+        "compiler_version"
+      ],
+      "replay_semantics": "immutable_compilation_hash",
+      "drift_checks": [
+        "schema_drift",
+        "compiler_drift"
+      ],
+      "observability": [
+        "compile_logs",
+        "hash_registry"
+      ],
+      "execution_boundary": "compilation_boundary",
+      "bypass_risk": "direct_runtime_object_injection",
+      "enforcement_status": "planned"
+    },
+    {
+      "surface_id": "aeo_validation",
+      "surface_type": "validation",
+      "entrypoint": "/validate",
+      "required_authority": "bound_authority",
+      "required_AEO": "VALIDATION_AEO",
+      "required_validation": [
+        "exact_object_validation",
+        "policy_validation",
+        "continuity_validation"
+      ],
+      "required_proof": [
+        "validation_hash",
+        "validator_result"
+      ],
+      "replay_semantics": "validated_hash_locked",
+      "drift_checks": [
+        "validator_drift",
+        "policy_drift"
+      ],
+      "observability": [
+        "validation_logs",
+        "validator_registry"
+      ],
+      "execution_boundary": "validation_boundary",
+      "bypass_risk": "execution_without_validation",
+      "enforcement_status": "planned"
+    },
+    {
+      "surface_id": "runtime_execution",
+      "surface_type": "execution",
+      "entrypoint": "/execute",
+      "required_authority": "validated_authority",
+      "required_AEO": "EXECUTION_AEO",
+      "required_validation": [
+        "exact_hash_match",
+        "unused_authority",
+        "policy_valid"
+      ],
+      "required_proof": [
+        "execution_receipt",
+        "execution_hash",
+        "execution_timestamp"
+      ],
+      "replay_semantics": "authority_consumed_after_execution",
+      "drift_checks": [
+        "execution_drift",
+        "runtime_drift"
+      ],
+      "observability": [
+        "execution_logs",
+        "runtime_registry"
+      ],
+      "execution_boundary": "non_bypassable_runtime_boundary",
+      "bypass_risk": "direct_runtime_invocation",
+      "enforcement_status": "planned"
+    },
+    {
+      "surface_id": "proof_persistence",
+      "surface_type": "proof_registry",
+      "entrypoint": "/proof",
+      "required_authority": "validated_execution_authority",
+      "required_AEO": "PROOF_AEO",
+      "required_validation": [
+        "proof_integrity",
+        "proof_lineage_validation"
+      ],
+      "required_proof": [
+        "proof_hash",
+        "registry_persistence",
+        "proof_timestamp"
+      ],
+      "replay_semantics": "duplicate_proof_hash_blocked",
+      "drift_checks": [
+        "proof_drift",
+        "registry_drift"
+      ],
+      "observability": [
+        "proof_registry",
+        "audit_logs"
+      ],
+      "execution_boundary": "proof_boundary",
+      "bypass_risk": "execution_without_proof",
+      "enforcement_status": "planned"
+    }
+  ],
+  "initial_runtime_targets": [
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof",
+    "workflow_dispatch",
+    "deployment_execution",
+    "proof_persistence"
+  ],
+  "global_constraints": [
+    "no_runtime_execution_without_validation",
+    "no_direct_runtime_mutation",
+    "no_implicit_authority",
+    "no_bypassable_execution_paths"
+  ]
+}
