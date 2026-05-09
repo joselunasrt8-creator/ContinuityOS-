@@ -1,0 +1,182 @@
+{
+  "version": "1.0",
+  "purpose": "Canonical enforcement planning map before runtime expansion",
+  "planning_loop": [
+    "inventory all mutation surfaces",
+    "classify risk",
+    "identify bypasses",
+    "define required objects",
+    "define validation rules",
+    "define proof obligations",
+    "define replay semantics",
+    "define drift checks",
+    "define observability",
+    "define enforcement order"
+  ],
+  "surfaces": [
+    {
+      "surface_id": "github_production_deploy",
+      "path": ".github/workflows/governed-deploy.yml",
+      "mutation_type": "production_deployment",
+      "risk_class": "P3",
+      "bypass_paths": [
+        "direct_wrangler_deploy",
+        "manual_workflow_dispatch",
+        "alternate_deploy_workflow",
+        "unprotected_branch_deploy"
+      ],
+      "required_objects": [
+        "Authority",
+        "Continuity",
+        "AEO",
+        "ValidationResult",
+        "ExecutionRecord",
+        "ProofOfTransfer",
+        "RegistryRecord"
+      ],
+      "validation_rules": [
+        "authority.status == ACTIVE",
+        "continuity.status == ACTIVE",
+        "validated_object_hash matches canonical_aeo",
+        "invocation_nonce unused",
+        "repo matches authority constraints",
+        "branch matches authority constraints",
+        "workflow matches authority constraints"
+      ],
+      "proof_obligations": [
+        "run_id",
+        "commit_sha",
+        "workflow",
+        "environment",
+        "validated_object_hash",
+        "execution_result"
+      ],
+      "replay_semantics": [
+        "same decision_id + validated_object_hash + invocation_nonce cannot execute twice",
+        "authority is consumed after valid execution",
+        "duplicate validated_object_hash is blocked when authority is single-use"
+      ],
+      "drift_checks": [
+        "commit_sha cannot change after validation",
+        "workflow cannot change after validation",
+        "branch cannot change after validation",
+        "repo cannot change after validation"
+      ],
+      "observability_events": [
+        "VALIDATION_GRANTED",
+        "EXECUTION_STARTED",
+        "EXECUTION_COMPLETED",
+        "PROOF_PERSISTED",
+        "REPLAY_BLOCKED",
+        "HASH_MISMATCH"
+      ],
+      "enforcement_order": 1
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "mutation_type": "authority_preparation",
+      "risk_class": "P2",
+      "bypass_paths": [
+        "manual_prepare_invocation_without_valid_identity",
+        "stale_session_reuse",
+        "continuity_id_mismatch",
+        "authority_created_without_continuity",
+        "compile_output_used_after_expiry"
+      ],
+      "required_objects": [
+        "Session",
+        "Continuity",
+        "Authority",
+        "AEO",
+        "InvocationNonce"
+      ],
+      "validation_rules": [
+        "workflow_dispatch only",
+        "session.status == SESSION_ACTIVE",
+        "continuity.status == CONTINUITY_ACTIVE",
+        "authority.decision_id matches continuity authority_chain",
+        "authority.continuity_id matches continuity_id",
+        "compile returns validated_object_hash"
+      ],
+      "proof_obligations": [
+        "step_summary_contains_decision_id",
+        "step_summary_contains_validated_object_hash",
+        "step_summary_contains_invocation_nonce"
+      ],
+      "replay_semantics": [
+        "generated invocation_nonce must be single-use downstream",
+        "expired authority cannot compile into valid execution"
+      ],
+      "drift_checks": [
+        "deploy workflow target cannot change after authority creation",
+        "repo cannot change after authority creation",
+        "branch cannot change after authority creation"
+      ],
+      "observability_events": [
+        "SESSION_CREATED",
+        "CONTINUITY_CREATED",
+        "AUTHORITY_CREATED",
+        "AEO_COMPILED",
+        "VALIDATION_REJECTED"
+      ],
+      "enforcement_order": 2
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "path": "src/index.ts",
+      "mutation_type": "runtime_execution",
+      "risk_class": "P3",
+      "bypass_paths": [
+        "execute_without_validation",
+        "execute_with_hash_mismatch",
+        "execute_with_reused_nonce",
+        "execute_after_authority_expiry",
+        "execute_without_proof_requirement"
+      ],
+      "required_objects": [
+        "Authority",
+        "AEO",
+        "ValidationResult",
+        "InvocationRecord",
+        "ExecutionRecord",
+        "ProofOfTransfer"
+      ],
+      "validation_rules": [
+        "validation.result == VALID",
+        "validated_object_hash matches compiled AEO",
+        "invocation_nonce unused",
+        "authority not expired",
+        "authority not consumed",
+        "proof requirement exists before execution"
+      ],
+      "proof_obligations": [
+        "execution_id",
+        "decision_id",
+        "validated_object_hash",
+        "invocation_nonce",
+        "surface",
+        "status"
+      ],
+      "replay_semantics": [
+        "each invocation_nonce can be reserved once",
+        "execution record blocks duplicate decision_id + validated_object_hash",
+        "reused authority returns NULL"
+      ],
+      "drift_checks": [
+        "validated object cannot mutate before execution",
+        "target surface cannot differ from validated target",
+        "proof surface must match execution surface"
+      ],
+      "observability_events": [
+        "VALIDATION_GRANTED",
+        "EXECUTION_STARTED",
+        "EXECUTION_COMPLETED",
+        "REPLAY_BLOCKED",
+        "HASH_MISMATCH",
+        "PROOF_PERSISTED"
+      ],
+      "enforcement_order": 3
+    }
+  ]
+}
