@@ -74,7 +74,7 @@ function toCanonicalAeo(input: any): CanonicalAEO | null {
   })
 }
 
-async function ensureSchema(env: Env) {
+async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolean } = {}) {
   const stmts = [
     `CREATE TABLE IF NOT EXISTS session_registry (session_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, owner TEXT NOT NULL, trust_tier TEXT NOT NULL, continuity_status TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_session_registry_status_expiry ON session_registry(continuity_status, expires_at)`,
@@ -95,6 +95,7 @@ async function ensureSchema(env: Env) {
   ]
   for (const s of stmts) await env.DB.prepare(s).run()
   await ensureContinuityColumns(env)
+  if (options.stabilizeProofRegistry === false) return
   await quarantineHistoricalProofDuplicates(env)
   await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
 }
@@ -274,7 +275,11 @@ export default {
     const mutationEndpoint = canonicalRuntimeRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
-    await ensureSchema(env)
+    try {
+      await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
+    } catch {
+      return json({ status: "NULL", reason: "schema_initialization_failed" }, 500)
+    }
 
     if (request.method === "POST" && !canonicalRuntimeRoute) {
       await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
