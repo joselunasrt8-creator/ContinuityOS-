@@ -6,19 +6,43 @@
       "surface_id": "github_production_deploy",
       "path": ".github/workflows/governed-deploy.yml",
       "mutation_type": "deployment",
-      "risk_class": "P3"
+      "risk_class": "P3",
+      "classification": "state_changing_execution_surface",
+      "required_controls": [
+        "ACTIVE authority",
+        "VALID exact AEO",
+        "unused invocation_nonce",
+        "proof persistence"
+      ]
     },
     {
       "surface_id": "prepare_governed_deploy",
       "path": ".github/workflows/prepare-governed-deploy.yml",
-      "mutation_type": "execution_adjacent",
-      "risk_class": "P1"
+      "mutation_type": "authority_preparation",
+      "risk_class": "P2",
+      "classification": "execution_adjacent_mutation_surface",
+      "rationale": "Workflow creates session, continuity, authority, compile output, and invocation nonce used by governed deployment.",
+      "required_controls": [
+        "explicit workflow_dispatch only",
+        "valid worker URL and API key",
+        "session creation must return SESSION_ACTIVE",
+        "continuity creation must return CONTINUITY_ACTIVE",
+        "authority creation must bind matching decision_id and continuity_id",
+        "compile must return validated_object_hash",
+        "generated invocation_nonce must be single-use downstream"
+      ]
     },
     {
       "surface_id": "runtime_execute_route",
       "path": "src/index.ts",
       "mutation_type": "runtime_execution",
-      "risk_class": "P3"
+      "risk_class": "P3",
+      "classification": "runtime_boundary_surface",
+      "required_controls": [
+        "VALID exact AEO",
+        "replay protection",
+        "proof capture"
+      ]
     }
   ]
 }
