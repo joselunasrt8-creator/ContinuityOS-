@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "purpose": "Replay resistance verification suite",
+  "tests": [
+    {
+      "test_id": "reused_nonce",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "reused_authority",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "duplicate_validated_hash",
+      "expected_result": "blocked"
+    }
+  ]
+}

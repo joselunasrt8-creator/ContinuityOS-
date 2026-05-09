@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "purpose": "Execution drift detection tests",
+  "tests": [
+    {
+      "test_id": "commit_sha_changed_after_validation",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "workflow_changed_after_validation",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "policy_mismatch",
+      "expected_result": "NULL"
+    }
+  ]
+}

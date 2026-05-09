@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "purpose": "Known and potential execution bypass paths",
+  "bypass_paths": [
+    {
+      "path": "direct_wrangler_deploy",
+      "risk": "production deploy bypass"
+    },
+    {
+      "path": "manual_workflow_dispatch",
+      "risk": "unauthorized execution"
+    },
+    {
+      "path": "raw_database_write",
+      "risk": "state mutation without validation"
+    }
+  ]
+}
