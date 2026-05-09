@@ -1,0 +1,389 @@
+{
+  "version": "1.0",
+  "purpose": "Score planned governance against actual enforcement maturity for each mutation surface.",
+  "scale": {
+    "0": "absent",
+    "1": "partial",
+    "2": "strong_but_bypassable_or_not_fully_proven",
+    "3": "fail_closed_structurally_enforced"
+  },
+  "dimensions": [
+    "surface_discovered",
+    "governance_defined",
+    "validation_enforced",
+    "replay_safe",
+    "proof_bound",
+    "drift_detected",
+    "observability_present",
+    "bypass_resistance",
+    "continuity_bound",
+    "production_hardened"
+  ],
+  "scorecard": [
+    {
+      "surface_id": "github_production_deploy",
+      "risk_class": "P3",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 2,
+        "replay_safe": 2,
+        "proof_bound": 2,
+        "drift_detected": 1,
+        "observability_present": 1,
+        "bypass_resistance": 1,
+        "continuity_bound": 2,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "branch protection and direct deploy lock are not proven in this scorecard",
+        "production hardening depends on GitHub/environment controls outside runtime code",
+        "drift coverage is mapped but not yet proven as fail-closed enforcement"
+      ],
+      "highest_risk_bypass": "direct_wrangler_deploy",
+      "next_enforcement_target": "direct deploy lock audit",
+      "priority": "CRITICAL"
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 2,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 1,
+        "bypass_resistance": 1,
+        "continuity_bound": 2,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "prepare workflow creates legitimacy inputs but is not itself proof-bound as a closed execution",
+        "step summary output can be manually copied into downstream workflow",
+        "nonce single-use is enforced downstream rather than at prepare boundary"
+      ],
+      "highest_risk_bypass": "manual input transfer into governed-deploy without closed handoff",
+      "next_enforcement_target": "automated governed handoff or prepare-output proof binding",
+      "priority": "HIGH"
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "risk_class": "P3",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 2,
+        "replay_safe": 2,
+        "proof_bound": 2,
+        "drift_detected": 1,
+        "observability_present": 2,
+        "bypass_resistance": 2,
+        "continuity_bound": 2,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "exact fail-closed proof requirement before state change must remain continuously tested",
+        "runtime route is concentrated in src/index.ts and needs stronger endpoint-level governance mapping"
+      ],
+      "highest_risk_bypass": "execute_without_proof_requirement",
+      "next_enforcement_target": "proof-required execution closure test",
+      "priority": "CRITICAL"
+    },
+    {
+      "surface_id": "runtime_authority_session_continuity_routes",
+      "risk_class": "P3",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 2,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 2,
+        "bypass_resistance": 2,
+        "continuity_bound": 2,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "authority/session/continuity creation mutates registries but does not yet have separate proof-of-creation schema",
+        "revocation propagation needs dedicated fail-closed regression coverage"
+      ],
+      "highest_risk_bypass": "authority_created_without_active_continuity",
+      "next_enforcement_target": "continuity-bound authority creation proof test",
+      "priority": "CRITICAL"
+    },
+    {
+      "surface_id": "runtime_compile_validate_routes",
+      "risk_class": "P3",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 2,
+        "replay_safe": 2,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 2,
+        "bypass_resistance": 2,
+        "continuity_bound": 2,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "AEO exact-object coverage exists but must be backed by direct runtime behavior tests",
+        "compile/validate proof obligations are registry records, not external proof receipts"
+      ],
+      "highest_risk_bypass": "validate_loose_request_instead_of_exact_object",
+      "next_enforcement_target": "exact-object mutation regression suite",
+      "priority": "CRITICAL"
+    },
+    {
+      "surface_id": "runtime_proof_route",
+      "risk_class": "P3",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 2,
+        "replay_safe": 2,
+        "proof_bound": 2,
+        "drift_detected": 1,
+        "observability_present": 2,
+        "bypass_resistance": 2,
+        "continuity_bound": 2,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "proof schema coverage exists but proof correctness must be tested against all execution surfaces",
+        "duplicate proof archive behavior needs continuous regression coverage"
+      ],
+      "highest_risk_bypass": "proof_written_without_execution",
+      "next_enforcement_target": "proof lineage closure test",
+      "priority": "CRITICAL"
+    },
+    {
+      "surface_id": "runtime_observability_and_drift_routes",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 3,
+        "validation_enforced": 1,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 2,
+        "observability_present": 2,
+        "bypass_resistance": 1,
+        "continuity_bound": 1,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "observability detects but does not itself enforce closure",
+        "drift records must not become implied authority",
+        "resolution workflow is not yet governed"
+      ],
+      "highest_risk_bypass": "drift_resolution_mutated_without_authority",
+      "next_enforcement_target": "drift resolution governance object",
+      "priority": "MEDIUM"
+    },
+    {
+      "surface_id": "schema_sql_source_of_truth",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 1,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 1,
+        "bypass_resistance": 1,
+        "continuity_bound": 1,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "schema changes are planned but not yet SCO/PREO enforced",
+        "schema hash validation not yet required before merge"
+      ],
+      "highest_risk_bypass": "schema_change_without_sco",
+      "next_enforcement_target": "schema hash + SCO requirement",
+      "priority": "HIGH"
+    },
+    {
+      "surface_id": "migration_files",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 1,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 1,
+        "bypass_resistance": 1,
+        "continuity_bound": 1,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "manual D1 migration remains a potential bypass surface",
+        "migration proof is planned but not yet enforced"
+      ],
+      "highest_risk_bypass": "manual_d1_migration",
+      "next_enforcement_target": "migration governance check",
+      "priority": "HIGH"
+    },
+    {
+      "surface_id": "wrangler_configuration",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 1,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 1,
+        "bypass_resistance": 1,
+        "continuity_bound": 1,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "config hash not yet validated before governed deploy",
+        "D1 binding drift could alter production target"
+      ],
+      "highest_risk_bypass": "d1_binding_changed_without_validation",
+      "next_enforcement_target": "wrangler config hash validation",
+      "priority": "HIGH"
+    },
+    {
+      "surface_id": "package_scripts",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 1,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 1,
+        "bypass_resistance": 2,
+        "continuity_bound": 1,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "deploy script is disabled but new scripts could reintroduce mutation paths",
+        "local D1 migration is intentionally available and must remain local-only"
+      ],
+      "highest_risk_bypass": "new script added without surface classification",
+      "next_enforcement_target": "script drift detection test",
+      "priority": "MEDIUM"
+    },
+    {
+      "surface_id": "local_d1_migration_script",
+      "risk_class": "P1",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 1,
+        "replay_safe": 0,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 0,
+        "bypass_resistance": 2,
+        "continuity_bound": 0,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "local mutation can create schema assumptions that drift from production",
+        "local proof must not be accepted as production proof"
+      ],
+      "highest_risk_bypass": "local_schema_drift_not_reflected_in_migrations",
+      "next_enforcement_target": "local/prod schema drift guard",
+      "priority": "LOW"
+    },
+    {
+      "surface_id": "legacy_worker_file",
+      "risk_class": "P1",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 2,
+        "replay_safe": 1,
+        "proof_bound": 1,
+        "drift_detected": 1,
+        "observability_present": 0,
+        "bypass_resistance": 2,
+        "continuity_bound": 0,
+        "production_hardened": 2
+      },
+      "critical_gaps": [
+        "worker.js is disabled but must stay disabled",
+        "wrangler main drift could reactivate legacy runtime"
+      ],
+      "highest_risk_bypass": "wrangler_main_changed_to_worker_js",
+      "next_enforcement_target": "legacy worker inertness test",
+      "priority": "MEDIUM"
+    },
+    {
+      "surface_id": "legacy_registry_file",
+      "risk_class": "P2",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 1,
+        "replay_safe": 0,
+        "proof_bound": 0,
+        "drift_detected": 1,
+        "observability_present": 0,
+        "bypass_resistance": 1,
+        "continuity_bound": 0,
+        "production_hardened": 1
+      },
+      "critical_gaps": [
+        "registry.js contains demo validation logic",
+        "must prove runtime does not import or rely on legacy validator"
+      ],
+      "highest_risk_bypass": "registry_validate_used_instead_of_omega_validator",
+      "next_enforcement_target": "legacy registry dependency ban test",
+      "priority": "HIGH"
+    },
+    {
+      "surface_id": "github_pr_merge_surface",
+      "risk_class": "P3",
+      "current_state": {
+        "surface_discovered": 3,
+        "governance_defined": 2,
+        "validation_enforced": 0,
+        "replay_safe": 0,
+        "proof_bound": 0,
+        "drift_detected": 1,
+        "observability_present": 0,
+        "bypass_resistance": 0,
+        "continuity_bound": 0,
+        "production_hardened": 0
+      },
+      "critical_gaps": [
+        "branch protection enforcement not proven",
+        "PREO not yet required before merge",
+        "SCO not yet required for system mutation"
+      ],
+      "highest_risk_bypass": "merge_without_PREO",
+      "next_enforcement_target": "branch protection + PREO merge gate",
+      "priority": "CRITICAL"
+    }
+  ],
+  "highest_priority_order": [
+    "github_pr_merge_surface",
+    "github_production_deploy",
+    "runtime_execute_route",
+    "runtime_compile_validate_routes",
+    "runtime_authority_session_continuity_routes",
+    "runtime_proof_route",
+    "legacy_registry_file",
+    "schema_sql_source_of_truth",
+    "migration_files",
+    "wrangler_configuration",
+    "package_scripts",
+    "legacy_worker_file",
+    "local_d1_migration_script",
+    "runtime_observability_and_drift_routes"
+  ]
+}
