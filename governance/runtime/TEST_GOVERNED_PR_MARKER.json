@@ -1,0 +1,11 @@
+{
+  "purpose": "Validate PREO/SCO generation and merge-governance workflow behavior on governed-path mutation.",
+  "status": "non_runtime_mutating_test_marker",
+  "mutation_class": "governance_test_only",
+  "expected_behavior": [
+    "PREO_CANDIDATE generated",
+    "SCO_CANDIDATE generated",
+    "governed path detected",
+    "merge-governance-check passes"
+  ]
+}
