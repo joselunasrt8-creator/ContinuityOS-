@@ -1,0 +1,113 @@
+{
+  "version": "1.0",
+  "purpose": "Design the PREO + SCO merge gate before branch protection integration.",
+  "status": "design_only_non_enforcing",
+  "invariant": [
+    "No PREO -> no governed merge",
+    "Governance/runtime mutation -> requires SCO",
+    "No valid merge object -> source-control mutation remains illegitimate"
+  ],
+  "tasks": [
+    {
+      "task_id": "A",
+      "name": "PREO workflow design",
+      "objective": "Convert PR evidence into a PREO candidate bound to the exact PR head SHA.",
+      "required_fields": [
+        "pr_number",
+        "repo",
+        "base_branch",
+        "head_branch",
+        "head_sha",
+        "changed_files",
+        "review_status",
+        "check_status",
+        "risk_class",
+        "timestamp"
+      ],
+      "output": "PREO_CANDIDATE.json or generated PR artifact",
+      "validity_rules": [
+        "PREO candidate must bind exact head_sha",
+        "PREO candidate must enumerate changed_files",
+        "PREO candidate cannot authorize a different PR",
+        "PREO candidate cannot authorize a different head_sha"
+      ]
+    },
+    {
+      "task_id": "B",
+      "name": "SCO workflow design",
+      "objective": "Require SCO candidate when governed paths change.",
+      "governed_paths": [
+        "governance/**",
+        ".github/workflows/**",
+        "src/**",
+        "schema.sql",
+        "migrations/**",
+        "wrangler.toml"
+      ],
+      "output": "SCO_CANDIDATE.json or generated PR artifact",
+      "validity_rules": [
+        "SCO candidate required when governed_paths are changed",
+        "SCO candidate must bind exact changed files",
+        "SCO candidate scope cannot exceed declared files",
+        "SCO candidate must classify mutation risk"
+      ]
+    },
+    {
+      "task_id": "C",
+      "name": "merge-governance workflow design",
+      "objective": "Check PREO, SCO, status checks, and merge proof declarations before merge legitimacy exists.",
+      "checks": [
+        "PREO exists for PR",
+        "PREO head SHA matches current PR head SHA",
+        "SCO exists when governed paths changed",
+        "SCO changed files match actual changed files",
+        "status checks are available",
+        "merge proof requirements are declared"
+      ],
+      "output": "merge-governance-check status result",
+      "validity_rules": [
+        "missing PREO -> NULL",
+        "head_sha mismatch -> NULL",
+        "governed path mutation without SCO -> NULL",
+        "SCO changed-file mismatch -> NULL",
+        "missing merge proof requirements -> NULL"
+      ]
+    },
+    {
+      "task_id": "D",
+      "name": "enforcement boundary classification",
+      "objective": "Classify current merge governance enforcement maturity.",
+      "states": [
+        "advisory",
+        "required_status_check",
+        "branch_protected_enforcement",
+        "non_bypassable_enforcement"
+      ],
+      "current_state": "advisory",
+      "classification_rules": [
+        "advisory = workflow exists but branch protection does not require it",
+        "required_status_check = workflow required before merge",
+        "branch_protected_enforcement = direct push restricted and status checks required",
+        "non_bypassable_enforcement = no alternate source-control mutation path exists"
+      ]
+    },
+    {
+      "task_id": "E",
+      "name": "branch protection integration",
+      "objective": "Integrate merge governance into branch protection only after Tasks A-D are stable.",
+      "required_controls": [
+        "require merge-governance-check",
+        "restrict direct push to main",
+        "require PR before merge",
+        "require status checks",
+        "define admin bypass policy"
+      ],
+      "preconditions": [
+        "PREO workflow design stable",
+        "SCO workflow design stable",
+        "merge-governance workflow stable",
+        "enforcement boundary classified"
+      ]
+    }
+  ]
+}
