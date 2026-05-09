@@ -80,7 +80,7 @@ test('authorized authority mutation request succeeds with active session', async
           bind() { return this },
           run() { writes += 1; return Promise.resolve({ meta: { changes: 1 } }) },
           all() { return Promise.resolve({ results: [] }) },
-          first() { return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' }) }
+          first() { return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', continuity_id: 'continuity-1', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2', canonical_continuity: JSON.stringify({ continuity_id: 'continuity-1', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: null, authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2' }), status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' }) }
         }
       }
     }
@@ -89,7 +89,7 @@ test('authorized authority mutation request succeeds with active session', async
   const response = await worker.fetch(new Request('https://runtime.test/authority', {
     method: 'POST',
     headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
-    body: JSON.stringify({ session_id: 'session-1', decision_id: 'decision-1', owner: 'tester' })
+    body: JSON.stringify({ session_id: 'session-1', continuity_id: 'continuity-1', decision_id: 'decision-1', owner: 'tester' })
   }), env)
   const payload = await response.json()
 
@@ -126,7 +126,7 @@ test('compile is fail-closed and never throws unhandled exception', () => {
 test('validate reserves nonce and binds validation to authority session', () => {
   assert.match(source, /INSERT OR IGNORE INTO invocation_registry/)
   assert.match(source, /String\(authority\.session_id \|\| ""\) !== session_id/)
-  assert.match(source, /INSERT INTO validation_registry \(validation_id,session_id,decision_id/)
+  assert.match(source, /INSERT INTO validation_registry \(validation_id,session_id,continuity_id,decision_id/)
   assert.match(source, /'RESERVED'/)
 })
 
@@ -141,8 +141,8 @@ test('execute rejects no validation, invalid session, lineage mismatch, wrong ha
 test('proof persists session lineage and consumes authority', () => {
   assert.match(source, /missing_validated_object_hash/)
   assert.match(source, /AND status='EXECUTED'/)
-  assert.match(source, /INSERT INTO proof_registry \(proof_id,session_id,execution_id/)
-  assert.match(source, /proof: \{ proof_id, session_id, execution_id, decision_id, validated_object_hash \}/)
+  assert.match(source, /INSERT INTO proof_registry \(proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id/)
+  assert.match(source, /proof: \{ proof_id, identity_id: String\(authority\.identity_id \|\| ""\), session_id, continuity_id: String\(authority\.continuity_id/)
   assert.match(source, /SET status='CONSUMED'/)
   assert.match(source, /status:"PROVEN"/)
   assert.match(source, /proof_id/)
@@ -203,10 +203,10 @@ test('session continuity schema is present across runtime schema and migration',
   assert.match(source, /CREATE TABLE IF NOT EXISTS session_registry/)
   assert.match(source, /continuity_status TEXT NOT NULL/)
   assert.match(source, /expires_at TEXT NOT NULL/)
-  assert.match(source, /CANONICAL_RUNTIME_ROUTES = \["\/session", "\/authority", "\/compile", "\/validate", "\/execute", "\/proof"\]/)
+  assert.match(source, /CANONICAL_RUNTIME_ROUTES = \["\/session", "\/continuity", "\/authority", "\/compile", "\/validate", "\/execute", "\/proof"\]/)
   assert.match(schema, /CREATE TABLE IF NOT EXISTS session_registry/)
-  assert.match(schema, /session_id TEXT NOT NULL,\n  owner TEXT NOT NULL/)
-  assert.match(schema, /proof_id TEXT PRIMARY KEY,\n  session_id TEXT NOT NULL/)
+  assert.match(schema, /identity_id TEXT NOT NULL,\n  session_id TEXT NOT NULL,\n  continuity_id TEXT NOT NULL/)
+  assert.match(schema, /proof_id TEXT PRIMARY KEY,\n  identity_id TEXT NOT NULL,\n  session_id TEXT NOT NULL/)
   assert.match(sessionContinuityMigration, /CREATE TABLE IF NOT EXISTS session_registry/)
   assert.match(sessionContinuityMigration, /ALTER TABLE authority_registry RENAME TO authority_registry_legacy_pre_session_continuity/)
   assert.match(sessionContinuityMigration, /UNIQUE\(decision_id, validated_object_hash\)/)

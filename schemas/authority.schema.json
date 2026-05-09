@@ -11,6 +11,7 @@
     "owner",
     "identity_id",
     "session_id",
+    "continuity_id",
     "intent",
     "scope",
     "constraints",
@@ -72,6 +73,10 @@
     "created_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "continuity_id": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }

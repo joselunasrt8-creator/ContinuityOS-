@@ -1,0 +1,25 @@
+{
+  "artifact": "SOVEREIGNTY_GAPS",
+  "status": "NON_OPERATIVE",
+  "failure_classes": ["boundary escape", "hidden mutation", "dependency sovereignty loss", "external replay", "proofless external execution", "adapter mismatch", "unbounded egress", "secret exposure"],
+  "gaps": [
+    { "surface_id": "npm_dependency_graph", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "outbound_curl_requests", "sovereignty_tier": "S2", "required_response": "classified-or-blocked" },
+    { "surface_id": "workflow_shell_scripts", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "environment_variables", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "docker_base_images", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "mcp_remote_servers", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "package_install_paths", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "ci_scripts", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "deployment_scripts", "sovereignty_tier": "S2", "required_response": "gap-listed" },
+    { "surface_id": "arbitrary_shell_execution", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "direct_cloud_console_mutation", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "unmanaged_saas_apis", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "local_mcp_stdio_servers", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "manual_database_mutation", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "unrestricted_outbound_network", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "direct_deploy_commands", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "direct_db_write_paths", "sovereignty_tier": "S3", "required_response": "NULL" },
+    { "surface_id": "stale_workflow_endpoints", "sovereignty_tier": "S3", "required_response": "NULL" }
+  ]
+}

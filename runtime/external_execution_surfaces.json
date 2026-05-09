@@ -1,0 +1,8 @@
+{
+  "artifact": "EXTERNAL_EXECUTION_SURFACES",
+  "status": "NON_OPERATIVE",
+  "adapters": [
+    { "adapter_id": "github_actions", "sovereignty_tier": "S1", "allowed_targets": ["governed-deploy.yml", "prepare-governed-deploy.yml"], "revocable": true, "proof_capable": true, "replay_resistant": true, "drift_observable": true, "known_trust_dependencies": ["GitHub-hosted runners", "GitHub secrets", "artifact upload systems"] }
+  ],
+  "weak_surfaces": ["npm_dependency_graph", "outbound_curl_requests", "workflow_shell_scripts", "environment_variables", "docker_base_images", "mcp_remote_servers", "package_install_paths", "ci_scripts", "deployment_scripts"]
+}
