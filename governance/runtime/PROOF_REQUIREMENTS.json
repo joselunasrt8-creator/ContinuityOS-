@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "purpose": "Execution proof persistence requirements",
+  "required_proof_fields": [
+    "run_id",
+    "commit_sha",
+    "workflow_name",
+    "execution_timestamp",
+    "validated_object_hash",
+    "execution_result"
+  ]
+}
