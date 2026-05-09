@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "purpose": "Inventory all state-changing execution surfaces",
+  "surfaces": [
+    {
+      "surface_id": "github_production_deploy",
+      "path": ".github/workflows/governed-deploy.yml",
+      "mutation_type": "deployment",
+      "risk_class": "P3"
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "mutation_type": "execution_adjacent",
+      "risk_class": "P1"
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "path": "src/index.ts",
+      "mutation_type": "runtime_execution",
+      "risk_class": "P3"
+    }
+  ]
+}
