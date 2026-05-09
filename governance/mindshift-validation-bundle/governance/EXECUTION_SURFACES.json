@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "status": "non_operative_governance_artifact",
+  "surfaces": [
+    {
+      "id": "cloudflare_worker_runtime",
+      "files": ["src/index.ts"],
+      "type": "runtime_boundary",
+      "canonical": true,
+      "allowed_state_change_path": ["/authority", "/compile", "/validate", "/execute", "/proof"],
+      "bundle_change": "none"
+    },
+    {
+      "id": "github_governed_production_deploy",
+      "files": [
+        ".github/workflows/prepare-governed-deploy.yml",
+        ".github/workflows/governed-deploy.yml"
+      ],
+      "type": "deployment_boundary",
+      "canonical": true,
+      "requires_validated_object": true,
+      "requires_invocation_nonce": true,
+      "requires_proof_persistence": true,
+      "bundle_change": "none"
+    },
+    {
+      "id": "package_scripts",
+      "files": ["package.json"],
+      "type": "developer_command_surface",
+      "canonical": false,
+      "deploy_script_status": "disabled_guard",
+      "bundle_change": "none"
+    },
+    {
+      "id": "d1_migrations",
+      "files": ["migrations/*.sql"],
+      "type": "registry_schema_surface",
+      "canonical": false,
+      "bundle_change": "none"
+    }
+  ]
+}
