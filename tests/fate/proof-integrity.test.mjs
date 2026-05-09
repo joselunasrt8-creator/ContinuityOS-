@@ -36,8 +36,8 @@ test('duplicate proof is blocked as NULL / INVALID', () => {
 })
 
 test('proof persists authority/session lineage', () => {
-  assert.match(source, /INSERT INTO proof_registry \(proof_id,session_id,execution_id,decision_id,validated_object_hash/)
-  assert.match(source, /AND EXISTS \(SELECT 1 FROM authority_registry WHERE decision_id=\?4 AND session_id=\?2 AND status='EXECUTED'\)/)
+  assert.match(source, /INSERT INTO proof_registry \(proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash/)
+  assert.match(source, /WHERE a\.decision_id=\?4 AND a\.session_id=\?2 AND a\.status='EXECUTED'/)
   assert.match(source, /UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=\?1 AND session_id=\?2 AND status='EXECUTED'/)
-  assert.match(source, /proof: \{ proof_id, session_id, execution_id, decision_id, validated_object_hash \}/)
+  assert.match(source, /proof: \{ proof_id, identity_id: String\(authority\.identity_id \|\| ""\), session_id, continuity_id: String\(authority\.continuity_id/)
 })

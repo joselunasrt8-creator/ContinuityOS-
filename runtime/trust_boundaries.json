@@ -1,0 +1,9 @@
+{
+  "artifact": "TRUST_BOUNDARIES",
+  "status": "NON_OPERATIVE",
+  "boundaries": [
+    { "boundary_id": "runtime_http", "inside": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"], "outside": ["client", "GitHub Actions"], "failure_classes": ["boundary escape", "external replay", "adapter mismatch"] },
+    { "boundary_id": "ci_cd", "inside": ["governed-deploy.yml"], "outside": ["GitHub-hosted runners", "artifact upload systems", "GitHub secrets"], "failure_classes": ["hidden mutation", "proofless external execution", "secret exposure"] },
+    { "boundary_id": "supply_chain", "inside": ["package-lock.json"], "outside": ["npm dependency graph", "Docker base images"], "failure_classes": ["dependency sovereignty loss", "drift", "unbounded egress"] }
+  ]
+}

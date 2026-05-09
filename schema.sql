@@ -14,10 +14,28 @@ CREATE TABLE IF NOT EXISTS session_registry (
 CREATE INDEX IF NOT EXISTS idx_session_registry_status_expiry
   ON session_registry (continuity_status, expires_at);
 
+CREATE TABLE IF NOT EXISTS continuity_registry (
+  continuity_id TEXT PRIMARY KEY,
+  identity_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  parent_continuity_id TEXT,
+  continuity_hash TEXT NOT NULL UNIQUE,
+  canonical_continuity TEXT NOT NULL,
+  status TEXT NOT NULL,
+  issued_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_continuity_registry_session_identity
+  ON continuity_registry (session_id, identity_id, status, expires_at);
+
 CREATE TABLE IF NOT EXISTS authority_registry (
   authority_id TEXT PRIMARY KEY,
   decision_id TEXT NOT NULL UNIQUE,
+  identity_id TEXT NOT NULL,
   session_id TEXT NOT NULL,
+  continuity_id TEXT NOT NULL,
   owner TEXT NOT NULL,
   intent TEXT NOT NULL,
   scope TEXT NOT NULL,
@@ -34,6 +52,7 @@ CREATE TABLE IF NOT EXISTS aeo_registry (
   aeo_id TEXT PRIMARY KEY,
   authority_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
+  continuity_id TEXT NOT NULL,
   canonical_aeo TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
   status TEXT NOT NULL,
@@ -49,6 +68,7 @@ CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_hash
 CREATE TABLE IF NOT EXISTS validation_registry (
   validation_id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
+  continuity_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
   invocation_nonce TEXT NOT NULL,
@@ -65,6 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_validation_registry_decision_hash_nonce
 CREATE TABLE IF NOT EXISTS execution_registry (
   execution_id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
+  continuity_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
   invocation_nonce TEXT NOT NULL,
@@ -78,10 +99,15 @@ CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_hash
 
 CREATE TABLE IF NOT EXISTS proof_registry (
   proof_id TEXT PRIMARY KEY,
+  identity_id TEXT NOT NULL,
   session_id TEXT NOT NULL,
+  continuity_id TEXT NOT NULL,
+  continuity_hash TEXT NOT NULL,
   execution_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
+  authority_lineage TEXT NOT NULL,
+  execution_lineage TEXT NOT NULL,
   surface TEXT,
   run_id TEXT,
   commit_sha TEXT,
@@ -120,6 +146,7 @@ CREATE TABLE IF NOT EXISTS invocation_registry (
   decision_id TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
   invocation_nonce TEXT NOT NULL,
+  continuity_id TEXT,
   status TEXT NOT NULL,
   created_at TEXT NOT NULL,
   PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce)

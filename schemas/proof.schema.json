@@ -15,7 +15,13 @@
     "target_action",
     "result",
     "timestamp",
-    "proof_reference"
+    "proof_reference",
+    "continuity_id",
+    "continuity_hash",
+    "identity_id",
+    "session_id",
+    "authority_lineage",
+    "execution_lineage"
   ],
   "properties": {
     "proof_id": {
@@ -59,6 +65,28 @@
       "format": "date-time"
     },
     "proof_reference": {
+      "type": "object"
+    },
+    "continuity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "continuity_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "identity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_lineage": {
+      "type": "object"
+    },
+    "execution_lineage": {
       "type": "object"
     }
   }

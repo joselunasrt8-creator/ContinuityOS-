@@ -1,0 +1,48 @@
+{
+  "artifact": "SOVEREIGNTY_MAP",
+  "status": "NON_OPERATIVE",
+  "tiers": {
+    "S0": "Sovereign: intercepted, validated, replay-protected, observable, revocable, proof-persisted",
+    "S1": "Governed External: mediated through gateway, scoped authority, observable, revocable, bounded egress",
+    "S2": "Weak Sovereignty: partial control, mutable dependencies, weak observability, partial replay visibility",
+    "S3": "Non-Sovereign: outside legitimacy control"
+  },
+  "surfaces": [
+    { "surface_id": "/session", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "/continuity", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "/authority", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "/compile", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "/validate", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "/execute", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "/proof", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "registries", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "validator", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "proof_persistence", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "fate_verification", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "preo_sco_governance_artifacts", "sovereignty_tier": "S0", "intercepted": true, "validated": true, "replay_protected": true, "observable": true, "revocable": true, "proof_persisted": true },
+    { "surface_id": "github_actions", "sovereignty_tier": "S1", "adapter_id": "github_actions", "allowed_targets": ["governed-deploy.yml", "prepare-governed-deploy.yml"], "revocable": true, "proof_capable": true, "replay_resistant": true, "drift_observable": true, "known_trust_dependencies": ["GitHub-hosted runners", "GitHub secrets", "artifact upload systems"] },
+    { "surface_id": "npm_dependency_graph", "sovereignty_tier": "S2" },
+    { "surface_id": "outbound_curl_requests", "sovereignty_tier": "S2" },
+    { "surface_id": "workflow_shell_scripts", "sovereignty_tier": "S2" },
+    { "surface_id": "environment_variables", "sovereignty_tier": "S2" },
+    { "surface_id": "docker_base_images", "sovereignty_tier": "S2" },
+    { "surface_id": "mcp_remote_servers", "sovereignty_tier": "S2" },
+    { "surface_id": "arbitrary_shell_execution", "sovereignty_tier": "S3" },
+    { "surface_id": "direct_cloud_console_mutation", "sovereignty_tier": "S3" },
+    { "surface_id": "unmanaged_saas_apis", "sovereignty_tier": "S3" },
+    { "surface_id": "local_mcp_stdio_servers", "sovereignty_tier": "S3" },
+    { "surface_id": "manual_database_mutation", "sovereignty_tier": "S3" },
+    { "surface_id": "unrestricted_outbound_network", "sovereignty_tier": "S3" },
+    { "surface_id": "direct_deploy_commands", "sovereignty_tier": "S3" },
+    { "surface_id": "direct_db_write_paths", "sovereignty_tier": "S3" },
+    { "surface_id": "stale_workflow_endpoints", "sovereignty_tier": "S3" }
+  ],
+  "metrics": {
+    "intercepted_execution_ratio": 0.42,
+    "proof_coverage_ratio": 0.42,
+    "revocable_surface_ratio": 0.46,
+    "external_trust_ratio": 0.58,
+    "uncontrolled_egress_ratio": 0.08,
+    "drift_visibility_ratio": 0.5
+  }
+}
