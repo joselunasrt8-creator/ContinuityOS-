@@ -89,6 +89,12 @@ jobs:
       - name: AUTHORITY — Create deploy authority and decision
         run: |
           set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ]; then
+            echo "NULL — Missing active session_id before authority"
+            exit 1
+          fi
+
           EXPIRY="$(date -u -d '+15 minutes' +%Y-%m-%dT%H:%M:%SZ)"
 
           RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
