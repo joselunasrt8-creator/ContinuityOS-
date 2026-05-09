@@ -13,6 +13,42 @@ const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const SESSION_TTL_MS = 3600_000
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 
+const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
+  session_registry: ["session_id", "identity_id", "owner", "trust_tier", "continuity_status", "created_at", "expires_at"],
+  continuity_registry: ["continuity_id", "identity_id", "session_id", "parent_continuity_id", "continuity_hash", "canonical_continuity", "status", "issued_at", "expires_at", "revoked_at"],
+  authority_registry: ["authority_id", "decision_id", "session_id", "owner", "intent", "scope", "constraints", "expiry", "status", "created_at", "continuity_id", "identity_id"],
+  aeo_registry: ["aeo_id", "authority_id", "decision_id", "canonical_aeo", "validated_object_hash", "status", "created_at", "continuity_id"],
+  validation_registry: ["validation_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "environment", "result", "reason", "status", "created_at", "continuity_id"],
+  execution_registry: ["execution_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id"],
+  proof_registry: ["proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "continuity_id", "continuity_hash", "identity_id", "authority_lineage", "execution_lineage"],
+  proof_registry_duplicate_archive: ["archive_id", "proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "archived_at", "archive_reason", "canonical_proof_id"],
+  invocation_registry: ["decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id"],
+  observability_registry: ["event_id", "event_type", "decision_id", "authority_id", "execution_id", "proof_id", "severity", "payload", "created_at"],
+  drift_registry: ["drift_id", "drift_class", "severity", "decision_id", "execution_id", "payload", "detected_by", "resolution_status", "created_at"]
+}
+
+type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
+
+class SchemaInitializationError extends Error {
+  reason: SchemaDiagnosticReason
+
+  constructor(reason: SchemaDiagnosticReason, cause?: unknown) {
+    super(reason)
+    this.reason = reason
+    this.cause = cause
+  }
+}
+
+function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
+  if (error instanceof SchemaInitializationError) return error.reason
+  const message = String((error as any)?.message || error || "")
+  if (/no such table/i.test(message)) return "missing_required_table"
+  if (/no such column|has no column named/i.test(message)) return "missing_required_column"
+  if (/duplicate column name|UNIQUE constraint failed|constraint failed|index.*already exists/i.test(message)) return "migration_required"
+  if (/database|D1_|SQLITE_BUSY|SQLITE_IOERR/i.test(message)) return "database_unavailable"
+  return "schema_initialization_failed"
+}
+
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
 type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift"
 
@@ -76,48 +112,69 @@ function toCanonicalAeo(input: any): CanonicalAEO | null {
 }
 
 async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolean } = {}) {
-  const stmts = [
-    `CREATE TABLE IF NOT EXISTS session_registry (session_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, owner TEXT NOT NULL, trust_tier TEXT NOT NULL, continuity_status TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_registry_status_expiry ON session_registry(continuity_status, expires_at)`,
-    `CREATE TABLE IF NOT EXISTS continuity_registry (continuity_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, session_id TEXT NOT NULL, parent_continuity_id TEXT, continuity_hash TEXT NOT NULL, canonical_continuity TEXT NOT NULL, status TEXT NOT NULL, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT, UNIQUE(continuity_hash))`,
-    `CREATE INDEX IF NOT EXISTS idx_continuity_registry_session_identity ON continuity_registry(session_id, identity_id, status, expires_at)`,
-    `CREATE TABLE IF NOT EXISTS authority_registry (authority_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL UNIQUE, identity_id TEXT NOT NULL, session_id TEXT NOT NULL, continuity_id TEXT NOT NULL, owner TEXT NOT NULL, intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, expiry TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)`,
-    `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, continuity_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)`,
-    `CREATE TABLE IF NOT EXISTS validation_registry (validation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, continuity_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, environment TEXT, result TEXT NOT NULL, reason TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL)`,
-    `CREATE TABLE IF NOT EXISTS execution_registry (execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, continuity_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(decision_id, validated_object_hash), UNIQUE(continuity_id, decision_id, validated_object_hash))`,
-    `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, session_id TEXT NOT NULL, continuity_id TEXT NOT NULL, continuity_hash TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, authority_lineage TEXT NOT NULL, execution_lineage TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, UNIQUE(decision_id, validated_object_hash))`,
-    `CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (archive_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, archived_at TEXT NOT NULL, archive_reason TEXT NOT NULL, canonical_proof_id TEXT NOT NULL, UNIQUE(proof_id))`,
-    `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, continuity_id TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
-    `CREATE TABLE IF NOT EXISTS observability_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, severity TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
-    `CREATE INDEX IF NOT EXISTS idx_observability_decision ON observability_registry(decision_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_observability_execution ON observability_registry(execution_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_observability_type ON observability_registry(event_type)`,
-    `CREATE TABLE IF NOT EXISTS drift_registry (drift_id TEXT PRIMARY KEY, drift_class TEXT NOT NULL, severity TEXT NOT NULL, decision_id TEXT, execution_id TEXT, payload TEXT NOT NULL, detected_by TEXT NOT NULL, resolution_status TEXT NOT NULL, created_at TEXT NOT NULL)`
-  ]
-  for (const s of stmts) await env.DB.prepare(s).run()
-  await ensureContinuityColumns(env)
-  if (options.stabilizeProofRegistry === false) return
-  await quarantineHistoricalProofDuplicates(env)
-  await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
+  try {
+    const stmts = [
+      `CREATE TABLE IF NOT EXISTS session_registry (session_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, owner TEXT NOT NULL, trust_tier TEXT NOT NULL, continuity_status TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_session_registry_status_expiry ON session_registry(continuity_status, expires_at)`,
+      `CREATE TABLE IF NOT EXISTS continuity_registry (continuity_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, session_id TEXT NOT NULL, parent_continuity_id TEXT, continuity_hash TEXT NOT NULL, canonical_continuity TEXT NOT NULL, status TEXT NOT NULL, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT, UNIQUE(continuity_hash))`,
+      `CREATE INDEX IF NOT EXISTS idx_continuity_registry_session_identity ON continuity_registry(session_id, identity_id, status, expires_at)`,
+      `CREATE TABLE IF NOT EXISTS authority_registry (authority_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL UNIQUE, session_id TEXT NOT NULL, owner TEXT NOT NULL, intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, expiry TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, identity_id TEXT)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_authority_registry_decision_unique ON authority_registry(decision_id)`,
+      `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT)`,
+      `CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_hash ON aeo_registry(decision_id, validated_object_hash)`,
+      `CREATE TABLE IF NOT EXISTS validation_registry (validation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, environment TEXT, result TEXT NOT NULL, reason TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT)`,
+      `CREATE INDEX IF NOT EXISTS idx_validation_registry_decision_hash_nonce ON validation_registry(decision_id, validated_object_hash, invocation_nonce)`,
+      `CREATE TABLE IF NOT EXISTS execution_registry (execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, UNIQUE(decision_id, validated_object_hash), UNIQUE(continuity_id, decision_id, validated_object_hash))`,
+      `CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_hash ON execution_registry(decision_id, validated_object_hash)`,
+      `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, continuity_id TEXT, continuity_hash TEXT, identity_id TEXT, authority_lineage TEXT, execution_lineage TEXT, UNIQUE(decision_id, validated_object_hash))`,
+      `CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash ON proof_registry(execution_id, decision_id, validated_object_hash)`,
+      `CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (archive_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, archived_at TEXT NOT NULL, archive_reason TEXT NOT NULL, canonical_proof_id TEXT NOT NULL, UNIQUE(proof_id))`,
+      `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_invocation_registry_nonce_once ON invocation_registry(decision_id, validated_object_hash, invocation_nonce)`,
+      `CREATE TABLE IF NOT EXISTS observability_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, severity TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_observability_decision ON observability_registry(decision_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_observability_execution ON observability_registry(execution_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_observability_type ON observability_registry(event_type)`,
+      `CREATE TABLE IF NOT EXISTS drift_registry (drift_id TEXT PRIMARY KEY, drift_class TEXT NOT NULL, severity TEXT NOT NULL, decision_id TEXT, execution_id TEXT, payload TEXT NOT NULL, detected_by TEXT NOT NULL, resolution_status TEXT NOT NULL, created_at TEXT NOT NULL)`
+    ]
+    for (const s of stmts) await env.DB.prepare(s).run()
+    await ensureRequiredSchemaColumns(env)
+    if (options.stabilizeProofRegistry === false) return
+    await quarantineHistoricalProofDuplicates(env)
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
+  } catch (error) {
+    throw new SchemaInitializationError(schemaDiagnosticReason(error), error)
+  }
 }
 
-async function ensureContinuityColumns(env: Env) {
-  const columnAdds: Array<[string, string, string]> = [
-    ["authority_registry", "identity_id", "TEXT"],
-    ["authority_registry", "continuity_id", "TEXT"],
-    ["aeo_registry", "continuity_id", "TEXT"],
-    ["validation_registry", "continuity_id", "TEXT"],
-    ["execution_registry", "continuity_id", "TEXT"],
-    ["invocation_registry", "continuity_id", "TEXT"],
-    ["proof_registry", "identity_id", "TEXT"],
-    ["proof_registry", "continuity_id", "TEXT"],
-    ["proof_registry", "continuity_hash", "TEXT"],
-    ["proof_registry", "authority_lineage", "TEXT"],
-    ["proof_registry", "execution_lineage", "TEXT"]
-  ]
-  for (const [table, column, type] of columnAdds) {
-    if (!(await hasColumn(env, table, column))) await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run()
+async function ensureRequiredSchemaColumns(env: Env) {
+  const tableColumnSets: Array<[string, string[], Set<string>]> = []
+  for (const [table, columns] of Object.entries(REQUIRED_SCHEMA_COLUMNS)) {
+    tableColumnSets.push([table, columns, await tableColumns(env, table)])
   }
+
+  if (tableColumnSets.every(([, , existing]) => existing.size === 0)) return
+
+  for (const [table, columns, existing] of tableColumnSets) {
+    if (existing.size === 0) throw new SchemaInitializationError("missing_required_table")
+    for (const column of columns) {
+      if (!existing.has(column)) {
+        await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${columnType(column)}`).run()
+        existing.add(column)
+      }
+    }
+  }
+}
+
+function columnType(column: string): string {
+  if (column === "upstream_status") return "INTEGER"
+  return "TEXT"
+}
+
+async function tableColumns(env: Env, table: string): Promise<Set<string>> {
+  const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all<any>()
+  const rows = Array.isArray(info?.results) ? info.results : []
+  return new Set(rows.map((row: any) => String(row?.name || "")).filter(Boolean))
 }
 
 function continuityHashMaterial(input: any): Record<string, unknown> {
@@ -280,8 +337,8 @@ export default {
 
     try {
       await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
-    } catch {
-      return json({ status: "NULL", reason: "schema_initialization_failed" }, 500)
+    } catch (error) {
+      return json({ status: "NULL", reason: schemaDiagnosticReason(error) }, 500)
     }
 
     try {
