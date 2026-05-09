@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/mindshift-proof-object.schema.json",
+  "title": "MindShift Proof Object",
+  "description": "Proof-of-Transfer linked to authority and exact object hash.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proof_id",
+    "execution_id",
+    "decision_id",
+    "authority_id",
+    "aeo_hash",
+    "target_system",
+    "target_action",
+    "result",
+    "timestamp",
+    "proof_reference"
+  ],
+  "properties": {
+    "proof_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aeo_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_system": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failure",
+        "blocked"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proof_reference": {
+      "type": "object"
+    }
+  }
+}

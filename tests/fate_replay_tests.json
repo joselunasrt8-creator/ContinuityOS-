@@ -1,0 +1,13 @@
+{
+  "artifact": "FATE_REPLAY_TESTS",
+  "status": "NON_OPERATIVE",
+  "tests": [
+    {
+      "name": "same_validated_object_cannot_execute_twice",
+      "given": "VALID AEO already consumed",
+      "when": "same AEO hash or invocation nonce is reused",
+      "then": "NULL",
+      "expected_reason": "replay_detected"
+    }
+  ]
+}

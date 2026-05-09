@@ -1,0 +1,14 @@
+{
+  "artifact": "BYPASS_PATHS",
+  "status": "NON_OPERATIVE",
+  "known_bypass_classes": [
+    "direct_deploy",
+    "direct_db_write",
+    "direct_webhook",
+    "direct_agent_tool_call",
+    "validator_request_level_approval",
+    "mutation_after_validation",
+    "proof_not_linked_to_aeo_hash"
+  ],
+  "required_response": "NULL"
+}

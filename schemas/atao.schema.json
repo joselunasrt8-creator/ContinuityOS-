@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/mindshift-atao-object.schema.json",
+  "title": "MindShift ATAO Object",
+  "description": "Captures proposed action before execution legitimacy exists.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "atao_id",
+    "agent_id",
+    "session_id",
+    "intent",
+    "proposed_action",
+    "scope",
+    "risk_class",
+    "timestamp"
+  ],
+  "properties": {
+    "atao_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "proposed_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "action",
+        "parameters"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "scope": {
+      "type": "object"
+    },
+    "risk_class": {
+      "type": "string",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

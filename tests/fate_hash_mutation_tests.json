@@ -1,0 +1,13 @@
+{
+  "artifact": "FATE_HASH_MUTATION_TESTS",
+  "status": "NON_OPERATIVE",
+  "tests": [
+    {
+      "name": "validated_object_must_equal_executed_object",
+      "given": "AEO validated with hash H1",
+      "when": "execution payload differs and produces hash H2",
+      "then": "NULL",
+      "expected_reason": "hash_mismatch"
+    }
+  ]
+}

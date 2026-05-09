@@ -1,0 +1,13 @@
+{
+  "artifact": "FATE_PROOF_INTEGRITY_TESTS",
+  "status": "NON_OPERATIVE",
+  "tests": [
+    {
+      "name": "proof_must_link_to_authority_and_aeo_hash",
+      "given": "execution completed",
+      "when": "proof omits authority_id or aeo_hash",
+      "then": "execution_incomplete",
+      "expected_reason": "proof_linkage_missing"
+    }
+  ]
+}

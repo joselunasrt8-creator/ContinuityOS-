@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/mindshift-identity-object.schema.json",
+  "title": "MindShift Identity Object",
+  "description": "Binds execution legitimacy to an identity origin.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identity_id",
+    "identity_provider",
+    "user_id",
+    "org_id",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "identity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "org_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "REVOKED",
+        "SUSPENDED"
+      ]
+    },
+    "public_key_ref": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revoked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

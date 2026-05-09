@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/mindshift-session-object.schema.json",
+  "title": "MindShift Session Object",
+  "description": "Preserves session continuity and revocation state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "identity_id",
+    "status",
+    "started_at",
+    "expires_at",
+    "continuity_hash"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "EXPIRED",
+        "REVOKED"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revoked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "continuity_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revocation_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

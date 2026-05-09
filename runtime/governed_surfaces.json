@@ -1,0 +1,18 @@
+{
+  "artifact": "GOVERNED_SURFACES",
+  "status": "NON_OPERATIVE",
+  "governed": [
+    {
+      "surface_id": "github_governed_deploy",
+      "current_state": "FIRST_SURFACE",
+      "requirements": [
+        "ACTIVE authority",
+        "valid session continuity",
+        "compiled exact AEO",
+        "VALID validator result",
+        "unused invocation nonce",
+        "proof persisted"
+      ]
+    }
+  ]
+}

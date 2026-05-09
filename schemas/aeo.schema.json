@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/mindshift-aeo-object.schema.json",
+  "title": "MindShift AEO Object",
+  "description": "Exact executable object. validated_object must equal executed_object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intent",
+    "scope",
+    "validation",
+    "target",
+    "finality"
+  ],
+  "properties": {
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "object"
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "authority_id",
+        "require_active_authority",
+        "require_exact_object_hash",
+        "require_session_continuity"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "require_active_authority": {
+          "type": "boolean"
+        },
+        "require_exact_object_hash": {
+          "type": "boolean"
+        },
+        "require_session_continuity": {
+          "type": "boolean"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "action"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "finality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proof_required",
+        "proof_type",
+        "registry_required"
+      ],
+      "properties": {
+        "proof_required": {
+          "type": "boolean"
+        },
+        "proof_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registry_required": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

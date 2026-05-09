@@ -1,0 +1,37 @@
+{
+  "artifact": "EXECUTION_SURFACES",
+  "status": "NON_OPERATIVE",
+  "surfaces": [
+    {
+      "surface_id": "github_governed_deploy",
+      "type": "ci_cd",
+      "state_changing": true,
+      "required_path": "/authority -> /compile -> /validate -> /execute -> /proof",
+      "proof_type": "deployment_receipt",
+      "risk_class": "P3"
+    },
+    {
+      "surface_id": "github_pr_merge",
+      "type": "source_control",
+      "state_changing": true,
+      "required_objects": [
+        "PREO",
+        "SCO when system mutation",
+        "AEO"
+      ],
+      "proof_type": "merge_receipt",
+      "risk_class": "P2"
+    },
+    {
+      "surface_id": "agent_tool_call",
+      "type": "agent_tool",
+      "state_changing": true,
+      "required_objects": [
+        "ATAO",
+        "AEO"
+      ],
+      "proof_type": "tool_execution_receipt",
+      "risk_class": "P2"
+    }
+  ]
+}
