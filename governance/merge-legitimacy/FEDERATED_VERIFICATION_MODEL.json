@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "federated_verification_model",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "federation_specification",
+  "scope": {
+    "purpose": "Define non-operative machine-readable requirements for federated verification of governance legitimacy.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "federation_object": {
+    "type": "FEDERATED_VERIFICATION_REQUIREMENT",
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "federation_id",
+      "federation_requirement_hash",
+      "verified_object_hash",
+      "participant_set_hash",
+      "quorum_rule",
+      "attestation_requirements",
+      "authority_lineage_requirements",
+      "replay_controls",
+      "proof_requirements",
+      "decision_state"
+    ],
+    "decision_states": ["VERIFICATION_REQUIREMENTS_SATISFIED", "NULL"],
+    "default_result": "NULL"
+  },
+  "participant_requirements": {
+    "participant_identity_required": true,
+    "participant_authority_lineage_required": true,
+    "participant_scope_binding_required": true,
+    "participant_replay_controls_required": true,
+    "implicit_participants": "forbidden",
+    "participant_set_change_result": "NULL_UNLESS_GOVERNED_AS_NEW_OBJECT"
+  },
+  "quorum_rule": {
+    "machine_readable": true,
+    "minimum_distinct_participants_required": 2,
+    "self_attestation_only": "forbidden",
+    "ambiguous_quorum_result": "NULL",
+    "quorum_reuse_policy": "Each verification event must bind a fresh invocation nonce and verified_object_hash."
+  },
+  "attestation_requirements": {
+    "required_bindings": [
+      "verified_object_hash",
+      "participant_identity_hash",
+      "participant_authority_hash",
+      "attestation_scope",
+      "attestation_nonce",
+      "attestation_timestamp_or_sequence",
+      "attestation_result"
+    ],
+    "allowed_results": ["SATISFIED", "NULL"],
+    "hash_mismatch_result": "NULL",
+    "missing_attestation_result": "NULL",
+    "reused_attestation_result": "NULL"
+  },
+  "authority_lineage_requirements": {
+    "preexisting_authority_required": true,
+    "implicit_authority": "forbidden",
+    "required_bindings": [
+      "source_authority_id",
+      "source_authority_hash",
+      "delegated_verification_scope",
+      "delegation_depth",
+      "revocation_or_expiration_condition"
+    ],
+    "lineage_gap_result": "NULL"
+  },
+  "replay_controls": {
+    "verified_object_hash_required": true,
+    "fresh_invocation_nonce_required": true,
+    "single_use_attestation_nonce_required": true,
+    "single_use_authority_requirement": true,
+    "replay_detected_result": "NULL"
+  },
+  "proof_requirements": {
+    "proof_required_for_downstream_execution_or_merge": true,
+    "federation_model_must_not_generate_proof": true,
+    "required_proof_bindings": [
+      "federation_requirement_hash",
+      "verified_object_hash",
+      "participant_set_hash",
+      "quorum_result_hash",
+      "authority_lineage_hash",
+      "invocation_nonce"
+    ],
+    "proof_gap_result": "NULL"
+  },
+  "non_bypassability": {
+    "direct_trust_without_attestation": "forbidden",
+    "direct_merge_without_federated_requirement": "forbidden",
+    "workflow_success_as_substitute": "forbidden",
+    "deployment_success_as_substitute": "forbidden",
+    "registry_write_as_substitute": "forbidden",
+    "bypass_detected_result": "NULL"
+  },
+  "recursive_governance": {
+    "required": true,
+    "rule": "Federation participant changes, quorum changes, attestation schema changes, and verification-scope changes must be represented as new governed objects with lineage, validation, replay, and proof requirements."
+  }
+}

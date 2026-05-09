@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "merge_lineage_model",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "lineage_model_specification",
+  "scope": {
+    "purpose": "Define machine-readable legitimacy lineage required before any merge could be considered valid by a separate governed process.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "lineage_object": {
+    "type": "MERGE_LINEAGE",
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "merge_lineage_id",
+      "merge_lineage_hash",
+      "proposal_hash",
+      "sco_hash",
+      "preo_hash",
+      "authority_lineage",
+      "validation_evidence_requirements",
+      "proof_requirements",
+      "replay_controls",
+      "federated_verification_requirements",
+      "decision_state"
+    ],
+    "decision_states": ["LEGITIMACY_REQUIREMENTS_SATISFIED", "NULL"],
+    "default_result": "NULL"
+  },
+  "required_lineage_chain": [
+    {
+      "position": 1,
+      "object_type": "proposal",
+      "required_binding": "proposal_hash",
+      "missing_result": "NULL"
+    },
+    {
+      "position": 2,
+      "object_type": "SCO",
+      "required_binding": "sco_hash",
+      "missing_result": "NULL"
+    },
+    {
+      "position": 3,
+      "object_type": "PREO",
+      "required_binding": "preo_hash",
+      "missing_result": "NULL"
+    },
+    {
+      "position": 4,
+      "object_type": "authority_lineage",
+      "required_binding": "source_authority_hash",
+      "missing_result": "NULL"
+    },
+    {
+      "position": 5,
+      "object_type": "validation_requirements",
+      "required_binding": "validation_requirement_hash",
+      "missing_result": "NULL"
+    },
+    {
+      "position": 6,
+      "object_type": "federated_verification_requirements",
+      "required_binding": "federated_verification_requirement_hash",
+      "missing_result": "NULL"
+    },
+    {
+      "position": 7,
+      "object_type": "proof_requirements",
+      "required_binding": "proof_requirement_hash",
+      "missing_result": "NULL"
+    }
+  ],
+  "authority_lineage": {
+    "preexisting_authority_required": true,
+    "implicit_authority": "forbidden",
+    "required_bindings": [
+      "source_authority_id",
+      "source_authority_hash",
+      "delegated_scope",
+      "delegation_depth",
+      "revocation_or_expiration_condition"
+    ],
+    "lineage_gap_result": "NULL"
+  },
+  "merge_legitimacy_requirements": {
+    "machine_readable_legitimacy": true,
+    "exact_object_discipline": "The object accepted as legitimate for merge consideration must be hash-identical to the object reviewed by SCO, PREO, validation, and federated verification requirements.",
+    "non_bypassability": "Merge legitimacy cannot be inferred from human approval, branch state, workflow success, or deployment success alone.",
+    "proof_requirements": "Any future governed merge process must require proof bindings to validated object, authority, invocation nonce, verification result, and merge result.",
+    "replay_resistance": "A merge legitimacy object must include nonce and single-use authority requirements; reuse produces NULL.",
+    "recursive_governance": "Changes to merge legitimacy rules must themselves pass through object, lineage, validation, federated verification, replay, and proof requirements."
+  },
+  "forbidden_legitimacy_sources": [
+    "implicit_maintainer_authority",
+    "unbound_human_approval",
+    "branch_name_only",
+    "workflow_success_without_object_binding",
+    "deployment_success_without_proof_binding",
+    "reused_authority",
+    "reused_nonce",
+    "unverified_federated_attestation"
+  ],
+  "failure_semantics": {
+    "missing_object": "NULL",
+    "hash_mismatch": "NULL",
+    "authority_gap": "NULL",
+    "validation_gap": "NULL",
+    "federation_gap": "NULL",
+    "proof_requirement_gap": "NULL",
+    "replay_detected": "NULL",
+    "bypass_detected": "NULL"
+  }
+}

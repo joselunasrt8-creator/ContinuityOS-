@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sco_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "governance_specification",
+  "scope": {
+    "name": "SCO",
+    "expansion": "Structured Change Object",
+    "purpose": "Define a machine-readable structure for proposed changes before authority binding, validation, execution, and proof.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "object_model": {
+    "type": "SCO",
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "identity": {
+      "sco_id": "stable_unique_identifier",
+      "sco_hash": "sha256_of_canonical_sco_payload",
+      "parent_proposal_hash": "sha256_of_canonical_parent_proposal_payload"
+    },
+    "required_fields": [
+      "schema_version",
+      "sco_id",
+      "sco_hash",
+      "mutation_class",
+      "declared_scope",
+      "object_bindings",
+      "authority_lineage_requirements",
+      "validation_requirements",
+      "proof_requirements",
+      "replay_controls",
+      "bypass_analysis",
+      "decision_state"
+    ],
+    "decision_states": ["STRUCTURED", "VALID_FOR_REVIEW", "NULL"],
+    "null_semantics": "If no valid SCO exists, no downstream review, authority binding, execution, or proof may occur."
+  },
+  "object_bindings": {
+    "required": true,
+    "bindings": [
+      "parent_proposal_hash",
+      "declared_file_set_hash",
+      "declared_intent_hash",
+      "mutation_class",
+      "authority_lineage_requirement_hash",
+      "validation_requirement_hash",
+      "proof_requirement_hash"
+    ],
+    "exact_object_discipline": "The SCO hash identifies the exact structured object to be reviewed and must not be replaced after validation."
+  },
+  "declared_scope": {
+    "scope_must_be_bounded": true,
+    "scope_dimensions": [
+      "files_or_artifacts",
+      "mutation_class",
+      "execution_surface",
+      "authority_requirement",
+      "proof_requirement",
+      "replay_requirement"
+    ],
+    "out_of_scope_result": "NULL"
+  },
+  "required_invariants": [
+    "fail_closed",
+    "machine_readable_legitimacy",
+    "replay_resistance",
+    "authority_lineage",
+    "proof_requirements",
+    "non_bypassability",
+    "recursive_governance"
+  ],
+  "authority_lineage_requirements": {
+    "preexisting_authority_required": true,
+    "implicit_authority": "forbidden",
+    "required_lineage_bindings": [
+      "source_authority_id",
+      "source_authority_hash",
+      "authorized_scope",
+      "delegation_depth",
+      "use_constraints"
+    ],
+    "missing_lineage_result": "NULL"
+  },
+  "proof_requirements": {
+    "proof_required_for_any_downstream_execution": true,
+    "sco_must_not_generate_proof": true,
+    "proof_binding_requirements": [
+      "sco_hash",
+      "validated_execution_object_hash",
+      "authority_hash",
+      "execution_boundary_id",
+      "invocation_nonce",
+      "result_hash"
+    ]
+  },
+  "replay_controls": {
+    "nonce_required": true,
+    "single_use_authority_required": true,
+    "single_use_execution_object_required": true,
+    "reused_object_result": "NULL"
+  },
+  "non_bypassability": {
+    "canonical_path_required": [
+      "proposal",
+      "structure",
+      "validation",
+      "authority",
+      "execution_boundary",
+      "proof"
+    ],
+    "direct_execution": "forbidden",
+    "direct_deploy": "forbidden",
+    "direct_registry_mutation": "forbidden",
+    "workflow_mutation_without_governed_object": "forbidden",
+    "merge_without_legitimacy_model": "forbidden"
+  }
+}

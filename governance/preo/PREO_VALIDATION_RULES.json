@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "preo_validation_rules",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "validation_requirement_specification",
+  "target_object_type": "PREO",
+  "default_result": "NULL",
+  "valid_result": "VALID_FOR_AUTHORITY_BINDING",
+  "rules": [
+    {
+      "id": "preo_required_fields",
+      "requirement": "All required PREO fields must be present and machine-readable.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_canonical_hash_binding",
+      "requirement": "preo_hash must bind to the deterministic canonical PREO payload and proposal_hash must bind to the deterministic canonical proposal payload.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_no_operational_effect",
+      "requirement": "PREO artifacts must not mutate runtime, workflows, deploy configuration, registries, proof stores, authority stores, or merge state.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_explicit_authority_lineage",
+      "requirement": "PREO legitimacy must reference preexisting authority lineage requirements and must not create or imply authority.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_replay_resistance",
+      "requirement": "PREO must require nonce, object-hash, and authority-use replay controls before downstream execution can be legitimate.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_proof_requirements",
+      "requirement": "PREO must require post-execution proof binding to validated object, authority, boundary, nonce, and result.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_non_bypassability",
+      "requirement": "PREO must declare direct execution, direct deploy, direct registry mutation, alternate execution paths, and merge operations forbidden.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "preo_recursive_governance",
+      "requirement": "PREO must require governance changes to be governed by the same object, validation, lineage, replay, and proof disciplines.",
+      "failure_result": "NULL"
+    }
+  ]
+}
