@@ -1,54 +1,1538 @@
 {
-  "schema_version": "1.0",
-  "status": "non_operative_governance_artifact",
-  "repo": "joselunasrt8-creator/mindshift-demo",
-  "canonical_execution_path": [
+  "artifact_type": "REPO_EXECUTION_MAP",
+  "status": "NON_OPERATIVE_MAP_GENERATED_FROM_UPLOADED_ZIP",
+  "source_archive": "mindshift-demo-main 15.zip",
+  "repo_root": "mindshift-demo-main",
+  "generated_at": "2026-05-07T00:00:00-05:00",
+  "core_invariant": "If no valid object exists -> nothing happens",
+  "canonical_runtime_chain": [
+    "/session",
     "/authority",
     "/compile",
     "/validate",
     "/execute",
     "/proof"
   ],
-  "current_locked_surface": "github_governed_production_deploy",
-  "runtime_entrypoints": [
+  "summary": {
+    "total_files": 66,
+    "execution_or_mutation_related_files": 16,
+    "runtime_routes_detected": 7,
+    "github_workflows_detected": 2,
+    "d1_tables_declared_in_schema": [
+      "session_registry",
+      "authority_registry",
+      "aeo_registry",
+      "validation_registry",
+      "execution_registry",
+      "proof_registry",
+      "proof_registry_duplicate_archive",
+      "invocation_registry",
+      "observability_registry",
+      "drift_registry"
+    ],
+    "d1_indexes_declared_in_schema": [
+      "idx_session_registry_status_expiry",
+      "idx_authority_registry_decision_id",
+      "idx_aeo_registry_decision_id",
+      "idx_aeo_registry_decision_hash",
+      "idx_validation_registry_decision_hash_nonce",
+      "idx_execution_registry_decision_hash",
+      "idx_proof_registry_execution_decision_hash",
+      "idx_proof_registry_decision_hash_unique",
+      "idx_observability_decision",
+      "idx_observability_execution",
+      "idx_observability_type"
+    ],
+    "primary_runtime": "Cloudflare Worker src/index.ts",
+    "primary_governed_surface": "GitHub Actions governed-deploy.yml",
+    "persistence": "Cloudflare D1 via DB binding"
+  },
+  "runtime_routes": [
     {
-      "path": "src/index.ts",
-      "role": "fail_closed_worker_router",
-      "routes": [
-        "/session",
-        "/authority",
-        "/compile",
-        "/validate",
-        "/execute",
-        "/proof"
-      ],
-      "mutation_status": "not_modified_by_bundle"
+      "path": "/health",
+      "method": "GET",
+      "line": 192,
+      "role": "health_check"
+    },
+    {
+      "path": "/session",
+      "method": "POST",
+      "line": 205,
+      "role": "identity_session_continuity"
+    },
+    {
+      "path": "/authority",
+      "method": "POST",
+      "line": 217,
+      "role": "authority_registry_create"
+    },
+    {
+      "path": "/compile",
+      "method": "POST",
+      "line": 228,
+      "role": "aeo_compile_exact_object"
+    },
+    {
+      "path": "/validate",
+      "method": "POST",
+      "line": 268,
+      "role": "omega_validation_valid_or_null"
+    },
+    {
+      "path": "/execute",
+      "method": "POST",
+      "line": 290,
+      "role": "execution_boundary"
+    },
+    {
+      "path": "/proof",
+      "method": "POST",
+      "line": 316,
+      "role": "proof_persistence_and_authority_consumption"
     }
   ],
-  "workflow_entrypoints": [
+  "github_workflows": [
+    {
+      "path": ".github/workflows/governed-deploy.yml",
+      "name": "governed-deploy",
+      "triggers": [
+        "actions",
+        "contents",
+        "group",
+        "workflow_dispatch"
+      ],
+      "required_inputs": [
+        {
+          "name": "decision_id",
+          "required": true
+        },
+        {
+          "name": "validated_object_hash",
+          "required": true
+        },
+        {
+          "name": "invocation_nonce",
+          "required": true
+        }
+      ],
+      "worker_endpoint_calls": [
+        "/authority",
+        "/compile",
+        "/execute",
+        "/proof",
+        "/session",
+        "/validate"
+      ],
+      "artifact_uploads": [
+        {
+          "name": "authority",
+          "path": "authority.json"
+        },
+        {
+          "name": "compile",
+          "path": "compile.json"
+        },
+        {
+          "name": "execute",
+          "path": "execute.json"
+        },
+        {
+          "name": "proof",
+          "path": "proof.json"
+        },
+        {
+          "name": "replay",
+          "path": "replay.json"
+        },
+        {
+          "name": "session",
+          "path": "session.json"
+        },
+        {
+          "name": "validate",
+          "path": "validate.json"
+        }
+      ],
+      "direct_deploy_commands_detected": false,
+      "curl_calls": 7,
+      "jq_canonical_assertions": 27,
+      "risk": "governed_deploy_conduit"
+    },
     {
       "path": ".github/workflows/prepare-governed-deploy.yml",
-      "role": "manual_authority_and_compile_preparation",
-      "mutation_status": "not_modified_by_bundle"
+      "name": "prepare-governed-deploy",
+      "triggers": [
+        "actions",
+        "contents",
+        "workflow_dispatch"
+      ],
+      "required_inputs": [],
+      "worker_endpoint_calls": [
+        "/authority",
+        "/compile"
+      ],
+      "artifact_uploads": [],
+      "direct_deploy_commands_detected": false,
+      "curl_calls": 2,
+      "jq_canonical_assertions": 4,
+      "risk": "governed_deploy_conduit"
+    }
+  ],
+  "package_scripts": {
+    "deploy": "echo \"Direct deploy disabled as a convenience guard. Production deploys must use .github/workflows/governed-deploy.yml.\" && exit 1",
+    "dev": "wrangler dev --local",
+    "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "wrangler": {
+    "config_path": "wrangler.toml",
+    "main": "src/index.ts",
+    "d1_binding": "DB",
+    "database_name": "mindshift-demo-prod"
+  },
+  "execution_surfaces": [
+    {
+      "path": ".github/workflows/governed-deploy.yml",
+      "role": "github_actions_workflow",
+      "signals": [
+        "workflow_dispatch",
+        "curl",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "artifact_upload",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "critical_if_unrouted",
+      "execution_surface": true,
+      "mutation_capable": true,
+      "registry_surface": false,
+      "proof_surface": true
+    },
+    {
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "role": "github_actions_workflow",
+      "signals": [
+        "workflow_dispatch",
+        "curl",
+        "authority_route",
+        "compile_route",
+        "api_key_guard",
+        "exact_hash"
+      ],
+      "bypass_risk": "critical_if_unrouted",
+      "execution_surface": true,
+      "mutation_capable": true,
+      "registry_surface": false,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0001_init.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0002_governed_deploy_schema.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0003_authority_registry_schema_fix.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0004_enforcement_lock.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0004_execution_replay_protection.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0005_invocation_registry.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0006_enforcement_reboot_v1.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0007_canonical_aeo_registry_rebuild.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0008_canonical_runtime_registry_rebuild.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "proof_route",
+        "db_insert",
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0009_runtime_observability_and_drift_registry.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0010_identity_session_continuity.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "migrations/0011_proof_atomicity_unique_guard.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_delete",
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "schema.sql",
+      "role": "d1_registry_schema_migration",
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false
+    },
+    {
+      "path": "src/index.ts",
+      "role": "cloudflare_worker_runtime_boundary",
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_update",
+        "db_delete",
+        "db_schema",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "critical_if_unrouted",
+      "execution_surface": true,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": true
+    }
+  ],
+  "file_objects": [
+    {
+      "path": ".codex",
+      "role": "supporting_artifact",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "role": "supporting_artifact",
+      "bytes": 88,
+      "sha256": "0ad801dff88bae827d1c84ca70bf333e84e3b2dfd3a8a6679322745bfbbe28f2",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": ".github/instructions/*.instructions.md",
+      "role": "supporting_artifact",
+      "bytes": 2409,
+      "sha256": "7f7b5df0dd0a9bfd845b140ddf266be33067fb0ea9ed7d05ef9f4ec157ee2e2b",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "validate_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": ".github/instructions/audit.instructions.md",
+      "role": "supporting_artifact",
+      "bytes": 3434,
+      "sha256": "d485ea3703c810f54a571a5df56ea95827ed2775959df75e629194624b614db5",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "validate_route"
+      ],
+      "bypass_risk": "none"
     },
     {
       "path": ".github/workflows/governed-deploy.yml",
-      "role": "governed_production_deploy_execution_surface",
-      "mutation_status": "not_modified_by_bundle"
+      "role": "github_actions_workflow",
+      "bytes": 16599,
+      "sha256": "869091acac0be8d633c554d0979ad230c6b48314876cb4a32674712d25a8317d",
+      "execution_surface": true,
+      "mutation_capable": true,
+      "registry_surface": false,
+      "proof_surface": true,
+      "signals": [
+        "workflow_dispatch",
+        "curl",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "artifact_upload",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "critical_if_unrouted"
+    },
+    {
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "role": "github_actions_workflow",
+      "bytes": 5061,
+      "sha256": "d2b9769caf9278679b59ae14d7b7073db1ab213191ed70bb464f1ff2b96e98b9",
+      "execution_surface": true,
+      "mutation_capable": true,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "workflow_dispatch",
+        "curl",
+        "authority_route",
+        "compile_route",
+        "api_key_guard",
+        "exact_hash"
+      ],
+      "bypass_risk": "critical_if_unrouted"
+    },
+    {
+      "path": ".gitignore",
+      "role": "supporting_artifact",
+      "bytes": 211,
+      "sha256": "1ea120ec6d8a946625c7b85c7ed819ab1858062a30152611d4cdeb8706de6d02",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "wrangler"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "Build v4 File.txt",
+      "role": "supporting_artifact",
+      "bytes": 3445,
+      "sha256": "2579b059375787e0a72c45f35ec2d9abc1627faba36568357338e0b59815db4e",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "CURRENT_SYSTEM_SNAPSHOT.md",
+      "role": "supporting_artifact",
+      "bytes": 17529,
+      "sha256": "2ef9c70dff1e41d1f70a4412992030539b8bc4a9809f262bb58a2a3e4d47ee8e",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "Dockerfile",
+      "role": "runtime_or_operator_config",
+      "bytes": 153,
+      "sha256": "30fec5f12db94edda17958767496421134fc04a14034db981cc70e089a9c6116",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "Mindshift llm.pdf",
+      "role": "supporting_artifact",
+      "bytes": 1397509,
+      "sha256": "3da884af1598c3eef29d21936bf036484ef45148806715903576017ae6e45b89",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "Mindshift%20canon%20v3.1 Compressed.pdf.pdf",
+      "role": "supporting_artifact",
+      "bytes": 312753,
+      "sha256": "523ee1eae46075a71b69159a975813f0542992c524e6149d52ffff37cab1e89f",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "README.md",
+      "role": "supporting_artifact",
+      "bytes": 5014,
+      "sha256": "2ef5eff359348d0373408f9fa06b2dbd900d25cbb4139091a69e7ee290833248",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "workflow_dispatch",
+        "repository_dispatch",
+        "wrangler",
+        "curl",
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "Save the final script as mindshift_bundle_generator.sh",
+      "role": "supporting_artifact",
+      "bytes": 6094,
+      "sha256": "f154134adfee4a85a2b67743ac76b1663e7baae5d6847a103c2e2ce788300eac",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "curl",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "aeo.json",
+      "role": "machine_object_fixture",
+      "bytes": 164,
+      "sha256": "fc7dd14b98e4d857055f83bee2bcfba7005c9f88f4481d2334e7cf5d56c57ce1",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "artifacts/prompts/next-coded-prompt-governed-deploy.md",
+      "role": "supporting_artifact",
+      "bytes": 3265,
+      "sha256": "f4dbd559200b8b98e27d5169eba4c8fa8d600ab5c0629bb02aeedaec02a1b94e",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "workflow_dispatch",
+        "curl",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "compile-decision.js",
+      "role": "runtime_or_operator_config",
+      "bytes": 952,
+      "sha256": "d85d00d23242ed4917c995cc9bbbcfaaa6289a412a0755d6772dfb35140011dd",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "decision.json",
+      "role": "machine_object_fixture",
+      "bytes": 397,
+      "sha256": "5490eb9177eaddbfc5b4836e57e80fde89c9d9f6ff07c113f9b43f3e07cba5d3",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/prod-deploy-boundary.md",
+      "role": "documentation_or_evidence",
+      "bytes": 842,
+      "sha256": "7f122167ec187634fbcbd8c94353d74e0b7cc5df0841944d9fd7c5f0ed07d61c",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "workflow_dispatch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/registry-lineage-verification.md",
+      "role": "documentation_or_evidence",
+      "bytes": 5389,
+      "sha256": "8367f110d2b39428f3cea424cf2792db55ccc429b4d6675f3d4c6fb7bcc66d79",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/.github__workflows__governed-deploy.yml.diff",
+      "role": "documentation_or_evidence",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/.github__workflows__mindshift-validate-pr.yml.diff",
+      "role": "documentation_or_evidence",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/.github__workflows__prepare-governed-deploy.yml.diff",
+      "role": "documentation_or_evidence",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/main12/mindshift-validate-pr.yml",
+      "role": "documentation_or_evidence",
+      "bytes": 5735,
+      "sha256": "131915a1965fa14f7411cf9f157764698278d251aa42b705169a07ce98a998c4",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "curl",
+        "authority_route",
+        "validate_route",
+        "api_key_guard"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/main12/src.index.ts",
+      "role": "documentation_or_evidence",
+      "bytes": 78886,
+      "sha256": "5e1c9cd74cf55a101ad46fe19d6a2d6d6c057f36ab13b444537a03520413124b",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_update",
+        "db_schema",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/main13/mindshift-validate-pr.yml",
+      "role": "documentation_or_evidence",
+      "bytes": 5735,
+      "sha256": "131915a1965fa14f7411cf9f157764698278d251aa42b705169a07ce98a998c4",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "curl",
+        "authority_route",
+        "validate_route",
+        "api_key_guard"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/main13/src.index.ts",
+      "role": "documentation_or_evidence",
+      "bytes": 13218,
+      "sha256": "9f9e90c9101357bb79a59179cfc94a87ab4fa5bf8085dd85dd9be4623a9877a7",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_update",
+        "db_schema",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/src__index.ts.diff",
+      "role": "documentation_or_evidence",
+      "bytes": 94428,
+      "sha256": "ee7318648ba1dba382797a338b1f9289d622a36f4f83b3a557762332c62a9ded",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_update",
+        "db_schema",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-evidence/worker.js.diff",
+      "role": "documentation_or_evidence",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "docs/regression-report.md",
+      "role": "documentation_or_evidence",
+      "bytes": 1687,
+      "sha256": "58620c814934f1cf7b9e601031ffe9e63b9d4436c8ddc6b585aafc67fd9ab6de",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "gateway.js",
+      "role": "runtime_or_operator_config",
+      "bytes": 142,
+      "sha256": "9b7b9cb75e9bcea4b07452200624eb159e685ef7f029a9eeebde064f6519733c",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "github_governed_deploy_spec.pdf",
+      "role": "supporting_artifact",
+      "bytes": 4741,
+      "sha256": "0e72a55d7e27c32c24186ac37c6684d409deb4ff5ace0d429fa3aa5818acba70",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "index.ts",
+      "role": "supporting_artifact",
+      "bytes": 38,
+      "sha256": "fdb90f8f02c9a30cd73877fd3da0994ec534d66c35d48c5ee878894ae32d59fd",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0001_init.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 1874,
+      "sha256": "384e6ba0aa2a7f47164938ed66dee0a28466bd99a39bb29d5b65317ad2d68b92",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0002_governed_deploy_schema.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 1981,
+      "sha256": "1a3726673b50dc4b4591e94ad47abad583d921e7fb857425c8b126afaed599ec",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0003_authority_registry_schema_fix.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 1990,
+      "sha256": "76f95950295934a13603e7b988926dc4797f788f3bb2f1b6b49f6da3ee3cb8d9",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0004_enforcement_lock.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 819,
+      "sha256": "309b47242117ebac8ae34d60ca429c82f1728caebc6a98ee02f5d2afa106e66c",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0004_execution_replay_protection.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 316,
+      "sha256": "a93677ead50614bb8aa9a9daa14da668f449b3f5f3d8fb8aad9cca39058aac99",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0005_invocation_registry.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 578,
+      "sha256": "f2298cf81f0113c2218f96b0a30779a3f65ac6d244398d839c27a4394e390b72",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0006_enforcement_reboot_v1.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 1694,
+      "sha256": "db21b197440e98a1fdbb1a3cc0d1f077c056cd27d4b97c78391eee38bea63dd6",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0007_canonical_aeo_registry_rebuild.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 964,
+      "sha256": "344078c65fec7ddb90c88683a441bce27d3f8f616df058d98b106d79d640b8a8",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0008_canonical_runtime_registry_rebuild.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 3781,
+      "sha256": "7fc442a9cd3f106275f1d96a917a995e3ef34971fe067ac04f66456ec860a596",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "proof_route",
+        "db_insert",
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0009_runtime_observability_and_drift_registry.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 768,
+      "sha256": "01670b04a1f61fff66bfc72227eadf7dced8d151df869812738f41c6096ccc8f",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0010_identity_session_continuity.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 3980,
+      "sha256": "f68f52d210ee5adeb6044a2dc30ba8ed99e4d0edfe6bed3b8d6ee78f8d8679cb",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "migrations/0011_proof_atomicity_unique_guard.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 2470,
+      "sha256": "f408f396a2ce7466b33b27b4d5ef97b7afb77d8e8baf314e1a3bb624b85dc3d7",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_delete",
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift/lock.json",
+      "role": "supporting_artifact",
+      "bytes": 64,
+      "sha256": "6a06d03049b9fdd565be24f71dc9eceb2a1bbb02364357c9303b2702ef111f16",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift/proof.schema.json",
+      "role": "supporting_artifact",
+      "bytes": 401,
+      "sha256": "6931d6ea429e69f17251ddc4addc3e99cae1a087cdcfe2488069d1278599bb5d",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift-runtime-hardening-pack.zip",
+      "role": "supporting_artifact",
+      "bytes": 18398,
+      "sha256": "24896edfe6ea03479b6137aa31159984bd6038cf2f978c649d7bdba098032f25",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "wrangler",
+        "compile_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift_bundle_generator.sh",
+      "role": "supporting_artifact",
+      "bytes": 5970,
+      "sha256": "fdd9e6126d127d7a6a7d02da848878fe15b6fc4a61d0953de18da6b894ca78b8",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "curl",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift_checklist_v4.pdf",
+      "role": "supporting_artifact",
+      "bytes": 4343,
+      "sha256": "46b7457355617009f9503179cd008e027d11d3c52396c34a1489ccb99949b224",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift_runtime_architecture_v2 2.pdf",
+      "role": "supporting_artifact",
+      "bytes": 1168284,
+      "sha256": "79ab132e25b91ae44b9a6d2f37de17a0682f9b3295848252704cbec427ad6a2d",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "mindshift_runtime_draft_kit.zip",
+      "role": "supporting_artifact",
+      "bytes": 12699,
+      "sha256": "d40b69c6ba54e281a08c8ff789351a3b9e92a252c1fda1dd427b016a47ae3e4d",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "wrangler",
+        "authority_route",
+        "compile_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "package-lock.json",
+      "role": "supporting_artifact",
+      "bytes": 48498,
+      "sha256": "97052c49e4b12f8c8e6129c20b6f1457bd9c1e443ed14a4be767cab2021bb6cb",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "wrangler"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "package.json",
+      "role": "runtime_or_operator_config",
+      "bytes": 479,
+      "sha256": "e7fcebababaf2e1ff457f37d9c5df488dad09c7423dc7b7acbf09e1254c0abbd",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "wrangler"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "registry.js",
+      "role": "runtime_or_operator_config",
+      "bytes": 394,
+      "sha256": "ee25e8ee8c550947cacc536d55016aa6743fd9d0e87ed4cb87ad1ff1552d51cb",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "schema.sql",
+      "role": "d1_registry_schema_migration",
+      "bytes": 4541,
+      "sha256": "0e143955e1a7ed3a6d8766e8f259504a5390ff8380b841415d8269fc16143b46",
+      "execution_surface": false,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": false,
+      "signals": [
+        "db_schema",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "server.js",
+      "role": "runtime_or_operator_config",
+      "bytes": 141,
+      "sha256": "9aefe5661860194dee5456eaffc49693bdc980b4dc3c59720b8130fb8654c9cb",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "src/index.ts",
+      "role": "cloudflare_worker_runtime_boundary",
+      "bytes": 38403,
+      "sha256": "8db99867a7634774af39a19886545a6116d22dca29375e9900d6c3989d654e2b",
+      "execution_surface": true,
+      "mutation_capable": true,
+      "registry_surface": true,
+      "proof_surface": true,
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_update",
+        "db_delete",
+        "db_schema",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "critical_if_unrouted"
+    },
+    {
+      "path": "tests/enforcement-reboot-v1.test.mjs",
+      "role": "test_or_verification_surface",
+      "bytes": 10850,
+      "sha256": "f207dafc5bd0b35939070b3b3b91bc53b5db5bd33e96ad8f3df7cdd9a20430ad",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_schema",
+        "api_key_guard",
+        "exact_hash",
+        "replay_guard"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "tests/no-stale-validate-pr-workflow.test.mjs",
+      "role": "test_or_verification_surface",
+      "bytes": 738,
+      "sha256": "e1b6278d97dc3ae7711bb1744d0bad0c054c15a1cca7b383c5b16cb0df36049b",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "validate_route"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "tests/registry-lineage-migrations.test.mjs",
+      "role": "test_or_verification_surface",
+      "bytes": 32119,
+      "sha256": "63ac7e93bd2eddced551d77dd7df7a07f3ab435ff5f4c44bc3bed1c8e9e7a27a",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [
+        "fetch",
+        "authority_route",
+        "compile_route",
+        "validate_route",
+        "execute_route",
+        "proof_route",
+        "db_insert",
+        "db_update",
+        "db_schema",
+        "api_key_guard",
+        "exact_hash"
+      ],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "tsconfig.json",
+      "role": "supporting_artifact",
+      "bytes": 276,
+      "sha256": "45a4db41d16a0af4d2f4a304ce7dcec30e5aaffd8781d86b9f4bca747bd98744",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "worker-configuration.d.ts",
+      "role": "supporting_artifact",
+      "bytes": 503546,
+      "sha256": "df71d8155e07997393301aa8e79ec6c690c3f1ee5793667d0f01bbe4378aef45",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "worker.js",
+      "role": "runtime_or_operator_config",
+      "bytes": 102,
+      "sha256": "7fccd45e87ba5e5dcf86a56384ac053db065abb3da01dae8d7b63371a57f4508",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "wrangler.jsonc.bak",
+      "role": "supporting_artifact",
+      "bytes": 96,
+      "sha256": "3c17448897d08782bf5a1f969b9d8114a06ed3f526ae3c669ebbc6f5d781d8f7",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
+    },
+    {
+      "path": "wrangler.toml",
+      "role": "runtime_or_operator_config",
+      "bytes": 204,
+      "sha256": "09c5ec718c0ff1b110743fb2fa6becabeac24a2793da5b60a39a56568433574b",
+      "execution_surface": false,
+      "mutation_capable": false,
+      "registry_surface": false,
+      "proof_surface": false,
+      "signals": [],
+      "bypass_risk": "none"
     }
   ],
-  "package_execution_scripts": {
-    "deploy": "disabled_convenience_guard",
-    "dev": "local_worker_development",
-    "d1:migrate:local": "local_d1_migration",
-    "test": "node_test_runner"
+  "mutation_map": {
+    "state_changing_routes": [
+      "/authority",
+      "/compile",
+      "/validate",
+      "/execute",
+      "/proof",
+      "/session"
+    ],
+    "db_write_tables": [
+      "session_registry",
+      "authority_registry",
+      "aeo_registry",
+      "validation_registry",
+      "execution_registry",
+      "proof_registry",
+      "invocation_registry",
+      "observability_registry",
+      "drift_registry",
+      "proof_registry_duplicate_archive"
+    ],
+    "external_state_surfaces": [
+      "github_actions.workflow_dispatch",
+      "github_actions.artifact_upload",
+      "cloudflare_worker_runtime",
+      "cloudflare_d1_registry"
+    ],
+    "proof_surfaces": [
+      "proof_registry",
+      "github_actions artifacts: authority compile validate execute replay proof",
+      "run_id",
+      "commit_sha",
+      "workflow",
+      "environment"
+    ]
   },
-  "artifact_scope": {
-    "path": "governance/mindshift-validation-bundle",
-    "operative": false,
-    "adds_execution_paths": false,
-    "deploys": false,
-    "creates_authority": false,
-    "generates_proof": false
+  "bypass_risks": [
+    {
+      "surface": ".github/workflows/prepare-governed-deploy.yml",
+      "risk": "possible_non_governed_mutation_workflow",
+      "status": "review_required"
+    },
+    {
+      "surface": "README.md",
+      "risk": "operator_document_or_script_contains_execution_examples",
+      "status": "non_runtime_but_requires_scope_label"
+    },
+    {
+      "surface": "mindshift_bundle_generator.sh",
+      "risk": "operator_document_or_script_contains_execution_examples",
+      "status": "non_runtime_but_requires_scope_label"
+    },
+    {
+      "surface": "Save the final script as mindshift_bundle_generator.sh",
+      "risk": "operator_document_or_script_contains_execution_examples",
+      "status": "non_runtime_but_requires_scope_label"
+    }
+  ],
+  "validation_requirements": [
+    "All production deploys must enter through .github/workflows/governed-deploy.yml",
+    "Every execution must have active authority, exact compiled AEO hash, reserved nonce, and matching session lineage",
+    "Execute must fail if validation is absent, hash mismatches, nonce reused, or authority not reserved",
+    "Proof must link execution_id, decision_id, validated_object_hash, run_id, commit_sha, workflow, and environment",
+    "No direct wrangler deploy or alternate production workflow may exist outside canonical path"
+  ],
+  "recommended_next_objects": [
+    "CODEBASE_OBJECT",
+    "FILE_OBJECT for each execution-capable file",
+    "SCO for any proposed repo mutation",
+    "PREO for every PR before merge/deploy",
+    "AEO for merge/deploy execution only after SCO + PREO exist"
+  ],
+  "lock_assessment": {
+    "working_boundary_detected": true,
+    "replay_guards_detected": true,
+    "proof_persistence_detected": true,
+    "direct_npm_deploy_disabled": true,
+    "remaining_lock_question": "confirm repository settings prevent new direct deploy workflows or admin-created bypasses outside governed-deploy.yml"
   }
 }
