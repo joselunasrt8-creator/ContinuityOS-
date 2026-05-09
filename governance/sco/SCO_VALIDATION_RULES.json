@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sco_validation_rules",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "validation_requirement_specification",
+  "target_object_type": "SCO",
+  "default_result": "NULL",
+  "valid_result": "VALID_FOR_REVIEW",
+  "rules": [
+    {
+      "id": "sco_required_fields",
+      "requirement": "All required SCO fields must be present and machine-readable.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_canonical_hash_binding",
+      "requirement": "sco_hash must bind to the deterministic canonical SCO payload and parent_proposal_hash must bind to the deterministic canonical parent proposal payload.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_allowed_mutation_class",
+      "requirement": "The SCO mutation_class must be one of the non-operative allowed classes and must not include blocked operational effects.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_exact_object_discipline",
+      "requirement": "The structured object validated for review must be the exact object later referenced by authority, validation, execution, and proof requirements.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_fail_closed_scope",
+      "requirement": "Missing, ambiguous, overbroad, or out-of-scope declarations must produce NULL.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_authority_lineage_required",
+      "requirement": "SCO must require preexisting authority lineage and must not create, expand, or imply authority.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_replay_controls_required",
+      "requirement": "SCO must require nonce binding, object hash binding, single-use authority constraints, and replay-blocking semantics.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_proof_requirements_required",
+      "requirement": "SCO must require downstream proof persistence after execution and must not generate proof itself.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_non_bypassability_required",
+      "requirement": "SCO must require the canonical proposal, structure, validation, authority, execution boundary, and proof path with no alternate execution path.",
+      "failure_result": "NULL"
+    },
+    {
+      "id": "sco_recursive_governance_required",
+      "requirement": "SCO must preserve governance over governance changes through object, validation, lineage, replay, and proof requirements.",
+      "failure_result": "NULL"
+    }
+  ]
+}

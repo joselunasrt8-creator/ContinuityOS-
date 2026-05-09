@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sco_mutation_classes",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "mutation_classification_specification",
+  "target_object_type": "SCO",
+  "default_classification": "UNKNOWN_BLOCKED",
+  "classes": [
+    {
+      "id": "GOVERNANCE_SCHEMA_ONLY",
+      "description": "Adds or changes non-operative machine-readable governance schemas or specifications.",
+      "operational_effect": "none",
+      "allowed_artifact_types": ["json_governance_schema", "json_governance_model", "json_validation_requirements"],
+      "requires_authority_lineage": true,
+      "requires_validation": true,
+      "requires_proof_requirements": true,
+      "runtime_mutation_allowed": false,
+      "workflow_mutation_allowed": false,
+      "deploy_mutation_allowed": false,
+      "registry_mutation_allowed": false,
+      "merge_operation_allowed": false,
+      "on_ambiguity": "NULL"
+    },
+    {
+      "id": "LINEAGE_MODEL_ONLY",
+      "description": "Defines non-operative lineage relationships, authority ancestry requirements, or legitimacy ancestry structures.",
+      "operational_effect": "none",
+      "allowed_artifact_types": ["json_lineage_model"],
+      "requires_authority_lineage": true,
+      "requires_validation": true,
+      "requires_proof_requirements": true,
+      "runtime_mutation_allowed": false,
+      "workflow_mutation_allowed": false,
+      "deploy_mutation_allowed": false,
+      "registry_mutation_allowed": false,
+      "merge_operation_allowed": false,
+      "on_ambiguity": "NULL"
+    },
+    {
+      "id": "VALIDATION_REQUIREMENTS_ONLY",
+      "description": "Defines validation requirements without implementing enforcement behavior.",
+      "operational_effect": "none",
+      "allowed_artifact_types": ["json_validation_requirements"],
+      "requires_authority_lineage": true,
+      "requires_validation": true,
+      "requires_proof_requirements": true,
+      "runtime_mutation_allowed": false,
+      "workflow_mutation_allowed": false,
+      "deploy_mutation_allowed": false,
+      "registry_mutation_allowed": false,
+      "merge_operation_allowed": false,
+      "on_ambiguity": "NULL"
+    },
+    {
+      "id": "FEDERATION_SPEC_ONLY",
+      "description": "Defines non-operative federated verification participants, quorum requirements, and evidence requirements.",
+      "operational_effect": "none",
+      "allowed_artifact_types": ["json_federation_specification"],
+      "requires_authority_lineage": true,
+      "requires_validation": true,
+      "requires_proof_requirements": true,
+      "runtime_mutation_allowed": false,
+      "workflow_mutation_allowed": false,
+      "deploy_mutation_allowed": false,
+      "registry_mutation_allowed": false,
+      "merge_operation_allowed": false,
+      "on_ambiguity": "NULL"
+    },
+    {
+      "id": "RUNTIME_MUTATION",
+      "description": "Changes executable runtime behavior or execution boundary behavior.",
+      "operational_effect": "runtime_state_or_behavior_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    },
+    {
+      "id": "WORKFLOW_MUTATION",
+      "description": "Changes CI, deployment, merge, or automation workflows.",
+      "operational_effect": "workflow_state_or_behavior_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    },
+    {
+      "id": "DEPLOY_MUTATION",
+      "description": "Changes production deployment behavior, credentials, targets, or commands.",
+      "operational_effect": "deployment_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    },
+    {
+      "id": "AUTHORITY_CREATION",
+      "description": "Creates, grants, expands, or implies authority.",
+      "operational_effect": "authority_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    },
+    {
+      "id": "PROOF_GENERATION",
+      "description": "Generates, persists, or mutates proof records.",
+      "operational_effect": "proof_state_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    },
+    {
+      "id": "REGISTRY_MUTATION",
+      "description": "Writes, deletes, migrates, or mutates registry state.",
+      "operational_effect": "registry_state_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    },
+    {
+      "id": "MERGE_OPERATION",
+      "description": "Performs, approves, or finalizes a source-control merge.",
+      "operational_effect": "repository_state_change_possible",
+      "classification_result": "BLOCKED_FOR_THIS_SPEC",
+      "on_detection": "NULL"
+    }
+  ],
+  "classification_rules": [
+    {
+      "id": "unknown_is_blocked",
+      "requirement": "Any mutation not classified as an allowed non-operative class must be classified as UNKNOWN_BLOCKED.",
+      "result": "NULL"
+    },
+    {
+      "id": "mixed_operability_is_blocked",
+      "requirement": "Any SCO that combines non-operative specification changes with operational runtime, workflow, deploy, authority, proof, registry, or merge effects is invalid for this specification set.",
+      "result": "NULL"
+    },
+    {
+      "id": "classification_must_be_machine_readable",
+      "requirement": "The selected mutation class must be present as an explicit machine-readable field in the SCO.",
+      "result": "NULL"
+    }
+  ]
+}

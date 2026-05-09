@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "preo_flow",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "governance_flow_specification",
+  "flow_name": "PREO review flow",
+  "operational_effect": "none",
+  "nodes": [
+    {
+      "id": "proposal_received",
+      "type": "input_object_reference",
+      "requires": ["proposal_hash", "declared_scope"],
+      "on_failure": "NULL"
+    },
+    {
+      "id": "structure_review",
+      "type": "schema_requirement_review",
+      "requires": ["complete_required_fields", "canonical_payload", "bounded_scope"],
+      "on_failure": "NULL"
+    },
+    {
+      "id": "legitimacy_review",
+      "type": "machine_readable_legitimacy_review",
+      "requires": ["legitimacy_claims", "non_bypassability_requirements", "recursive_governance_requirements"],
+      "on_failure": "NULL"
+    },
+    {
+      "id": "lineage_review",
+      "type": "authority_lineage_requirement_review",
+      "requires": ["source_authority_reference", "delegation_scope", "delegation_depth"],
+      "on_failure": "NULL"
+    },
+    {
+      "id": "replay_review",
+      "type": "replay_resistance_requirement_review",
+      "requires": ["nonce_requirement", "single_use_requirement", "object_hash_binding"],
+      "on_failure": "NULL"
+    },
+    {
+      "id": "proof_review",
+      "type": "proof_requirement_review",
+      "requires": ["proof_binding_requirements", "proof_persistence_requirement", "post_execution_only_requirement"],
+      "on_failure": "NULL"
+    },
+    {
+      "id": "preo_decision",
+      "type": "review_decision",
+      "allowed_results": ["VALID_FOR_AUTHORITY_BINDING", "NULL"],
+      "on_failure": "NULL"
+    }
+  ],
+  "edges": [
+    { "from": "proposal_received", "to": "structure_review" },
+    { "from": "structure_review", "to": "legitimacy_review" },
+    { "from": "legitimacy_review", "to": "lineage_review" },
+    { "from": "lineage_review", "to": "replay_review" },
+    { "from": "replay_review", "to": "proof_review" },
+    { "from": "proof_review", "to": "preo_decision" }
+  ],
+  "fail_closed_rules": [
+    "No node may be skipped.",
+    "Any missing input produces NULL.",
+    "Any ambiguous legitimacy claim produces NULL.",
+    "Any unresolved authority lineage produces NULL.",
+    "Any replay-control gap produces NULL.",
+    "Any proof-requirement gap produces NULL."
+  ],
+  "forbidden_transitions": [
+    { "from": "proposal_received", "to": "authority_creation" },
+    { "from": "preo_decision", "to": "runtime_execution" },
+    { "from": "preo_decision", "to": "workflow_mutation" },
+    { "from": "preo_decision", "to": "deploy_mutation" },
+    { "from": "preo_decision", "to": "registry_mutation" },
+    { "from": "preo_decision", "to": "merge_operation" }
+  ],
+  "canonical_downstream_path_requirement": [
+    "authority",
+    "compile",
+    "validate",
+    "execute",
+    "proof"
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "preo_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "governance_specification",
+  "scope": {
+    "name": "PREO",
+    "expansion": "Proposal Review Execution Object",
+    "purpose": "Define the machine-readable governance structure for proposal review before any authority binding or execution boundary is reached.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "required_invariants": [
+    "fail_closed",
+    "machine_readable_legitimacy",
+    "replay_resistance",
+    "authority_lineage",
+    "proof_requirements",
+    "non_bypassability",
+    "recursive_governance"
+  ],
+  "object_model": {
+    "type": "PREO",
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "identity": {
+      "preo_id": "stable_unique_identifier",
+      "preo_hash": "sha256_of_canonical_preo_payload",
+      "proposal_hash": "sha256_of_canonical_proposal_payload"
+    },
+    "required_fields": [
+      "schema_version",
+      "preo_id",
+      "proposal_hash",
+      "review_scope",
+      "legitimacy_claims",
+      "authority_lineage_requirements",
+      "proof_requirements",
+      "replay_controls",
+      "non_bypassability_requirements",
+      "decision_state"
+    ],
+    "decision_states": [
+      "PENDING_REVIEW",
+      "VALID_FOR_AUTHORITY_BINDING",
+      "NULL"
+    ],
+    "null_semantics": "If any required field, legitimacy claim, lineage link, replay control, or proof requirement is absent or invalid, the PREO decision_state must be NULL."
+  },
+  "review_scope": {
+    "allowed_subjects": [
+      "proposal_structure",
+      "governance_legitimacy",
+      "authority_lineage_requirements",
+      "proof_requirements",
+      "replay_resistance_requirements",
+      "bypass_risk_classification",
+      "recursive_governance_requirements"
+    ],
+    "forbidden_subjects": [
+      "runtime_execution",
+      "workflow_editing",
+      "production_deploy",
+      "proof_materialization",
+      "authority_issuance",
+      "registry_write",
+      "merge_execution"
+    ]
+  },
+  "legitimacy_claims": {
+    "machine_readable": true,
+    "claim_types": [
+      "scope_is_bounded",
+      "object_is_exact",
+      "authority_must_preexist",
+      "proof_must_follow_execution",
+      "replay_controls_are_declared",
+      "bypass_paths_are_blocked_by_requirement",
+      "recursive_governance_is_preserved"
+    ],
+    "claim_statuses": [
+      "ASSERTED",
+      "UNSATISFIED",
+      "NULL"
+    ]
+  },
+  "authority_lineage_requirements": {
+    "authority_source": "preexisting_governance_authority_required",
+    "lineage_fields": [
+      "source_authority_id",
+      "source_authority_hash",
+      "delegation_scope",
+      "delegation_depth",
+      "expiration_or_revocation_condition"
+    ],
+    "implicit_authority": "forbidden",
+    "missing_lineage_result": "NULL"
+  },
+  "proof_requirements": {
+    "proof_must_be_required": true,
+    "proof_must_not_be_generated_by_preo": true,
+    "required_proof_bindings": [
+      "validated_object_hash",
+      "execution_boundary_id",
+      "authority_hash",
+      "invocation_nonce",
+      "result_hash"
+    ],
+    "missing_requirement_result": "NULL"
+  },
+  "replay_controls": {
+    "nonce_required": true,
+    "object_hash_required": true,
+    "authority_use_status_required": true,
+    "reuse_policy": "single_use_unless_explicitly_scoped_by_valid_authority",
+    "replay_detected_result": "NULL"
+  },
+  "non_bypassability_requirements": {
+    "canonical_path": [
+      "proposal",
+      "structure",
+      "validation",
+      "authority",
+      "execution_boundary",
+      "proof"
+    ],
+    "direct_execution": "forbidden",
+    "direct_deploy": "forbidden",
+    "direct_registry_mutation": "forbidden",
+    "alternate_execution_paths": "forbidden",
+    "bypass_detected_result": "NULL"
+  },
+  "recursive_governance": {
+    "required": true,
+    "rule": "Any governance change proposal must itself be represented as an object with declared scope, lineage, validation requirements, replay controls, and proof requirements before it can be considered legitimate."
+  }
+}
