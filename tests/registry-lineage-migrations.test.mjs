@@ -542,3 +542,70 @@ test('runtime non-session startup quarantines historical duplicate proof lineage
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('compile is deterministic and fails closed on mismatched execution hash', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-compile-determinism-'))
+  const dbPath = join(dir, 'runtime.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+
+  async function post(path, payload, expectedStatus = 200) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, expectedStatus)
+    return response.json()
+  }
+
+  async function createCompiledDeploy(decision_id, branch = 'main') {
+    const session = await post('/session', { identity_id: `compile-identity-${decision_id}` })
+    assert.equal(session.status, 'SESSION_ACTIVE')
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    assert.equal(continuity.status, 'CONTINUITY_ACTIVE')
+    const authority = await post('/authority', {
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id,
+      owner: 'compile-determinism-test',
+      intent: 'deploy_production',
+      scope: { environment: 'production' },
+      constraints: { repo: 'example/repo', branch, workflow: 'governed-deploy.yml' }
+    })
+    assert.equal(authority.status, 'ACTIVE')
+    return { session, continuity, compiled: await post('/compile', { decision_id }) }
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const first = await createCompiledDeploy('decision-compile-stable')
+    assert.equal(first.compiled.status, 'COMPILED')
+    const repeated = await post('/compile', { decision_id: 'decision-compile-stable' })
+    assert.equal(repeated.status, 'COMPILED')
+    assert.equal(repeated.validated_object_hash, first.compiled.validated_object_hash)
+    assert.deepEqual(repeated.canonical_aeo, first.compiled.canonical_aeo)
+    assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM aeo_registry WHERE decision_id='decision-compile-stable'"]).trim(), '1')
+
+    const changed = await createCompiledDeploy('decision-compile-changed', 'release')
+    assert.equal(changed.compiled.status, 'COMPILED')
+    assert.notEqual(changed.compiled.validated_object_hash, first.compiled.validated_object_hash)
+
+    const mismatch = await post('/validate', {
+      decision_id: 'decision-compile-stable',
+      validated_object_hash: changed.compiled.validated_object_hash,
+      invocation_nonce: 'nonce-mismatched-hash',
+      environment: 'production',
+      session_id: first.session.session_id
+    })
+    assert.equal(mismatch.status, 'NULL')
+    assert.equal(mismatch.result, 'INVALID')
+    assert.equal(mismatch.reason, 'hash_missing')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

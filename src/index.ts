@@ -22,6 +22,7 @@ function json(data: unknown, status = 200) {
 
 async function body(req: Request): Promise<any> { try { return await req.json() } catch { return {} } }
 function authorized(req: Request, env: Env): boolean { return typeof env.API_KEY === "string" && env.API_KEY.length > 0 && req.headers.get("X-API-Key") === env.API_KEY }
+function hasDb(env: unknown): env is Env { return Boolean((env as any)?.DB && typeof (env as any).DB.prepare === "function") }
 function isPlainRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
@@ -275,12 +276,15 @@ export default {
     const mutationEndpoint = canonicalRuntimeRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
+    if (!hasDb(env)) return json({ status: "NULL", reason: "database_unavailable" }, 500)
+
     try {
       await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
     } catch {
       return json({ status: "NULL", reason: "schema_initialization_failed" }, 500)
     }
 
+    try {
     if (request.method === "POST" && !canonicalRuntimeRoute) {
       await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
       return json({ status: "NULL", reason: "not_found" }, 404)
@@ -289,13 +293,13 @@ export default {
     if (url.pathname === "/session" && request.method === "POST") {
       const b = await body(request)
       const identity_id = String(b.identity_id || "")
-      if (!identity_id) return json({ status: "NULL", reason: "missing_identity_id" })
+      if (!identity_id) return json({ status: "NULL", reason: "missing_identity_id" }, 400)
       const expires_at = String(b.expires_at || new Date(Date.now()+SESSION_TTL_MS).toISOString())
-      if (isExpired(expires_at)) return json({ status: "NULL", reason: "invalid_session_expiry" })
+      if (isExpired(expires_at)) return json({ status: "NULL", reason: "invalid_session_expiry" }, 400)
       const session = { session_id: crypto.randomUUID(), identity_id, owner: "human-origin", trust_tier: "T0", continuity_status: "ACTIVE", created_at: new Date().toISOString(), expires_at }
       await env.DB.prepare(`INSERT INTO session_registry (session_id,identity_id,owner,trust_tier,continuity_status,created_at,expires_at) VALUES (?1,?2,?3,?4,?5,?6,?7)`).bind(session.session_id,session.identity_id,session.owner,session.trust_tier,session.continuity_status,session.created_at,session.expires_at).run()
-      await emitTelemetry(env, { event_type: "SESSION_CREATED", severity: "INFO", payload: { route: "/session", session_id: session.session_id, continuity_status: "ACTIVE" } })
-      return json({ status: "SESSION_ACTIVE", session_id: session.session_id })
+      try { await emitTelemetry(env, { event_type: "SESSION_CREATED", severity: "INFO", payload: { route: "/session", session_id: session.session_id, identity_id: session.identity_id, continuity_status: "ACTIVE" } }) } catch {}
+      return json({ status: "SESSION_ACTIVE", session_id: session.session_id, identity_id: session.identity_id, created_at: session.created_at, expires_at: session.expires_at })
     }
 
     if (url.pathname === "/continuity" && request.method === "POST") {
@@ -357,6 +361,22 @@ export default {
         }
         const aeoHasHash = await hasColumn(env, "aeo_registry", "validated_object_hash")
         if (!aeoHasHash) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "schema_incompatible_aeo_registry" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "CRITICAL", payload: { route: "/compile" }, drift_class: "registry_drift" })
+
+        const existingAeos = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(decision_id).all<any>()
+        const existingRows = Array.isArray(existingAeos?.results) ? existingAeos.results : []
+        if (existingRows.length > 0) {
+          const first = existingRows[0]
+          let canonicalAeo: unknown
+          try { canonicalAeo = JSON.parse(String(first.canonical_aeo || "{}")) } catch { canonicalAeo = null }
+          const storedHash = String(first.validated_object_hash || "")
+          const recomputedHash = await sha256Hex(canonicalize(canonicalAeo))
+          const hasConflictingAeo = existingRows.some((row: any) => String(row.validated_object_hash || "") !== storedHash || String(row.canonical_aeo || "") !== String(first.canonical_aeo || ""))
+          if (!canonicalAeo || !storedHash || recomputedHash !== storedHash || hasConflictingAeo) {
+            return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "compiled_aeo_hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/compile", stored_hash: storedHash, actual_hash: recomputedHash, indicator: "stored_aeo_hash_mismatch" }, drift_class: "hash_drift" })
+          }
+          await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(first.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash: storedHash, indicator: "existing_canonical_aeo_reused" } })
+          return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, canonical_aeo: canonicalAeo })
+        }
 
         const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
         if (!authority) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
@@ -495,5 +515,8 @@ export default {
     }
 
     return json({ status: "NULL", reason: "not_found" }, 404)
+    } catch {
+      return json({ status: "NULL", reason: "runtime_exception" }, 500)
+    }
   }
 }

@@ -86,13 +86,33 @@ test('/session does not run historical proof quarantine or unique index mutation
   assert.equal(preparedSql.some((sql) => sql.includes('CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique')), false)
 })
 
+
+test('/session telemetry failure does not throw Worker exception or invalidate persisted session', async () => {
+  const worker = await loadWorker()
+  const { env } = createD1Mock({
+    failRunWhen: (sql) => sql.includes('INSERT INTO observability_registry')
+  })
+  let response
+
+  await assert.doesNotReject(async () => {
+    response = await worker.fetch(post('/session', { identity_id: 'identity-telemetry-failure' }), env)
+  })
+
+  const payload = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(payload.status, 'SESSION_ACTIVE')
+  assert.equal(payload.identity_id, 'identity-telemetry-failure')
+  assert.ok(payload.created_at)
+  assert.ok(payload.expires_at)
+})
+
 test('/session missing identity_id returns canonical NULL', async () => {
   const worker = await loadWorker()
   const { env } = createD1Mock()
 
   const response = await worker.fetch(post('/session', {}), env)
 
-  assert.equal(response.status, 200)
+  assert.equal(response.status, 400)
   assert.deepEqual(await response.json(), { status: 'NULL', reason: 'missing_identity_id' })
 })
 
