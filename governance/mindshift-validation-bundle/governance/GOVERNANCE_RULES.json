@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "status": "non_operative_governance_artifact",
+  "rules": [
+    {
+      "id": "exact_object_discipline",
+      "rule": "validated_object_hash must identify the exact object that reaches execution.",
+      "failure_mode": "NULL_OR_BLOCKED"
+    },
+    {
+      "id": "fail_closed",
+      "rule": "invalid, missing, stale, mismatched, or replayed objects must not execute.",
+      "failure_mode": "NULL_OR_BLOCKED"
+    },
+    {
+      "id": "canonical_path_only",
+      "rule": "state-changing production deploys must route through authority, compile, validate, execute, and proof.",
+      "failure_mode": "BLOCKED_EXECUTION"
+    },
+    {
+      "id": "no_direct_deploy",
+      "rule": "direct deploy commands must remain disabled or non-production unless routed through governed workflow controls.",
+      "failure_mode": "BLOCKED_DEPLOY"
+    },
+    {
+      "id": "replay_resistance",
+      "rule": "used authority, reused invocation nonce, or reused execution object must be blocked.",
+      "failure_mode": "REPLAY_BLOCKED"
+    },
+    {
+      "id": "proof_after_execution",
+      "rule": "proof must be persisted only after the execution boundary accepts the validated object.",
+      "failure_mode": "NO_PROOF"
+    },
+    {
+      "id": "artifact_non_operability",
+      "rule": "files under governance/mindshift-validation-bundle are audit references and must not execute, deploy, authorize, or mutate runtime.",
+      "failure_mode": "REMOVE_OR_BLOCK_ARTIFACT"
+    }
+  ]
+}

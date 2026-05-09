@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "status": "non_operative_governance_artifact",
+  "nodes": [
+    { "id": "github_actions_prepare", "file": ".github/workflows/prepare-governed-deploy.yml", "operative": true },
+    { "id": "worker_authority", "route": "/authority", "file": "src/index.ts", "operative": true },
+    { "id": "worker_compile", "route": "/compile", "file": "src/index.ts", "operative": true },
+    { "id": "github_actions_governed_deploy", "file": ".github/workflows/governed-deploy.yml", "operative": true },
+    { "id": "worker_validate", "route": "/validate", "file": "src/index.ts", "operative": true },
+    { "id": "worker_execute", "route": "/execute", "file": "src/index.ts", "operative": true },
+    { "id": "worker_proof", "route": "/proof", "file": "src/index.ts", "operative": true },
+    { "id": "d1_registry", "file": "migrations/*.sql", "operative": true },
+    { "id": "validation_bundle", "file": "governance/mindshift-validation-bundle/**", "operative": false }
+  ],
+  "edges": [
+    { "from": "github_actions_prepare", "to": "worker_authority", "purpose": "create bounded deploy authority" },
+    { "from": "worker_authority", "to": "worker_compile", "purpose": "compile canonical execution object" },
+    { "from": "worker_compile", "to": "github_actions_governed_deploy", "purpose": "provide validated object hash and decision input" },
+    { "from": "github_actions_governed_deploy", "to": "worker_validate", "purpose": "validate exact object before deploy" },
+    { "from": "worker_validate", "to": "worker_execute", "purpose": "cross execution boundary only after validation" },
+    { "from": "worker_execute", "to": "worker_proof", "purpose": "persist proof after accepted execution" },
+    { "from": "worker_proof", "to": "d1_registry", "purpose": "record proof and replay-resistant lineage" }
+  ],
+  "artifact_edges": []
+}

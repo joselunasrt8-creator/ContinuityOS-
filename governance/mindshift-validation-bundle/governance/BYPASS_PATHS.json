@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "status": "non_operative_governance_artifact",
+  "bypass_findings": [
+    {
+      "id": "direct_package_deploy",
+      "path": "package.json:scripts.deploy",
+      "risk": "direct_deploy_without_canonical_authority",
+      "observed_control": "script exits with disabled direct deploy guard",
+      "bundle_change": "none"
+    },
+    {
+      "id": "workflow_dispatch_without_prepare",
+      "path": ".github/workflows/governed-deploy.yml",
+      "risk": "manual_execution_without_prepared_authority_inputs",
+      "observed_control": "workflow validates decision_id, validated_object_hash, and invocation_nonce before execution",
+      "bundle_change": "none"
+    },
+    {
+      "id": "runtime_execute_without_validation",
+      "path": "src/index.ts:/execute",
+      "risk": "execution_without_validated_object",
+      "observed_control": "execute route requires validation registry match before proof persistence",
+      "bundle_change": "none"
+    },
+    {
+      "id": "proof_generation_without_execution",
+      "path": "src/index.ts:/proof",
+      "risk": "proof_without_execution_boundary",
+      "observed_control": "proof route binds proof to execution_id and validated object hash",
+      "bundle_change": "none"
+    }
+  ],
+  "artifact_assertions": {
+    "adds_bypass": false,
+    "adds_execution_path": false,
+    "modifies_controls": false
+  }
+}

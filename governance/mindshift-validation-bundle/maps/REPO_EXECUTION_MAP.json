@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "status": "non_operative_governance_artifact",
+  "repo": "joselunasrt8-creator/mindshift-demo",
+  "canonical_execution_path": [
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "current_locked_surface": "github_governed_production_deploy",
+  "runtime_entrypoints": [
+    {
+      "path": "src/index.ts",
+      "role": "fail_closed_worker_router",
+      "routes": [
+        "/session",
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof"
+      ],
+      "mutation_status": "not_modified_by_bundle"
+    }
+  ],
+  "workflow_entrypoints": [
+    {
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "role": "manual_authority_and_compile_preparation",
+      "mutation_status": "not_modified_by_bundle"
+    },
+    {
+      "path": ".github/workflows/governed-deploy.yml",
+      "role": "governed_production_deploy_execution_surface",
+      "mutation_status": "not_modified_by_bundle"
+    }
+  ],
+  "package_execution_scripts": {
+    "deploy": "disabled_convenience_guard",
+    "dev": "local_worker_development",
+    "d1:migrate:local": "local_d1_migration",
+    "test": "node_test_runner"
+  },
+  "artifact_scope": {
+    "path": "governance/mindshift-validation-bundle",
+    "operative": false,
+    "adds_execution_paths": false,
+    "deploys": false,
+    "creates_authority": false,
+    "generates_proof": false
+  }
+}

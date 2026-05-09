@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "status": "non_operative_governance_artifact",
+  "files": [
+    {
+      "path": "src/index.ts",
+      "role": "fail_closed_router_and_runtime_governance_boundary",
+      "operative": true,
+      "bundle_change": "none"
+    },
+    {
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "role": "authority_and_compile_preparation_workflow",
+      "operative": true,
+      "bundle_change": "none"
+    },
+    {
+      "path": ".github/workflows/governed-deploy.yml",
+      "role": "validated_execution_and_deploy_workflow",
+      "operative": true,
+      "bundle_change": "none"
+    },
+    {
+      "path": "package.json",
+      "role": "package_metadata_and_developer_scripts",
+      "operative": true,
+      "bundle_change": "none"
+    },
+    {
+      "path": "migrations/*.sql",
+      "role": "registry_schema_history",
+      "operative": true,
+      "bundle_change": "none"
+    },
+    {
+      "path": "governance/mindshift-validation-bundle/**",
+      "role": "non_operative_audit_reference",
+      "operative": false,
+      "bundle_change": "added"
+    }
+  ]
+}
