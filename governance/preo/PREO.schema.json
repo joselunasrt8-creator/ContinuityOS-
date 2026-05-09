@@ -266,7 +266,8 @@
                 },
                 "validated_object_hash": {
                     "type": "string",
-                    "pattern": "^sha256:[a-fA-F0-9]{64}$"
+                    "pattern": "^sha256:[a-fA-F0-9]{64}$",
+                    "description": "The canonical PREO hash as sha256:<hex>. It is computed from canonical_json(PREO object excluding validation_result.validated_object_hash) using RFC 8785 JCS semantics, and MUST NOT participate in canonical PREO hash generation."
                 },
                 "errors": {
                     "type": "array",
@@ -289,7 +290,8 @@
                         }
                     }
                 }
-            }
+            },
+            "description": "Validation outcome for the exact PREO evidence object. Canonical PREO hash generation MUST use RFC 8785 JSON Canonicalization Scheme (JCS) semantics over the PREO object excluding validation_result.validated_object_hash, so the hash field does not recursively participate in its own digest."
         },
         "merge_eligibility": {
             "type": "string",
