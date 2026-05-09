@@ -1,0 +1,89 @@
+{
+  "version": "1.0",
+  "purpose": "Convert governance visibility into enforced non-bypassable boundaries in safe stages.",
+  "status": "planning_non_runtime_mutating",
+  "core_invariant": "No valid object -> no execution",
+  "stages": [
+    {
+      "stage": 1,
+      "name": "visibility",
+      "state": "complete",
+      "description": "Governance artifacts, scorecards, and coverage tests exist."
+    },
+    {
+      "stage": 2,
+      "name": "advisory checks",
+      "state": "in_progress",
+      "description": "Workflows detect governed mutations and validate governance artifacts, but branch protection does not require them yet."
+    },
+    {
+      "stage": 3,
+      "name": "required status checks",
+      "state": "planned",
+      "description": "merge-governance-check becomes required for PRs into main."
+    },
+    {
+      "stage": 4,
+      "name": "branch-protected enforcement",
+      "state": "planned",
+      "description": "Direct push is restricted, PRs are required, required checks must pass, and admin bypass policy is explicit."
+    },
+    {
+      "stage": 5,
+      "name": "runtime-boundary enforcement",
+      "state": "planned",
+      "description": "Production deploy, execution, proof, replay, and merge governance are all bound to exact objects and proof."
+    },
+    {
+      "stage": 6,
+      "name": "non-bypassable enforcement",
+      "state": "planned",
+      "description": "No alternate path to source-control, deploy, schema, or runtime mutation exists outside governed boundaries."
+    }
+  ],
+  "first_enforcement_targets": [
+    {
+      "target": "github_pr_merge_surface",
+      "current_state": "advisory",
+      "next_state": "required_status_check",
+      "required_control": "Require merge-governance-check before merge",
+      "blocked_until": [
+        "PREO candidate workflow exists",
+        "SCO candidate workflow exists",
+        "merge governance check validates PREO/SCO candidates",
+        "branch protection policy is explicitly documented"
+      ]
+    },
+    {
+      "target": "github_production_deploy",
+      "current_state": "governed but external bypasses must be proven closed",
+      "next_state": "direct deploy lock verified",
+      "required_control": "Prove direct wrangler deploy cannot reach production outside governed-deploy.yml",
+      "blocked_until": [
+        "direct deploy path audit complete",
+        "Wrangler config hash check exists",
+        "production deploy environment restrictions documented"
+      ]
+    },
+    {
+      "target": "runtime_execute_route",
+      "current_state": "runtime governed but proof closure requires continuous tests",
+      "next_state": "proof-required execution closure",
+      "required_control": "Execution cannot be considered complete without proof persistence",
+      "blocked_until": [
+        "proof lineage closure test exists",
+        "proof failure returns NULL or non-complete execution state",
+        "replay after proof is blocked"
+      ]
+    }
+  ],
+  "non_bypassability_checks": [
+    "no direct push to main",
+    "no merge without required status checks",
+    "no governed path mutation without SCO",
+    "no PR merge legitimacy without PREO",
+    "no production deploy outside governed-deploy.yml",
+    "no runtime execution outside /authority -> /compile -> /validate -> /execute -> /proof",
+    "no schema migration outside SCO/PREO governance"
+  ]
+}
