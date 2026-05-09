@@ -1,0 +1,170 @@
+name: sco-candidate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  generate-sco-candidate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate SCO candidate
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --name-only "origin/${{ github.base_ref }}"...HEAD > changed_files.txt
+
+          : > governed_files.txt
+          : > mutation_classes.txt
+          : > target_surfaces.txt
+
+          REQUIRES_SCO="false"
+          RISK_CLASS="P0"
+
+          while IFS= read -r file; do
+            case "$file" in
+              governance/*)
+                echo "$file" >> governed_files.txt
+                echo "governance_mutation" >> mutation_classes.txt
+                echo "governance_runtime" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+              .github/workflows/*)
+                echo "$file" >> governed_files.txt
+                echo "workflow_mutation" >> mutation_classes.txt
+                echo "source_control_governance" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P3"
+                ;;
+              src/*)
+                echo "$file" >> governed_files.txt
+                echo "runtime_mutation" >> mutation_classes.txt
+                echo "runtime_boundary" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P3"
+                ;;
+              schema.sql)
+                echo "$file" >> governed_files.txt
+                echo "schema_mutation" >> mutation_classes.txt
+                echo "database_schema" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+              migrations/*)
+                echo "$file" >> governed_files.txt
+                echo "migration_mutation" >> mutation_classes.txt
+                echo "database_migration" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+              wrangler.toml)
+                echo "$file" >> governed_files.txt
+                echo "deployment_config_mutation" >> mutation_classes.txt
+                echo "deployment_configuration" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+            esac
+          done < changed_files.txt
+
+          sort -u mutation_classes.txt -o mutation_classes.txt
+          sort -u target_surfaces.txt -o target_surfaces.txt
+
+          jq -n \
+            --arg sco_id "SCO-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}" \
+            --argjson pr_number "${{ github.event.pull_request.number }}" \
+            --arg repo "${{ github.repository }}" \
+            --arg base_branch "${{ github.base_ref }}" \
+            --arg head_branch "${{ github.head_ref }}" \
+            --arg head_sha "${{ github.event.pull_request.head.sha }}" \
+            --arg requires_sco "$REQUIRES_SCO" \
+            --arg risk_class "$RISK_CLASS" \
+            --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile changed_files <(jq -R . changed_files.txt | jq -s .) \
+            --slurpfile governed_files <(jq -R . governed_files.txt | jq -s .) \
+            --slurpfile mutation_classes <(jq -R . mutation_classes.txt | jq -s .) \
+            --slurpfile target_surfaces <(jq -R . target_surfaces.txt | jq -s .) \
+            '{
+              sco_id: $sco_id,
+              pr_number: $pr_number,
+              repo: $repo,
+              base_branch: $base_branch,
+              head_branch: $head_branch,
+              head_sha: $head_sha,
+              changed_files: $changed_files[0],
+              governed_files: $governed_files[0],
+              mutation_classes: $mutation_classes[0],
+              target_surfaces: $target_surfaces[0],
+              requires_sco: ($requires_sco == "true"),
+              risk_class: $risk_class,
+              created_at: $created_at,
+              status: "SCO_CANDIDATE"
+            }' > SCO_CANDIDATE.json
+
+          cat SCO_CANDIDATE.json
+
+      - name: Validate SCO candidate shape
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+
+          const sco = JSON.parse(readFileSync('SCO_CANDIDATE.json', 'utf8'));
+
+          for (const field of [
+            'sco_id',
+            'pr_number',
+            'repo',
+            'base_branch',
+            'head_branch',
+            'head_sha',
+            'changed_files',
+            'governed_files',
+            'mutation_classes',
+            'target_surfaces',
+            'requires_sco',
+            'risk_class',
+            'created_at',
+            'status',
+          ]) {
+            assert.ok(Object.hasOwn(sco, field), `SCO candidate missing field: ${field}`);
+          }
+
+          assert.equal(sco.status, 'SCO_CANDIDATE');
+          assert.ok(Array.isArray(sco.changed_files), 'changed_files must be an array');
+          assert.ok(Array.isArray(sco.governed_files), 'governed_files must be an array');
+          assert.ok(Array.isArray(sco.mutation_classes), 'mutation_classes must be an array');
+          assert.ok(Array.isArray(sco.target_surfaces), 'target_surfaces must be an array');
+          assert.equal(typeof sco.requires_sco, 'boolean');
+          assert.ok(String(sco.head_sha).length > 0, 'head_sha must be non-empty');
+          NODE
+
+      - name: Upload SCO candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SCO_CANDIDATE
+          path: SCO_CANDIDATE.json
+
+      - name: Emit SCO summary
+        run: |
+          set -euo pipefail
+          {
+            echo "### SCO Candidate"
+            echo ""
+            echo '```json'
+            cat SCO_CANDIDATE.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
