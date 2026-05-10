@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "purpose": "Canonical governance rules for source-control mutation and merge legitimacy.",
+  "merge_surface": "github_pr_merge_surface",
+  "rules": [
+    "No PREO -> no governed merge",
+    "Governance/runtime mutation -> requires SCO",
+    "PREO must bind exact PR head_sha",
+    "SCO must bind exact governed files",
+    "Merge proof must persist merge_commit_sha",
+    "Protected branch required for governed merges",
+    "Direct push to governed branches is a bypass path"
+  ],
+  "required_proof_fields": [
+    "pr_number",
+    "head_sha",
+    "merge_commit_sha",
+    "review_status",
+    "checks_status",
+    "merged_by",
+    "merged_at"
+  ],
+  "bypass_paths": [
+    "direct_push_to_main",
+    "merge_without_PREO",
+    "merge_without_SCO",
+    "admin_bypass",
+    "force_push",
+    "branch_protection_disabled"
+  ]
+}

@@ -1,0 +1,119 @@
+name: preo-candidate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  generate-preo-candidate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate PREO candidate
+        run: |
+          set -euo pipefail
+
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > changed_files.txt
+
+          GOVERNED_PATH_DETECTED="false"
+          RISK_CLASS="P1"
+
+          while IFS= read -r file; do
+            case "$file" in
+              governance/*|.github/workflows/*|src/*|schema.sql|migrations/*|wrangler.toml)
+                GOVERNED_PATH_DETECTED="true"
+                RISK_CLASS="P3"
+                ;;
+            esac
+          done < changed_files.txt
+
+          jq -n \
+            --arg preo_id "PREO-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}" \
+            --argjson pr_number "${{ github.event.pull_request.number }}" \
+            --arg repo "${{ github.repository }}" \
+            --arg base_branch "${{ github.base_ref }}" \
+            --arg head_branch "${{ github.head_ref }}" \
+            --arg head_sha "${{ github.event.pull_request.head.sha }}" \
+            --arg review_status "UNVERIFIED" \
+            --arg checks_status "UNVERIFIED" \
+            --arg risk_class "$RISK_CLASS" \
+            --arg governed_path_detected "$GOVERNED_PATH_DETECTED" \
+            --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile changed_files <(jq -R . changed_files.txt | jq -s .) \
+            '{
+              preo_id: $preo_id,
+              pr_number: $pr_number,
+              repo: $repo,
+              base_branch: $base_branch,
+              head_branch: $head_branch,
+              head_sha: $head_sha,
+              changed_files: $changed_files[0],
+              review_status: $review_status,
+              checks_status: $checks_status,
+              risk_class: $risk_class,
+              governed_path_detected: ($governed_path_detected == "true"),
+              created_at: $created_at,
+              status: "PREO_CANDIDATE"
+            }' > PREO_CANDIDATE.json
+
+          cat PREO_CANDIDATE.json
+
+      - name: Validate PREO candidate shape
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+
+          const preo = JSON.parse(readFileSync('PREO_CANDIDATE.json', 'utf8'));
+
+          for (const field of [
+            'preo_id',
+            'pr_number',
+            'repo',
+            'base_branch',
+            'head_branch',
+            'head_sha',
+            'changed_files',
+            'review_status',
+            'checks_status',
+            'risk_class',
+            'created_at',
+            'status',
+          ]) {
+            assert.ok(Object.hasOwn(preo, field), `PREO candidate missing field: ${field}`);
+          }
+
+          assert.equal(preo.status, 'PREO_CANDIDATE');
+          assert.ok(Array.isArray(preo.changed_files), 'changed_files must be an array');
+          assert.ok(String(preo.head_sha).length > 0, 'head_sha must be non-empty');
+          NODE
+
+      - name: Upload PREO candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PREO_CANDIDATE
+          path: PREO_CANDIDATE.json
+
+      - name: Emit PREO summary
+        run: |
+          set -euo pipefail
+          {
+            echo "### PREO Candidate"
+            echo ""
+            echo '```json'
+            cat PREO_CANDIDATE.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

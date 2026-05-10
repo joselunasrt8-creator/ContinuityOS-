@@ -86,9 +86,65 @@ jobs:
 
           echo "SESSION_ID=$SESSION_ID" >> "$GITHUB_ENV"
 
+      - name: CONTINUITY — Create active deploy continuity
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ]; then
+            echo "NULL — Missing active session_id before continuity"
+            exit 1
+          fi
+
+          DECISION_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+          EXPIRY="$(date -u -d '+15 minutes' +%Y-%m-%dT%H:%M:%SZ)"
+
+          RESPONSE_CODE=$(curl -sS -o continuity.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/continuity" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --arg expires_at "$EXPIRY" \
+              '{session_id:$session_id,authority_chain:[$decision_id],actor_chain:["github_actions"],scope:{environment:$environment},constraints:{repo:$repo,branch:$branch,workflow:$workflow,max_executions:1},expires_at:$expires_at}')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Continuity endpoint error"
+            cat continuity.json
+            exit 1
+          fi
+
+          CONTINUITY_STATUS=$(jq -r '.status // empty' continuity.json)
+          CONTINUITY_ID=$(jq -r '.continuity_id // empty' continuity.json)
+          CONTINUITY_HASH=$(jq -r '.continuity_hash // empty' continuity.json)
+          if [ "$CONTINUITY_STATUS" != "CONTINUITY_ACTIVE" ] || [ -z "$CONTINUITY_ID" ] || [ -z "$CONTINUITY_HASH" ]; then
+            echo "NULL — Continuity response is non-canonical"
+            cat continuity.json
+            exit 1
+          fi
+
+          echo "DECISION_ID=$DECISION_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_ID=$CONTINUITY_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_HASH=$CONTINUITY_HASH" >> "$GITHUB_ENV"
+
       - name: AUTHORITY — Create deploy authority and decision
         run: |
           set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ]; then
+            echo "NULL — Missing active session_id before authority"
+            exit 1
+          fi
+
+          if [ -z "${DECISION_ID:-}" ] || [ -z "${CONTINUITY_ID:-}" ]; then
+            echo "NULL — Missing continuity-bound decision before authority"
+            exit 1
+          fi
+
           EXPIRY="$(date -u -d '+15 minutes' +%Y-%m-%dT%H:%M:%SZ)"
 
           RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
@@ -97,6 +153,8 @@ jobs:
             -H "X-API-Key: $API_KEY" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
+              --arg continuity_id "$CONTINUITY_ID" \
+              --arg decision_id "$DECISION_ID" \
               --arg owner "github_actions" \
               --arg intent "$DEPLOY_INTENT" \
               --arg expiry "$EXPIRY" \
@@ -104,7 +162,7 @@ jobs:
               --arg repo "$DEPLOY_REPO" \
               --arg branch "$DEPLOY_BRANCH" \
               --arg workflow "$DEPLOY_WORKFLOW" \
-              '{session_id:$session_id,owner:$owner,intent:$intent,scope:{environment:$environment},constraints:{repo:$repo,branch:$branch,workflow:$workflow,max_executions:1},expiry:$expiry}')")
+              '{session_id:$session_id,continuity_id:$continuity_id,decision_id:$decision_id,owner:$owner,intent:$intent,scope:{environment:$environment},constraints:{repo:$repo,branch:$branch,workflow:$workflow,max_executions:1},expiry:$expiry}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Authority endpoint error"
@@ -112,9 +170,16 @@ jobs:
             exit 1
           fi
 
-          DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
-          if [ -z "$DECISION_ID" ]; then
-            echo "NULL — Missing decision_id from authority"
+          AUTHORITY_DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
+          AUTHORITY_CONTINUITY_ID=$(jq -r '.continuity_id // empty' authority.json)
+          if [ -z "$AUTHORITY_DECISION_ID" ] || [ "$AUTHORITY_DECISION_ID" != "$DECISION_ID" ]; then
+            echo "NULL — Missing or mismatched decision_id from authority"
+            cat authority.json
+            exit 1
+          fi
+
+          if [ -z "$AUTHORITY_CONTINUITY_ID" ] || [ "$AUTHORITY_CONTINUITY_ID" != "$CONTINUITY_ID" ]; then
+            echo "NULL — Missing or mismatched continuity_id from authority"
             cat authority.json
             exit 1
           fi

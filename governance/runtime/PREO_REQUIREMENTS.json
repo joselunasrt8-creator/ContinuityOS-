@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "purpose": "Define Pull Request Review Evidence Object requirements before source-control mutation.",
+  "object": "PREO",
+  "required_fields": [
+    "preo_id",
+    "pr_number",
+    "repo",
+    "base_branch",
+    "head_branch",
+    "head_sha",
+    "changed_files",
+    "review_status",
+    "checks_status",
+    "risk_class",
+    "created_at"
+  ],
+  "rules": [
+    "No PREO -> no governed merge",
+    "PREO must bind to exact PR head_sha",
+    "PREO must enumerate changed files",
+    "PREO must classify source-control mutation risk",
+    "PREO cannot be reused for a different PR or head_sha"
+  ]
+}

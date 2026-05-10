@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "predicateType",
+    "subject",
+    "continuity_id",
+    "trace_id",
+    "validity"
+  ],
+  "properties": {
+    "predicateType": {
+      "type": "string",
+      "const": "mindshift.proof.v1"
+    },
+    "purpose": {
+      "type": "string",
+      "const": "Execution closure predicate that persists authority lineage, execution lineage, continuity_id, continuity_hash, identity_id, and session_id."
+    },
+    "subject": {
+      "type": "array"
+    },
+    "continuity_id": {
+      "type": "string"
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "payload_hash": {
+      "type": "string"
+    },
+    "replay": {
+      "type": "object"
+    },
+    "revocation": {
+      "type": "object"
+    },
+    "validity": {
+      "type": "string",
+      "enum": [
+        "VALID",
+        "NULL"
+      ]
+    }
+  },
+  "$id": "https://mindshift.local/standards/proof-predicate-v1.json",
+  "title": "mindshift.proof.v1"
+}

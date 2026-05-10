@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "purpose": "Define System Change Object requirements for governance/runtime mutation.",
+  "object": "SCO",
+  "required_fields": [
+    "sco_id",
+    "change_class",
+    "target_surface",
+    "changed_files",
+    "risk_class",
+    "authority_scope",
+    "validation_requirements",
+    "rollback_requirements",
+    "proof_requirements",
+    "created_at"
+  ],
+  "rules": [
+    "governance/runtime mutation requires SCO",
+    "workflow mutation requires SCO",
+    "schema mutation requires SCO",
+    "deployment-boundary mutation requires SCO",
+    "SCO must bind exact changed files",
+    "SCO cannot authorize files outside declared scope"
+  ],
+  "governed_paths": [
+    "governance/**",
+    ".github/workflows/**",
+    "src/**",
+    "schema.sql",
+    "migrations/**",
+    "wrangler.toml"
+  ]
+}

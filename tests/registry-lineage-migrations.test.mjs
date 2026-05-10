@@ -75,24 +75,24 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'session_registry', ['identity_id', 'owner', 'trust_tier', 'continuity_status', 'created_at', 'expires_at'])
     assertIndex(dbPath, 'session_registry', 'idx_session_registry_status_expiry', ['continuity_status', 'expires_at'])
 
-    assertColumns(dbPath, 'authority_registry', ['authority_id', 'decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at'])
+    assertColumns(dbPath, 'authority_registry', ['authority_id', 'decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at', 'continuity_id', 'identity_id'])
     assertNotNull(dbPath, 'authority_registry', ['decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'authority_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'authority_registry must retain UNIQUE(decision_id) lifecycle guard')
 
-    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at'])
+    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id'])
     assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at'])
     assertIndex(dbPath, 'aeo_registry', 'idx_aeo_registry_decision_hash', ['decision_id', 'validated_object_hash'])
 
-    assertColumns(dbPath, 'validation_registry', ['validation_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'environment', 'result', 'reason', 'status', 'created_at'])
+    assertColumns(dbPath, 'validation_registry', ['validation_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'environment', 'result', 'reason', 'status', 'created_at', 'continuity_id'])
     assertNotNull(dbPath, 'validation_registry', ['session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'result', 'status', 'created_at'])
     assertIndex(dbPath, 'validation_registry', 'idx_validation_registry_decision_hash_nonce', ['decision_id', 'validated_object_hash', 'invocation_nonce'])
 
-    assertColumns(dbPath, 'execution_registry', ['execution_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
+    assertColumns(dbPath, 'execution_registry', ['execution_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at', 'continuity_id'])
     assertNotNull(dbPath, 'execution_registry', ['session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assertIndex(dbPath, 'execution_registry', 'idx_execution_registry_decision_hash', ['decision_id', 'validated_object_hash'])
     assert.ok(indexList(dbPath, 'execution_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'execution_registry must retain UNIQUE(decision_id, validated_object_hash) replay guard')
 
-    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at'])
+    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage'])
     assertNotNull(dbPath, 'proof_registry', ['session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_execution_decision_hash', ['execution_id', 'decision_id', 'validated_object_hash'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
@@ -100,7 +100,7 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertColumns(dbPath, 'proof_registry_duplicate_archive', ['archive_id', 'proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'archived_at', 'archive_reason', 'canonical_proof_id'])
     assertNotNull(dbPath, 'proof_registry_duplicate_archive', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at', 'archived_at', 'archive_reason', 'canonical_proof_id'])
 
-    assertColumns(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
+    assertColumns(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at', 'continuity_id'])
     assertNotNull(dbPath, 'invocation_registry', ['decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'invocation_registry').some((index) => index.unique === 1 && index.origin === 'pk'), 'invocation_registry must use canonical triple primary key')
 
@@ -208,8 +208,10 @@ test('runtime lifecycle persists against migration-built canonical registries', 
 
     const session = await post('/session', { identity_id: 'lineage-identity' })
     assert.equal(session.status, 'SESSION_ACTIVE')
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
 
     const authority = await post('/authority', {
+      continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'lineage-test',
@@ -298,7 +300,9 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
 
   async function prepareDecision(decision_id, nonce) {
     const session = await post('/session', { identity_id: `${decision_id}-identity` })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     await post('/authority', {
+      continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'observability-test',
@@ -365,7 +369,9 @@ test('compile and validate share canonical deploy target coercion semantics', as
   try {
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'target-coercion-identity' })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     await post('/authority', {
+      continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'target-coercion-test',
@@ -403,7 +409,9 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
   try {
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'workflow-rejection-identity' })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     await post('/authority', {
+      continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'workflow-rejection-test',
@@ -440,7 +448,9 @@ test('proof transaction rolls back proof persistence when authority consumption 
   try {
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'rollback-identity' })
-    await post('/authority', { session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    await post('/authority', {
+      continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
     const compiled = await post('/compile', { decision_id })
     await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', environment: 'production' })
     const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback' })
@@ -476,7 +486,9 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
   try {
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'duplicates-identity' })
-    await post('/authority', { session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    await post('/authority', {
+      continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
     const compiled = await post('/compile', { decision_id })
     await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
     const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates' })
@@ -497,7 +509,7 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
   }
 })
 
-test('runtime startup quarantines historical duplicate proof lineage before enforcing uniqueness', async () => {
+test('runtime non-session startup quarantines historical duplicate proof lineage before enforcing uniqueness', async () => {
   const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
   const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
@@ -510,15 +522,15 @@ test('runtime startup quarantines historical duplicate proof lineage before enfo
     runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-canonical','session-1','execution-1','decision-historical','hash-historical','github-actions','1','aaa','governed-deploy.yml','production','2026-01-01T00:00:00.000Z');`])
     runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-duplicate','session-1','execution-2','decision-historical','hash-historical','github-actions','2','bbb','governed-deploy.yml','production','2026-01-02T00:00:00.000Z');`])
 
-    const response = await worker.fetch(new Request('https://runtime.test/session', {
+    const response = await worker.fetch(new Request('https://runtime.test/authority', {
       method: 'POST',
       headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
-      body: JSON.stringify({ identity_id: 'startup-survivor' })
+      body: JSON.stringify({ session_id: 'missing-session' })
     }), env)
     const payload = await response.json()
 
     assert.equal(response.status, 200)
-    assert.equal(payload.status, 'SESSION_ACTIVE')
+    assert.deepEqual(payload, { status: 'NULL', reason: 'invalid_session' })
     assert.equal(runSqlite([dbPath, `SELECT proof_id FROM proof_registry WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-canonical')
     assert.equal(runSqlite([dbPath, `SELECT proof_id || ':' || canonical_proof_id || ':' || archive_reason FROM proof_registry_duplicate_archive WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-duplicate:proof-canonical:duplicate_proof_lineage')
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
@@ -526,6 +538,73 @@ test('runtime startup quarantines historical duplicate proof lineage before enfo
     const duplicateInsert = spawnSync('sqlite3', [dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,created_at) VALUES ('proof-after-cleanup','session-1','execution-3','decision-historical','hash-historical','2026-01-03T00:00:00.000Z');`], { encoding: 'utf8' })
     assert.notEqual(duplicateInsert.status, 0)
     assert.match(duplicateInsert.stderr, /UNIQUE constraint failed/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('compile is deterministic and fails closed on mismatched execution hash', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-compile-determinism-'))
+  const dbPath = join(dir, 'runtime.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+
+  async function post(path, payload, expectedStatus = 200) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, expectedStatus)
+    return response.json()
+  }
+
+  async function createCompiledDeploy(decision_id, branch = 'main') {
+    const session = await post('/session', { identity_id: `compile-identity-${decision_id}` })
+    assert.equal(session.status, 'SESSION_ACTIVE')
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    assert.equal(continuity.status, 'CONTINUITY_ACTIVE')
+    const authority = await post('/authority', {
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id,
+      owner: 'compile-determinism-test',
+      intent: 'deploy_production',
+      scope: { environment: 'production' },
+      constraints: { repo: 'example/repo', branch, workflow: 'governed-deploy.yml' }
+    })
+    assert.equal(authority.status, 'ACTIVE')
+    return { session, continuity, compiled: await post('/compile', { decision_id }) }
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const first = await createCompiledDeploy('decision-compile-stable')
+    assert.equal(first.compiled.status, 'COMPILED')
+    const repeated = await post('/compile', { decision_id: 'decision-compile-stable' })
+    assert.equal(repeated.status, 'COMPILED')
+    assert.equal(repeated.validated_object_hash, first.compiled.validated_object_hash)
+    assert.deepEqual(repeated.canonical_aeo, first.compiled.canonical_aeo)
+    assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM aeo_registry WHERE decision_id='decision-compile-stable'"]).trim(), '1')
+
+    const changed = await createCompiledDeploy('decision-compile-changed', 'release')
+    assert.equal(changed.compiled.status, 'COMPILED')
+    assert.notEqual(changed.compiled.validated_object_hash, first.compiled.validated_object_hash)
+
+    const mismatch = await post('/validate', {
+      decision_id: 'decision-compile-stable',
+      validated_object_hash: changed.compiled.validated_object_hash,
+      invocation_nonce: 'nonce-mismatched-hash',
+      environment: 'production',
+      session_id: first.session.session_id
+    })
+    assert.equal(mismatch.status, 'NULL')
+    assert.equal(mismatch.result, 'INVALID')
+    assert.equal(mismatch.reason, 'hash_missing')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

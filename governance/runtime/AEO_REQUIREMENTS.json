@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "purpose": "Canonical exact-object requirements",
+  "required_fields": [
+    "decision_id",
+    "intent",
+    "scope",
+    "constraints",
+    "validated_object_hash",
+    "authority_id",
+    "expiry",
+    "nonce"
+  ],
+  "invariants": [
+    "validated_object == executed_object",
+    "No ATAO -> No AEO -> NULL",
+    "No authority -> NULL"
+  ]
+}

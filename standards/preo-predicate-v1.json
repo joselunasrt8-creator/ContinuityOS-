@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "predicateType",
+    "subject",
+    "continuity_id",
+    "trace_id",
+    "validity"
+  ],
+  "properties": {
+    "predicateType": {
+      "type": "string",
+      "const": "mindshift.preo.v1"
+    },
+    "purpose": {
+      "type": "string",
+      "const": "Merge/review legitimacy evidence predicate."
+    },
+    "subject": {
+      "type": "array"
+    },
+    "continuity_id": {
+      "type": "string"
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "payload_hash": {
+      "type": "string"
+    },
+    "replay": {
+      "type": "object"
+    },
+    "revocation": {
+      "type": "object"
+    },
+    "validity": {
+      "type": "string",
+      "enum": [
+        "VALID",
+        "NULL"
+      ]
+    }
+  },
+  "$id": "https://mindshift.local/standards/preo-predicate-v1.json",
+  "title": "mindshift.preo.v1"
+}
