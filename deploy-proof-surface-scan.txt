@@ -1,0 +1,112 @@
+./.github/workflows/governed-deploy.yml:4:  workflow_dispatch:
+./.github/workflows/governed-deploy.yml:46:          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+./.github/workflows/prepare-governed-deploy.yml:4:  workflow_dispatch:
+./.github/workflows/prepare-governed-deploy.yml:30:          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+./CURRENT_SYSTEM_SNAPSHOT.md:111:2. **`execute-surface-1`** *(needs: validate)* — Sends a governed webhook to a logging endpoint (`webhook.site`).
+./CURRENT_SYSTEM_SNAPSHOT.md:113:4. **`combine-proof`** *(needs: execute-surface-1, execute-surface-2)* — Generates `proof/proof-of-transfer.json` and uploads it as a downloadable artifact named `proof-of-transfer`.
+./CURRENT_SYSTEM_SNAPSHOT.md:124:2. **`transfer`** *(needs: validate)* — Sends the governed webhook (with rate-limit handling) and then generates and uploads `proof/proof-of-transfer.json` as artifact `proof-of-transfer`.
+./CURRENT_SYSTEM_SNAPSHOT.md:130:Both workflows produce a `proof-of-transfer.json` file that is stored as a GitHub Actions artifact. The proof is only generated after successful validation **and** execution. It is never generated on a failed validation path.
+./CURRENT_SYSTEM_SNAPSHOT.md:156:| **Production deployment** | The execution surfaces in this demo point to `webhook.site` (a public logging endpoint) and a simulated echo. No real production system is connected. |
+./CURRENT_SYSTEM_SNAPSHOT.md:224:Every successful workflow run produces a `proof/proof-of-transfer.json` artifact. The file structure is:
+./artifacts/prompts/next-coded-prompt-governed-deploy.md:39:- `workflow_dispatch` only
+./migrations/0008_canonical_runtime_registry_rebuild.sql:2:-- Earlier migrations created validation/execution/proof/invocation registries before
+./package-lock.json:15:    "node_modules/@cloudflare/kv-asset-handler": {
+./package-lock.json:17:      "resolved": "https://registry.npmjs.org/@cloudflare/kv-asset-handler/-/kv-asset-handler-0.4.2.tgz",
+./package-lock.json:25:    "node_modules/@cloudflare/unenv-preset": {
+./package-lock.json:27:      "resolved": "https://registry.npmjs.org/@cloudflare/unenv-preset/-/unenv-preset-2.16.0.tgz",
+./package-lock.json:41:    "node_modules/@cloudflare/workerd-darwin-64": {
+./package-lock.json:43:      "resolved": "https://registry.npmjs.org/@cloudflare/workerd-darwin-64/-/workerd-darwin-64-1.20260421.1.tgz",
+./package-lock.json:58:    "node_modules/@cloudflare/workerd-darwin-arm64": {
+./package-lock.json:60:      "resolved": "https://registry.npmjs.org/@cloudflare/workerd-darwin-arm64/-/workerd-darwin-arm64-1.20260421.1.tgz",
+./package-lock.json:75:    "node_modules/@cloudflare/workerd-linux-64": {
+./package-lock.json:77:      "resolved": "https://registry.npmjs.org/@cloudflare/workerd-linux-64/-/workerd-linux-64-1.20260421.1.tgz",
+./package-lock.json:92:    "node_modules/@cloudflare/workerd-linux-arm64": {
+./package-lock.json:94:      "resolved": "https://registry.npmjs.org/@cloudflare/workerd-linux-arm64/-/workerd-linux-arm64-1.20260421.1.tgz",
+./package-lock.json:109:    "node_modules/@cloudflare/workerd-windows-64": {
+./package-lock.json:111:      "resolved": "https://registry.npmjs.org/@cloudflare/workerd-windows-64/-/workerd-windows-64-1.20260421.1.tgz",
+./package-lock.json:1429:        "@cloudflare/workerd-darwin-64": "1.20260421.1",
+./package-lock.json:1430:        "@cloudflare/workerd-darwin-arm64": "1.20260421.1",
+./package-lock.json:1431:        "@cloudflare/workerd-linux-64": "1.20260421.1",
+./package-lock.json:1432:        "@cloudflare/workerd-linux-arm64": "1.20260421.1",
+./package-lock.json:1433:        "@cloudflare/workerd-windows-64": "1.20260421.1"
+./package-lock.json:1443:        "@cloudflare/kv-asset-handler": "0.4.2",
+./package-lock.json:1444:        "@cloudflare/unenv-preset": "2.16.0",
+./package-lock.json:1463:        "@cloudflare/workers-types": "^4.20260421.1"
+./package-lock.json:1466:        "@cloudflare/workers-types": {
+./docs/prod-deploy-boundary.md:18:`workflow_dispatch` is permitted only for `governed-deploy.yml`; non-governed production deploy paths are disallowed.
+./docs/prod-deploy-boundary.md:20:The blocked `npm run deploy` script is a convenience guard, not the full bypass lock.
+./worker-configuration.d.ts:406:* the [supported algorithms](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/#supported-algorithms)
+./worker-configuration.d.ts:409:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)
+./worker-configuration.d.ts:415:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/)
+./worker-configuration.d.ts:423:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/performance/)
+./worker-configuration.d.ts:992:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/)
+./worker-configuration.d.ts:1006:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/)
+./worker-configuration.d.ts:1009:    /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/#delete) */
+./worker-configuration.d.ts:1011:    /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/#match) */
+./worker-configuration.d.ts:1013:    /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/#put) */
+./worker-configuration.d.ts:1022:* the [supported algorithms](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/#supported-algorithms)
+./worker-configuration.d.ts:1025:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)
+./worker-configuration.d.ts:3463:* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/performance/)
+./worker-configuration.d.ts:3466:    /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/performance/#performancetimeorigin) */
+./worker-configuration.d.ts:3468:    /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/performance/#performancenow) */
+./worker-configuration.d.ts:4188:     *   source: "https://developers.cloudflare.com",
+./worker-configuration.d.ts:9836:     * https://developers.cloudflare.com/workers-ai/features/batch-api
+./worker-configuration.d.ts:9901:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:9907:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10207: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10213: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10219: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10225: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10240: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10258: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10266: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10273: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10293: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10306: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10313: * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10318:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10323:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10328:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10333:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10338:     * See https://developers.cloudflare.com/ai-search/usage/workers-binding/
+./worker-configuration.d.ts:10747:     * from cloudflare.
+./worker-configuration.d.ts:10792:     * Cloudflare’s [level of certainty](https://developers.cloudflare.com/bots/concepts/bot-score/) that a request comes from a bot,
+./worker-configuration.d.ts:10800:     * Most customers choose to allow this traffic. For more details, see [Traffic from known bots](https://developers.cloudflare.com/firewall/known-issues-and-faq/#how-does-firewall-rules-handle-traffic-from-known-bots).
+./worker-configuration.d.ts:10809:     * A boolean value that's true if the request matches [file extensions](https://developers.cloudflare.com/bots/reference/static-resources/) for many types of static resources.
+./worker-configuration.d.ts:10835:         * A [JA3 Fingerprint](https://developers.cloudflare.com/bots/concepts/ja3-fingerprint/) to help profile specific SSL/TLS clients
+./worker-configuration.d.ts:10843:     * Custom metadata set per-host in [Cloudflare for SaaS](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/).
+./worker-configuration.d.ts:10846:     * and you have followed the [required steps to enable it]((https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/custom-metadata/)).
+./worker-configuration.d.ts:10903:     * If your worker is [configured to accept TOR connections](https://support.cloudflare.com/hc/en-us/articles/203306930-Understanding-Cloudflare-Tor-support-and-Onion-Routing), this may also be `"T1"`, indicating a request that originated over TOR.
+./worker-configuration.d.ts:10994:     * @example "CN=cloudflareaccess.com, C=US, ST=Texas, L=Austin, O=Cloudflare"
+./worker-configuration.d.ts:11000:     * @example "CN=*.cloudflareaccess.com, C=US, ST=Texas, L=Austin, O=Cloudflare"
+./worker-configuration.d.ts:11006:     * @example "CN=cloudflareaccess.com, C=US, ST=Texas, L=Austin, O=Cloudflare"
+./worker-configuration.d.ts:11012:     * @example "CN=*.cloudflareaccess.com, C=US, ST=Texas, L=Austin, O=Cloudflare"
+./worker-configuration.d.ts:11316:declare module "cloudflare:email" {
+./worker-configuration.d.ts:11460:     * the "cloudflare:sockets" module, will connect to the Hyperdrive instance
+./worker-configuration.d.ts:11809:declare module 'cloudflare:node' {
+./worker-configuration.d.ts:11860:declare module "cloudflare:pipelines" {
+./worker-configuration.d.ts:11891:// https://developers.cloudflare.com/pub-sub/
+./worker-configuration.d.ts:11895:    // MQTT broker FQDN in the form mqtts://BROKER.NAMESPACE.cloudflarepubsub.com:PORT
+./worker-configuration.d.ts:11931:     * @see https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+./worker-configuration.d.ts:11942:    // For the classes exported by `cloudflare:workers` we want *nominal* typing (i.e. we only want to
+./worker-configuration.d.ts:11943:    // accept `WorkerEntrypoint` from `cloudflare:workers`, not any other class with the same shape)
+./worker-configuration.d.ts:12172:declare module 'cloudflare:workers' {
+./worker-configuration.d.ts:12182:declare module "cloudflare:sockets" {
+./worker-configuration.d.ts:13444:declare module 'cloudflare:workflows' {
+./governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json:13:      "id": "workflow_dispatch_without_prepare",
+./governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json:6:      "id": "cloudflare_worker_runtime",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:102:        "workflow_dispatch"
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:167:        "workflow_dispatch"
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:198:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:220:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:404:      "role": "cloudflare_worker_runtime_boundary",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:490:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:514:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:617:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:670:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:714:        "workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:1312:      "role": "cloudflare_worker_runtime_boundary",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:1481:      "github_actions.workflow_dispatch",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:1483:      "cloudflare_worker_runtime",
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:1484:      "cloudflare_d1_registry"
+./governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json:1522:    "No direct wrangler deploy or alternate production workflow may exist outside canonical path"
