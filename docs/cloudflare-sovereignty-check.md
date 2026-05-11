@@ -5,7 +5,7 @@ MODE B — STRUCTURED ARTIFACT
 Status: Non-Operative
 
 Purpose:
-Document unresolved deploy credential sovereignty assumptions.
+Document unresolved deploy credential sovereignty assumptions and observed bypass evidence.
 
 ## Required verification
 
@@ -15,6 +15,7 @@ Document unresolved deploy credential sovereignty assumptions.
 4. Whether Cloudflare API tokens can deploy outside governed workflows.
 5. Whether branch protections prevent unauthorized workflow mutation.
 6. Whether production deploy requires governed-deploy.yml.
+7. Whether Cloudflare Git integration auto-preview deploys are disabled or routed through MindShift.
 
 ## Current evidence
 
@@ -39,6 +40,52 @@ invocation_nonce
 /proof
 ```
 
+## Observed sovereignty violation
+
+During PR #252 review, Cloudflare Workers bot reported an automatic successful deployment for the PR branch:
+
+```text
+Deployment successful
+Commit Preview URL
+Branch Preview URL
+```
+
+This occurred as a platform preview deploy outside the MindShift canonical route:
+
+```text
+/authority
+→ /compile
+→ /validate
+→ /execute
+→ /proof
+```
+
+Classification:
+
+```text
+BYPASS_DETECTED
+```
+
+Reason:
+
+```text
+Cloudflare Git integration / preview deploy can create a runtime deployment without MindShift authority, validation, execution boundary, or proof registry closure.
+```
+
+## Required remediation
+
+Before claiming runtime sovereignty:
+
+1. Disable Cloudflare automatic preview deployments for PR branches, or
+2. Route preview deployment through a MindShift-governed preview workflow, or
+3. Classify preview deployment as explicitly non-production but still outside canonical sovereignty.
+
+Until one of those is completed:
+
+```text
+SOVEREIGNTY_BOUNDARY_STILL_OPEN
+```
+
 ## Unresolved sovereignty risks
 
 Repository evidence alone cannot prove:
@@ -48,10 +95,15 @@ Cloudflare dashboard deploy prohibition
 Cloudflare token scope exclusivity
 GitHub environment secret exclusivity
 workflow mutation protections
+Cloudflare Git preview deploy disablement
 ```
 
-Until verified:
+## Closure condition
+
+Cloudflare deployment capability must not create runtime state outside MindShift governance.
+
+Otherwise:
 
 ```text
-SOVEREIGNTY_BOUNDARY_STILL_OPEN
+system integrity = broken for that execution surface
 ```
