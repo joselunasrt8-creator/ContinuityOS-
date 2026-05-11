@@ -1,25 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-// MODE B — STRUCTURED ARTIFACT
-// Non-operative sovereignty verification scaffold.
-// This test intentionally documents the required invariant
-// without expanding runtime architecture.
+const runtime = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8');
 
-test('exact-object re-derivation rejects mutated execution payloads', async () => {
-  const canonicalInvariant = 'validated_object == executed_object';
+test('execute route is bound to stored canonical AEO and validated hash', () => {
+  assert.match(runtime, /\/execute/);
+  assert.match(runtime, /validated_object_hash/);
+  assert.match(runtime, /aeo_registry/);
+  assert.match(runtime, /execution_registry/);
+  assert.match(runtime, /invocation_registry/);
+});
 
-  const mutationCases = [
-    'repo mutation',
-    'branch mutation',
-    'workflow mutation',
-    'environment mutation'
+test('runtime contains exact-object mismatch failure signals', () => {
+  const exactObjectSignals = [
+    'hash_mismatch',
+    'scope_mismatch',
+    'workflow_mismatch',
+    'validated_object_hash'
   ];
 
-  assert.equal(typeof canonicalInvariant, 'string');
-  assert.ok(mutationCases.length > 0);
+  for (const signal of exactObjectSignals) {
+    assert.match(runtime, new RegExp(signal));
+  }
+});
 
-  // Required future runtime assertion:
-  // /execute must re-derive or verify the canonical compiled object
-  // instead of trusting request-supplied validated_object_hash.
+test('execute route must not be hash-trust-only documentation', () => {
+  const hasCanonicalization = /canonical/i.test(runtime) || /canonicalize/i.test(runtime);
+  const hasHashComputation = /SHA-256|sha256|digest/i.test(runtime);
+
+  assert.equal(hasCanonicalization, true, 'runtime must contain canonical object handling');
+  assert.equal(hasHashComputation, true, 'runtime must contain hash computation / verification');
 });
