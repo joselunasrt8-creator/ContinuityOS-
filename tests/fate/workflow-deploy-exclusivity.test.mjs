@@ -1,28 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
 
-// MODE B — STRUCTURED ARTIFACT
-// Non-operative workflow sovereignty verification scaffold.
+const workflowDir = new URL('../../.github/workflows/', import.meta.url);
+const workflowFiles = readdirSync(workflowDir);
 
-test('only governed-deploy.yml may contain deploy-capable production execution', async () => {
-  const canonicalWorkflow = '.github/workflows/governed-deploy.yml';
+const deployPatterns = [
+  'wrangler deploy',
+  'npx wrangler deploy',
+  'cloudflare deploy'
+];
 
-  const requiredRoutes = [
+test('only governed-deploy.yml may contain deploy-capable commands', () => {
+  const violatingFiles = [];
+
+  for (const file of workflowFiles) {
+    const fullPath = path.join(workflowDir.pathname, file);
+    const content = readFileSync(fullPath, 'utf8');
+
+    const hasDeployPattern = deployPatterns.some(pattern =>
+      content.includes(pattern)
+    );
+
+    if (hasDeployPattern && file !== 'governed-deploy.yml') {
+      violatingFiles.push(file);
+    }
+  }
+
+  assert.deepEqual(violatingFiles, []);
+});
+
+test('governed-deploy workflow requires canonical governance fields', () => {
+  const governedDeploy = readFileSync(
+    path.join(workflowDir.pathname, 'governed-deploy.yml'),
+    'utf8'
+  );
+
+  const requiredFields = [
+    'decision_id',
+    'validated_object_hash',
+    'invocation_nonce',
     '/validate',
     '/execute',
     '/proof'
   ];
 
-  const forbiddenDeployPatterns = [
-    'wrangler deploy',
-    'npx wrangler deploy',
-    'cloudflare deploy'
-  ];
-
-  assert.equal(canonicalWorkflow.includes('governed-deploy'), true);
-  assert.equal(requiredRoutes.length, 3);
-  assert.ok(forbiddenDeployPatterns.length > 0);
-
-  // Required future static assertion:
-  // no alternate workflow may deploy production state.
+  for (const field of requiredFields) {
+    assert.match(governedDeploy, new RegExp(field));
+  }
 });
