@@ -10,5 +10,25 @@
     "mutation_after_validation",
     "proof_not_linked_to_aeo_hash"
   ],
-  "required_response": "NULL"
+  "required_response": "NULL",
+  "bypass_paths": [
+    {
+      "path": "direct_wrangler_deploy",
+      "bypass_id": "direct_wrangler_deploy",
+      "risk": "production deploy bypass",
+      "required_response": "NULL"
+    },
+    {
+      "path": "manual_workflow_dispatch",
+      "bypass_id": "manual_workflow_dispatch",
+      "risk": "unauthorized workflow dispatch bypass",
+      "required_response": "NULL"
+    },
+    {
+      "path": "raw_database_write",
+      "bypass_id": "raw_database_write",
+      "risk": "state mutation without validation",
+      "required_response": "NULL"
+    }
+  ]
 }

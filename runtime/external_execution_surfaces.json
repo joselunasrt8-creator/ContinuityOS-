@@ -2,7 +2,72 @@
   "artifact": "EXTERNAL_EXECUTION_SURFACES",
   "status": "NON_OPERATIVE",
   "adapters": [
-    { "adapter_id": "github_actions", "sovereignty_tier": "S1", "allowed_targets": ["governed-deploy.yml", "prepare-governed-deploy.yml"], "revocable": true, "proof_capable": true, "replay_resistant": true, "drift_observable": true, "known_trust_dependencies": ["GitHub-hosted runners", "GitHub secrets", "artifact upload systems"] }
+    {
+      "adapter_id": "github_actions",
+      "sovereignty_tier": "S1",
+      "allowed_targets": [
+        "governed-deploy.yml",
+        "prepare-governed-deploy.yml"
+      ],
+      "revocable": true,
+      "proof_capable": true,
+      "replay_resistant": true,
+      "drift_observable": true,
+      "known_trust_dependencies": [
+        "GitHub-hosted runners",
+        "GitHub secrets",
+        "artifact upload systems"
+      ]
+    },
+    {
+      "surface_id": "github_production_deploy",
+      "type": "ci_cd",
+      "state_changing": true,
+      "required_path": "/authority -> /compile -> /validate -> /execute -> /proof",
+      "proof_type": "deployment_receipt",
+      "risk_class": "P3",
+      "adapter_id": "github_production_deploy",
+      "sovereignty_tier": "S1",
+      "proof_capable": true,
+      "revocable": true,
+      "drift_observable": true
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "type": "ci_cd_preparation",
+      "state_changing": true,
+      "required_path": "/session -> /continuity -> /authority -> /compile",
+      "proof_type": "preparation_artifact",
+      "risk_class": "P2",
+      "adapter_id": "prepare_governed_deploy",
+      "sovereignty_tier": "S1",
+      "proof_capable": true,
+      "revocable": true,
+      "drift_observable": true
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "type": "cloudflare_worker_route",
+      "state_changing": true,
+      "required_path": "/validate -> /execute -> /proof",
+      "proof_type": "execution_receipt",
+      "risk_class": "P3",
+      "adapter_id": "runtime_execute_route",
+      "sovereignty_tier": "S1",
+      "proof_capable": true,
+      "revocable": true,
+      "drift_observable": true
+    }
   ],
-  "weak_surfaces": ["npm_dependency_graph", "outbound_curl_requests", "workflow_shell_scripts", "environment_variables", "docker_base_images", "mcp_remote_servers", "package_install_paths", "ci_scripts", "deployment_scripts"]
+  "weak_surfaces": [
+    "npm_dependency_graph",
+    "outbound_curl_requests",
+    "workflow_shell_scripts",
+    "environment_variables",
+    "docker_base_images",
+    "mcp_remote_servers",
+    "package_install_paths",
+    "ci_scripts",
+    "deployment_scripts"
+  ]
 }

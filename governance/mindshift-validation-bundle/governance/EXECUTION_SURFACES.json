@@ -4,10 +4,18 @@
   "surfaces": [
     {
       "id": "cloudflare_worker_runtime",
-      "files": ["src/index.ts"],
+      "files": [
+        "src/index.ts"
+      ],
       "type": "runtime_boundary",
       "canonical": true,
-      "allowed_state_change_path": ["/authority", "/compile", "/validate", "/execute", "/proof"],
+      "allowed_state_change_path": [
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof"
+      ],
       "bundle_change": "none"
     },
     {
@@ -25,7 +33,9 @@
     },
     {
       "id": "package_scripts",
-      "files": ["package.json"],
+      "files": [
+        "package.json"
+      ],
       "type": "developer_command_surface",
       "canonical": false,
       "deploy_script_status": "disabled_guard",
@@ -33,10 +43,39 @@
     },
     {
       "id": "d1_migrations",
-      "files": ["migrations/*.sql"],
+      "files": [
+        "migrations/*.sql"
+      ],
       "type": "registry_schema_surface",
       "canonical": false,
       "bundle_change": "none"
+    },
+    {
+      "surface_id": "github_production_deploy",
+      "type": "ci_cd",
+      "state_changing": true,
+      "required_path": "/authority -> /compile -> /validate -> /execute -> /proof",
+      "proof_type": "deployment_receipt",
+      "risk_class": "P3",
+      "classification": "canonical_runtime_surface"
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "type": "ci_cd_preparation",
+      "state_changing": true,
+      "required_path": "/session -> /continuity -> /authority -> /compile",
+      "proof_type": "preparation_artifact",
+      "risk_class": "P2",
+      "classification": "canonical_runtime_surface"
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "type": "cloudflare_worker_route",
+      "state_changing": true,
+      "required_path": "/validate -> /execute -> /proof",
+      "proof_type": "execution_receipt",
+      "risk_class": "P3",
+      "classification": "canonical_runtime_surface"
     }
   ]
 }

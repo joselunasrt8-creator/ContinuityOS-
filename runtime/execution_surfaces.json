@@ -32,6 +32,30 @@
       ],
       "proof_type": "tool_execution_receipt",
       "risk_class": "P2"
+    },
+    {
+      "surface_id": "github_production_deploy",
+      "type": "ci_cd",
+      "state_changing": true,
+      "required_path": "/authority -> /compile -> /validate -> /execute -> /proof",
+      "proof_type": "deployment_receipt",
+      "risk_class": "P3"
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "type": "ci_cd_preparation",
+      "state_changing": true,
+      "required_path": "/session -> /continuity -> /authority -> /compile",
+      "proof_type": "preparation_artifact",
+      "risk_class": "P2"
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "type": "cloudflare_worker_route",
+      "state_changing": true,
+      "required_path": "/validate -> /execute -> /proof",
+      "proof_type": "execution_receipt",
+      "risk_class": "P3"
     }
   ]
 }
