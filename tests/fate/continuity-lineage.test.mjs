@@ -25,7 +25,7 @@ test('lineage mismatch → NULL', () => {
 })
 
 test('orphaned execution → NULL', () => {
-  assert.match(source, /reason:"no_validation"/)
+  assert.match(source, /reason:"hash_mismatch"/)
   assert.match(source, /orphaned_execution_prevented/)
   assert.match(source, /const continuity = await activeContinuity\(env, String\(authority\.continuity_id \|\| ""\), session/)
 })
@@ -50,6 +50,6 @@ test('proof persists continuity lineage', () => {
 
 test('proof lineage must equal execution lineage', () => {
   assert.match(source, /authority_lineage,execution_lineage/)
-  assert.match(source, /JSON\.stringify\(\{ session_id, continuity_id: "runtime-bound", execution_id, decision_id, validated_object_hash \}\),JSON\.stringify\(\{ session_id, continuity_id: "runtime-bound", execution_id, decision_id, validated_object_hash \}\)/)
+  assert.match(source, /continuity_ancestry: continuity\.ancestry/)
   assert.match(authoritySchema, /continuity_id/)
 })

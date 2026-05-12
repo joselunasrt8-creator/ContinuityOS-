@@ -19,7 +19,7 @@ test('revoked session returns NULL', () => {
 
 test('mismatched session lineage returns NULL / INVALID', () => {
   assert.match(source, /String\(authority\.session_id \|\| ""\) !== session_id/)
-  assert.match(source, /String\(valid\.session_id \|\| ""\) !== session_id/)
+  assert.match(source, /String\(validation\.session_id \|\| ""\) !== session_id/)
   assert.match(source, /reason:"session_lineage_mismatch"/)
 })
 

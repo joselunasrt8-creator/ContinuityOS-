@@ -199,6 +199,39 @@ async function continuityHash(input: any): Promise<string> {
   return sha256Hex(canonicalize(continuityHashMaterial(input)))
 }
 
+async function collectContinuityDescendants(env: Env, root_continuity_id: string): Promise<string[]> {
+  if (!root_continuity_id) return []
+  const discovered = new Set<string>([root_continuity_id])
+  const frontier = [root_continuity_id]
+  while (frontier.length > 0) {
+    const parent_id = frontier.shift() || ""
+    const children = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE parent_continuity_id=?1`).bind(parent_id).all<any>()
+    for (const row of Array.isArray(children?.results) ? children.results : []) {
+      const child_id = String(row?.continuity_id || "")
+      if (!child_id || discovered.has(child_id)) continue
+      discovered.add(child_id)
+      frontier.push(child_id)
+    }
+  }
+  return Array.from(discovered)
+}
+
+async function invalidateContinuityLineage(env: Env, continuity_id: string, status: "REVOKED" | "EXPIRED", reason: string, invalidated_at = new Date().toISOString()) {
+  const ids = await collectContinuityDescendants(env, continuity_id)
+  if (ids.length === 0) return
+  const placeholders = ids.map((_, index) => `?${index + 1}`).join(",")
+  await env.DB.prepare(`UPDATE continuity_registry SET status=?${ids.length + 1}, revoked_at=COALESCE(revoked_at, ?${ids.length + 2}) WHERE continuity_id IN (${placeholders}) AND status IN ('ACTIVE','RESERVED','EXECUTED','CONSUMED')`).bind(...ids, status, invalidated_at).run()
+  await env.DB.prepare(`UPDATE authority_registry SET status='REVOKED' WHERE continuity_id IN (${placeholders}) AND status IN ('ACTIVE','VALIDATED','RESERVED','EXECUTED')`).bind(...ids).run()
+  await env.DB.prepare(`UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=?${ids.length + 1} WHERE continuity_id IN (${placeholders}) AND status='VALID'`).bind(...ids, reason).run()
+  await env.DB.prepare(`UPDATE invocation_registry SET status='REVOKED' WHERE continuity_id IN (${placeholders}) AND status='RESERVED'`).bind(...ids).run()
+}
+
+async function cascadeRevocation(env: Env, continuity_id: string, revoked_at = new Date().toISOString()) {
+  await invalidateContinuityLineage(env, continuity_id, "REVOKED", "continuity_revoked", revoked_at)
+}
+
+async function cascadeExpiration(env: Env, continuity_id: string, expired_at = new Date().toISOString()) {
+  await invalidateContinuityLineage(env, continuity_id, "EXPIRED", "continuity_expired", expired_at)
 async function collectContinuityDescendants(env: Env, continuity_id: string): Promise<string[]> {
   const descendants: string[] = []
   const visited = new Set<string>([continuity_id])
@@ -241,6 +274,86 @@ async function cascadeSessionRevocation(env: Env, session_id: string) {
 
 async function activeContinuity(env: Env, continuity_id: string, session: any, decision_id?: string): Promise<any | null> {
   if (!continuity_id || !session) return null
+  const now = new Date().toISOString()
+  const visited = new Set<string>()
+  const ancestry: any[] = []
+  let requestedContinuity: any = null
+  let requestedCanonical: any = null
+  let current_id = continuity_id
+
+  while (current_id) {
+    if (visited.has(current_id)) {
+      await cascadeRevocation(env, continuity_id)
+      return null
+    }
+    visited.add(current_id)
+
+    const continuity = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(current_id).first<any>()
+    if (!continuity) {
+      await cascadeRevocation(env, continuity_id)
+      return null
+    }
+    if (String(continuity.status || "") !== "ACTIVE") {
+      await cascadeRevocation(env, current_id)
+      return null
+    }
+    if (isExpired(String(continuity.expires_at || ""))) {
+      await cascadeExpiration(env, current_id, now)
+      return null
+    }
+    if (String(continuity.session_id || "") !== String(session.session_id || "")) return null
+    if (String(continuity.identity_id || "") !== String(session.identity_id || "")) return null
+
+    let canonical: any
+    try { canonical = JSON.parse(String(continuity.canonical_continuity || "{}")) } catch { return null }
+    const actualHash = await continuityHash(canonical)
+    if (actualHash !== String(continuity.continuity_hash || "") || actualHash !== String(canonical.continuity_hash || "")) return null
+    if (String(canonical.continuity_id || "") !== String(continuity.continuity_id || "")) return null
+    const canonicalParent = canonical.parent_continuity_id ? String(canonical.parent_continuity_id) : ""
+    const storedParent = continuity.parent_continuity_id ? String(continuity.parent_continuity_id) : ""
+    if (canonicalParent !== storedParent) return null
+    if (canonicalParent === current_id) {
+      await cascadeRevocation(env, continuity_id)
+      return null
+    }
+    if (current_id === continuity_id) {
+      requestedContinuity = continuity
+      requestedCanonical = canonical
+      if (decision_id && !Array.isArray(canonical.authority_chain)) return null
+      if (decision_id && !canonical.authority_chain.map(String).includes(String(decision_id))) return null
+    }
+
+    ancestry.push({
+      continuity_id: String(continuity.continuity_id || ""),
+      parent_continuity_id: storedParent || null,
+      continuity_hash: String(continuity.continuity_hash || ""),
+      identity_id: String(continuity.identity_id || ""),
+      session_id: String(continuity.session_id || ""),
+      status: String(continuity.status || ""),
+      issued_at: String(continuity.issued_at || ""),
+      expires_at: String(continuity.expires_at || "")
+    })
+if (ancestry.length > SYSTEM_MAX_CONTINUITY_DEPTH) {
+  await cascadeRevocation(env, continuity_id)
+  return null
+}
+
+const configuredMaxDepth =
+  Number(canonical?.constraints?.max_depth)
+
+if (
+  Number.isFinite(configuredMaxDepth)
+  && configuredMaxDepth >= 0
+  && ancestry.length > configuredMaxDepth
+) {
+  await cascadeRevocation(env, continuity_id)
+  return null
+}    
+current_id = canonicalParent
+  }
+
+  const root = ancestry[ancestry.length - 1]
+  if (!root || root.parent_continuity_id || !requestedContinuity || !requestedCanonical) return null
   const requestedContinuity = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(continuity_id).first<any>()
   if (!requestedContinuity) return null
   const continuity = requestedContinuity
@@ -426,6 +539,77 @@ export default {
       const issued_at = String(b.issued_at || new Date().toISOString())
       const expires_at = String(b.expires_at || session.expires_at)
       if (isExpired(expires_at)) return rejectWithTelemetry(env, { status: "NULL", reason: "expired_continuity" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id }, drift_class: "authority_drift" })
+      const parent_continuity_id = b.parent_continuity_id ? String(b.parent_continuity_id) : ""
+      if (parent_continuity_id === continuity_id) return rejectWithTelemetry(env, { status: "NULL", reason: "continuity_cycle_detected" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id, parent_continuity_id }, drift_class: "authority_drift" })
+if (parent_continuity_id) {
+  const parent = await activeContinuity(env, parent_continuity_id, session)
+
+  if (!parent) {
+    return rejectWithTelemetry(
+      env,
+      { status: "NULL", reason: "invalid_parent_continuity" },
+      {
+        event_type: "VALIDATION_REJECTED",
+        severity: "HIGH",
+        payload: {
+          route: "/continuity",
+          session_id,
+          continuity_id,
+          parent_continuity_id,
+          indicator: "orphaned_continuity_prevented"
+        },
+        drift_class: "authority_drift"
+      }
+    )
+  }
+
+  const prospectiveDepth = parent.ancestry.length + 1
+
+  if (prospectiveDepth > SYSTEM_MAX_CONTINUITY_DEPTH) {
+    return rejectWithTelemetry(
+      env,
+      { status: "NULL", reason: "continuity_depth_exceeded" },
+      {
+        event_type: "VALIDATION_REJECTED",
+        severity: "HIGH",
+        payload: {
+          route: "/continuity",
+          continuity_id,
+          parent_continuity_id,
+          prospective_depth: prospectiveDepth,
+          system_max_depth: SYSTEM_MAX_CONTINUITY_DEPTH
+        },
+        drift_class: "authority_drift"
+      }
+    )
+  }
+
+  const configuredMaxDepth =
+    Number(parent?.canonical?.constraints?.max_depth)
+
+  if (
+    Number.isFinite(configuredMaxDepth)
+    && configuredMaxDepth >= 0
+    && prospectiveDepth > configuredMaxDepth
+  ) {
+    return rejectWithTelemetry(
+      env,
+      { status: "NULL", reason: "continuity_depth_exceeded" },
+      {
+        event_type: "VALIDATION_REJECTED",
+        severity: "HIGH",
+        payload: {
+          route: "/continuity",
+          continuity_id,
+          parent_continuity_id,
+          prospective_depth: prospectiveDepth,
+          configured_max_depth: configuredMaxDepth
+        },
+        drift_class: "authority_drift"
+      }
+    )
+  }
+}
       const parent_continuity_id = String(b.parent_continuity_id || "")
       const requestedScope =
         isPlainRecord(b.scope)
@@ -530,6 +714,16 @@ export default {
         const aeoHasHash = await hasColumn(env, "aeo_registry", "validated_object_hash")
         if (!aeoHasHash) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "schema_incompatible_aeo_registry" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "CRITICAL", payload: { route: "/compile" }, drift_class: "registry_drift" })
 
+        const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
+        if (!authority) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
+        if (!["ACTIVE", "VALIDATED", "RESERVED"].includes(String(authority.status || ""))) {
+          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_unusable" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+        }
+        const session = await activeSession(env, String(authority.session_id || ""))
+        if (!session) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
+        const continuity = await activeContinuity(env, String(authority.continuity_id || ""), session, decision_id)
+        if (!continuity) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", continuity_id: authority.continuity_id || null }, drift_class: "authority_drift" })
+
         const existingAeos = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(decision_id).all<any>()
         const existingRows = Array.isArray(existingAeos?.results) ? existingAeos.results : []
         if (existingRows.length > 0) {
@@ -546,15 +740,6 @@ export default {
           return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, canonical_aeo: canonicalAeo })
         }
 
-        const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
-        if (!authority) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
-        if (!["ACTIVE", "VALIDATED", "RESERVED"].includes(String(authority.status || ""))) {
-          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_unusable" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
-        }
-        const session = await activeSession(env, String(authority.session_id || ""))
-        if (!session) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
-        const continuity = await activeContinuity(env, String(authority.continuity_id || ""), session, decision_id)
-        if (!continuity) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", continuity_id: authority.continuity_id || null }, drift_class: "authority_drift" })
         const constraints = JSON.parse(String(authority.constraints || "{}"))
         const target = canonicalDeployTarget(constraints)
         if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
@@ -660,28 +845,22 @@ export default {
       let execution: any = null
       let session: any = null
       let authority: any = null
+      let validation: any = null
       let proofInserted = 0
       let authorityConsumed = 0
       try {
-        const proofBoundary = await env.DB.batch<any>([
+        const proofReads = await env.DB.batch<any>([
           env.DB.prepare(`SELECT * FROM execution_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 AND status='EXECUTED'`).bind(execution_id,decision_id,validated_object_hash),
           env.DB.prepare(`SELECT * FROM session_registry WHERE session_id=?1 AND continuity_status='ACTIVE' AND expires_at>?2`).bind(session_id,created_at),
           env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id),
-          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at)
-            SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13
-            FROM authority_registry a JOIN session_registry s ON s.session_id=a.session_id JOIN continuity_registry c ON c.continuity_id=a.continuity_id
-            WHERE a.decision_id=?4 AND a.session_id=?2 AND a.status='EXECUTED' AND c.status='ACTIVE' AND c.expires_at>?13
-              AND EXISTS (SELECT 1 FROM execution_registry WHERE execution_id=?3 AND decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='EXECUTED')
-              AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,JSON.stringify({ session_id, continuity_id: "runtime-bound", execution_id, decision_id, validated_object_hash }),JSON.stringify({ session_id, continuity_id: "runtime-bound", execution_id, decision_id, validated_object_hash }),String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),created_at),
-          env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND session_id=?2 AND status='EXECUTED' AND EXISTS (SELECT 1 FROM proof_registry WHERE proof_id=?3 AND decision_id=?1 AND validated_object_hash=?4)`).bind(decision_id,session_id,proof_id,validated_object_hash)
+          env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND session_id=?3 AND status='VALID' AND result='VALID' ORDER BY created_at DESC LIMIT 1`).bind(decision_id,validated_object_hash,session_id)
         ])
-        execution = proofBoundary[0]?.results?.[0] || null
-        session = proofBoundary[1]?.results?.[0] || null
-        authority = proofBoundary[2]?.results?.[0] || null
-        proofInserted = proofBoundary[3]?.meta?.changes || 0
-        authorityConsumed = proofBoundary[4]?.meta?.changes || 0
+        execution = proofReads[0]?.results?.[0] || null
+        session = proofReads[1]?.results?.[0] || null
+        authority = proofReads[2]?.results?.[0] || null
+        validation = proofReads[3]?.results?.[0] || null
       } catch {
-        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
+        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_read_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash }, drift_class: "proof_drift" })
       }
       if (!execution) {
         const executionById = await env.DB.prepare(`SELECT * FROM execution_registry WHERE execution_id=?1`).bind(execution_id).first<any>()
@@ -692,6 +871,50 @@ export default {
       if (String(execution.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", expected_session_id: execution.session_id, provided_session_id: session_id }, drift_class: "proof_drift" })
       if (!authority || String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority?.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority?.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       if (String(authority.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_session_id: authority.session_id, provided_session_id: session_id }, drift_class: "authority_drift" })
+      if (String(authority.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: authority.continuity_id, provided_continuity_id: execution.continuity_id }, drift_class: "proof_drift" })
+      if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
+      const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
+      if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
+      const authorityLineage = canonicalize({
+        identity_id: String(authority.identity_id || ""),
+        session_id,
+        continuity_id: String(execution.continuity_id || ""),
+        continuity_ancestry: continuity.ancestry || [],
+        authority_id: String(authority.authority_id || ""),
+        decision_id,
+        validated_object_hash,
+        validation_id: String(validation.validation_id || ""),
+        validation_status: String(validation.status || "")
+      })
+      const executionLineage = canonicalize({
+        identity_id: String(authority.identity_id || ""),
+        session_id,
+        continuity_id: String(execution.continuity_id || ""),
+        continuity_ancestry: continuity.ancestry || [],
+        authority_id: String(authority.authority_id || ""),
+        decision_id,
+        execution_id,
+        validated_object_hash,
+        invocation_nonce: String(execution.invocation_nonce || ""),
+        execution_status: String(execution.status || "")
+      })
+      try {
+        const proofBoundary = await env.DB.batch<any>([
+          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at)
+            SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13
+            FROM authority_registry a JOIN session_registry s ON s.session_id=a.session_id JOIN continuity_registry c ON c.continuity_id=a.continuity_id
+            WHERE a.decision_id=?4 AND a.session_id=?2 AND a.status='EXECUTED' AND c.status='ACTIVE' AND c.expires_at>?13
+              AND a.continuity_id=?14
+              AND EXISTS (SELECT 1 FROM execution_registry WHERE execution_id=?3 AND decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='EXECUTED')
+              AND EXISTS (SELECT 1 FROM validation_registry WHERE decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='VALID' AND result='VALID')
+              AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),created_at,String(execution.continuity_id || "")),
+          env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND session_id=?2 AND status='EXECUTED' AND continuity_id=?5 AND EXISTS (SELECT 1 FROM proof_registry WHERE proof_id=?3 AND decision_id=?1 AND validated_object_hash=?4)`).bind(decision_id,session_id,proof_id,validated_object_hash,String(execution.continuity_id || ""))
+        ])
+        proofInserted = proofBoundary[0]?.meta?.changes || 0
+        authorityConsumed = proofBoundary[1]?.meta?.changes || 0
+      } catch {
+        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
+      }
       if (proofInserted !== 1 || authorityConsumed !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_consumption_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", proof_inserted: proofInserted, authority_consumed: authorityConsumed }, drift_class: "authority_drift" })
       await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash } })
       await emitTelemetry(env, { event_type: "AUTHORITY_CONSUMED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", authority_status: "CONSUMED" } })

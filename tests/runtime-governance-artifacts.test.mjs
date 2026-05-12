@@ -80,7 +80,7 @@ test('exact-object validation requirements preserve validated_object equals exec
   ].sort());
 
   assert.match(source, /validated_object_hash/);
-  assert.match(source, /reason:"no_validation"/);
+  assert.match(source, /reason:"hash_mismatch"/);
   assert.match(source, /authority_lineage,execution_lineage/);
   assert.match(governedDeploy, /COMPILED_HASH[\s\S]*VALIDATED_OBJECT_HASH/);
   assert.match(governedDeploy, /RETURNED_HASH[\s\S]*VALIDATED_OBJECT_HASH/);

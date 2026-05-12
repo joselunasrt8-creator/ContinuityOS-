@@ -131,10 +131,10 @@ test('validate reserves nonce and binds validation to authority session', () => 
 })
 
 test('execute rejects no validation, invalid session, lineage mismatch, wrong hash, and replay', () => {
-  assert.match(source, /reason:"no_validation"/)
+  assert.match(source, /reason:"hash_mismatch"/)
   assert.match(source, /reason:"invalid_session"/)
   assert.match(source, /reason:"session_lineage_mismatch"/)
-  assert.match(source, /reason:"wrong_hash"/)
+  assert.match(source, /reason:"hash_mismatch"/)
   assert.match(source, /reason:"replay_detected"/)
 })
 

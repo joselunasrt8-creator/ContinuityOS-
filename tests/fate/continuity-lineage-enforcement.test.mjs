@@ -30,6 +30,37 @@ test('active continuity validates identity, session, status, expiry, and hash co
     /String\(continuity\.status \|\| ""\) !== "ACTIVE"[\s\S]*cascadeRevocation/,
     'inactive continuity must fail closed and trigger revocation cascade',
   )
+test('recursive continuity depth enforcement fails closed', () => {
+  assert.match(
+    source,
+    /SYSTEM_MAX_CONTINUITY_DEPTH/,
+    'system continuity depth ceiling must exist',
+  )
+
+  assert.match(
+    source,
+    /ancestry\.length > SYSTEM_MAX_CONTINUITY_DEPTH/,
+    'ancestry traversal must fail closed on system depth overflow',
+  )
+
+  assert.match(
+    source,
+    /Number\.isFinite\(configuredMaxDepth\)/,
+    'configured continuity max_depth must be validated',
+  )
+
+  assert.match(
+    source,
+    /ancestry\.length > configuredMaxDepth/,
+    'configured continuity max_depth overflow must fail closed',
+  )
+
+  assert.match(
+    source,
+    /cascadeRevocation\(env, continuity_id\)/,
+    'depth overflow must revoke recursive continuity lineage',
+  )
+})
 
   assert.match(
     source,
@@ -138,6 +169,7 @@ test('execution and proof preserve continuity lineage', () => {
 test('revocation propagates through continuity, authority, validation, and invocation state', () => {
   assert.match(
     source,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status=\?\$\{ids\.length \+ 1\}/,
     /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status='REVOKED'/,
     'continuity revocation must mark continuity records revoked',
   )
@@ -150,6 +182,7 @@ test('revocation propagates through continuity, authority, validation, and invoc
 
   assert.match(
     source,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=\?\$\{ids\.length \+ 1\}/,
     /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked'/,
     'continuity revocation must invalidate dependent validations',
   )

@@ -13,8 +13,8 @@ test('authority lifecycle reserves before execution and consumes after execution
 
   assert.match(
     source,
-    /UPDATE authority_registry SET status='CONSUMED'[\s\S]*WHERE decision_id=\?1[\s\S]*status IN \('RESERVED','VALIDATED'\)/,
-    'runtime must consume only RESERVED or VALIDATED authority after execution',
+    /UPDATE authority_registry SET status='CONSUMED'[\s\S]*WHERE decision_id=\?1[\s\S]*status='EXECUTED'/,
+    'runtime must consume only EXECUTED authority after proof persistence',
   )
 
   assert.match(

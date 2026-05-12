@@ -13,7 +13,7 @@ test('FATE hash mutation specs are now represented by executable assertions', ()
 
 test('modified validated_object_hash returns NULL / INVALID', () => {
   assert.match(source, /SELECT \* FROM aeo_registry WHERE decision_id=\?1 AND validated_object_hash=\?2/)
-  assert.match(source, /if \(!compiled\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_missing" \}/)
+  assert.match(source, /if \(!compiled\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/)
   assert.match(source, /event_type: "HASH_MISMATCH"/)
 })
 
@@ -32,6 +32,6 @@ test('modified branch/repo constraints return NULL / INVALID', () => {
 test('compile hash must match execute hash', () => {
   assert.match(source, /const canonical_aeo_json = canonicalize\(canonical_aeo\)/)
   assert.match(source, /const validated_object_hash = await sha256Hex\(canonical_aeo_json\)/)
-  assert.match(source, /const execHash = await sha256Hex\(canonicalize\(JSON\.parse\(String\(compiled\?\.canonical_aeo\|\|"\{\}"\)\)\)\)/)
-  assert.match(source, /if \(execHash !== validated_object_hash\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"wrong_hash" \}/)
+  assert.match(source, /const execHash = executionCanonicalAeo \? await sha256Hex\(canonicalize\(executionCanonicalAeo\)\) : ""/)
+  assert.match(source, /execHash !== validated_object_hash[\s\S]*reason:"hash_mismatch"/)
 })

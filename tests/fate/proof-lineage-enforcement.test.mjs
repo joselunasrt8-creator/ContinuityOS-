@@ -27,13 +27,13 @@ test('proof creation requires matching execution lineage', () => {
 
   assert.match(
     source,
-    /if \(!execution\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_execution" \}/,
+    /if \(!execution\)[\s\S]*reason:"execution_missing"/,
     'orphaned proof without matching execution must return NULL / INVALID',
   )
 
   assert.match(
     source,
-    /drift_class: "proof_drift"[\s\S]*indicator: "orphaned_proof_attempt"/,
+    /drift_class: "proof_drift"[\s\S]*indicator: "proof_without_execute"/,
     'orphaned proof attempt must be classified as proof_drift',
   )
 })
@@ -41,19 +41,19 @@ test('proof creation requires matching execution lineage', () => {
 test('proof creation binds authority and execution lineage into persisted proof', () => {
   assert.match(
     source,
-    /const authorityLineage = JSON\.stringify\(\{[\s\S]*authority_id:[\s\S]*decision_id:[\s\S]*continuity_id:[\s\S]*identity_id:/,
+    /const authorityLineage = canonicalize\(\{[\s\S]*identity_id:[\s\S]*session_id,[\s\S]*continuity_id:[\s\S]*continuity_ancestry:[\s\S]*authority_id:/,
     'proof must construct authority lineage evidence',
   )
 
   assert.match(
     source,
-    /const executionLineage = JSON\.stringify\(\{[\s\S]*execution_id:[\s\S]*decision_id:[\s\S]*validated_object_hash:[\s\S]*continuity_id:/,
+    /const executionLineage = canonicalize\(\{[\s\S]*identity_id:[\s\S]*session_id,[\s\S]*continuity_id:[\s\S]*continuity_ancestry:[\s\S]*execution_id,/,
     'proof must construct execution lineage evidence',
   )
 
   assert.match(
     source,
-    /INSERT INTO proof_registry[\s\S]*authority_lineage,execution_lineage[\s\S]*authorityLineage, executionLineage/,
+    /INSERT INTO proof_registry[\s\S]*authority_lineage,execution_lineage[\s\S]*authorityLineage,executionLineage/,
     'proof must persist authority_lineage and execution_lineage',
   )
 })
