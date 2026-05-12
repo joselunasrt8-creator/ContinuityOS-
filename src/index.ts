@@ -13,7 +13,8 @@ const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
-const GOVERNED_AUXILIARY_ROUTES = ["/preo"] as const
+const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -513,7 +514,7 @@ async function validateDeploymentProvenance(env: Env, params: {
   compiledCanonicalAeo: CanonicalAEO
   provenance: DeploymentProvenance
   execution?: any
-}): Promise<{ ok: true, preo: any, canonical_preo: any } | { ok: false, reason: string, drift_class: DriftClass, payload: Record<string, unknown> }> {
+}): Promise<{ ok: true, preo: any | null, canonical_preo: any | null } | { ok: false, reason: string, drift_class: DriftClass, payload: Record<string, unknown> }> {
   const missing = missingDeploymentProvenance(params.provenance)
   if (missing.length > 0) return { ok: false, reason: "workflow_provenance_missing", drift_class: "provenance_drift", payload: { route: params.route, missing_provenance: missing, indicator: "workflow_provenance_missing" } }
 
@@ -522,9 +523,25 @@ async function validateDeploymentProvenance(env: Env, params: {
     return { ok: false, reason: "branch_lineage_mismatch", drift_class: "branch_lineage_drift", payload: { route: params.route, expected_repository: target.repo, provided_repository: params.provenance.repository, expected_branch: target.branch, provided_branch: params.provenance.branch, indicator: "branch_lineage_mismatch" } }
   }
 
-  const preoLineage = await deploymentPreoLineage(env, params.decision_id, params.validated_object_hash, params.authority, true)
-  if (preoLineage.status !== "OK" || !preoLineage.preo || !preoLineage.canonical_preo) {
-    return { ok: false, reason: preoLineage.status, drift_class: "provenance_drift", payload: { route: params.route, policy: REQUIRE_PREO_LINEAGE, indicator: preoLineage.status } }
+  let authorityConstraints: Record<string, unknown> = {}
+  try { authorityConstraints = canonicalRecord(JSON.parse(String(params.authority.constraints || "{}"))) } catch { authorityConstraints = {} }
+  const requirePreoLineage = preoGovernanceEnabled(authorityConstraints, target)
+  const preoLineage = await deploymentPreoLineage(env, params.decision_id, params.validated_object_hash, params.authority, requirePreoLineage)
+  if (preoLineage.status !== "OK") {
+    return { ok: false, reason: preoLineage.status, drift_class: "provenance_drift", payload: { route: params.route, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage.status } }
+  }
+  if (!requirePreoLineage) {
+    if (params.execution) {
+      for (const key of Object.keys(params.provenance) as Array<keyof DeploymentProvenance>) {
+        if (String(params.execution[key] || "") !== params.provenance[key]) {
+          return { ok: false, reason: "provenance_drift", drift_class: "provenance_drift", payload: { route: params.route, field: key, expected: String(params.execution[key] || ""), provided: params.provenance[key], indicator: "execution_proof_provenance_mismatch" } }
+        }
+      }
+    }
+    return { ok: true, preo: null, canonical_preo: null }
+  }
+  if (!preoLineage.preo || !preoLineage.canonical_preo) {
+    return { ok: false, reason: "missing_preo", drift_class: "provenance_drift", payload: { route: params.route, policy: REQUIRE_PREO_LINEAGE, required: true, indicator: "missing_preo" } }
   }
 
   const canonicalPreo = preoLineage.canonical_preo as any
@@ -556,10 +573,11 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     if (url.pathname === "/health" && request.method === "GET") return json({ ok: true })
+    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
-    const governedAuxiliaryRoute = GOVERNED_AUXILIARY_ROUTES.includes(url.pathname as any)
-    const governedMutationRoute = canonicalRuntimeRoute || governedAuxiliaryRoute
+    const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
@@ -573,7 +591,7 @@ export default {
 
     try {
     if (request.method === "POST" && !canonicalRuntimeRoute) {
-      if (!governedAuxiliaryRoute) {
+      if (!governanceEvidenceRoute) {
         await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
         return json({ status: "NULL", reason: "not_found" }, 404)
       }

@@ -3,167 +3,398 @@
   "version": "2026-05-11.runtime-governance-v1",
   "status": "NON_OPERATIVE_GOVERNANCE_ARTIFACT",
   "canonical_invariant": "If no valid object exists -> nothing happens.",
-  "canonical_runtime_route": ["/authority", "/compile", "/validate", "/execute", "/proof"],
+  "canonical_runtime_route": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
   "scope": "Repository-local enumeration only; this artifact does not deploy, merge, or mutate production.",
   "surfaces": [
     {
       "surface_id": "github_governed_deploy_workflow",
       "path": ".github/workflows/governed-deploy.yml",
       "surface_type": "github_actions_workflow",
-      "capabilities": ["workflow_dispatch", "runtime_execute_call", "proof_persistence_call"],
+      "capabilities": [
+        "workflow_dispatch",
+        "runtime_execute_call",
+        "proof_persistence_call"
+      ],
       "state_changing": true,
       "target": "github governed production deploy",
       "risk_class": "P3",
       "authority_model": "explicit workflow_dispatch inputs bound to worker validation",
-      "required_route": ["/authority", "/compile", "/validate", "/execute", "/proof"],
-      "exact_object_controls": ["validated_object_hash input must equal compile output", "execute request must use validated_object_hash and invocation_nonce accepted by /validate", "proof request must bind execution_id, decision_id, validated_object_hash, workflow, run_id, and commit_sha"],
-      "replay_controls": ["invocation_nonce single use", "replay execute probe must return NULL/INVALID", "authority consumed only after proof persistence"],
-      "proof_controls": ["proof endpoint required after execution", "proof_id required", "commit_sha/run_id/workflow/environment persisted"],
-      "bypass_implications": ["manual dispatch remains possible but must fail closed without valid object inputs", "no direct wrangler deploy command observed in workflow"]
+      "required_route": [
+        "/session",
+        "/continuity",
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof"
+      ],
+      "exact_object_controls": [
+        "validated_object_hash input must equal compile output",
+        "execute request must use validated_object_hash and invocation_nonce accepted by /validate",
+        "proof request must bind execution_id, decision_id, validated_object_hash, workflow, run_id, and commit_sha"
+      ],
+      "replay_controls": [
+        "invocation_nonce single use",
+        "replay execute probe must return NULL/INVALID",
+        "authority consumed only after proof persistence"
+      ],
+      "proof_controls": [
+        "proof endpoint required after execution",
+        "proof_id required",
+        "commit_sha/run_id/workflow/environment persisted"
+      ],
+      "bypass_implications": [
+        "manual dispatch remains possible but must fail closed without valid object inputs",
+        "no direct wrangler deploy command observed in workflow"
+      ]
     },
     {
       "surface_id": "github_prepare_governed_deploy_workflow",
       "path": ".github/workflows/prepare-governed-deploy.yml",
       "surface_type": "github_actions_workflow",
-      "capabilities": ["workflow_dispatch", "authority_preparation", "compile_preparation"],
+      "capabilities": [
+        "workflow_dispatch",
+        "authority_preparation",
+        "compile_preparation"
+      ],
       "state_changing": true,
       "target": "authority/session/continuity preparation",
       "risk_class": "P2",
-      "required_route": ["/session", "/continuity", "/authority", "/compile"],
-      "prohibited_calls": ["/execute", "/proof", "wrangler deploy"],
-      "exact_object_controls": ["outputs must be treated as proposal artifacts until validation/execution", "must not collapse proposal into execution"],
-      "replay_controls": ["generated invocation_nonce must be single-use downstream"],
-      "proof_controls": ["no production proof expected because this workflow must not execute"],
-      "bypass_implications": ["manual prepare-to-deploy handoff is execution-adjacent and must remain non-executing"]
+      "required_route": [
+        "/session",
+        "/continuity",
+        "/authority",
+        "/compile"
+      ],
+      "prohibited_calls": [
+        "/execute",
+        "/proof",
+        "wrangler deploy"
+      ],
+      "exact_object_controls": [
+        "outputs must be treated as proposal artifacts until validation/execution",
+        "must not collapse proposal into execution"
+      ],
+      "replay_controls": [
+        "generated invocation_nonce must be single-use downstream"
+      ],
+      "proof_controls": [
+        "no production proof expected because this workflow must not execute"
+      ],
+      "bypass_implications": [
+        "manual prepare-to-deploy handoff is execution-adjacent and must remain non-executing"
+      ]
     },
     {
       "surface_id": "github_merge_governance_check_workflow",
       "path": ".github/workflows/merge-governance-check.yml",
       "surface_type": "github_actions_workflow",
-      "capabilities": ["pull_request", "PREO_candidate_generation", "SCO_candidate_generation"],
+      "capabilities": [
+        "pull_request",
+        "PREO_candidate_generation",
+        "SCO_candidate_generation"
+      ],
       "state_changing": false,
       "target": "PR governance classification",
       "risk_class": "P2",
-      "required_route": ["proposal", "structure", "validation"],
-      "prohibited_calls": ["/execute", "/proof", "wrangler deploy", "git push"],
-      "exact_object_controls": ["changed_files and governed_files must bind to current PR head SHA"],
-      "replay_controls": ["candidate objects bind to PR number and head_sha"],
-      "proof_controls": ["artifact upload only; no production proof"],
-      "bypass_implications": ["can hide future bypass if governed path patterns are incomplete"]
+      "required_route": [
+        "proposal",
+        "structure",
+        "validation"
+      ],
+      "prohibited_calls": [
+        "/execute",
+        "/proof",
+        "wrangler deploy",
+        "git push"
+      ],
+      "exact_object_controls": [
+        "changed_files and governed_files must bind to current PR head SHA"
+      ],
+      "replay_controls": [
+        "candidate objects bind to PR number and head_sha"
+      ],
+      "proof_controls": [
+        "artifact upload only; no production proof"
+      ],
+      "bypass_implications": [
+        "can hide future bypass if governed path patterns are incomplete"
+      ]
     },
     {
       "surface_id": "github_preo_candidate_workflow",
       "path": ".github/workflows/preo-candidate.yml",
       "surface_type": "github_actions_workflow",
-      "capabilities": ["pull_request", "PREO_candidate_generation"],
+      "capabilities": [
+        "pull_request",
+        "PREO_candidate_generation"
+      ],
       "state_changing": false,
       "target": "PR review object generation",
       "risk_class": "P1",
-      "required_route": ["proposal", "structure", "validation"],
-      "prohibited_calls": ["/execute", "/proof", "wrangler deploy", "git push"],
-      "exact_object_controls": ["PREO candidate must bind to PR head_sha"],
-      "replay_controls": ["candidate identity includes PR number and head_sha"],
-      "proof_controls": ["artifact upload only; no production proof"],
-      "bypass_implications": ["review-only surface; not sufficient for execution authority"]
+      "required_route": [
+        "proposal",
+        "structure",
+        "validation"
+      ],
+      "prohibited_calls": [
+        "/execute",
+        "/proof",
+        "wrangler deploy",
+        "git push"
+      ],
+      "exact_object_controls": [
+        "PREO candidate must bind to PR head_sha"
+      ],
+      "replay_controls": [
+        "candidate identity includes PR number and head_sha"
+      ],
+      "proof_controls": [
+        "artifact upload only; no production proof"
+      ],
+      "bypass_implications": [
+        "review-only surface; not sufficient for execution authority"
+      ],
+      "classification": "governance_evidence_only_non_executable"
     },
     {
       "surface_id": "github_sco_candidate_workflow",
       "path": ".github/workflows/sco-candidate.yml",
       "surface_type": "github_actions_workflow",
-      "capabilities": ["pull_request", "SCO_candidate_generation"],
+      "capabilities": [
+        "pull_request",
+        "SCO_candidate_generation"
+      ],
       "state_changing": false,
       "target": "source-change object generation",
       "risk_class": "P1",
-      "required_route": ["proposal", "structure", "validation"],
-      "prohibited_calls": ["/execute", "/proof", "wrangler deploy", "git push"],
-      "exact_object_controls": ["SCO candidate must bind changed/governed files to PR head_sha"],
-      "replay_controls": ["candidate identity includes PR number and head_sha"],
-      "proof_controls": ["artifact upload only; no production proof"],
-      "bypass_implications": ["classification gaps may leave governed mutations unmarked"]
+      "required_route": [
+        "proposal",
+        "structure",
+        "validation"
+      ],
+      "prohibited_calls": [
+        "/execute",
+        "/proof",
+        "wrangler deploy",
+        "git push"
+      ],
+      "exact_object_controls": [
+        "SCO candidate must bind changed/governed files to PR head_sha"
+      ],
+      "replay_controls": [
+        "candidate identity includes PR number and head_sha"
+      ],
+      "proof_controls": [
+        "artifact upload only; no production proof"
+      ],
+      "bypass_implications": [
+        "classification gaps may leave governed mutations unmarked"
+      ]
     },
     {
       "surface_id": "cloudflare_worker_runtime_router",
       "path": "src/index.ts",
       "surface_type": "cloudflare_worker_fetch_handler",
-      "capabilities": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof", "D1 registry writes"],
+      "capabilities": [
+        "/session",
+        "/continuity",
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof",
+        "D1 registry writes"
+      ],
       "state_changing": true,
       "target": "canonical runtime boundary",
       "risk_class": "P3",
-      "required_route": ["/authority", "/compile", "/validate", "/execute", "/proof"],
-      "exact_object_controls": ["canonicalized AEO hash persisted before validation", "execute requires matching VALID validation row", "proof lineage must equal execution lineage"],
-      "replay_controls": ["invocation_registry status transitions", "authority status transitions ACTIVE/RESERVED/EXECUTED/CONSUMED", "duplicate proof uniqueness"],
-      "proof_controls": ["proof_registry insert is required", "authority consumption conditioned on proof row existence"],
-      "bypass_implications": ["all raw D1 writes must stay inside canonical route handlers or lifecycle revocation helpers"]
+      "required_route": [
+        "/session",
+        "/continuity",
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof"
+      ],
+      "exact_object_controls": [
+        "canonicalized AEO hash persisted before validation",
+        "execute requires matching VALID validation row",
+        "proof lineage must equal execution lineage"
+      ],
+      "replay_controls": [
+        "invocation_registry status transitions",
+        "authority status transitions ACTIVE/RESERVED/EXECUTED/CONSUMED",
+        "duplicate proof uniqueness"
+      ],
+      "proof_controls": [
+        "proof_registry insert is required",
+        "authority consumption conditioned on proof row existence"
+      ],
+      "bypass_implications": [
+        "all raw D1 writes must stay inside canonical route handlers or lifecycle revocation helpers"
+      ]
     },
     {
       "surface_id": "d1_schema_and_migrations",
       "path": "schema.sql and migrations/*.sql",
       "surface_type": "database_schema_migration",
-      "capabilities": ["CREATE TABLE", "ALTER TABLE", "INSERT INTO", "UPDATE", "DELETE FROM", "UNIQUE constraints"],
+      "capabilities": [
+        "CREATE TABLE",
+        "ALTER TABLE",
+        "INSERT INTO",
+        "UPDATE",
+        "DELETE FROM",
+        "UNIQUE constraints"
+      ],
       "state_changing": true,
       "target": "Cloudflare D1 registry schema/history",
       "risk_class": "P2",
-      "required_route": ["PR governance", "SCO", "migration review", "non-production validation before production apply"],
-      "exact_object_controls": ["registry schema must preserve validated_object_hash, execution_id, proof_id, lineage fields"],
-      "replay_controls": ["unique constraints for invocation/proof replay prevention must not be weakened"],
-      "proof_controls": ["proof_registry and archive schema must remain proof-capable"],
-      "bypass_implications": ["wrangler d1 migrations apply against production would be a raw DB mutation bypass unless governed separately"]
+      "required_route": [
+        "PR governance",
+        "SCO",
+        "migration review",
+        "non-production validation before production apply"
+      ],
+      "exact_object_controls": [
+        "registry schema must preserve validated_object_hash, execution_id, proof_id, lineage fields"
+      ],
+      "replay_controls": [
+        "unique constraints for invocation/proof replay prevention must not be weakened"
+      ],
+      "proof_controls": [
+        "proof_registry and archive schema must remain proof-capable"
+      ],
+      "bypass_implications": [
+        "wrangler d1 migrations apply against production would be a raw DB mutation bypass unless governed separately"
+      ]
     },
     {
       "surface_id": "package_manager_scripts",
       "path": "package.json",
       "surface_type": "npm_scripts",
-      "capabilities": ["dev worker", "local D1 migrations", "test", "disabled deploy script"],
+      "capabilities": [
+        "dev worker",
+        "local D1 migrations",
+        "test",
+        "disabled deploy script"
+      ],
       "state_changing": true,
       "target": "local development and convenience commands",
       "risk_class": "P1",
-      "required_route": ["local only unless promoted through governed deploy"],
-      "exact_object_controls": ["deploy script must remain disabled or route to governed workflow"],
-      "replay_controls": ["none for local dev; production must not rely on npm deploy"],
-      "proof_controls": ["none for local dev"],
-      "bypass_implications": ["npm run deploy must not become a direct deploy path"]
+      "required_route": [
+        "local only unless promoted through governed deploy"
+      ],
+      "exact_object_controls": [
+        "deploy script must remain disabled or route to governed workflow"
+      ],
+      "replay_controls": [
+        "none for local dev; production must not rely on npm deploy"
+      ],
+      "proof_controls": [
+        "none for local dev"
+      ],
+      "bypass_implications": [
+        "npm run deploy must not become a direct deploy path"
+      ]
     },
     {
       "surface_id": "wrangler_configuration",
       "path": "wrangler.toml",
       "surface_type": "deployment_configuration",
-      "capabilities": ["worker main binding", "D1 database binding"],
+      "capabilities": [
+        "worker main binding",
+        "D1 database binding"
+      ],
       "state_changing": false,
       "target": "Cloudflare Worker and D1 production binding metadata",
       "risk_class": "P2",
-      "required_route": ["PR governance", "SCO for mutations"],
-      "exact_object_controls": ["main must remain canonical runtime entrypoint src/index.ts"],
-      "replay_controls": ["configuration changes must not introduce alternate execution identity"],
-      "proof_controls": ["production deploy proof must identify workflow and commit_sha"],
-      "bypass_implications": ["changing main/database binding can redirect execution outside canonical runtime"]
+      "required_route": [
+        "PR governance",
+        "SCO for mutations"
+      ],
+      "exact_object_controls": [
+        "main must remain canonical runtime entrypoint src/index.ts"
+      ],
+      "replay_controls": [
+        "configuration changes must not introduce alternate execution identity"
+      ],
+      "proof_controls": [
+        "production deploy proof must identify workflow and commit_sha"
+      ],
+      "bypass_implications": [
+        "changing main/database binding can redirect execution outside canonical runtime"
+      ]
     },
     {
       "surface_id": "legacy_demo_entrypoints",
       "path": "server.js, gateway.js, worker.js, registry.js, compile-decision.js, Dockerfile, mindshift_bundle_generator.sh",
       "surface_type": "legacy_or_demo_runtime_scripts",
-      "capabilities": ["node runtime", "legacy validation", "static AEO generation", "container CMD", "bundle generation"],
+      "capabilities": [
+        "node runtime",
+        "legacy validation",
+        "static AEO generation",
+        "container CMD",
+        "bundle generation"
+      ],
       "state_changing": true,
       "target": "legacy/demo surfaces quarantined or non-production",
       "risk_class": "P2",
-      "required_route": ["quarantine", "demo-only", "no production authority"],
-      "exact_object_controls": ["must not be accepted as production execution proof", "must not write production registry"],
-      "replay_controls": ["demo static objects must not be reusable as authority"],
-      "proof_controls": ["no production proof accepted from these paths"],
-      "bypass_implications": ["Dockerfile points at disabled server.js; registry.js and compile-decision.js remain hidden demo execution paths if invoked manually"]
+      "required_route": [
+        "quarantine",
+        "demo-only",
+        "no production authority"
+      ],
+      "exact_object_controls": [
+        "must not be accepted as production execution proof",
+        "must not write production registry"
+      ],
+      "replay_controls": [
+        "demo static objects must not be reusable as authority"
+      ],
+      "proof_controls": [
+        "no production proof accepted from these paths"
+      ],
+      "bypass_implications": [
+        "Dockerfile points at disabled server.js; registry.js and compile-decision.js remain hidden demo execution paths if invoked manually"
+      ]
     },
     {
       "surface_id": "static_demo_webhook_objects",
       "path": "decision.json and aeo.json",
       "surface_type": "static_demo_object",
-      "capabilities": ["transfer_webhook intent", "static validation payload"],
+      "capabilities": [
+        "transfer_webhook intent",
+        "static validation payload"
+      ],
       "state_changing": false,
       "target": "demo-only webhook mutation representation",
       "risk_class": "P1",
-      "required_route": ["demo quarantine", "must be recompiled/validated through runtime before any execution"],
-      "exact_object_controls": ["static object must not bypass compile/validate"],
-      "replay_controls": ["static demo decision_id/signature are not production replay authority"],
-      "proof_controls": ["no proof implication unless converted to canonical runtime object"],
-      "bypass_implications": ["webhook mutation path exists as demo data and must remain non-operative"]
+      "required_route": [
+        "demo quarantine",
+        "must be recompiled/validated through runtime before any execution"
+      ],
+      "exact_object_controls": [
+        "static object must not bypass compile/validate"
+      ],
+      "replay_controls": [
+        "static demo decision_id/signature are not production replay authority"
+      ],
+      "proof_controls": [
+        "no proof implication unless converted to canonical runtime object"
+      ],
+      "bypass_implications": [
+        "webhook mutation path exists as demo data and must remain non-operative"
+      ]
     }
   ]
 }

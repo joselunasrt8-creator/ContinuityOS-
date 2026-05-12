@@ -7,6 +7,7 @@
   "core_invariant": "If no valid object exists -> nothing happens",
   "canonical_runtime_chain": [
     "/session",
+    "/continuity",
     "/authority",
     "/compile",
     "/validate",
@@ -59,6 +60,12 @@
       "method": "POST",
       "line": 205,
       "role": "identity_session_continuity"
+    },
+    {
+      "path": "/continuity",
+      "method": "POST",
+      "line": 636,
+      "role": "continuity_registry_create"
     },
     {
       "path": "/authority",

@@ -42,7 +42,43 @@
         "VALID exact AEO",
         "replay protection",
         "proof capture"
+      ],
+      "canonical_executable_routes": [
+        "/session",
+        "/continuity",
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof"
+      ],
+      "excluded_non_executable_routes": [
+        "/preo",
+        "/reconcile"
       ]
+    }
+  ],
+  "canonical_executable_routes": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "governance_evidence_routes": [
+    {
+      "path": "/preo",
+      "classification": "governance_evidence_only_non_executable",
+      "authoritative_for_execution": false
+    }
+  ],
+  "observability_only_routes": [
+    {
+      "path": "/reconcile",
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "authoritative_for_execution": false
     }
   ]
 }
