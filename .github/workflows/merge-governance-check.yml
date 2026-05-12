@@ -190,7 +190,8 @@ jobs:
           for file in \
             governance/runtime/PREO_REQUIREMENTS.json \
             governance/runtime/SCO_REQUIREMENTS.json \
-            governance/runtime/MERGE_GOVERNANCE_RULES.json
+            governance/runtime/MERGE_GOVERNANCE_RULES.json \
+            governance/runtime/BRANCH_PROTECTION_POLICY.json
           do
             if [ ! -f "$file" ]; then
               echo "NULL — missing merge governance artifact: $file"
@@ -201,15 +202,35 @@ jobs:
 
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          import { readFileSync } from 'node:fs';
+          import { readdirSync, readFileSync } from 'node:fs';
+          import { join } from 'node:path';
 
           const merge = JSON.parse(readFileSync('governance/runtime/MERGE_GOVERNANCE_RULES.json', 'utf8'));
+          const branch = JSON.parse(readFileSync('governance/runtime/BRANCH_PROTECTION_POLICY.json', 'utf8'));
           const rules = merge.rules.join('\n');
 
+          function emittedCheckNames() {
+            return new Set(
+              readdirSync('.github/workflows')
+                .filter((file) => file.endsWith('.yml'))
+                .flatMap((file) => {
+                  const source = readFileSync(join('.github/workflows', file), 'utf8');
+                  const jobsBlock = source.match(/^jobs:\s*$([\s\S]*)/m)?.[1] ?? '';
+                  return [...jobsBlock.matchAll(/^  ([A-Za-z0-9_-]+):\s*$/gm)].map((match) => match[1]);
+                }),
+            );
+          }
+
           assert.ok(rules.includes('No PREO -> no governed merge'), 'merge rules must require PREO');
+          assert.ok(rules.includes('No PREO_VALID -> no merge legitimacy'), 'merge rules must require PREO_VALID legitimacy');
           assert.ok(rules.includes('Governance/runtime mutation -> requires SCO'), 'merge rules must require SCO');
           assert.ok(Array.isArray(merge.required_proof_fields), 'merge proof requirements must be declared');
           assert.ok(merge.required_proof_fields.includes('merge_commit_sha'), 'merge proof must require merge_commit_sha');
+
+          const emitted = emittedCheckNames();
+          const required = branch.required_controls.required_status_checks;
+          const missing = required.filter((checkName) => !emitted.has(checkName));
+          assert.deepEqual(missing, [], `required branch protection checks must be emitted workflow jobs: ${missing.join(', ')}`);
           NODE
 
       - name: Upload merge governance candidates

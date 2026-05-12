@@ -3,7 +3,7 @@
   "purpose": "Define required repository branch protection controls before Stage 4 enforcement activation.",
   "status": "policy_only_non_enforcing",
   "target_branch": "main",
-  "core_invariant": "No passing governance boundary -> no merge legitimacy",
+  "core_invariant": "No PREO_VALID -> no merge legitimacy",
   "required_controls": {
     "require_pull_request_before_merge": true,
     "require_approvals": true,
@@ -12,8 +12,8 @@
     "require_status_checks": true,
     "required_status_checks": [
       "merge-governance-check",
-      "preo-candidate",
-      "sco-candidate"
+      "generate-preo-candidate",
+      "generate-sco-candidate"
     ],
     "require_branch_up_to_date_before_merge": true,
     "restrict_direct_push_to_main": true,
@@ -27,9 +27,11 @@
     "future_exception_process": "Requires explicit governance policy artifact and audit logging."
   },
   "merge_legitimacy_requirements": [
-    "PREO_CANDIDATE generated",
+    "PREO_VALID generated for exact head_sha",
     "SCO_CANDIDATE generated when governed paths changed",
     "merge-governance-check passing",
+    "generate-preo-candidate passing",
+    "generate-sco-candidate passing",
     "required status checks passing",
     "branch synchronized with main"
   ],
@@ -37,11 +39,40 @@
     "direct push to main",
     "force push to main",
     "merge without required checks",
+    "merge with nonexistent required checks",
     "governed mutation without SCO visibility",
-    "merge legitimacy without PREO visibility"
+    "merge legitimacy without PREO_VALID visibility"
   ],
   "enforcement_classification": {
     "current": "advisory",
     "target": "branch_protected_enforcement"
+  },
+  "emitted_check_inventory": [
+    {
+      "workflow_file": ".github/workflows/merge-governance-check.yml",
+      "workflow_name": "merge-governance-check",
+      "job_name": "merge-governance-check",
+      "emitted_check_run_name": "merge-governance-check",
+      "required_check": "merge-governance-check"
+    },
+    {
+      "workflow_file": ".github/workflows/preo-candidate.yml",
+      "workflow_name": "preo-candidate",
+      "job_name": "generate-preo-candidate",
+      "emitted_check_run_name": "generate-preo-candidate",
+      "required_check": "generate-preo-candidate"
+    },
+    {
+      "workflow_file": ".github/workflows/sco-candidate.yml",
+      "workflow_name": "sco-candidate",
+      "job_name": "generate-sco-candidate",
+      "emitted_check_run_name": "generate-sco-candidate",
+      "required_check": "generate-sco-candidate"
+    }
+  ],
+  "governance_drift_policy": {
+    "required_check_without_emitted_job": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "fail_closed": true,
+    "rationale": "Branch protection requirements must bind to emitted GitHub Actions job check-run names; unresolved required checks create governance drift and cannot produce merge legitimacy."
   }
 }

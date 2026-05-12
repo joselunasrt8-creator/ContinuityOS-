@@ -20,6 +20,12 @@
     "PREO must bind to exact PR head_sha",
     "PREO must enumerate changed files",
     "PREO must classify source-control mutation risk",
-    "PREO cannot be reused for a different PR or head_sha"
-  ]
+    "PREO cannot be reused for a different PR or head_sha",
+    "No PREO_VALID -> no merge legitimacy",
+    "PREO_VALID requires all branch protection required_status_checks to resolve to emitted GitHub Actions job check-run names",
+    "Unresolved required_status_checks are governance drift and force PREO invalid with merge legitimacy NULL"
+  ],
+  "validation_outcomes": {
+    "required_check_drift": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+  }
 }
