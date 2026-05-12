@@ -463,10 +463,75 @@ export default {
       if (isExpired(expires_at)) return rejectWithTelemetry(env, { status: "NULL", reason: "expired_continuity" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id }, drift_class: "authority_drift" })
       const parent_continuity_id = b.parent_continuity_id ? String(b.parent_continuity_id) : ""
       if (parent_continuity_id === continuity_id) return rejectWithTelemetry(env, { status: "NULL", reason: "continuity_cycle_detected" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id, parent_continuity_id }, drift_class: "authority_drift" })
-      if (parent_continuity_id) {
-        const parent = await activeContinuity(env, parent_continuity_id, session)
-        if (!parent) return rejectWithTelemetry(env, { status: "NULL", reason: "invalid_parent_continuity" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id, parent_continuity_id, indicator: "orphaned_continuity_prevented" }, drift_class: "authority_drift" })
+if (parent_continuity_id) {
+  const parent = await activeContinuity(env, parent_continuity_id, session)
+
+  if (!parent) {
+    return rejectWithTelemetry(
+      env,
+      { status: "NULL", reason: "invalid_parent_continuity" },
+      {
+        event_type: "VALIDATION_REJECTED",
+        severity: "HIGH",
+        payload: {
+          route: "/continuity",
+          session_id,
+          continuity_id,
+          parent_continuity_id,
+          indicator: "orphaned_continuity_prevented"
+        },
+        drift_class: "authority_drift"
       }
+    )
+  }
+
+  const prospectiveDepth = parent.ancestry.length + 1
+
+  if (prospectiveDepth > SYSTEM_MAX_CONTINUITY_DEPTH) {
+    return rejectWithTelemetry(
+      env,
+      { status: "NULL", reason: "continuity_depth_exceeded" },
+      {
+        event_type: "VALIDATION_REJECTED",
+        severity: "HIGH",
+        payload: {
+          route: "/continuity",
+          continuity_id,
+          parent_continuity_id,
+          prospective_depth: prospectiveDepth,
+          system_max_depth: SYSTEM_MAX_CONTINUITY_DEPTH
+        },
+        drift_class: "authority_drift"
+      }
+    )
+  }
+
+  const configuredMaxDepth =
+    Number(parent?.canonical?.constraints?.max_depth)
+
+  if (
+    Number.isFinite(configuredMaxDepth)
+    && configuredMaxDepth >= 0
+    && prospectiveDepth > configuredMaxDepth
+  ) {
+    return rejectWithTelemetry(
+      env,
+      { status: "NULL", reason: "continuity_depth_exceeded" },
+      {
+        event_type: "VALIDATION_REJECTED",
+        severity: "HIGH",
+        payload: {
+          route: "/continuity",
+          continuity_id,
+          parent_continuity_id,
+          prospective_depth: prospectiveDepth,
+          configured_max_depth: configuredMaxDepth
+        },
+        drift_class: "authority_drift"
+      }
+    )
+  }
+}
       const material: any = continuityHashMaterial({
         continuity_id,
         identity_id: String(session.identity_id || ""),
