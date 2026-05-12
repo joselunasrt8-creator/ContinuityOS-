@@ -11,6 +11,7 @@ type CanonicalAEO = {
 const REQUIRED_AEO_KEYS = ["intent", "scope", "validation", "target", "finality"] as const
 const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const SESSION_TTL_MS = 3600_000
+const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -198,11 +199,37 @@ async function continuityHash(input: any): Promise<string> {
   return sha256Hex(canonicalize(continuityHashMaterial(input)))
 }
 
+async function collectContinuityDescendants(env: Env, continuity_id: string): Promise<string[]> {
+  const descendants: string[] = []
+  const visited = new Set<string>([continuity_id])
+  const pending = [continuity_id]
+  while (pending.length) {
+    const parent_id = pending.shift() || ""
+    const children = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE parent_continuity_id=?1`).bind(parent_id).all<any>()
+    const rows = Array.isArray(children?.results) ? children.results : []
+    for (const child of rows) {
+      const child_id = String(child?.continuity_id || "")
+      if (!child_id || visited.has(child_id)) continue
+      visited.add(child_id)
+      descendants.push(child_id)
+      pending.push(child_id)
+    }
+  }
+  return descendants
+}
+
+async function invalidateContinuityLineage(env: Env, continuity_ids: string[], revoked_at = new Date().toISOString()) {
+  for (const lineage_id of continuity_ids) {
+    await env.DB.prepare(`UPDATE continuity_registry SET status='REVOKED', revoked_at=COALESCE(revoked_at, ?2) WHERE continuity_id=?1 AND status='ACTIVE'`).bind(lineage_id, revoked_at).run()
+    await env.DB.prepare(`UPDATE authority_registry SET status='REVOKED' WHERE continuity_id=?1 AND status IN ('ACTIVE','VALIDATED','RESERVED')`).bind(lineage_id).run()
+    await env.DB.prepare(`UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked' WHERE continuity_id=?1 AND status='VALID'`).bind(lineage_id).run()
+    await env.DB.prepare(`UPDATE invocation_registry SET status='REVOKED' WHERE continuity_id=?1 AND status='RESERVED'`).bind(lineage_id).run()
+  }
+}
+
 async function cascadeRevocation(env: Env, continuity_id: string, revoked_at = new Date().toISOString()) {
-  await env.DB.prepare(`UPDATE continuity_registry SET status='REVOKED', revoked_at=COALESCE(revoked_at, ?2) WHERE (continuity_id=?1 OR parent_continuity_id=?1) AND status='ACTIVE'`).bind(continuity_id, revoked_at).run()
-  await env.DB.prepare(`UPDATE authority_registry SET status='REVOKED' WHERE continuity_id IN (SELECT continuity_id FROM continuity_registry WHERE continuity_id=?1 OR parent_continuity_id=?1) AND status IN ('ACTIVE','VALIDATED','RESERVED')`).bind(continuity_id).run()
-  await env.DB.prepare(`UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked' WHERE continuity_id IN (SELECT continuity_id FROM continuity_registry WHERE continuity_id=?1 OR parent_continuity_id=?1) AND status='VALID'`).bind(continuity_id).run()
-  await env.DB.prepare(`UPDATE invocation_registry SET status='REVOKED' WHERE continuity_id IN (SELECT continuity_id FROM continuity_registry WHERE continuity_id=?1 OR parent_continuity_id=?1) AND status='RESERVED'`).bind(continuity_id).run()
+  const descendants = await collectContinuityDescendants(env, continuity_id)
+  await invalidateContinuityLineage(env, [continuity_id, ...descendants], revoked_at)
 }
 
 async function cascadeSessionRevocation(env: Env, session_id: string) {
@@ -214,23 +241,54 @@ async function cascadeSessionRevocation(env: Env, session_id: string) {
 
 async function activeContinuity(env: Env, continuity_id: string, session: any, decision_id?: string): Promise<any | null> {
   if (!continuity_id || !session) return null
-  const continuity = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(continuity_id).first<any>()
-  if (!continuity) return null
+  const requestedContinuity = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(continuity_id).first<any>()
+  if (!requestedContinuity) return null
+  const continuity = requestedContinuity
   if (String(continuity.status || "") !== "ACTIVE") { await cascadeRevocation(env, continuity_id); return null }
   if (isExpired(String(continuity.expires_at || ""))) { await cascadeRevocation(env, continuity_id); return null }
   if (String(continuity.session_id || "") !== String(session.session_id || "")) return null
   if (String(continuity.identity_id || "") !== String(session.identity_id || "")) return null
-  let canonical: any
-  try { canonical = JSON.parse(String(continuity.canonical_continuity || "{}")) } catch { return null }
+  let requestedCanonical: any
+  try { requestedCanonical = JSON.parse(String(continuity.canonical_continuity || "{}")) } catch { return null }
+  const canonical = requestedCanonical
   const actualHash = await continuityHash(canonical)
   if (actualHash !== String(continuity.continuity_hash || "") || actualHash !== String(canonical.continuity_hash || "")) return null
-  if (decision_id && !Array.isArray(canonical.authority_chain)) return null
-  if (decision_id && !canonical.authority_chain.map(String).includes(String(decision_id))) return null
-  if (canonical.parent_continuity_id) {
-    const parent = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1 AND status='ACTIVE' AND expires_at>?2`).bind(String(canonical.parent_continuity_id), new Date().toISOString()).first<any>()
-    if (!parent || String(parent.identity_id || "") !== String(session.identity_id || "")) return null
+  if (decision_id && !Array.isArray(requestedCanonical.authority_chain)) return null
+  if (decision_id && !requestedCanonical.authority_chain.map(String).includes(String(decision_id))) return null
+
+  const configuredMaxDepth = Number(requestedCanonical?.constraints?.max_depth)
+  const ancestry: any[] = []
+  const visited = new Set<string>([continuity_id])
+  let current_id = requestedCanonical.parent_continuity_id ? String(requestedCanonical.parent_continuity_id) : ""
+  while (current_id) {
+    if (visited.has(current_id)) { await cascadeRevocation(env, continuity_id); return null }
+    visited.add(current_id)
+    const ancestor = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(current_id).first<any>()
+    if (!ancestor) { await cascadeRevocation(env, continuity_id); return null }
+    if (String(ancestor.status || "") !== "ACTIVE") { await cascadeRevocation(env, continuity_id); return null }
+    if (isExpired(String(ancestor.expires_at || ""))) { await cascadeRevocation(env, continuity_id); return null }
+    if (String(ancestor.session_id || "") !== String(session.session_id || "")) { await cascadeRevocation(env, continuity_id); return null }
+    if (String(ancestor.identity_id || "") !== String(session.identity_id || "")) { await cascadeRevocation(env, continuity_id); return null }
+    let ancestorCanonical: any
+    try { ancestorCanonical = JSON.parse(String(ancestor.canonical_continuity || "{}")) } catch { await cascadeRevocation(env, continuity_id); return null }
+    const ancestorHash = await continuityHash(ancestorCanonical)
+    if (ancestorHash !== String(ancestor.continuity_hash || "") || ancestorHash !== String(ancestorCanonical.continuity_hash || "")) { await cascadeRevocation(env, continuity_id); return null }
+    ancestry.push({ ...ancestor, canonical: ancestorCanonical })
+    if (ancestry.length > SYSTEM_MAX_CONTINUITY_DEPTH) {
+      await cascadeRevocation(env, continuity_id)
+      return null
+    }
+    if (
+      Number.isFinite(configuredMaxDepth)
+      && configuredMaxDepth >= 0
+      && ancestry.length > configuredMaxDepth
+    ) {
+      await cascadeRevocation(env, continuity_id)
+      return null
+    }
+    current_id = ancestorCanonical.parent_continuity_id ? String(ancestorCanonical.parent_continuity_id) : ""
   }
-  return { ...continuity, canonical }
+  return { ...requestedContinuity, canonical: requestedCanonical, ancestry }
 }
 
 async function quarantineHistoricalProofDuplicates(env: Env) {

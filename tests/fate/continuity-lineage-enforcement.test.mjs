@@ -50,6 +50,39 @@ test('active continuity validates identity, session, status, expiry, and hash co
   )
 })
 
+
+test('recursive continuity depth overflow fails closed', () => {
+  assert.match(
+    source,
+    /const SYSTEM_MAX_CONTINUITY_DEPTH = 32/,
+    'runtime must define a canonical continuity recursion ceiling',
+  )
+
+  assert.match(
+    source,
+    /ancestry\.push\(\{ \.\.\.ancestor, canonical: ancestorCanonical \}\)[\s\S]*if \(ancestry\.length > SYSTEM_MAX_CONTINUITY_DEPTH\) \{[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null/,
+    'system depth overflow must revoke lineage and return NULL',
+  )
+
+  assert.match(
+    source,
+    /const configuredMaxDepth = Number\(requestedCanonical\?\.constraints\?\.max_depth\)/,
+    'activeContinuity must extract canonical continuity max_depth constraints',
+  )
+
+  assert.match(
+    source,
+    /Number\.isFinite\(configuredMaxDepth\)[\s\S]*configuredMaxDepth >= 0[\s\S]*ancestry\.length > configuredMaxDepth[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null/,
+    'canonical max_depth overflow must revoke lineage and return NULL',
+  )
+
+  assert.match(
+    source,
+    /while \(current_id\)[\s\S]*visited\.has\(current_id\)[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null[\s\S]*return \{ \.\.\.requestedContinuity, canonical: requestedCanonical, ancestry \}/,
+    'recursive lineage traversal must retain cycle fail-closed behavior and only return validated ancestry',
+  )
+})
+
 test('authority issuance requires valid continuity lineage', () => {
   assert.match(
     source,
@@ -91,13 +124,13 @@ test('execution and proof preserve continuity lineage', () => {
 
   assert.match(
     source,
-    /INSERT INTO execution_registry[\s\S]*continuity_id[\s\S]*\.bind\(execution_id, authority\.session_id, decision_id, validated_object_hash, invocation_nonce, "COMPLETED", created_at, authority\.continuity_id\)/,
+    /INSERT INTO execution_registry[\s\S]*continuity_id[\s\S]*\.bind\(execution_id, authority\.session_id, decision_id, validated_object_hash, invocation_nonce, new Date\(\)\.toISOString\(\), String\(authority\.continuity_id \|\| ""\)\)/,
     'execution must persist authority continuity_id into execution lineage',
   )
 
   assert.match(
     source,
-    /INSERT INTO proof_registry[\s\S]*continuity_id,continuity_hash,identity_id,authority_lineage,execution_lineage/,
+    /INSERT INTO proof_registry[\s\S]*identity_id,session_id,continuity_id,continuity_hash[\s\S]*authority_lineage,execution_lineage/,
     'proof must persist continuity and lineage fields',
   )
 })
@@ -105,25 +138,25 @@ test('execution and proof preserve continuity lineage', () => {
 test('revocation propagates through continuity, authority, validation, and invocation state', () => {
   assert.match(
     source,
-    /async function cascadeRevocation[\s\S]*UPDATE continuity_registry SET status='REVOKED'/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status='REVOKED'/,
     'continuity revocation must mark continuity records revoked',
   )
 
   assert.match(
     source,
-    /async function cascadeRevocation[\s\S]*UPDATE authority_registry SET status='REVOKED'/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE authority_registry SET status='REVOKED'/,
     'continuity revocation must revoke dependent authorities',
   )
 
   assert.match(
     source,
-    /async function cascadeRevocation[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked'/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked'/,
     'continuity revocation must invalidate dependent validations',
   )
 
   assert.match(
     source,
-    /async function cascadeRevocation[\s\S]*UPDATE invocation_registry SET status='REVOKED'/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE invocation_registry SET status='REVOKED'/,
     'continuity revocation must revoke reserved invocations',
   )
 })
