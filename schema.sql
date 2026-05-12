@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS preo_registry (
   authority_id TEXT NOT NULL,
   continuity_id TEXT NOT NULL,
   reviewed_hash TEXT NOT NULL,
+  reviewed_tree_hash TEXT,
+  merge_commit_sha TEXT,
   canonical_preo TEXT NOT NULL,
   status TEXT NOT NULL,
   created_at TEXT NOT NULL,
@@ -79,6 +81,9 @@ CREATE TABLE IF NOT EXISTS preo_registry (
 
 CREATE INDEX IF NOT EXISTS idx_preo_registry_decision_hash
   ON preo_registry (decision_id, reviewed_hash);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_preo_registry_lineage_unique
+  ON preo_registry (decision_id, reviewed_hash, reviewed_tree_hash, merge_commit_sha);
 
 CREATE TABLE IF NOT EXISTS validation_registry (
   validation_id TEXT PRIMARY KEY,
@@ -106,11 +111,22 @@ CREATE TABLE IF NOT EXISTS execution_registry (
   invocation_nonce TEXT NOT NULL,
   status TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  UNIQUE(decision_id, validated_object_hash)
+  repository TEXT,
+  branch TEXT,
+  pull_request_id TEXT,
+  merge_commit_sha TEXT,
+  source_tree_hash TEXT,
+  workflow_run_id TEXT,
+  workflow_sha TEXT,
+  UNIQUE(decision_id, validated_object_hash),
+  UNIQUE(workflow_run_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_hash
   ON execution_registry (decision_id, validated_object_hash);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_registry_workflow_run_unique
+  ON execution_registry (workflow_run_id);
 
 CREATE TABLE IF NOT EXISTS proof_registry (
   proof_id TEXT PRIMARY KEY,
@@ -129,11 +145,25 @@ CREATE TABLE IF NOT EXISTS proof_registry (
   workflow TEXT,
   environment TEXT,
   created_at TEXT NOT NULL,
-  UNIQUE(decision_id, validated_object_hash)
+  repository TEXT,
+  branch TEXT,
+  pull_request_id TEXT,
+  merge_commit_sha TEXT,
+  source_tree_hash TEXT,
+  workflow_run_id TEXT,
+  workflow_sha TEXT,
+  UNIQUE(decision_id, validated_object_hash),
+  UNIQUE(workflow_run_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash
   ON proof_registry (execution_id, decision_id, validated_object_hash);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique
+  ON proof_registry (workflow_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_proof_registry_provenance
+  ON proof_registry (repository, branch, pull_request_id, merge_commit_sha, workflow_run_id);
 
 CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (
   archive_id TEXT PRIMARY KEY,
