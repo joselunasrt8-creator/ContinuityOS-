@@ -9,7 +9,10 @@
     "SCO must bind exact governed files",
     "Merge proof must persist merge_commit_sha",
     "Protected branch required for governed merges",
-    "Direct push to governed branches is a bypass path"
+    "Direct push to governed branches is a bypass path",
+    "No PREO_VALID -> no merge legitimacy",
+    "Required branch protection checks must resolve to emitted GitHub Actions job check-run names",
+    "Governance drift -> PREO invalid -> merge legitimacy NULL"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -27,5 +30,10 @@
     "admin_bypass",
     "force_push",
     "branch_protection_disabled"
+  ],
+  "required_status_checks": [
+    "merge-governance-check",
+    "generate-preo-candidate",
+    "generate-sco-candidate"
   ]
 }
