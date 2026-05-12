@@ -13,9 +13,8 @@ const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
-const GOVERNED_AUXILIARY_ROUTES = ["/preo", "/reconcile"] as const
+const GOVERNED_AUXILIARY_ROUTES = ["/preo"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
-const RECONCILIATION_TRAVERSAL_ORDER = ["proof_registry", "execution_registry", "validation_registry", "aeo_registry", "authority_registry", "continuity_registry", "session_registry"] as const
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   session_registry: ["session_id", "identity_id", "owner", "trust_tier", "continuity_status", "created_at", "expires_at"],
@@ -54,8 +53,6 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
   return "schema_initialization_failed"
 }
 
-type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_DRIFT"
-type DriftClass = "proof_drift" | "execution_drift" | "authority_drift" | "continuity_drift" | "hash_drift" | "preo_drift" | "replay_drift" | "provenance_drift" | "reconciliation_drift" | "registry_drift"
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
 type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift"
 
@@ -202,16 +199,6 @@ async function ensureRequiredSchemaColumns(env: Env) {
         await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${columnType(column)}`).run()
         existing.add(column)
       }
-    }
-  }
-}
-
-async function assertRequiredSchemaAvailable(env: Env) {
-  for (const [table, columns] of Object.entries(REQUIRED_SCHEMA_COLUMNS)) {
-    const existing = await tableColumns(env, table)
-    if (existing.size === 0) throw new SchemaInitializationError("missing_required_table")
-    for (const column of columns) {
-      if (!existing.has(column)) throw new SchemaInitializationError("missing_required_column")
     }
   }
 }
@@ -518,207 +505,6 @@ async function deploymentPreoLineage(env: Env, decision_id: string, validated_ob
   return { status: "OK", preo: matching, canonical_preo: canonicalPreo }
 }
 
-
-type ReconciliationDriftClass = Exclude<DriftClass, "registry_drift">
-type ReconciliationResult =
-  | { status: "VALID", reconciliation: "COMPLETE" }
-  | { status: "DRIFT", drift_class: ReconciliationDriftClass, failing_surface: string, reason: string }
-
-function parseCanonicalJson(input: unknown): any | null {
-  try {
-    const parsed = JSON.parse(String(input || "{}"))
-    return isPlainRecord(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-async function readonlyContinuityChain(env: Env, continuity_id: string, expectedSession: any, decision_id?: string): Promise<{ continuity: any, canonical: any, ancestry: any[] } | ReconciliationResult> {
-  if (!continuity_id) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "missing_continuity_id" }
-  const visited = new Set<string>()
-  const ancestry: any[] = []
-  let current_id = continuity_id
-  let requestedContinuity: any = null
-  let requestedCanonical: any = null
-
-  while (current_id) {
-    if (visited.has(current_id)) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_cycle_detected" }
-    visited.add(current_id)
-    const continuity = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(current_id).first<any>()
-    if (!continuity) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "orphan_continuity_lineage" }
-    if (String(continuity.status || "") !== "ACTIVE") return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "revoked_continuity_descendant" }
-    if (isExpired(String(continuity.expires_at || ""))) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_expired" }
-    if (String(continuity.session_id || "") !== String(expectedSession?.session_id || "")) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_session_lineage_mismatch" }
-    if (String(continuity.identity_id || "") !== String(expectedSession?.identity_id || "")) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_identity_lineage_mismatch" }
-    const canonical = parseCanonicalJson(continuity.canonical_continuity)
-    if (!canonical) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_canonical_parse_failed" }
-    const actualHash = await continuityHash(canonical)
-    if (actualHash !== String(continuity.continuity_hash || "") || actualHash !== String(canonical.continuity_hash || "")) return { status: "DRIFT", drift_class: "hash_drift", failing_surface: "continuity_registry", reason: "continuity_hash_mismatch" }
-    const canonicalParent = canonical.parent_continuity_id ? String(canonical.parent_continuity_id) : ""
-    const storedParent = continuity.parent_continuity_id ? String(continuity.parent_continuity_id) : ""
-    if (canonicalParent !== storedParent) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_parent_lineage_mismatch" }
-    if (decision_id && current_id === continuity_id && (!Array.isArray(canonical.authority_chain) || !canonical.authority_chain.map(String).includes(String(decision_id)))) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_authority_chain_mismatch" }
-    if (current_id === continuity_id) {
-      requestedContinuity = continuity
-      requestedCanonical = canonical
-    }
-    ancestry.push({ ...continuity, canonical })
-    if (ancestry.length > SYSTEM_MAX_CONTINUITY_DEPTH) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_depth_exceeded" }
-    current_id = canonicalParent
-  }
-  const root = ancestry[ancestry.length - 1]
-  if (!root || root.parent_continuity_id || !requestedContinuity || !requestedCanonical) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "continuity_registry", reason: "continuity_root_missing" }
-  return { continuity: requestedContinuity, canonical: requestedCanonical, ancestry }
-}
-
-async function reconciliationDrift(env: Env, result: Extract<ReconciliationResult, { status: "DRIFT" }>, refs: { decision_id?: string, execution_id?: string, proof_id?: string, authority_id?: string } = {}): Promise<ReconciliationResult> {
-  const payload = { route: "/reconcile", failing_surface: result.failing_surface, reason: result.reason, status: "DRIFT", reconciliation: "FAILED_CLOSED" }
-  await emitTelemetry(env, { event_type: "RECONCILIATION_DRIFT", decision_id: refs.decision_id, execution_id: refs.execution_id, proof_id: refs.proof_id, authority_id: refs.authority_id, severity: "CRITICAL", payload })
-  await recordDrift(env, { drift_class: result.drift_class, severity: "CRITICAL", decision_id: refs.decision_id, execution_id: refs.execution_id, payload, detected_by: "runtime_reconciliation_agent" })
-  return result
-}
-
-async function reconcilePreo(env: Env, params: { proof: any, execution: any, authority: any, aeo: any, continuity: any }): Promise<ReconciliationResult> {
-  const { proof, execution, authority, aeo, continuity } = params
-  const decision_id = String(proof.decision_id || "")
-  const validated_object_hash = String(proof.validated_object_hash || "")
-  const target = canonicalRecord(aeo.target)
-  const constraints = parseCanonicalJson(authority.constraints) || {}
-  const required = preoGovernanceEnabled(constraints, target)
-  if (!(await preoTableExists(env))) return required ? { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "missing_preo_lineage" } : { status: "VALID", reconciliation: "COMPLETE" }
-  const rows = await env.DB.prepare(`SELECT * FROM preo_registry WHERE decision_id=?1 ORDER BY created_at ASC, preo_id ASC`).bind(decision_id).all<any>()
-  const preos = Array.isArray(rows?.results) ? rows.results : []
-  if (required && preos.length === 0) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "missing_preo_lineage" }
-  if (preos.length === 0) return { status: "VALID", reconciliation: "COMPLETE" }
-  const matching = preos.filter((preo: any) => String(preo.reviewed_hash || "") === validated_object_hash)
-  if (matching.length !== 1) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_duplicate_or_missing_reviewed_hash" }
-  const preo = matching[0]
-  if (String(preo.authority_id || "") !== String(authority.authority_id || "")) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_authority_lineage_mismatch" }
-  if (String(preo.continuity_id || "") !== String(authority.continuity_id || "")) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_continuity_lineage_mismatch" }
-  if (String(preo.status || "") !== "PREO_VALID") return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_status_invalid" }
-  const canonicalPreo = parseCanonicalJson(preo.canonical_preo)
-  if (!canonicalPreo) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_canonical_parse_failed" }
-  if (String(canonicalPreo.reviewed_hash || "") !== validated_object_hash) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_reviewed_hash_mismatch" }
-  if (String(canonicalPreo.decision_id || "") !== decision_id || String(canonicalPreo.authority_id || "") !== String(authority.authority_id || "")) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_pull_request_lineage_mismatch" }
-  const expectedTreeHash = await sha256Hex(canonicalize({ continuity_id: String(continuity.continuity_id || ""), decision_id, execution_id: String(execution.execution_id || ""), invocation_nonce: String(execution.invocation_nonce || ""), workflow: String(proof.workflow || ""), workflow_sha: String(proof.commit_sha || "") }))
-  if (canonicalPreo.reviewed_tree_hash != null && String(canonicalPreo.reviewed_tree_hash || "") !== expectedTreeHash) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_reviewed_tree_hash_mismatch" }
-  if (canonicalPreo.execution_provenance_tree_hash != null && String(canonicalPreo.execution_provenance_tree_hash || "") !== expectedTreeHash) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_execution_tree_hash_mismatch" }
-  if (canonicalPreo.merge_commit_sha != null && String(canonicalPreo.merge_commit_sha || "") !== String(proof.commit_sha || "")) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_merge_commit_mismatch" }
-  if (canonicalPreo.workflow_sha != null && String(canonicalPreo.workflow_sha || "") !== String(proof.commit_sha || "")) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_workflow_sha_mismatch" }
-  if (isPlainRecord(canonicalPreo.pull_request) && String((canonicalPreo.pull_request as any).decision_id || decision_id) !== decision_id) return { status: "DRIFT", drift_class: "preo_drift", failing_surface: "preo_registry", reason: "preo_pull_request_lineage_mismatch" }
-  return { status: "VALID", reconciliation: "COMPLETE" }
-}
-
-async function reconcileProofLineage(env: Env, proof: any): Promise<ReconciliationResult> {
-  const proof_id = String(proof.proof_id || "")
-  const decision_id = String(proof.decision_id || "")
-  const execution_id = String(proof.execution_id || "")
-  const validated_object_hash = String(proof.validated_object_hash || "")
-  if (!proof_id || !decision_id || !execution_id || !validated_object_hash) return { status: "DRIFT", drift_class: "proof_drift", failing_surface: "proof_registry", reason: "proof_lineage_incomplete" }
-
-  const duplicateProofs = await env.DB.prepare(`SELECT COUNT(*) AS count FROM proof_registry WHERE decision_id=?1 AND validated_object_hash=?2`).bind(decision_id, validated_object_hash).first<any>()
-  if (Number(duplicateProofs?.count || 0) !== 1) return { status: "DRIFT", drift_class: "replay_drift", failing_surface: "proof_registry", reason: "duplicate_lineage_reconciliation" }
-
-  const execution = await env.DB.prepare(`SELECT * FROM execution_registry WHERE execution_id=?1`).bind(execution_id).first<any>()
-  if (!execution) return { status: "DRIFT", drift_class: "proof_drift", failing_surface: "proof_registry", reason: "orphan_proof_lineage" }
-  if (String(execution.decision_id || "") !== decision_id) return { status: "DRIFT", drift_class: "proof_drift", failing_surface: "execution_registry", reason: "proof_decision_id_mismatch" }
-  if (String(execution.validated_object_hash || "") !== validated_object_hash) return { status: "DRIFT", drift_class: "hash_drift", failing_surface: "execution_registry", reason: "proof_execution_hash_mismatch" }
-  if (String(execution.status || "") !== "EXECUTED") return { status: "DRIFT", drift_class: "execution_drift", failing_surface: "execution_registry", reason: "execution_status_invalid" }
-
-  const executions = await env.DB.prepare(`SELECT COUNT(*) AS count FROM execution_registry WHERE decision_id=?1 AND validated_object_hash=?2`).bind(decision_id, validated_object_hash).first<any>()
-  if (Number(executions?.count || 0) !== 1) return { status: "DRIFT", drift_class: "replay_drift", failing_surface: "execution_registry", reason: "execution_replay_inconsistency" }
-
-  const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND status='VALID' AND result='VALID'`).bind(decision_id, validated_object_hash, String(execution.invocation_nonce || "")).first<any>()
-  if (!validation) return { status: "DRIFT", drift_class: "execution_drift", failing_surface: "validation_registry", reason: "orphan_execution_lineage" }
-  if (String(validation.session_id || "") !== String(execution.session_id || "")) return { status: "DRIFT", drift_class: "execution_drift", failing_surface: "validation_registry", reason: "execution_session_lineage_mismatch" }
-  if (String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return { status: "DRIFT", drift_class: "execution_drift", failing_surface: "validation_registry", reason: "execution_continuity_lineage_mismatch" }
-  const invocation = await env.DB.prepare(`SELECT * FROM invocation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3`).bind(decision_id, validated_object_hash, String(execution.invocation_nonce || "")).first<any>()
-  if (!invocation || String(invocation.status || "") !== "EXECUTED") return { status: "DRIFT", drift_class: "replay_drift", failing_surface: "invocation_registry", reason: "invocation_registry_inconsistency" }
-  if (String(invocation.continuity_id || "") !== String(execution.continuity_id || "")) return { status: "DRIFT", drift_class: "replay_drift", failing_surface: "invocation_registry", reason: "invocation_continuity_lineage_mismatch" }
-
-  const compiled = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id, validated_object_hash).first<any>()
-  if (!compiled) return { status: "DRIFT", drift_class: "hash_drift", failing_surface: "aeo_registry", reason: "orphan_validation_lineage" }
-  if (String(compiled.continuity_id || "") !== String(validation.continuity_id || "")) return { status: "DRIFT", drift_class: "hash_drift", failing_surface: "aeo_registry", reason: "validation_aeo_continuity_mismatch" }
-  const parsedAeo = parseCanonicalJson(compiled.canonical_aeo)
-  const canonicalAeo = toCanonicalAeo(parsedAeo)
-  const recomputedAeoHash = canonicalAeo ? await sha256Hex(canonicalize(canonicalAeo)) : ""
-  if (!canonicalAeo || recomputedAeoHash !== validated_object_hash || recomputedAeoHash !== String(compiled.validated_object_hash || "")) return { status: "DRIFT", drift_class: "hash_drift", failing_surface: "aeo_registry", reason: "canonical_hash_recomputation_mismatch" }
-  if (String(proof.workflow || "") !== String(canonicalAeo.target.workflow || "")) return { status: "DRIFT", drift_class: "provenance_drift", failing_surface: "proof_registry", reason: "workflow_provenance_divergence" }
-
-  const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
-  if (!authority) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "authority_registry", reason: "orphan_authority_lineage" }
-  if (!["ACTIVE", "VALIDATED", "RESERVED", "EXECUTED", "CONSUMED"].includes(String(authority.status || ""))) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "authority_registry", reason: "authority_status_invalid" }
-  if (isExpired(String(authority.expiry || "")) && String(authority.status || "") !== "CONSUMED") return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "authority_registry", reason: "authority_expiry_invalid" }
-  if (String(authority.authority_id || "") !== String(compiled.authority_id || "")) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "authority_registry", reason: "aeo_authority_lineage_mismatch" }
-  if (String(authority.continuity_id || "") !== String(compiled.continuity_id || "")) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "authority_registry", reason: "authority_continuity_lineage_mismatch" }
-
-  const session = await env.DB.prepare(`SELECT * FROM session_registry WHERE session_id=?1`).bind(String(authority.session_id || "")).first<any>()
-  if (!session) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "session_registry", reason: "authority_session_missing" }
-  if (String(session.continuity_status || "") !== "ACTIVE") return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "session_registry", reason: "session_inactive" }
-  if (isExpired(String(session.expires_at || ""))) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "session_registry", reason: "session_expired" }
-  if (String(session.session_id || "") !== String(execution.session_id || "") || String(session.session_id || "") !== String(proof.session_id || "")) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "session_registry", reason: "session_lineage_mismatch" }
-  if (String(session.identity_id || "") !== String(authority.identity_id || "") || String(session.identity_id || "") !== String(proof.identity_id || "")) return { status: "DRIFT", drift_class: "authority_drift", failing_surface: "session_registry", reason: "identity_continuity_mismatch" }
-
-  const continuityResult = await readonlyContinuityChain(env, String(authority.continuity_id || ""), session, decision_id)
-  if ("status" in continuityResult && continuityResult.status === "DRIFT") return continuityResult
-  const continuityChain = continuityResult as { continuity: any, canonical: any, ancestry: any[] }
-  if (String(continuityChain.continuity.continuity_hash || "") !== String(proof.continuity_hash || "")) return { status: "DRIFT", drift_class: "continuity_drift", failing_surface: "proof_registry", reason: "proof_continuity_hash_mismatch" }
-
-  const expectedAuthorityLineage = canonicalize({
-    identity_id: String(authority.identity_id || ""),
-    session_id: String(session.session_id || ""),
-    continuity_id: String(execution.continuity_id || ""),
-    continuity_ancestry: continuityChain.ancestry || [],
-    authority_id: String(authority.authority_id || ""),
-    decision_id,
-    validated_object_hash,
-    validation_id: String(validation.validation_id || ""),
-    validation_status: String(validation.status || "")
-  })
-  const expectedExecutionLineage = canonicalize({
-    identity_id: String(authority.identity_id || ""),
-    session_id: String(session.session_id || ""),
-    continuity_id: String(execution.continuity_id || ""),
-    continuity_ancestry: continuityChain.ancestry || [],
-    authority_id: String(authority.authority_id || ""),
-    decision_id,
-    execution_id,
-    validated_object_hash,
-    invocation_nonce: String(execution.invocation_nonce || ""),
-    execution_status: String(execution.status || "")
-  })
-  if (String(proof.authority_lineage || "") !== expectedAuthorityLineage) return { status: "DRIFT", drift_class: "provenance_drift", failing_surface: "proof_registry", reason: "authority_lineage_reconciliation_mismatch" }
-  if (String(proof.execution_lineage || "") !== expectedExecutionLineage) return { status: "DRIFT", drift_class: "provenance_drift", failing_surface: "proof_registry", reason: "execution_lineage_reconciliation_mismatch" }
-
-  const preo = await reconcilePreo(env, { proof, execution, authority, aeo: canonicalAeo, continuity: continuityChain.continuity })
-  if (preo.status === "DRIFT") return preo
-  return { status: "VALID", reconciliation: "COMPLETE" }
-}
-
-async function reconcileCanonicalRuntime(env: Env, requestBody: any): Promise<ReconciliationResult> {
-  const proof_id = String(requestBody?.proof_id || "")
-  const execution_id = String(requestBody?.execution_id || "")
-  const decision_id = String(requestBody?.decision_id || "")
-  const validated_object_hash = String(requestBody?.validated_object_hash || "")
-  let query = `SELECT * FROM proof_registry`
-  const clauses: string[] = []
-  const binds: string[] = []
-  if (proof_id) { clauses.push(`proof_id=?${binds.length + 1}`); binds.push(proof_id) }
-  if (execution_id) { clauses.push(`execution_id=?${binds.length + 1}`); binds.push(execution_id) }
-  if (decision_id) { clauses.push(`decision_id=?${binds.length + 1}`); binds.push(decision_id) }
-  if (validated_object_hash) { clauses.push(`validated_object_hash=?${binds.length + 1}`); binds.push(validated_object_hash) }
-  if (clauses.length > 0) query += ` WHERE ${clauses.join(" AND ")}`
-  query += ` ORDER BY created_at ASC, proof_id ASC`
-  const read = await env.DB.prepare(query).bind(...binds).all<any>()
-  const proofs = Array.isArray(read?.results) ? read.results : []
-  if (proofs.length === 0) return { status: "DRIFT", drift_class: "proof_drift", failing_surface: "proof_registry", reason: "orphan_or_missing_proof_lineage" }
-  for (const proof of proofs) {
-    const result = await reconcileProofLineage(env, proof)
-    if (result.status === "DRIFT") return result
-  }
-  return { status: "VALID", reconciliation: "COMPLETE" }
-}
-
 async function validateDeploymentProvenance(env: Env, params: {
   route: string
   decision_id: string
@@ -780,8 +566,7 @@ export default {
     if (!hasDb(env)) return json({ status: "NULL", reason: "database_unavailable" }, 500)
 
     try {
-      if (url.pathname === "/reconcile") await assertRequiredSchemaAvailable(env)
-      else await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
+      await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
     } catch (error) {
       return json({ status: "NULL", reason: schemaDiagnosticReason(error) }, 500)
     }
@@ -792,22 +577,6 @@ export default {
         await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
         return json({ status: "NULL", reason: "not_found" }, 404)
       }
-    }
-
-
-    if (url.pathname === "/reconcile" && request.method === "POST") {
-      const b = await body(request)
-      const result = await reconcileCanonicalRuntime(env, b)
-      if (result.status === "DRIFT") {
-        return json(await reconciliationDrift(env, result, {
-          decision_id: String(b?.decision_id || ""),
-          execution_id: String(b?.execution_id || ""),
-          proof_id: String(b?.proof_id || ""),
-          authority_id: String(b?.authority_id || "")
-        }))
-      }
-      await emitTelemetry(env, { event_type: "RECONCILIATION_COMPLETE", decision_id: String(b?.decision_id || ""), execution_id: String(b?.execution_id || ""), proof_id: String(b?.proof_id || ""), severity: "INFO", payload: { route: "/reconcile", status: "VALID", reconciliation: "COMPLETE" } })
-      return json({ status: "VALID", reconciliation: "COMPLETE" })
     }
 
     if (url.pathname === "/preo" && request.method === "POST") {
@@ -839,11 +608,6 @@ export default {
         authority_id: String(authority.authority_id || ""),
         continuity_id: String(authority.continuity_id || ""),
         reviewed_hash,
-        reviewed_tree_hash: b.reviewed_tree_hash ? String(b.reviewed_tree_hash) : null,
-        execution_provenance_tree_hash: b.execution_provenance_tree_hash ? String(b.execution_provenance_tree_hash) : null,
-        merge_commit_sha: b.merge_commit_sha ? String(b.merge_commit_sha) : null,
-        workflow_sha: b.workflow_sha ? String(b.workflow_sha) : null,
-        pull_request: canonicalRecord(b.pull_request),
         reviewed_tree_hash,
         merge_commit_sha,
         pull_request_id,
