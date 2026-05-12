@@ -21,9 +21,10 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   continuity_registry: ["continuity_id", "identity_id", "session_id", "parent_continuity_id", "continuity_hash", "canonical_continuity", "status", "issued_at", "expires_at", "revoked_at"],
   authority_registry: ["authority_id", "decision_id", "session_id", "owner", "intent", "scope", "constraints", "expiry", "status", "created_at", "continuity_id", "identity_id"],
   aeo_registry: ["aeo_id", "authority_id", "decision_id", "canonical_aeo", "validated_object_hash", "status", "created_at", "continuity_id"],
+  preo_registry: ["preo_id", "decision_id", "authority_id", "continuity_id", "reviewed_hash", "reviewed_tree_hash", "merge_commit_sha", "canonical_preo", "status", "created_at"],
   validation_registry: ["validation_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "environment", "result", "reason", "status", "created_at", "continuity_id"],
-  execution_registry: ["execution_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id"],
-  proof_registry: ["proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "continuity_id", "continuity_hash", "identity_id", "authority_lineage", "execution_lineage"],
+  execution_registry: ["execution_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha"],
+  proof_registry: ["proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "continuity_id", "continuity_hash", "identity_id", "authority_lineage", "execution_lineage", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha"],
   proof_registry_duplicate_archive: ["archive_id", "proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "archived_at", "archive_reason", "canonical_proof_id"],
   invocation_registry: ["decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id"],
   observability_registry: ["event_id", "event_type", "decision_id", "authority_id", "execution_id", "proof_id", "severity", "payload", "created_at"],
@@ -53,7 +54,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift"
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -95,10 +96,36 @@ async function sha256Hex(input: string): Promise<string> { const d = await crypt
 
 function canonicalDeployTarget(input: any): { repo: string, branch: string, workflow: string } {
   return {
-    repo: String(input?.repo || ""),
+    repo: String(input?.repo || input?.repository || ""),
     branch: String(input?.branch || ""),
     workflow: String(input?.workflow || GOVERNED_WORKFLOW)
   }
+}
+
+type DeploymentProvenance = {
+  repository: string
+  branch: string
+  pull_request_id: string
+  merge_commit_sha: string
+  source_tree_hash: string
+  workflow_run_id: string
+  workflow_sha: string
+}
+
+function deploymentProvenanceFrom(input: any): DeploymentProvenance {
+  return {
+    repository: String(input?.repository || input?.repo || ""),
+    branch: String(input?.branch || ""),
+    pull_request_id: String(input?.pull_request_id || input?.pull_request_number || ""),
+    merge_commit_sha: String(input?.merge_commit_sha || input?.commit_sha || ""),
+    source_tree_hash: String(input?.source_tree_hash || ""),
+    workflow_run_id: String(input?.workflow_run_id || input?.run_id || ""),
+    workflow_sha: String(input?.workflow_sha || input?.commit_sha || "")
+  }
+}
+
+function missingDeploymentProvenance(provenance: DeploymentProvenance): string[] {
+  return Object.entries(provenance).filter(([, value]) => !value).map(([key]) => key)
 }
 
 function toCanonicalAeo(input: any): CanonicalAEO | null {
@@ -125,11 +152,15 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_authority_registry_decision_unique ON authority_registry(decision_id)`,
       `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT)`,
       `CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_hash ON aeo_registry(decision_id, validated_object_hash)`,
+      `CREATE TABLE IF NOT EXISTS preo_registry (preo_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, authority_id TEXT NOT NULL, continuity_id TEXT NOT NULL, reviewed_hash TEXT NOT NULL, reviewed_tree_hash TEXT, merge_commit_sha TEXT, canonical_preo TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(decision_id, reviewed_hash))`,
+      `CREATE INDEX IF NOT EXISTS idx_preo_registry_decision_hash ON preo_registry(decision_id, reviewed_hash)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_preo_registry_lineage_unique ON preo_registry(decision_id, reviewed_hash, reviewed_tree_hash, merge_commit_sha)`,
       `CREATE TABLE IF NOT EXISTS validation_registry (validation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, environment TEXT, result TEXT NOT NULL, reason TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT)`,
       `CREATE INDEX IF NOT EXISTS idx_validation_registry_decision_hash_nonce ON validation_registry(decision_id, validated_object_hash, invocation_nonce)`,
-      `CREATE TABLE IF NOT EXISTS execution_registry (execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, UNIQUE(decision_id, validated_object_hash), UNIQUE(continuity_id, decision_id, validated_object_hash))`,
+      `CREATE TABLE IF NOT EXISTS execution_registry (execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, repository TEXT, branch TEXT, pull_request_id TEXT, merge_commit_sha TEXT, source_tree_hash TEXT, workflow_run_id TEXT, workflow_sha TEXT, UNIQUE(decision_id, validated_object_hash), UNIQUE(continuity_id, decision_id, validated_object_hash), UNIQUE(workflow_run_id))`,
       `CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_hash ON execution_registry(decision_id, validated_object_hash)`,
-      `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, continuity_id TEXT, continuity_hash TEXT, identity_id TEXT, authority_lineage TEXT, execution_lineage TEXT, UNIQUE(decision_id, validated_object_hash))`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_registry_workflow_run_unique ON execution_registry(workflow_run_id)`,
+      `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, continuity_id TEXT, continuity_hash TEXT, identity_id TEXT, authority_lineage TEXT, execution_lineage TEXT, repository TEXT, branch TEXT, pull_request_id TEXT, merge_commit_sha TEXT, source_tree_hash TEXT, workflow_run_id TEXT, workflow_sha TEXT, UNIQUE(decision_id, validated_object_hash), UNIQUE(workflow_run_id))`,
       `CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash ON proof_registry(execution_id, decision_id, validated_object_hash)`,
       `CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (archive_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, archived_at TEXT NOT NULL, archive_reason TEXT NOT NULL, canonical_proof_id TEXT NOT NULL, UNIQUE(proof_id))`,
       `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
@@ -145,6 +176,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     if (options.stabilizeProofRegistry === false) return
     await quarantineHistoricalProofDuplicates(env)
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique ON proof_registry(workflow_run_id)`).run()
+    await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_proof_registry_provenance ON proof_registry(repository, branch, pull_request_id, merge_commit_sha, workflow_run_id)`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_registry_workflow_run_unique ON execution_registry(workflow_run_id)`).run()
   } catch (error) {
     throw new SchemaInitializationError(schemaDiagnosticReason(error), error)
   }
@@ -424,12 +458,15 @@ async function ensurePreoSchema(env: Env) {
     authority_id TEXT NOT NULL,
     continuity_id TEXT NOT NULL,
     reviewed_hash TEXT NOT NULL,
+    reviewed_tree_hash TEXT,
+    merge_commit_sha TEXT,
     canonical_preo TEXT NOT NULL,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE(decision_id, reviewed_hash)
   )`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_preo_registry_decision_hash ON preo_registry (decision_id, reviewed_hash)`).run()
+  await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_preo_registry_lineage_unique ON preo_registry(decision_id, reviewed_hash, reviewed_tree_hash, merge_commit_sha)`).run()
 }
 
 async function preoTableExists(env: Env): Promise<boolean> {
@@ -438,30 +475,83 @@ async function preoTableExists(env: Env): Promise<boolean> {
 }
 
 async function validatePreoLineage(env: Env, params: { decision_id: string, validated_object_hash: string, authority: any, required: boolean }): Promise<"OK" | "missing_preo" | "preo_hash_mismatch"> {
-  const { decision_id, validated_object_hash, authority, required } = params
+  const result = await deploymentPreoLineage(env, params.decision_id, params.validated_object_hash, params.authority, params.required)
+  return result.status
+}
+
+async function deploymentPreoLineage(env: Env, decision_id: string, validated_object_hash: string, authority: any, required = true): Promise<{ status: "OK" | "missing_preo" | "preo_hash_mismatch", preo?: any, canonical_preo?: any }> {
   if (!(await preoTableExists(env))) {
     if (required) {
       await ensurePreoSchema(env)
-      return "missing_preo"
+      return { status: "missing_preo" }
     }
-    return "OK"
+    return { status: "OK" }
   }
 
   const rows = await env.DB.prepare(`SELECT * FROM preo_registry WHERE decision_id=?1 AND status='PREO_VALID' ORDER BY created_at ASC, preo_id ASC`).bind(decision_id).all<any>()
   const preos = Array.isArray(rows?.results) ? rows.results : []
-  if (preos.length === 0) return required ? "missing_preo" : "OK"
+  if (preos.length === 0) return { status: required ? "missing_preo" : "OK" }
 
   const matching = preos.find((preo: any) => String(preo.reviewed_hash || "") === validated_object_hash)
-  if (!matching) return "preo_hash_mismatch"
-  if (String(matching.authority_id || "") !== String(authority.authority_id || "")) return "preo_hash_mismatch"
-  if (String(matching.continuity_id || "") !== String(authority.continuity_id || "")) return "preo_hash_mismatch"
+  if (!matching) return { status: "preo_hash_mismatch" }
+  if (String(matching.authority_id || "") !== String(authority.authority_id || "")) return { status: "preo_hash_mismatch" }
+  if (String(matching.continuity_id || "") !== String(authority.continuity_id || "")) return { status: "preo_hash_mismatch" }
 
   let canonicalPreo: unknown
   try { canonicalPreo = JSON.parse(String(matching.canonical_preo || "{}")) } catch { canonicalPreo = null }
-  if (!isPlainRecord(canonicalPreo) || String((canonicalPreo as any).reviewed_hash || "") !== validated_object_hash) return "preo_hash_mismatch"
-  return "OK"
+  if (!isPlainRecord(canonicalPreo) || String((canonicalPreo as any).reviewed_hash || "") !== validated_object_hash) return { status: "preo_hash_mismatch" }
+  if (String((canonicalPreo as any).reviewed_tree_hash || "") !== String(matching.reviewed_tree_hash || "")) return { status: "preo_hash_mismatch" }
+  if (String((canonicalPreo as any).merge_commit_sha || "") !== String(matching.merge_commit_sha || "")) return { status: "preo_hash_mismatch" }
+  return { status: "OK", preo: matching, canonical_preo: canonicalPreo }
 }
 
+async function validateDeploymentProvenance(env: Env, params: {
+  route: string
+  decision_id: string
+  validated_object_hash: string
+  authority: any
+  compiledCanonicalAeo: CanonicalAEO
+  provenance: DeploymentProvenance
+  execution?: any
+}): Promise<{ ok: true, preo: any, canonical_preo: any } | { ok: false, reason: string, drift_class: DriftClass, payload: Record<string, unknown> }> {
+  const missing = missingDeploymentProvenance(params.provenance)
+  if (missing.length > 0) return { ok: false, reason: "workflow_provenance_missing", drift_class: "provenance_drift", payload: { route: params.route, missing_provenance: missing, indicator: "workflow_provenance_missing" } }
+
+  const target = canonicalDeployTarget(params.compiledCanonicalAeo.target)
+  if (params.provenance.repository !== target.repo || params.provenance.branch !== target.branch) {
+    return { ok: false, reason: "branch_lineage_mismatch", drift_class: "branch_lineage_drift", payload: { route: params.route, expected_repository: target.repo, provided_repository: params.provenance.repository, expected_branch: target.branch, provided_branch: params.provenance.branch, indicator: "branch_lineage_mismatch" } }
+  }
+
+  const preoLineage = await deploymentPreoLineage(env, params.decision_id, params.validated_object_hash, params.authority, true)
+  if (preoLineage.status !== "OK" || !preoLineage.preo || !preoLineage.canonical_preo) {
+    return { ok: false, reason: preoLineage.status, drift_class: "provenance_drift", payload: { route: params.route, policy: REQUIRE_PREO_LINEAGE, indicator: preoLineage.status } }
+  }
+
+  const canonicalPreo = preoLineage.canonical_preo as any
+  const reviewedTreeHash = String(preoLineage.preo.reviewed_tree_hash || "")
+  const mergeCommitSha = String(preoLineage.preo.merge_commit_sha || "")
+  if (!reviewedTreeHash || !mergeCommitSha) return { ok: false, reason: "reviewed_provenance_missing", drift_class: "provenance_drift", payload: { route: params.route, indicator: "reviewed_provenance_missing" } }
+  if (params.provenance.source_tree_hash !== reviewedTreeHash || String(canonicalPreo.reviewed_tree_hash || "") !== reviewedTreeHash) {
+    return { ok: false, reason: "reviewed_tree_mismatch", drift_class: "workflow_source_drift", payload: { route: params.route, expected_source_tree_hash: reviewedTreeHash, provided_source_tree_hash: params.provenance.source_tree_hash, indicator: "reviewed_tree_mismatch" } }
+  }
+  if (params.provenance.merge_commit_sha !== mergeCommitSha) {
+    return { ok: false, reason: "merge_sha_mismatch", drift_class: "provenance_drift", payload: { route: params.route, expected_merge_commit_sha: mergeCommitSha, provided_merge_commit_sha: params.provenance.merge_commit_sha, indicator: "merge_sha_mismatch" } }
+  }
+  if (params.provenance.workflow_sha !== mergeCommitSha) {
+    return { ok: false, reason: "workflow_sha_mismatch", drift_class: "workflow_source_drift", payload: { route: params.route, expected_workflow_sha: mergeCommitSha, provided_workflow_sha: params.provenance.workflow_sha, indicator: "workflow_source_mismatch" } }
+  }
+  if (String(canonicalPreo.pull_request_id || "") && params.provenance.pull_request_id !== String(canonicalPreo.pull_request_id || "")) {
+    return { ok: false, reason: "pull_request_lineage_mismatch", drift_class: "branch_lineage_drift", payload: { route: params.route, expected_pull_request_id: String(canonicalPreo.pull_request_id || ""), provided_pull_request_id: params.provenance.pull_request_id, indicator: "pull_request_lineage_mismatch" } }
+  }
+  if (params.execution) {
+    for (const key of Object.keys(params.provenance) as Array<keyof DeploymentProvenance>) {
+      if (String(params.execution[key] || "") !== params.provenance[key]) {
+        return { ok: false, reason: "provenance_drift", drift_class: "provenance_drift", payload: { route: params.route, field: key, expected: String(params.execution[key] || ""), provided: params.provenance[key], indicator: "execution_proof_provenance_mismatch" } }
+      }
+    }
+  }
+  return { ok: true, preo: preoLineage.preo, canonical_preo: preoLineage.canonical_preo }
+}
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -493,8 +583,14 @@ export default {
       const b = await body(request)
       const decision_id = String(b.decision_id || "")
       const reviewed_hash = String(b.reviewed_hash || b.validated_object_hash || "")
+      const reviewed_tree_hash = String(b.reviewed_tree_hash || b.source_tree_hash || "")
+      const merge_commit_sha = String(b.merge_commit_sha || "")
+      const pull_request_id = String(b.pull_request_id || b.pull_request_number || "")
       if (!decision_id) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/preo", indicator: "missing_decision_id" }, drift_class: "registry_drift" })
       if (!reviewed_hash) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_reviewed_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/preo", indicator: "missing_reviewed_hash" }, drift_class: "hash_drift" })
+      if (!reviewed_tree_hash) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_reviewed_tree_hash" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/preo", indicator: "missing_reviewed_tree_hash" }, drift_class: "provenance_drift" })
+      if (!merge_commit_sha) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_merge_commit_sha" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/preo", indicator: "missing_merge_commit_sha" }, drift_class: "provenance_drift" })
+      if (!pull_request_id) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_pull_request_id" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/preo", indicator: "missing_pull_request_id" }, drift_class: "branch_lineage_drift" })
       if (b.validated_object_hash && String(b.validated_object_hash) !== reviewed_hash) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "preo_hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/preo", reviewed_hash, validated_object_hash: String(b.validated_object_hash), indicator: "preo_hash_mismatch" }, drift_class: "hash_drift" })
 
       const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
@@ -512,14 +608,17 @@ export default {
         authority_id: String(authority.authority_id || ""),
         continuity_id: String(authority.continuity_id || ""),
         reviewed_hash,
+        reviewed_tree_hash,
+        merge_commit_sha,
+        pull_request_id,
         evidence: canonicalRecord(b.evidence),
         status: "PREO_VALID"
       })
       const preo_id = String(b.preo_id || crypto.randomUUID())
-      const insert = await env.DB.prepare(`INSERT OR IGNORE INTO preo_registry (preo_id,decision_id,authority_id,continuity_id,reviewed_hash,canonical_preo,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,'PREO_VALID',?7)`).bind(preo_id, decision_id, String(authority.authority_id || ""), String(authority.continuity_id || ""), reviewed_hash, canonical_preo, created_at).run()
+      const insert = await env.DB.prepare(`INSERT OR IGNORE INTO preo_registry (preo_id,decision_id,authority_id,continuity_id,reviewed_hash,reviewed_tree_hash,merge_commit_sha,canonical_preo,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'PREO_VALID',?9)`).bind(preo_id, decision_id, String(authority.authority_id || ""), String(authority.continuity_id || ""), reviewed_hash, reviewed_tree_hash, merge_commit_sha, canonical_preo, created_at).run()
       if ((insert.meta?.changes || 0) === 0) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "preo_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/preo", reviewed_hash, indicator: "duplicate_preo" }, drift_class: "replay_drift" })
       await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/preo", reviewed_hash, policy: REQUIRE_PREO_LINEAGE } })
-      return json({ status: "PREO_VALID", decision_id, preo_id, reviewed_hash })
+      return json({ status: "PREO_VALID", decision_id, preo_id, reviewed_hash, reviewed_tree_hash, merge_commit_sha, pull_request_id })
     }
 
     if (url.pathname === "/session" && request.method === "POST") {
@@ -798,7 +897,7 @@ export default {
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
-      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || "")
+      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b)
       await emitTelemetry(env, { event_type: "EXECUTION_STARTED", decision_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce } })
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/execute" }, drift_class: "execution_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
@@ -825,8 +924,14 @@ export default {
       const execHash = executionCanonicalAeo ? await sha256Hex(canonicalize(executionCanonicalAeo)) : ""
       if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
+      const provenanceValidation = await validateDeploymentProvenance(env, { route: "/execute", decision_id, validated_object_hash, authority, compiledCanonicalAeo: executionCanonicalAeo, provenance })
+      if (!provenanceValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: provenanceValidation.reason }, { event_type: provenanceValidation.drift_class === "workflow_source_drift" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { ...provenanceValidation.payload, validated_object_hash }, drift_class: provenanceValidation.drift_class })
       const execution_id = crypto.randomUUID()
-      await env.DB.prepare(`INSERT INTO execution_registry (execution_id,session_id,decision_id,validated_object_hash,invocation_nonce,status,created_at,continuity_id) VALUES (?1,?2,?3,?4,?5,'EXECUTED',?6,?7)`).bind(execution_id, authority.session_id, decision_id, validated_object_hash, invocation_nonce, new Date().toISOString(), String(authority.continuity_id || "")).run()
+      try {
+        await env.DB.prepare(`INSERT INTO execution_registry (execution_id,session_id,decision_id,validated_object_hash,invocation_nonce,status,created_at,continuity_id,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha) VALUES (?1,?2,?3,?4,?5,'EXECUTED',?6,?7,?8,?9,?10,?11,?12,?13,?14)`).bind(execution_id, authority.session_id, decision_id, validated_object_hash, invocation_nonce, new Date().toISOString(), String(authority.continuity_id || ""), provenance.repository, provenance.branch, provenance.pull_request_id, provenance.merge_commit_sha, provenance.source_tree_hash, provenance.workflow_run_id, provenance.workflow_sha).run()
+      } catch {
+        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"replayed_provenance" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "HIGH", payload: { route: "/execute", workflow_run_id: provenance.workflow_run_id, indicator: "duplicate_workflow_run" }, drift_class: "replay_drift" })
+      }
       await env.DB.prepare(`UPDATE invocation_registry SET status='EXECUTED' WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3`).bind(decision_id,validated_object_hash,invocation_nonce).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='EXECUTED' WHERE decision_id=?1`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "EXECUTION_COMPLETED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce, authority_status: "EXECUTED" } })
@@ -835,6 +940,7 @@ export default {
 
     if (url.pathname === "/proof" && request.method === "POST") {
       const b = await body(request)
+      const provenance = deploymentProvenanceFrom(b)
       const execution_id = String(b.execution_id || "")
       const decision_id = String(b.decision_id || "")
       const validated_object_hash = String(b.validated_object_hash || "")
@@ -877,6 +983,14 @@ export default {
       if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
+      const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
+      let proofAeo: any
+      try { proofAeo = JSON.parse(String(compiled?.canonical_aeo || "{}")) } catch { proofAeo = null }
+      const proofCanonicalAeo = toCanonicalAeo(proofAeo)
+      const proofHash = proofCanonicalAeo ? await sha256Hex(canonicalize(proofCanonicalAeo)) : ""
+      if (!compiled || !proofCanonicalAeo || proofHash !== validated_object_hash || proofHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_hash: validated_object_hash, actual_hash: proofHash, indicator: "proof_hash_mismatch" }, drift_class: "hash_drift" })
+      const provenanceValidation = await validateDeploymentProvenance(env, { route: "/proof", decision_id, validated_object_hash, authority, compiledCanonicalAeo: proofCanonicalAeo, provenance, execution })
+      if (!provenanceValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: provenanceValidation.reason }, { event_type: provenanceValidation.drift_class === "workflow_source_drift" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { ...provenanceValidation.payload, validated_object_hash }, drift_class: provenanceValidation.drift_class })
       const authorityLineage = canonicalize({
         identity_id: String(authority.identity_id || ""),
         session_id,
@@ -885,6 +999,13 @@ export default {
         authority_id: String(authority.authority_id || ""),
         decision_id,
         validated_object_hash,
+        repository: provenance.repository,
+        branch: provenance.branch,
+        pull_request_id: provenance.pull_request_id,
+        merge_commit_sha: provenance.merge_commit_sha,
+        source_tree_hash: provenance.source_tree_hash,
+        workflow_run_id: provenance.workflow_run_id,
+        workflow_sha: provenance.workflow_sha,
         validation_id: String(validation.validation_id || ""),
         validation_status: String(validation.status || "")
       })
@@ -897,19 +1018,26 @@ export default {
         decision_id,
         execution_id,
         validated_object_hash,
+        repository: provenance.repository,
+        branch: provenance.branch,
+        pull_request_id: provenance.pull_request_id,
+        merge_commit_sha: provenance.merge_commit_sha,
+        source_tree_hash: provenance.source_tree_hash,
+        workflow_run_id: provenance.workflow_run_id,
+        workflow_sha: provenance.workflow_sha,
         invocation_nonce: String(execution.invocation_nonce || ""),
         execution_status: String(execution.status || "")
       })
       try {
         const proofBoundary = await env.DB.batch<any>([
-          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at)
-            SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13
+          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha)
+            SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?15, ?16, ?17, ?18, ?19, ?20, ?21
             FROM authority_registry a JOIN session_registry s ON s.session_id=a.session_id JOIN continuity_registry c ON c.continuity_id=a.continuity_id
             WHERE a.decision_id=?4 AND a.session_id=?2 AND a.status='EXECUTED' AND c.status='ACTIVE' AND c.expires_at>?13
               AND a.continuity_id=?14
               AND EXISTS (SELECT 1 FROM execution_registry WHERE execution_id=?3 AND decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='EXECUTED')
               AND EXISTS (SELECT 1 FROM validation_registry WHERE decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='VALID' AND result='VALID')
-              AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),String(b.run_id||""),String(b.commit_sha||""),String(b.workflow||""),String(b.environment||""),created_at,String(execution.continuity_id || "")),
+              AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),provenance.workflow_run_id,provenance.workflow_sha,String(b.workflow||GOVERNED_WORKFLOW),String(b.environment||""),created_at,String(execution.continuity_id || ""),provenance.repository,provenance.branch,provenance.pull_request_id,provenance.merge_commit_sha,provenance.source_tree_hash,provenance.workflow_run_id,provenance.workflow_sha),
           env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND session_id=?2 AND status='EXECUTED' AND continuity_id=?5 AND EXISTS (SELECT 1 FROM proof_registry WHERE proof_id=?3 AND decision_id=?1 AND validated_object_hash=?4)`).bind(decision_id,session_id,proof_id,validated_object_hash,String(execution.continuity_id || ""))
         ])
         proofInserted = proofBoundary[0]?.meta?.changes || 0
@@ -918,9 +1046,9 @@ export default {
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
       }
       if (proofInserted !== 1 || authorityConsumed !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_consumption_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", proof_inserted: proofInserted, authority_consumed: authorityConsumed }, drift_class: "authority_drift" })
-      await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash } })
+      await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, workflow_run_id: provenance.workflow_run_id } })
       await emitTelemetry(env, { event_type: "AUTHORITY_CONSUMED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", authority_status: "CONSUMED" } })
-      return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, identity_id: String(authority.identity_id || ""), session_id, continuity_id: String(authority.continuity_id || ""), execution_id, decision_id, validated_object_hash } })
+      return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, identity_id: String(authority.identity_id || ""), session_id, continuity_id: String(authority.continuity_id || ""), execution_id, decision_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, pull_request_id: provenance.pull_request_id, merge_commit_sha: provenance.merge_commit_sha, source_tree_hash: provenance.source_tree_hash, workflow_run_id: provenance.workflow_run_id, workflow_sha: provenance.workflow_sha } })
     }
 
     return json({ status: "NULL", reason: "not_found" }, 404)
