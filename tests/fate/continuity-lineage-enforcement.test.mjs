@@ -81,6 +81,39 @@ test('recursive continuity depth enforcement fails closed', () => {
   )
 })
 
+
+test('recursive continuity depth overflow fails closed', () => {
+  assert.match(
+    source,
+    /const SYSTEM_MAX_CONTINUITY_DEPTH = 32/,
+    'runtime must define a canonical continuity recursion ceiling',
+  )
+
+  assert.match(
+    source,
+    /ancestry\.push\(\{ \.\.\.ancestor, canonical: ancestorCanonical \}\)[\s\S]*if \(ancestry\.length > SYSTEM_MAX_CONTINUITY_DEPTH\) \{[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null/,
+    'system depth overflow must revoke lineage and return NULL',
+  )
+
+  assert.match(
+    source,
+    /const configuredMaxDepth = Number\(requestedCanonical\?\.constraints\?\.max_depth\)/,
+    'activeContinuity must extract canonical continuity max_depth constraints',
+  )
+
+  assert.match(
+    source,
+    /Number\.isFinite\(configuredMaxDepth\)[\s\S]*configuredMaxDepth >= 0[\s\S]*ancestry\.length > configuredMaxDepth[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null/,
+    'canonical max_depth overflow must revoke lineage and return NULL',
+  )
+
+  assert.match(
+    source,
+    /while \(current_id\)[\s\S]*visited\.has\(current_id\)[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null[\s\S]*return \{ \.\.\.requestedContinuity, canonical: requestedCanonical, ancestry \}/,
+    'recursive lineage traversal must retain cycle fail-closed behavior and only return validated ancestry',
+  )
+})
+
 test('authority issuance requires valid continuity lineage', () => {
   assert.match(
     source,
@@ -137,6 +170,7 @@ test('revocation propagates through continuity, authority, validation, and invoc
   assert.match(
     source,
     /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status=\?\$\{ids\.length \+ 1\}/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status='REVOKED'/,
     'continuity revocation must mark continuity records revoked',
   )
 
@@ -149,6 +183,7 @@ test('revocation propagates through continuity, authority, validation, and invoc
   assert.match(
     source,
     /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=\?\$\{ids\.length \+ 1\}/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked'/,
     'continuity revocation must invalidate dependent validations',
   )
 
@@ -172,5 +207,55 @@ test('continuity creation emits telemetry and invalid continuity fails closed', 
     source,
     /drift_class: "authority_drift"/,
     'continuity legitimacy failures must be classified as authority drift',
+  )
+
+  assert.match(
+    source,
+    /scope_expansion_detected/,
+    'recursive continuity scope expansion must fail closed',
+  )
+
+  assert.match(
+    source,
+    /if \(!Object\.prototype\.hasOwnProperty\.call\(parentScope, key\)\)[\s\S]*rejectWithTelemetry\([\s\S]*env,[\s\S]*\{ status: "NULL", reason: "scope_expansion_detected" \}[\s\S]*indicator: "recursive_scope_expansion_detected"/,
+    'additive child continuity scope keys must fail closed as recursive scope expansion',
+  )
+
+  assert.match(
+    source,
+    /canonicalize\(parentScope\[key\]\) !== canonicalize\(value\)[\s\S]*rejectWithTelemetry\([\s\S]*env,[\s\S]*\{ status: "NULL", reason: "scope_expansion_detected" \}[\s\S]*indicator: "recursive_scope_expansion_detected"/,
+    'conflicting inherited child continuity scope values must fail closed as recursive scope expansion',
+  )
+
+  assert.match(
+    source,
+    /payload: \{[\s\S]*route: "\/continuity",[\s\S]*continuity_id,[\s\S]*parent_continuity_id,[\s\S]*indicator: "recursive_scope_expansion_detected"[\s\S]*\},[\s\S]*drift_class: "authority_drift"/,
+    'recursive continuity scope expansion must emit required authority drift telemetry shape',
+  )
+})
+
+test('continuity scope subset semantics permit equal and narrowed scopes only', () => {
+  assert.match(
+    source,
+    /const parentScope =[\s\S]*canonicalRecord\(parent\.canonical\.scope\)[\s\S]*const childScope = canonicalRecord\(requestedScope\)/,
+    'parent and child continuity scopes must be canonicalized before subset comparison',
+  )
+
+  assert.match(
+    source,
+    /for \(const \[key, value\] of Object\.entries\(childScope\)\)[\s\S]*Object\.prototype\.hasOwnProperty\.call\(parentScope, key\)[\s\S]*canonicalize\(parentScope\[key\]\) !== canonicalize\(value\)[\s\S]*const material: any = continuityHashMaterial/,
+    'equal inherited scope keys pass through to deterministic continuity hashing',
+  )
+
+  assert.doesNotMatch(
+    source,
+    /for \(const \[key, value\] of Object\.entries\(parentScope\)\)/,
+    'narrowed child scope may omit parent keys without being rejected as expansion',
+  )
+
+  assert.match(
+    source,
+    /if \(parent_continuity_id\)[\s\S]*const parent = await activeContinuity\(env, parent_continuity_id, session\)[\s\S]*for \(const \[key, value\] of Object\.entries\(childScope\)\)/,
+    'recursive descendants are constrained by their active parent scope and cannot re-expand omitted ancestor dimensions',
   )
 })
