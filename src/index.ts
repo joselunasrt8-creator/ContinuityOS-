@@ -11,6 +11,7 @@ type CanonicalAEO = {
 const REQUIRED_AEO_KEYS = ["intent", "scope", "validation", "target", "finality"] as const
 const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const SESSION_TTL_MS = 3600_000
+const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -301,7 +302,23 @@ async function activeContinuity(env: Env, continuity_id: string, session: any, d
       issued_at: String(continuity.issued_at || ""),
       expires_at: String(continuity.expires_at || "")
     })
-    current_id = canonicalParent
+if (ancestry.length > SYSTEM_MAX_CONTINUITY_DEPTH) {
+  await cascadeRevocation(env, continuity_id)
+  return null
+}
+
+const configuredMaxDepth =
+  Number(canonical?.constraints?.max_depth)
+
+if (
+  Number.isFinite(configuredMaxDepth)
+  && configuredMaxDepth >= 0
+  && ancestry.length > configuredMaxDepth
+) {
+  await cascadeRevocation(env, continuity_id)
+  return null
+}    
+current_id = canonicalParent
   }
 
   const root = ancestry[ancestry.length - 1]
