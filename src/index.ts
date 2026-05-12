@@ -368,14 +368,70 @@ export default {
       const issued_at = String(b.issued_at || new Date().toISOString())
       const expires_at = String(b.expires_at || session.expires_at)
       if (isExpired(expires_at)) return rejectWithTelemetry(env, { status: "NULL", reason: "expired_continuity" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id }, drift_class: "authority_drift" })
+      const parent_continuity_id = String(b.parent_continuity_id || "")
+      const requestedScope =
+        isPlainRecord(b.scope)
+          ? canonicalRecord(b.scope)
+          : { environment: "production" }
+
+      if (parent_continuity_id) {
+        const parent = await activeContinuity(env, parent_continuity_id, session)
+        if (!parent) return rejectWithTelemetry(env, { status: "NULL", reason: "invalid_continuity" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/continuity", session_id, continuity_id, parent_continuity_id }, drift_class: "authority_drift" })
+        const parentScope =
+          isPlainRecord(parent?.canonical?.scope)
+            ? canonicalRecord(parent.canonical.scope)
+            : {}
+
+        for (const [key, value] of Object.entries(requestedScope)) {
+          if (!(key in parentScope)) {
+            return rejectWithTelemetry(
+              env,
+              { status: "NULL", reason: "scope_expansion_detected" },
+              {
+                event_type: "VALIDATION_REJECTED",
+                severity: "HIGH",
+                payload: {
+                  route: "/continuity",
+                  continuity_id,
+                  parent_continuity_id,
+                  violating_scope_key: key,
+                  indicator: "recursive_scope_expansion_blocked"
+                },
+                drift_class: "authority_drift"
+              }
+            )
+          }
+          if (
+            canonicalize(parentScope[key]) !== canonicalize(value)
+          ) {
+            return rejectWithTelemetry(
+              env,
+              { status: "NULL", reason: "scope_expansion_detected" },
+              {
+                event_type: "VALIDATION_REJECTED",
+                severity: "HIGH",
+                payload: {
+                  route: "/continuity",
+                  continuity_id,
+                  parent_continuity_id,
+                  violating_scope_key: key,
+                  indicator: "recursive_scope_mutation_blocked"
+                },
+                drift_class: "authority_drift"
+              }
+            )
+          }
+        }
+      }
+
       const material: any = continuityHashMaterial({
         continuity_id,
         identity_id: String(session.identity_id || ""),
         session_id,
-        parent_continuity_id: b.parent_continuity_id || null,
+        parent_continuity_id: parent_continuity_id || null,
         authority_chain: Array.isArray(b.authority_chain) ? b.authority_chain : [],
         actor_chain: Array.isArray(b.actor_chain) ? b.actor_chain : ["human", "agent"],
-        scope: b.scope || { environment: "production" },
+        scope: requestedScope,
         constraints: b.constraints || { max_depth: 3, delegation_allowed: false },
         revocation: b.revocation || { status: "ACTIVE", revoked_at: null },
         issued_at,

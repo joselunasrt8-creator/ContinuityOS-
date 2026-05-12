@@ -142,4 +142,34 @@ test('continuity creation emits telemetry and invalid continuity fails closed', 
     /drift_class: "authority_drift"/,
     'continuity legitimacy failures must be classified as authority drift',
   )
+
+  assert.match(
+    source,
+    /scope_expansion_detected/,
+    'recursive continuity scope expansion must fail closed',
+  )
+
+  assert.match(
+    source,
+    /if \(!\(key in parentScope\)\)[\s\S]*reason: "scope_expansion_detected"[\s\S]*indicator: "recursive_scope_expansion_blocked"/,
+    'additive child continuity scope keys must fail closed as recursive scope expansion',
+  )
+
+  assert.match(
+    source,
+    /canonicalize\(parentScope\[key\]\) !== canonicalize\(value\)[\s\S]*reason: "scope_expansion_detected"[\s\S]*indicator: "recursive_scope_mutation_blocked"/,
+    'inherited child continuity scope mutation must fail closed as recursive scope expansion',
+  )
+
+  assert.match(
+    source,
+    /\{ status: "NULL", reason: "scope_expansion_detected" \}/,
+    'recursive continuity scope expansion must return NULL semantics',
+  )
+
+  assert.match(
+    source,
+    /violating_scope_key: key/,
+    'recursive continuity scope rejection telemetry must identify the violating scope key',
+  )
 })
