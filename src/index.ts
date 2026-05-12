@@ -16,6 +16,20 @@ const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/com
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
+const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
+  "session_registry",
+  "continuity_registry",
+  "authority_registry",
+  "aeo_registry",
+  "validation_registry",
+  "execution_registry",
+  "proof_registry",
+  "invocation_registry",
+  "preo_registry"
+] as const
+const RECONCILIATION_MAX_RECURSION_DEPTH = SYSTEM_MAX_CONTINUITY_DEPTH
+const RECONCILIATION_ROW_LIMIT = 2
+
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   session_registry: ["session_id", "identity_id", "owner", "trust_tier", "continuity_status", "created_at", "expires_at"],
@@ -352,6 +366,300 @@ async function activeContinuity(env: Env, continuity_id: string, session: any, d
   const root = ancestry[ancestry.length - 1]
   if (!root || root.parent_continuity_id || !requestedContinuity || !requestedCanonical) return null
   return { ...requestedContinuity, canonical: requestedCanonical, ancestry }
+}
+
+type ReconciliationRegistry = typeof CANONICAL_RECONCILIATION_REGISTRY_ORDER[number]
+type ReconciliationStatus = "VALID_RECONCILIATION" | "INVALID_RECONCILIATION" | "NULL"
+type ReconciliationAnchor = {
+  session_id?: string
+  continuity_id?: string
+  decision_id?: string
+  execution_id?: string
+  proof_id?: string
+  validated_object_hash?: string
+  invocation_nonce?: string
+}
+type ReconciliationTraceEntry = {
+  registry: ReconciliationRegistry
+  canonical_traversal_position: number
+  reconciliation_depth: number
+  lookup_key: string
+  row_count: number
+  lineage_hash?: string
+}
+type ReconciliationDrift = {
+  drift_id: string
+  drift_class: DriftClass
+  lineage_anchor: string
+  registry_origin: ReconciliationRegistry
+  detected_at: string
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  deterministic_trace: ReconciliationTraceEntry[]
+}
+type ReconciliationResult = {
+  status: ReconciliationStatus
+  result: ReconciliationStatus
+  lineage_anchor: string
+  canonical_registry_ordering: readonly ReconciliationRegistry[]
+  recursion_depth: number
+  deterministic_traversal_trace: ReconciliationTraceEntry[]
+  drift_classifications: ReconciliationDrift[]
+}
+
+function reconciliationAnchorKey(anchor: ReconciliationAnchor): string {
+  return canonicalize({
+    continuity_id: String(anchor.continuity_id || ""),
+    decision_id: String(anchor.decision_id || ""),
+    execution_id: String(anchor.execution_id || ""),
+    invocation_nonce: String(anchor.invocation_nonce || ""),
+    proof_id: String(anchor.proof_id || ""),
+    session_id: String(anchor.session_id || ""),
+    validated_object_hash: String(anchor.validated_object_hash || "")
+  })
+}
+
+async function reconciliationDriftId(drift_class: DriftClass, registry: ReconciliationRegistry, lineage_anchor: string, trace: ReconciliationTraceEntry[]): Promise<string> {
+  return sha256Hex(canonicalize({ drift_class, registry, lineage_anchor, trace }))
+}
+
+async function reconciliationInvalid(
+  drift_class: DriftClass,
+  registry: ReconciliationRegistry,
+  anchor: ReconciliationAnchor,
+  trace: ReconciliationTraceEntry[],
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "HIGH"
+): Promise<ReconciliationResult> {
+  const lineage_anchor = reconciliationAnchorKey(anchor)
+  const drift: ReconciliationDrift = {
+    drift_id: await reconciliationDriftId(drift_class, registry, lineage_anchor, trace),
+    drift_class,
+    lineage_anchor,
+    registry_origin: registry,
+    detected_at: "DETERMINISTIC_RECONCILIATION_TRAVERSAL",
+    severity,
+    deterministic_trace: trace.map((entry) => ({ ...entry }))
+  }
+  return {
+    status: "INVALID_RECONCILIATION",
+    result: "NULL",
+    lineage_anchor,
+    canonical_registry_ordering: CANONICAL_RECONCILIATION_REGISTRY_ORDER,
+    recursion_depth: trace.length,
+    deterministic_traversal_trace: trace.map((entry) => ({ ...entry })),
+    drift_classifications: [drift]
+  }
+}
+
+function reconciliationValid(anchor: ReconciliationAnchor, trace: ReconciliationTraceEntry[]): ReconciliationResult {
+  return {
+    status: "VALID_RECONCILIATION",
+    result: "VALID_RECONCILIATION",
+    lineage_anchor: reconciliationAnchorKey(anchor),
+    canonical_registry_ordering: CANONICAL_RECONCILIATION_REGISTRY_ORDER,
+    recursion_depth: trace.length,
+    deterministic_traversal_trace: trace.map((entry) => ({ ...entry })),
+    drift_classifications: []
+  }
+}
+
+function reconciliationNull(anchor: ReconciliationAnchor, trace: ReconciliationTraceEntry[] = []): ReconciliationResult {
+  return {
+    status: "NULL",
+    result: "NULL",
+    lineage_anchor: reconciliationAnchorKey(anchor),
+    canonical_registry_ordering: CANONICAL_RECONCILIATION_REGISTRY_ORDER,
+    recursion_depth: trace.length,
+    deterministic_traversal_trace: trace.map((entry) => ({ ...entry })),
+    drift_classifications: []
+  }
+}
+
+function reconciliationLookup(anchor: ReconciliationAnchor, context: Record<string, any>, registry: ReconciliationRegistry): { sql: string, bind: string[], lookup_key: string } {
+  const session_id = String(context.session?.session_id || anchor.session_id || "")
+  const continuity_id = String(context.continuity?.continuity_id || anchor.continuity_id || "")
+  const decision_id = String(context.authority?.decision_id || anchor.decision_id || "")
+  const validated_object_hash = String(context.aeo?.validated_object_hash || anchor.validated_object_hash || "")
+  const execution_id = String(context.execution?.execution_id || anchor.execution_id || "")
+  const invocation_nonce = String(context.validation?.invocation_nonce || context.execution?.invocation_nonce || anchor.invocation_nonce || "")
+  const proof_id = String(anchor.proof_id || "")
+  switch (registry) {
+    case "session_registry":
+      return session_id
+        ? { sql: `SELECT * FROM session_registry WHERE session_id=?1 ORDER BY created_at ASC, session_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [session_id], lookup_key: session_id }
+        : { sql: `SELECT * FROM session_registry WHERE continuity_status='ACTIVE' ORDER BY created_at ASC, session_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [], lookup_key: "ACTIVE" }
+    case "continuity_registry":
+      return continuity_id
+        ? { sql: `SELECT * FROM continuity_registry WHERE continuity_id=?1 ORDER BY issued_at ASC, continuity_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [continuity_id], lookup_key: continuity_id }
+        : { sql: `SELECT * FROM continuity_registry WHERE session_id=?1 ORDER BY issued_at ASC, continuity_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [session_id], lookup_key: session_id }
+    case "authority_registry":
+      return decision_id
+        ? { sql: `SELECT * FROM authority_registry WHERE decision_id=?1 ORDER BY created_at ASC, authority_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id], lookup_key: decision_id }
+        : { sql: `SELECT * FROM authority_registry WHERE session_id=?1 AND continuity_id=?2 ORDER BY created_at ASC, authority_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [session_id, continuity_id], lookup_key: `${session_id}:${continuity_id}` }
+    case "aeo_registry":
+      return { sql: `SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id], lookup_key: decision_id }
+    case "validation_registry":
+      return { sql: `SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 ORDER BY created_at ASC, validation_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash], lookup_key: `${decision_id}:${validated_object_hash}` }
+    case "execution_registry":
+      return execution_id
+        ? { sql: `SELECT * FROM execution_registry WHERE execution_id=?1 ORDER BY created_at ASC, execution_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [execution_id], lookup_key: execution_id }
+        : { sql: `SELECT * FROM execution_registry WHERE decision_id=?1 AND validated_object_hash=?2 ORDER BY created_at ASC, execution_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash], lookup_key: `${decision_id}:${validated_object_hash}` }
+    case "proof_registry":
+      return proof_id
+        ? { sql: `SELECT * FROM proof_registry WHERE proof_id=?1 ORDER BY created_at ASC, proof_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [proof_id], lookup_key: proof_id }
+        : { sql: `SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [execution_id, decision_id, validated_object_hash], lookup_key: `${execution_id}:${decision_id}:${validated_object_hash}` }
+    case "invocation_registry":
+      return { sql: `SELECT * FROM invocation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 ORDER BY created_at ASC, invocation_nonce ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash, invocation_nonce], lookup_key: `${decision_id}:${validated_object_hash}:${invocation_nonce}` }
+    case "preo_registry":
+      return { sql: `SELECT * FROM preo_registry WHERE decision_id=?1 AND reviewed_hash=?2 ORDER BY created_at ASC, preo_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash], lookup_key: `${decision_id}:${validated_object_hash}` }
+  }
+}
+
+async function readReconciliationRows(env: Env, anchor: ReconciliationAnchor, context: Record<string, any>, registry: ReconciliationRegistry): Promise<{ rows: any[], lookup_key: string }> {
+  const lookup = reconciliationLookup(anchor, context, registry)
+  const stmt = env.DB.prepare(lookup.sql).bind(...lookup.bind)
+  const result = await stmt.all<any>()
+  return { rows: Array.isArray(result?.results) ? result.results : [], lookup_key: lookup.lookup_key }
+}
+
+async function verifyContinuityAncestryReadOnly(env: Env, continuity: any, session: any): Promise<"VALID" | DriftClass> {
+  const visited = new Set<string>()
+  let current: any = continuity
+  let depth = 0
+  while (current) {
+    const current_id = String(current.continuity_id || "")
+    if (!current_id || visited.has(current_id)) return "recursive_ancestry_drift"
+    visited.add(current_id)
+    depth += 1
+    if (depth > RECONCILIATION_MAX_RECURSION_DEPTH) return "traversal_instability_drift"
+    if (String(current.session_id || "") !== String(session.session_id || "")) return "recursive_ancestry_drift"
+    if (String(current.identity_id || "") !== String(session.identity_id || "")) return "recursive_ancestry_drift"
+    if (String(current.status || "") !== "ACTIVE" || current.revoked_at) return "revocation_propagation_drift"
+    if (isExpired(String(current.expires_at || ""))) return "revocation_propagation_drift"
+    let canonical: any
+    try { canonical = JSON.parse(String(current.canonical_continuity || "{}")) } catch { return "recursive_ancestry_drift" }
+    const actualHash = await continuityHash(canonical)
+    if (actualHash !== String(current.continuity_hash || "") || actualHash !== String(canonical.continuity_hash || "")) return "recursive_ancestry_drift"
+    const duplicateHash = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE continuity_hash=?1 ORDER BY continuity_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`).bind(String(current.continuity_hash || "")).all<any>()
+    if ((duplicateHash?.results || []).length > 1) return "duplicate_lineage_hash_drift"
+    const canonicalParent = canonical.parent_continuity_id ? String(canonical.parent_continuity_id) : ""
+    const storedParent = current.parent_continuity_id ? String(current.parent_continuity_id) : ""
+    if (canonicalParent !== storedParent) return "recursive_ancestry_drift"
+    if (!canonicalParent) return "VALID"
+    current = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1`).bind(canonicalParent).first<any>()
+    if (!current) return "orphan_legitimacy_object_drift"
+  }
+  return "orphan_legitimacy_object_drift"
+}
+
+async function verifyReconciliationRegistryRow(env: Env, registry: ReconciliationRegistry, row: any, context: Record<string, any>): Promise<"VALID" | DriftClass> {
+  switch (registry) {
+    case "session_registry":
+      if (String(row.continuity_status || "") !== "ACTIVE" || isExpired(String(row.expires_at || ""))) return "revocation_propagation_drift"
+      context.session = row
+      return "VALID"
+    case "continuity_registry": {
+      if (!context.session) return "orphan_legitimacy_object_drift"
+      const ancestry = await verifyContinuityAncestryReadOnly(env, row, context.session)
+      if (ancestry !== "VALID") return ancestry
+      context.continuity = row
+      return "VALID"
+    }
+    case "authority_registry":
+      if (!context.session || !context.continuity) return "orphan_legitimacy_object_drift"
+      if (String(row.session_id || "") !== String(context.session.session_id || "")) return "recursive_ancestry_drift"
+      if (String(row.continuity_id || "") !== String(context.continuity.continuity_id || "")) return "recursive_ancestry_drift"
+      if (String(row.identity_id || "") !== String(context.session.identity_id || "")) return "recursive_ancestry_drift"
+      if (["REVOKED", "EXPIRED"].includes(String(row.status || ""))) return "revocation_propagation_drift"
+      context.authority = row
+      return "VALID"
+    case "aeo_registry": {
+      if (!context.authority) return "orphan_legitimacy_object_drift"
+      if (String(row.authority_id || "") !== String(context.authority.authority_id || "")) return "recursive_ancestry_drift"
+      if (String(row.continuity_id || "") !== String(context.authority.continuity_id || "")) return "recursive_ancestry_drift"
+      let parsed: any
+      try { parsed = JSON.parse(String(row.canonical_aeo || "{}")) } catch { return "recursive_ancestry_drift" }
+      const canonicalAeo = toCanonicalAeo(parsed)
+      const actualHash = canonicalAeo ? await sha256Hex(canonicalize(canonicalAeo)) : ""
+      if (!canonicalAeo || actualHash !== String(row.validated_object_hash || "")) return "recursive_ancestry_drift"
+      context.aeo = row
+      return "VALID"
+    }
+    case "validation_registry":
+      if (!context.session || !context.continuity || !context.aeo) return "orphan_legitimacy_object_drift"
+      if (String(row.session_id || "") !== String(context.session.session_id || "")) return "recursive_ancestry_drift"
+      if (String(row.continuity_id || "") !== String(context.continuity.continuity_id || "")) return "recursive_ancestry_drift"
+      if (String(row.validated_object_hash || "") !== String(context.aeo.validated_object_hash || "")) return "recursive_ancestry_drift"
+      if (String(row.status || "") !== "VALID" || String(row.result || "") !== "VALID") return "replay_chain_drift"
+      context.validation = row
+      return "VALID"
+    case "execution_registry":
+      if (!context.validation) return "orphan_legitimacy_object_drift"
+      if (String(row.session_id || "") !== String(context.validation.session_id || "")) return "recursive_ancestry_drift"
+      if (String(row.continuity_id || "") !== String(context.validation.continuity_id || "")) return "recursive_ancestry_drift"
+      if (String(row.decision_id || "") !== String(context.validation.decision_id || "")) return "recursive_ancestry_drift"
+      if (String(row.validated_object_hash || "") !== String(context.validation.validated_object_hash || "")) return "recursive_ancestry_drift"
+      if (String(row.invocation_nonce || "") !== String(context.validation.invocation_nonce || "")) return "replay_chain_drift"
+      if (String(row.status || "") !== "EXECUTED") return "proof_lineage_drift"
+      context.execution = row
+      return "VALID"
+    case "proof_registry": {
+      if (!context.execution || !context.continuity || !context.authority) return "orphan_legitimacy_object_drift"
+      if (String(row.execution_id || "") !== String(context.execution.execution_id || "")) return "proof_lineage_drift"
+      if (String(row.decision_id || "") !== String(context.execution.decision_id || "")) return "proof_lineage_drift"
+      if (String(row.validated_object_hash || "") !== String(context.execution.validated_object_hash || "")) return "proof_lineage_drift"
+      if (String(row.continuity_id || "") !== String(context.continuity.continuity_id || "")) return "proof_lineage_drift"
+      if (String(row.continuity_hash || "") !== String(context.continuity.continuity_hash || "")) return "proof_lineage_drift"
+      let authorityLineage: any = null
+      let executionLineage: any = null
+      try { authorityLineage = JSON.parse(String(row.authority_lineage || "{}")); executionLineage = JSON.parse(String(row.execution_lineage || "{}")) } catch { return "proof_lineage_drift" }
+      if (String(authorityLineage.authority_id || "") !== String(context.authority.authority_id || "")) return "proof_lineage_drift"
+      if (String(executionLineage.execution_id || "") !== String(context.execution.execution_id || "")) return "proof_lineage_drift"
+      context.proof = row
+      return "VALID"
+    }
+    case "invocation_registry":
+      if (!context.validation || !context.execution) return "orphan_legitimacy_object_drift"
+      if (String(row.decision_id || "") !== String(context.validation.decision_id || "")) return "replay_chain_drift"
+      if (String(row.validated_object_hash || "") !== String(context.validation.validated_object_hash || "")) return "replay_chain_drift"
+      if (String(row.invocation_nonce || "") !== String(context.validation.invocation_nonce || "")) return "replay_chain_drift"
+      if (String(row.continuity_id || "") !== String(context.validation.continuity_id || "")) return "replay_chain_drift"
+      if (String(row.status || "") !== "EXECUTED") return "replay_chain_drift"
+      context.invocation = row
+      return "VALID"
+    case "preo_registry":
+      if (!context.authority || !context.aeo) return "orphan_legitimacy_object_drift"
+      if (String(row.decision_id || "") !== String(context.authority.decision_id || "")) return "preo_ancestry_drift"
+      if (String(row.authority_id || "") !== String(context.authority.authority_id || "")) return "preo_ancestry_drift"
+      if (String(row.continuity_id || "") !== String(context.authority.continuity_id || "")) return "preo_ancestry_drift"
+      if (String(row.reviewed_hash || "") !== String(context.aeo.validated_object_hash || "")) return "preo_ancestry_drift"
+      if (String(row.status || "") !== "PREO_VALID") return "preo_ancestry_drift"
+      context.preo = row
+      return "VALID"
+  }
+}
+
+async function deterministicRecursiveReconciliationTraversal(env: Env, anchor: ReconciliationAnchor): Promise<ReconciliationResult> {
+  if (!hasDb(env)) return reconciliationNull(anchor)
+  const context: Record<string, any> = {}
+  const trace: ReconciliationTraceEntry[] = []
+  for (const registry of CANONICAL_RECONCILIATION_REGISTRY_ORDER) {
+    if (trace.length >= RECONCILIATION_MAX_RECURSION_DEPTH) return reconciliationInvalid("traversal_instability_drift", registry, anchor, trace, "CRITICAL")
+    const { rows, lookup_key } = await readReconciliationRows(env, anchor, context, registry)
+    const traceEntry: ReconciliationTraceEntry = {
+      registry,
+      canonical_traversal_position: CANONICAL_RECONCILIATION_REGISTRY_ORDER.indexOf(registry),
+      reconciliation_depth: trace.length + 1,
+      lookup_key,
+      row_count: rows.length,
+      lineage_hash: String(rows[0]?.continuity_hash || rows[0]?.validated_object_hash || rows[0]?.reviewed_hash || "")
+    }
+    trace.push(traceEntry)
+    if (rows.length === 0) return reconciliationInvalid("orphan_legitimacy_object_drift", registry, anchor, trace)
+    if (rows.length > 1) return reconciliationInvalid("traversal_instability_drift", registry, anchor, trace)
+    const rowDrift = await verifyReconciliationRegistryRow(env, registry, rows[0], context)
+    if (rowDrift !== "VALID") return reconciliationInvalid(rowDrift, registry, anchor, trace)
+  }
+  return reconciliationValid(anchor, trace)
 }
 
 async function quarantineHistoricalProofDuplicates(env: Env) {
