@@ -13,6 +13,8 @@ const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
+const GOVERNED_AUXILIARY_ROUTES = ["/preo"] as const
+const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   session_registry: ["session_id", "identity_id", "owner", "trust_tier", "continuity_status", "created_at", "expires_at"],
@@ -408,13 +410,67 @@ async function activeSession(env: Env, session_id: string): Promise<any | null> 
   return session
 }
 
+function preoGovernanceEnabled(constraints: Record<string, unknown>, target: Record<string, unknown>): boolean {
+  if (String(target.workflow || "") !== GOVERNED_WORKFLOW) return false
+  const governance = isPlainRecord(constraints.governance) ? constraints.governance : {}
+  const preo = isPlainRecord(constraints.preo) ? constraints.preo : {}
+  return constraints.require_preo_lineage === true || governance.require_preo_lineage === true || preo.required === true || preo.require_lineage === true
+}
+
+async function ensurePreoSchema(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS preo_registry (
+    preo_id TEXT PRIMARY KEY,
+    decision_id TEXT NOT NULL,
+    authority_id TEXT NOT NULL,
+    continuity_id TEXT NOT NULL,
+    reviewed_hash TEXT NOT NULL,
+    canonical_preo TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(decision_id, reviewed_hash)
+  )`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_preo_registry_decision_hash ON preo_registry (decision_id, reviewed_hash)`).run()
+}
+
+async function preoTableExists(env: Env): Promise<boolean> {
+  const table = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='preo_registry'`).first<any>()
+  return Boolean(table)
+}
+
+async function validatePreoLineage(env: Env, params: { decision_id: string, validated_object_hash: string, authority: any, required: boolean }): Promise<"OK" | "missing_preo" | "preo_hash_mismatch"> {
+  const { decision_id, validated_object_hash, authority, required } = params
+  if (!(await preoTableExists(env))) {
+    if (required) {
+      await ensurePreoSchema(env)
+      return "missing_preo"
+    }
+    return "OK"
+  }
+
+  const rows = await env.DB.prepare(`SELECT * FROM preo_registry WHERE decision_id=?1 AND status='PREO_VALID' ORDER BY created_at ASC, preo_id ASC`).bind(decision_id).all<any>()
+  const preos = Array.isArray(rows?.results) ? rows.results : []
+  if (preos.length === 0) return required ? "missing_preo" : "OK"
+
+  const matching = preos.find((preo: any) => String(preo.reviewed_hash || "") === validated_object_hash)
+  if (!matching) return "preo_hash_mismatch"
+  if (String(matching.authority_id || "") !== String(authority.authority_id || "")) return "preo_hash_mismatch"
+  if (String(matching.continuity_id || "") !== String(authority.continuity_id || "")) return "preo_hash_mismatch"
+
+  let canonicalPreo: unknown
+  try { canonicalPreo = JSON.parse(String(matching.canonical_preo || "{}")) } catch { canonicalPreo = null }
+  if (!isPlainRecord(canonicalPreo) || String((canonicalPreo as any).reviewed_hash || "") !== validated_object_hash) return "preo_hash_mismatch"
+  return "OK"
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     if (url.pathname === "/health" && request.method === "GET") return json({ ok: true })
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
-    const mutationEndpoint = canonicalRuntimeRoute && request.method === "POST"
+    const governedAuxiliaryRoute = GOVERNED_AUXILIARY_ROUTES.includes(url.pathname as any)
+    const governedMutationRoute = canonicalRuntimeRoute || governedAuxiliaryRoute
+    const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
     if (!hasDb(env)) return json({ status: "NULL", reason: "database_unavailable" }, 500)
@@ -427,8 +483,43 @@ export default {
 
     try {
     if (request.method === "POST" && !canonicalRuntimeRoute) {
-      await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
-      return json({ status: "NULL", reason: "not_found" }, 404)
+      if (!governedAuxiliaryRoute) {
+        await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
+        return json({ status: "NULL", reason: "not_found" }, 404)
+      }
+    }
+
+    if (url.pathname === "/preo" && request.method === "POST") {
+      const b = await body(request)
+      const decision_id = String(b.decision_id || "")
+      const reviewed_hash = String(b.reviewed_hash || b.validated_object_hash || "")
+      if (!decision_id) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/preo", indicator: "missing_decision_id" }, drift_class: "registry_drift" })
+      if (!reviewed_hash) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "missing_reviewed_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/preo", indicator: "missing_reviewed_hash" }, drift_class: "hash_drift" })
+      if (b.validated_object_hash && String(b.validated_object_hash) !== reviewed_hash) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "preo_hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/preo", reviewed_hash, validated_object_hash: String(b.validated_object_hash), indicator: "preo_hash_mismatch" }, drift_class: "hash_drift" })
+
+      const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
+      if (!authority) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "authority_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/preo" }, drift_class: "authority_drift" })
+      if (!["ACTIVE", "VALIDATED", "RESERVED"].includes(String(authority.status || ""))) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "authority_unusable" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/preo", authority_status: authority.status }, drift_class: "authority_drift" })
+      const session = await activeSession(env, String(authority.session_id || ""))
+      if (!session) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/preo" }, drift_class: "authority_drift" })
+      const continuity = await activeContinuity(env, String(authority.continuity_id || ""), session, decision_id)
+      if (!continuity) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/preo", continuity_id: authority.continuity_id || null }, drift_class: "authority_drift" })
+
+      await ensurePreoSchema(env)
+      const created_at = new Date().toISOString()
+      const canonical_preo = canonicalize({
+        decision_id,
+        authority_id: String(authority.authority_id || ""),
+        continuity_id: String(authority.continuity_id || ""),
+        reviewed_hash,
+        evidence: canonicalRecord(b.evidence),
+        status: "PREO_VALID"
+      })
+      const preo_id = String(b.preo_id || crypto.randomUUID())
+      const insert = await env.DB.prepare(`INSERT OR IGNORE INTO preo_registry (preo_id,decision_id,authority_id,continuity_id,reviewed_hash,canonical_preo,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,'PREO_VALID',?7)`).bind(preo_id, decision_id, String(authority.authority_id || ""), String(authority.continuity_id || ""), reviewed_hash, canonical_preo, created_at).run()
+      if ((insert.meta?.changes || 0) === 0) return rejectWithTelemetry(env, { status: "NULL", route: "/preo", reason: "preo_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/preo", reviewed_hash, indicator: "duplicate_preo" }, drift_class: "replay_drift" })
+      await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/preo", reviewed_hash, policy: REQUIRE_PREO_LINEAGE } })
+      return json({ status: "PREO_VALID", decision_id, preo_id, reviewed_hash })
     }
 
     if (url.pathname === "/session" && request.method === "POST") {
@@ -629,6 +720,11 @@ export default {
         const continuity = await activeContinuity(env, String(authority.continuity_id || ""), session, decision_id)
         if (!continuity) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", continuity_id: authority.continuity_id || null }, drift_class: "authority_drift" })
 
+        const constraints = JSON.parse(String(authority.constraints || "{}"))
+        const target = canonicalDeployTarget(constraints)
+        if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
+        const requirePreoLineage = preoGovernanceEnabled(constraints, target)
+
         const existingAeos = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(decision_id).all<any>()
         const existingRows = Array.isArray(existingAeos?.results) ? existingAeos.results : []
         if (existingRows.length > 0) {
@@ -641,17 +737,18 @@ export default {
           if (!canonicalAeo || !storedHash || recomputedHash !== storedHash || hasConflictingAeo) {
             return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "compiled_aeo_hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/compile", stored_hash: storedHash, actual_hash: recomputedHash, indicator: "stored_aeo_hash_mismatch" }, drift_class: "hash_drift" })
           }
+          const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash: storedHash, authority, required: requirePreoLineage })
+          if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash: storedHash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
           await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(first.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash: storedHash, indicator: "existing_canonical_aeo_reused" } })
           return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, canonical_aeo: canonicalAeo })
         }
 
-        const constraints = JSON.parse(String(authority.constraints || "{}"))
-        const target = canonicalDeployTarget(constraints)
-        if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
         const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope || "{}")), validation: { workflow: GOVERNED_WORKFLOW }, target, finality: { proof_required: true } })
         if (!canonical_aeo) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "registry_drift" })
         const canonical_aeo_json = canonicalize(canonical_aeo)
         const validated_object_hash = await sha256Hex(canonical_aeo_json)
+        const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash, authority, required: requirePreoLineage })
+        if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
         await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,'COMPILED',?7)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, new Date().toISOString()).run()
         await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash } })
         return json({ status: "COMPILED", decision_id, validated_object_hash, canonical_aeo: JSON.parse(canonical_aeo_json) })
