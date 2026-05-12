@@ -1,4 +1,4 @@
-type Env = { DB: D1Database, API_KEY?: string }
+type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_SIGNING_KEY?: string, PROVENANCE_SIGNER_ID?: string }
 
 type CanonicalAEO = {
   intent: string
@@ -10,6 +10,7 @@ type CanonicalAEO = {
 
 const REQUIRED_AEO_KEYS = ["intent", "scope", "validation", "target", "finality"] as const
 const GOVERNED_WORKFLOW = "governed-deploy.yml"
+const PROVENANCE_PAYLOAD_TYPE = "application/vnd.mindshift.provenance.v1+json"
 const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
@@ -26,6 +27,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   validation_registry: ["validation_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "environment", "result", "reason", "status", "created_at", "continuity_id"],
   execution_registry: ["execution_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha"],
   proof_registry: ["proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "continuity_id", "continuity_hash", "identity_id", "authority_lineage", "execution_lineage", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha"],
+  attestation_registry: ["attestation_id", "envelope_hash", "payload_hash", "payload_type", "signer_identity", "decision_id", "validated_object_hash", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha", "canonical_aeo_hash", "transparency_log_id", "transparency_integrated_time", "status", "created_at"],
   proof_registry_duplicate_archive: ["archive_id", "proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "archived_at", "archive_reason", "canonical_proof_id"],
   invocation_registry: ["decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id"],
   observability_registry: ["event_id", "event_type", "decision_id", "authority_id", "execution_id", "proof_id", "severity", "payload", "created_at"],
@@ -55,9 +57,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_DRIFT"
-type DriftClass = "proof_drift" | "execution_drift" | "authority_drift" | "continuity_drift" | "hash_drift" | "preo_drift" | "replay_drift" | "provenance_drift" | "reconciliation_drift" | "registry_drift"
-type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift"
+type DriftClass = "proof_drift" | "execution_drift" | "authority_drift" | "continuity_drift" | "hash_drift" | "preo_drift" | "replay_drift" | "provenance_drift" | "reconciliation_drift" | "registry_drift" | "branch_lineage_drift" | "workflow_source_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -131,6 +131,136 @@ function missingDeploymentProvenance(provenance: DeploymentProvenance): string[]
   return Object.entries(provenance).filter(([, value]) => !value).map(([key]) => key)
 }
 
+type DsseEnvelope = {
+  payloadType: string
+  payload: string
+  signatures: Array<{ keyid: string, sig: string }>
+  transparency?: Record<string, unknown>
+}
+
+type ProvenanceAttestationValidation =
+  | { ok: true, envelope_hash: string, payload_hash: string, payload: Record<string, unknown>, signer_identity: string, transparency_log_id: string, transparency_integrated_time: string }
+  | { ok: false, reason: string, drift_class: DriftClass, payload: Record<string, unknown> }
+
+function provenanceSigningConfigured(env: Env): boolean {
+  return Boolean(String(env.PROVENANCE_SIGNING_KEY || "") && String(env.PROVENANCE_SIGNER_ID || ""))
+}
+
+function base64EncodeUtf8(input: string): string {
+  const bytes = new TextEncoder().encode(input)
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+function base64DecodeUtf8(input: string): string | null {
+  try {
+    const binary = atob(input)
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+    return new TextDecoder().decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+function dssePreAuthenticationEncoding(payloadType: string, payload: string): string {
+  return `DSSEv1 ${payloadType.length} ${payloadType} ${payload.length} ${payload}`
+}
+
+function canonicalProvenancePayload(params: {
+  decision_id: string
+  provenance: DeploymentProvenance
+  validated_object_hash: string
+  canonical_aeo_hash: string
+}): Record<string, unknown> {
+  return {
+    branch: params.provenance.branch,
+    canonical_aeo_hash: params.canonical_aeo_hash,
+    merge_commit_sha: params.provenance.merge_commit_sha,
+    pull_request_id: params.provenance.pull_request_id,
+    repository: params.provenance.repository,
+    source_tree_hash: params.provenance.source_tree_hash,
+    validated_object_hash: params.validated_object_hash,
+    workflow_run_id: params.provenance.workflow_run_id,
+    workflow_sha: params.provenance.workflow_sha
+  }
+}
+
+function dsseEnvelopeFrom(input: any): DsseEnvelope | null {
+  const envelope = input?.provenance_attestation || input?.dsse_envelope || input?.attestation || null
+  if (!isPlainRecord(envelope)) return null
+  const signatures = Array.isArray(envelope.signatures) ? envelope.signatures : []
+  return {
+    payloadType: String(envelope.payloadType || ""),
+    payload: String(envelope.payload || ""),
+    signatures: signatures.map((signature: any) => ({ keyid: String(signature?.keyid || ""), sig: String(signature?.sig || "") })),
+    transparency: isPlainRecord(envelope.transparency) ? canonicalRecord(envelope.transparency) : {}
+  }
+}
+
+async function hmacSha256Base64(keyMaterial: string, input: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(keyMaterial), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input))
+  let binary = ""
+  for (const byte of new Uint8Array(signature)) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let index = 0; index < a.length; index += 1) diff |= a.charCodeAt(index) ^ b.charCodeAt(index)
+  return diff === 0
+}
+
+async function validateDsseProvenanceEnvelope(env: Env, params: {
+  route: string
+  decision_id: string
+  validated_object_hash: string
+  provenance: DeploymentProvenance
+  compiledCanonicalAeo: CanonicalAEO
+  envelope: DsseEnvelope | null
+}): Promise<ProvenanceAttestationValidation> {
+  if (!provenanceSigningConfigured(env)) {
+    if (params.envelope) return { ok: false, reason: "provenance_signing_policy_missing", drift_class: "signature_drift", payload: { route: params.route, indicator: "signature_policy_missing" } }
+    return { ok: true, envelope_hash: "", payload_hash: "", payload: {}, signer_identity: "", transparency_log_id: "", transparency_integrated_time: "" }
+  }
+  if (!params.envelope) return { ok: false, reason: "signature_missing", drift_class: "signature_drift", payload: { route: params.route, indicator: "signature_missing" } }
+  if (params.envelope.payloadType !== PROVENANCE_PAYLOAD_TYPE) return { ok: false, reason: "payload_type_mismatch", drift_class: "payload_drift", payload: { route: params.route, expected_payload_type: PROVENANCE_PAYLOAD_TYPE, provided_payload_type: params.envelope.payloadType, indicator: "dsse_payload_drift" } }
+  if (params.envelope.signatures.length !== 1 || !params.envelope.signatures[0].sig) return { ok: false, reason: "signature_missing", drift_class: "signature_drift", payload: { route: params.route, indicator: "signature_missing" } }
+  const signature = params.envelope.signatures[0]
+  const expectedSigner = String(env.PROVENANCE_SIGNER_ID || "")
+  if (signature.keyid !== expectedSigner) return { ok: false, reason: "signer_identity_mismatch", drift_class: "signer_identity_drift", payload: { route: params.route, expected_signer_identity: expectedSigner, provided_signer_identity: signature.keyid, indicator: "signer_identity_mismatch" } }
+  const decodedPayload = base64DecodeUtf8(params.envelope.payload)
+  if (!decodedPayload) return { ok: false, reason: "payload_drift", drift_class: "payload_drift", payload: { route: params.route, indicator: "dsse_payload_decode_failed" } }
+  let parsedPayload: any
+  try { parsedPayload = JSON.parse(decodedPayload) } catch { parsedPayload = null }
+  if (!isPlainRecord(parsedPayload)) return { ok: false, reason: "payload_drift", drift_class: "payload_drift", payload: { route: params.route, indicator: "dsse_payload_parse_failed" } }
+  const expectedPayload = canonicalProvenancePayload({ decision_id: params.decision_id, provenance: params.provenance, validated_object_hash: params.validated_object_hash, canonical_aeo_hash: await sha256Hex(canonicalize(params.compiledCanonicalAeo)) })
+  const canonicalPayload = canonicalize(parsedPayload)
+  const expectedCanonicalPayload = canonicalize(expectedPayload)
+  if (canonicalPayload !== expectedCanonicalPayload || params.envelope.payload !== base64EncodeUtf8(expectedCanonicalPayload)) return { ok: false, reason: "dsse_payload_drift", drift_class: "payload_drift", payload: { route: params.route, expected_payload_hash: await sha256Hex(expectedCanonicalPayload), provided_payload_hash: await sha256Hex(canonicalPayload), indicator: "dsse_payload_drift" } }
+  const expectedSignature = await hmacSha256Base64(String(env.PROVENANCE_SIGNING_KEY || ""), dssePreAuthenticationEncoding(params.envelope.payloadType, params.envelope.payload))
+  if (!constantTimeEqual(signature.sig, expectedSignature)) return { ok: false, reason: "signature_invalid", drift_class: "signature_drift", payload: { route: params.route, signer_identity: signature.keyid, indicator: "signature_invalid" } }
+  const transparency = params.envelope.transparency || {}
+  const transparencyLogId = String(transparency.log_id || "")
+  const transparencyIntegratedTime = String(transparency.integrated_time || "")
+  if (!transparencyLogId || !transparencyIntegratedTime) return { ok: false, reason: "transparency_drift", drift_class: "transparency_drift", payload: { route: params.route, indicator: "transparency_proof_missing" } }
+  const envelope_hash = await sha256Hex(canonicalize({ payload: params.envelope.payload, payloadType: params.envelope.payloadType, signatures: params.envelope.signatures, transparency }))
+  const payload_hash = await sha256Hex(expectedCanonicalPayload)
+  const replay = await env.DB.prepare(`SELECT decision_id, validated_object_hash, workflow_run_id FROM attestation_registry WHERE envelope_hash=?1 AND status='VERIFIED'`).bind(envelope_hash).first<any>()
+  if (replay && (String(replay.decision_id || "") !== params.decision_id || String(replay.validated_object_hash || "") !== params.validated_object_hash || String(replay.workflow_run_id || "") !== params.provenance.workflow_run_id)) {
+    return { ok: false, reason: "replayed_attestation", drift_class: "attestation_drift", payload: { route: params.route, envelope_hash, indicator: "replayed_attestation" } }
+  }
+  return { ok: true, envelope_hash, payload_hash, payload: expectedPayload, signer_identity: signature.keyid, transparency_log_id: transparencyLogId, transparency_integrated_time: transparencyIntegratedTime }
+}
+
+async function persistVerifiedAttestation(env: Env, validation: Extract<ProvenanceAttestationValidation, { ok: true }>, provenance: DeploymentProvenance, decision_id: string, validated_object_hash: string, created_at = new Date().toISOString()) {
+  if (!validation.envelope_hash) return
+  await env.DB.prepare(`INSERT OR IGNORE INTO attestation_registry (attestation_id,envelope_hash,payload_hash,payload_type,signer_identity,decision_id,validated_object_hash,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,canonical_aeo_hash,transparency_log_id,transparency_integrated_time,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,'VERIFIED',?18)`).bind(crypto.randomUUID(), validation.envelope_hash, validation.payload_hash, PROVENANCE_PAYLOAD_TYPE, validation.signer_identity, decision_id, validated_object_hash, provenance.repository, provenance.branch, provenance.pull_request_id, provenance.merge_commit_sha, provenance.source_tree_hash, provenance.workflow_run_id, provenance.workflow_sha, String(validation.payload.canonical_aeo_hash || ""), validation.transparency_log_id, validation.transparency_integrated_time, created_at).run()
+}
+
 function toCanonicalAeo(input: any): CanonicalAEO | null {
   const keys = Object.keys(input || {}).sort()
   if (keys.length !== REQUIRED_AEO_KEYS.length) return null
@@ -172,7 +302,10 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_observability_decision ON observability_registry(decision_id)`,
       `CREATE INDEX IF NOT EXISTS idx_observability_execution ON observability_registry(execution_id)`,
       `CREATE INDEX IF NOT EXISTS idx_observability_type ON observability_registry(event_type)`,
-      `CREATE TABLE IF NOT EXISTS drift_registry (drift_id TEXT PRIMARY KEY, drift_class TEXT NOT NULL, severity TEXT NOT NULL, decision_id TEXT, execution_id TEXT, payload TEXT NOT NULL, detected_by TEXT NOT NULL, resolution_status TEXT NOT NULL, created_at TEXT NOT NULL)`
+      `CREATE TABLE IF NOT EXISTS drift_registry (drift_id TEXT PRIMARY KEY, drift_class TEXT NOT NULL, severity TEXT NOT NULL, decision_id TEXT, execution_id TEXT, payload TEXT NOT NULL, detected_by TEXT NOT NULL, resolution_status TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS attestation_registry (attestation_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, payload_type TEXT NOT NULL, signer_identity TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, repository TEXT NOT NULL, branch TEXT NOT NULL, pull_request_id TEXT NOT NULL, merge_commit_sha TEXT NOT NULL, source_tree_hash TEXT NOT NULL, workflow_run_id TEXT NOT NULL, workflow_sha TEXT NOT NULL, canonical_aeo_hash TEXT NOT NULL, transparency_log_id TEXT NOT NULL, transparency_integrated_time TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(workflow_run_id), UNIQUE(decision_id, validated_object_hash))`,
+      `CREATE INDEX IF NOT EXISTS idx_attestation_registry_lineage ON attestation_registry(decision_id, validated_object_hash, workflow_run_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_attestation_registry_transparency ON attestation_registry(transparency_log_id, transparency_integrated_time)`
     ]
     for (const s of stmts) await env.DB.prepare(s).run()
     await ensureRequiredSchemaColumns(env)
@@ -182,6 +315,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique ON proof_registry(workflow_run_id)`).run()
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_proof_registry_provenance ON proof_registry(repository, branch, pull_request_id, merge_commit_sha, workflow_run_id)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_registry_workflow_run_unique ON execution_registry(workflow_run_id)`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_envelope_unique ON attestation_registry(envelope_hash)`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_workflow_run_unique ON attestation_registry(workflow_run_id)`).run()
   } catch (error) {
     throw new SchemaInitializationError(schemaDiagnosticReason(error), error)
   }
@@ -726,6 +861,7 @@ async function validateDeploymentProvenance(env: Env, params: {
   authority: any
   compiledCanonicalAeo: CanonicalAEO
   provenance: DeploymentProvenance
+  provenanceAttestation: DsseEnvelope | null
   execution?: any
 }): Promise<{ ok: true, preo: any, canonical_preo: any } | { ok: false, reason: string, drift_class: DriftClass, payload: Record<string, unknown> }> {
   const missing = missingDeploymentProvenance(params.provenance)
@@ -764,6 +900,9 @@ async function validateDeploymentProvenance(env: Env, params: {
       }
     }
   }
+  const attestationValidation = await validateDsseProvenanceEnvelope(env, { route: params.route, decision_id: params.decision_id, validated_object_hash: params.validated_object_hash, provenance: params.provenance, compiledCanonicalAeo: params.compiledCanonicalAeo, envelope: params.provenanceAttestation })
+  if (!attestationValidation.ok) return attestationValidation
+  await persistVerifiedAttestation(env, attestationValidation, params.provenance, params.decision_id, params.validated_object_hash)
   return { ok: true, preo: preoLineage.preo, canonical_preo: preoLineage.canonical_preo }
 }
 export default {
@@ -839,9 +978,7 @@ export default {
         authority_id: String(authority.authority_id || ""),
         continuity_id: String(authority.continuity_id || ""),
         reviewed_hash,
-        reviewed_tree_hash: b.reviewed_tree_hash ? String(b.reviewed_tree_hash) : null,
         execution_provenance_tree_hash: b.execution_provenance_tree_hash ? String(b.execution_provenance_tree_hash) : null,
-        merge_commit_sha: b.merge_commit_sha ? String(b.merge_commit_sha) : null,
         workflow_sha: b.workflow_sha ? String(b.workflow_sha) : null,
         pull_request: canonicalRecord(b.pull_request),
         reviewed_tree_hash,
@@ -1133,7 +1270,7 @@ export default {
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
-      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b)
+      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b); const provenanceAttestation = dsseEnvelopeFrom(b)
       await emitTelemetry(env, { event_type: "EXECUTION_STARTED", decision_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce } })
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/execute" }, drift_class: "execution_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
@@ -1160,7 +1297,7 @@ export default {
       const execHash = executionCanonicalAeo ? await sha256Hex(canonicalize(executionCanonicalAeo)) : ""
       if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
-      const provenanceValidation = await validateDeploymentProvenance(env, { route: "/execute", decision_id, validated_object_hash, authority, compiledCanonicalAeo: executionCanonicalAeo, provenance })
+      const provenanceValidation = await validateDeploymentProvenance(env, { route: "/execute", decision_id, validated_object_hash, authority, compiledCanonicalAeo: executionCanonicalAeo, provenance, provenanceAttestation })
       if (!provenanceValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: provenanceValidation.reason }, { event_type: provenanceValidation.drift_class === "workflow_source_drift" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { ...provenanceValidation.payload, validated_object_hash }, drift_class: provenanceValidation.drift_class })
       const execution_id = crypto.randomUUID()
       try {
@@ -1177,6 +1314,7 @@ export default {
     if (url.pathname === "/proof" && request.method === "POST") {
       const b = await body(request)
       const provenance = deploymentProvenanceFrom(b)
+      const provenanceAttestation = dsseEnvelopeFrom(b)
       const execution_id = String(b.execution_id || "")
       const decision_id = String(b.decision_id || "")
       const validated_object_hash = String(b.validated_object_hash || "")
@@ -1225,7 +1363,7 @@ export default {
       const proofCanonicalAeo = toCanonicalAeo(proofAeo)
       const proofHash = proofCanonicalAeo ? await sha256Hex(canonicalize(proofCanonicalAeo)) : ""
       if (!compiled || !proofCanonicalAeo || proofHash !== validated_object_hash || proofHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_hash: validated_object_hash, actual_hash: proofHash, indicator: "proof_hash_mismatch" }, drift_class: "hash_drift" })
-      const provenanceValidation = await validateDeploymentProvenance(env, { route: "/proof", decision_id, validated_object_hash, authority, compiledCanonicalAeo: proofCanonicalAeo, provenance, execution })
+      const provenanceValidation = await validateDeploymentProvenance(env, { route: "/proof", decision_id, validated_object_hash, authority, compiledCanonicalAeo: proofCanonicalAeo, provenance, provenanceAttestation, execution })
       if (!provenanceValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: provenanceValidation.reason }, { event_type: provenanceValidation.drift_class === "workflow_source_drift" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { ...provenanceValidation.payload, validated_object_hash }, drift_class: provenanceValidation.drift_class })
       const authorityLineage = canonicalize({
         identity_id: String(authority.identity_id || ""),
