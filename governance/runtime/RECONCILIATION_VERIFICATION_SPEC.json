@@ -1,0 +1,177 @@
+{
+  "version": "1.0",
+  "purpose": "Continuous, read-only reconciliation verification substrate for persisted legitimacy lineage.",
+  "core_invariant": "If lineage cannot be recursively reconciled, legitimacy integrity does not exist and verification returns NULL.",
+  "execution_surface_touched": "observability_only_reconciliation",
+  "runtime_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+  "continuous_reconciliation_architecture": {
+    "scheduler_design": {
+      "mode": "deterministic_read_only_traversal",
+      "cadence": "operator_scheduled_or_cron_invoked_observability_pass",
+      "authority": "none_created",
+      "mutation_policy": "MUST_NOT_MUTATE_REGISTRIES_OR_RUNTIME_LEGITIMACY",
+      "replay_policy": "MUST_NOT_RESERVE_OR_CONSUME_REPLAY_STATE",
+      "ordering": [
+        "proof_registry.created_at ASC",
+        "proof_registry.decision_id ASC",
+        "proof_registry.execution_id ASC",
+        "proof_registry.proof_id ASC"
+      ],
+      "batching": {
+        "cursor": "last_canonical_traversal_position",
+        "cursor_material": ["registry", "lookup_key", "created_at", "canonical_hash"],
+        "restart_behavior": "restart_from_last_confirmed_position_without_side_effects"
+      },
+      "failure_result": "NULL"
+    },
+    "non_bypassability": [
+      "scheduler is observability-only and never routes around /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof",
+      "verification cannot create authority, validation, execution, proof, continuity, PREO, or invocation rows",
+      "verification cannot reinterpret an invalid lineage as valid"
+    ]
+  },
+  "reconciliation_verification_loop": [
+    {
+      "position": 1,
+      "step": "select_canonical_roots",
+      "read_sets": ["proof_registry"],
+      "checks": ["stable ordering", "duplicate proof lineage pre-scan"],
+      "on_failure": "NULL"
+    },
+    {
+      "position": 2,
+      "step": "verify_proof_continuity",
+      "read_sets": ["proof_registry", "execution_registry", "validation_registry", "authority_registry", "aeo_registry"],
+      "checks": ["validated_object_hash equality", "decision_id equality", "execution_id binding", "proof authority_lineage matches authority row", "proof execution_lineage matches execution row"],
+      "on_failure": "NULL"
+    },
+    {
+      "position": 3,
+      "step": "verify_recursive_ancestry",
+      "read_sets": ["continuity_registry", "session_registry"],
+      "checks": ["parent traversal to exactly one root", "cycle rejection", "identity/session equality", "continuity_hash re-derivation", "depth bounds"],
+      "on_failure": "NULL"
+    },
+    {
+      "position": 4,
+      "step": "verify_replay_lineage",
+      "read_sets": ["invocation_registry", "validation_registry", "execution_registry", "proof_registry"],
+      "checks": ["nonce equality", "reserved-to-executed continuity", "duplicate lineage replay rejection", "workflow_run_id uniqueness"],
+      "on_failure": "NULL"
+    },
+    {
+      "position": 5,
+      "step": "verify_preo_lineage",
+      "read_sets": ["preo_registry", "authority_registry", "proof_registry"],
+      "checks": ["reviewed_hash equals validated_object_hash", "authority_id equality", "continuity_id equality", "reviewed_tree_hash and merge_commit_sha equality"],
+      "on_failure": "NULL"
+    },
+    {
+      "position": 6,
+      "step": "verify_revocation_propagation",
+      "read_sets": ["continuity_registry", "authority_registry", "validation_registry", "invocation_registry"],
+      "checks": ["revoked/expired ancestor invalidates descendants", "reserved replay state is revoked", "validated descendants are invalidated"],
+      "on_failure": "NULL"
+    },
+    {
+      "position": 7,
+      "step": "emit_observability_only_evidence",
+      "write_sets": ["observability_registry", "drift_registry"],
+      "checks": ["deterministic payload schema", "deterministic drift classification"],
+      "on_failure": "NULL"
+    }
+  ],
+  "drift_telemetry_expansion": {
+    "schema": {
+      "registry": "string",
+      "lookup_key": "string",
+      "expected_lineage": "canonical JSON object or null",
+      "observed_lineage": "canonical JSON object or null",
+      "drift_class": "enumerated reconciliation drift class",
+      "reconciliation_depth": "integer >= 0",
+      "canonical_traversal_position": "integer >= 1",
+      "deterministic_hash_evidence": "sha256 canonical hash evidence",
+      "timestamp": "runtime emission timestamp only; not hash material"
+    },
+    "classes": [
+      "reconciliation_failure_drift",
+      "recursive_ancestry_drift",
+      "replay_chain_drift",
+      "proof_lineage_drift",
+      "preo_ancestry_drift",
+      "revocation_propagation_drift",
+      "duplicate_lineage_hash_drift",
+      "orphan_legitimacy_object_drift",
+      "federated_lineage_drift",
+      "traversal_instability_drift",
+      "telemetry_payload_drift"
+    ],
+    "observability_only": true
+  },
+  "federated_integrity_model": {
+    "assumptions": [
+      "remote lineage is evidence, not authority",
+      "local validation remains mandatory",
+      "canonical hash stability must survive runtime portability",
+      "trust boundary classification is explicit and bounded"
+    ],
+    "trust_boundaries": ["local_runtime", "remote_runtime_reference", "external_authority_reference", "portable_proof_bundle"],
+    "rules": [
+      "federated proof continuity must bind local proof hash to remote lineage reference without inferring remote legitimacy",
+      "cross-runtime replay claims must include runtime_id, decision_id, validated_object_hash, invocation_nonce, proof_id, and revocation_state",
+      "external authority lineage references can only narrow local acceptance; they cannot bypass local validation",
+      "revocation propagation semantics must classify remote revocation evidence as bounded trust input until locally reconciled"
+    ],
+    "forbidden": ["trusted_federation_assumption", "remote_legitimacy_inference", "local_validation_bypass"]
+  },
+  "reconciliation_fate_matrix": [
+    { "test_id": "orphan_proof_detection", "corruption": "proof without execution/validation/authority ancestry", "expected_result": "NULL" },
+    { "test_id": "recursive_lineage_divergence", "corruption": "continuity parent hash or parent pointer mismatch", "expected_result": "NULL" },
+    { "test_id": "replay_chain_corruption", "corruption": "invocation nonce differs between validation and execution", "expected_result": "NULL" },
+    { "test_id": "preo_ancestry_corruption", "corruption": "PREO authority_id or continuity_id mismatch", "expected_result": "NULL" },
+    { "test_id": "federated_lineage_mismatch", "corruption": "remote proof reference hash differs from local expected hash", "expected_result": "NULL" },
+    { "test_id": "duplicate_lineage_replay", "corruption": "same decision_id and validated_object_hash appear in competing proof/replay lineage", "expected_result": "NULL" },
+    { "test_id": "stale_revocation_propagation", "corruption": "descendant remains active after ancestor revoked or expired", "expected_result": "NULL" },
+    { "test_id": "deterministic_traversal_stability", "corruption": "same registry state yields different traversal order", "expected_result": "NULL" },
+    { "test_id": "reconciliation_hash_instability", "corruption": "canonical hash re-derivation changes across passes", "expected_result": "NULL" },
+    { "test_id": "observability_payload_drift", "corruption": "telemetry omits required reconciliation payload fields", "expected_result": "NULL" }
+  ],
+  "recursive_traversal_rules": [
+    "start from exact persisted object under verification",
+    "follow explicit parent_continuity_id only; never infer ancestry",
+    "recompute canonical continuity hash at every depth",
+    "terminate only at exactly one root with no parent_continuity_id",
+    "detect cycles and over-depth traversal deterministically",
+    "preserve canonical traversal position in telemetry"
+  ],
+  "replay_lineage_rules": [
+    "validation, invocation, execution, and proof must share decision_id and validated_object_hash",
+    "invocation_nonce must remain identical from validation through execution",
+    "verification must not reserve, consume, or release replay state",
+    "duplicate lineage hashes and duplicate workflow_run_id evidence classify as replay drift",
+    "ambiguous replay lineage returns NULL"
+  ],
+  "revocation_integrity_rules": [
+    "revoked or expired continuity ancestors invalidate descendant legitimacy",
+    "authority, validation, and invocation descendants must reflect ancestor revocation",
+    "stale descendant ACTIVE/VALID/RESERVED states classify as revocation propagation drift",
+    "verification observes propagation only and never auto-heals stale rows"
+  ],
+  "observability_constraints": [
+    "telemetry is evidence only",
+    "drift rows cannot create, repair, or authorize legitimacy",
+    "payloads must be deterministic except emission timestamp",
+    "expected_lineage and observed_lineage must be canonicalized before hash evidence is computed",
+    "ambiguous drift classification returns NULL rather than best-effort classification"
+  ],
+  "failure_classification_matrix": [
+    { "condition": "ambiguous ancestry", "drift_class": "recursive_ancestry_drift", "result": "NULL" },
+    { "condition": "replay ambiguity", "drift_class": "replay_chain_drift", "result": "NULL" },
+    { "condition": "traversal instability", "drift_class": "traversal_instability_drift", "result": "NULL" },
+    { "condition": "proof discontinuity", "drift_class": "proof_lineage_drift", "result": "NULL" },
+    { "condition": "PREO mismatch", "drift_class": "preo_ancestry_drift", "result": "NULL" },
+    { "condition": "drift ambiguity", "drift_class": "reconciliation_failure_drift", "result": "NULL" },
+    { "condition": "reconciliation mutation", "drift_class": "telemetry_payload_drift", "result": "NULL" },
+    { "condition": "federation trust assumption", "drift_class": "federated_lineage_drift", "result": "NULL" }
+  ]
+}
