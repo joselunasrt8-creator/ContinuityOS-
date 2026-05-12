@@ -151,25 +151,45 @@ test('continuity creation emits telemetry and invalid continuity fails closed', 
 
   assert.match(
     source,
-    /if \(!\(key in parentScope\)\)[\s\S]*reason: "scope_expansion_detected"[\s\S]*indicator: "recursive_scope_expansion_blocked"/,
+    /if \(!Object\.prototype\.hasOwnProperty\.call\(parentScope, key\)\)[\s\S]*rejectWithTelemetry\([\s\S]*env,[\s\S]*\{ status: "NULL", reason: "scope_expansion_detected" \}[\s\S]*indicator: "recursive_scope_expansion_detected"/,
     'additive child continuity scope keys must fail closed as recursive scope expansion',
   )
 
   assert.match(
     source,
-    /canonicalize\(parentScope\[key\]\) !== canonicalize\(value\)[\s\S]*reason: "scope_expansion_detected"[\s\S]*indicator: "recursive_scope_mutation_blocked"/,
-    'inherited child continuity scope mutation must fail closed as recursive scope expansion',
+    /canonicalize\(parentScope\[key\]\) !== canonicalize\(value\)[\s\S]*rejectWithTelemetry\([\s\S]*env,[\s\S]*\{ status: "NULL", reason: "scope_expansion_detected" \}[\s\S]*indicator: "recursive_scope_expansion_detected"/,
+    'conflicting inherited child continuity scope values must fail closed as recursive scope expansion',
   )
 
   assert.match(
     source,
-    /\{ status: "NULL", reason: "scope_expansion_detected" \}/,
-    'recursive continuity scope expansion must return NULL semantics',
+    /payload: \{[\s\S]*route: "\/continuity",[\s\S]*continuity_id,[\s\S]*parent_continuity_id,[\s\S]*indicator: "recursive_scope_expansion_detected"[\s\S]*\},[\s\S]*drift_class: "authority_drift"/,
+    'recursive continuity scope expansion must emit required authority drift telemetry shape',
+  )
+})
+
+test('continuity scope subset semantics permit equal and narrowed scopes only', () => {
+  assert.match(
+    source,
+    /const parentScope =[\s\S]*canonicalRecord\(parent\.canonical\.scope\)[\s\S]*const childScope = canonicalRecord\(requestedScope\)/,
+    'parent and child continuity scopes must be canonicalized before subset comparison',
   )
 
   assert.match(
     source,
-    /violating_scope_key: key/,
-    'recursive continuity scope rejection telemetry must identify the violating scope key',
+    /for \(const \[key, value\] of Object\.entries\(childScope\)\)[\s\S]*Object\.prototype\.hasOwnProperty\.call\(parentScope, key\)[\s\S]*canonicalize\(parentScope\[key\]\) !== canonicalize\(value\)[\s\S]*const material: any = continuityHashMaterial/,
+    'equal inherited scope keys pass through to deterministic continuity hashing',
+  )
+
+  assert.doesNotMatch(
+    source,
+    /for \(const \[key, value\] of Object\.entries\(parentScope\)\)/,
+    'narrowed child scope may omit parent keys without being rejected as expansion',
+  )
+
+  assert.match(
+    source,
+    /if \(parent_continuity_id\)[\s\S]*const parent = await activeContinuity\(env, parent_continuity_id, session\)[\s\S]*for \(const \[key, value\] of Object\.entries\(childScope\)\)/,
+    'recursive descendants are constrained by their active parent scope and cannot re-expand omitted ancestor dimensions',
   )
 })
