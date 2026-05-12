@@ -383,9 +383,26 @@ export default {
             : {}
 
         for (const [key, value] of Object.entries(requestedScope)) {
+          if (!(key in parentScope)) {
+            return rejectWithTelemetry(
+              env,
+              { status: "NULL", reason: "scope_expansion_detected" },
+              {
+                event_type: "VALIDATION_REJECTED",
+                severity: "HIGH",
+                payload: {
+                  route: "/continuity",
+                  continuity_id,
+                  parent_continuity_id,
+                  violating_scope_key: key,
+                  indicator: "recursive_scope_expansion_blocked"
+                },
+                drift_class: "authority_drift"
+              }
+            )
+          }
           if (
-            key in parentScope
-            && canonicalize(parentScope[key]) !== canonicalize(value)
+            canonicalize(parentScope[key]) !== canonicalize(value)
           ) {
             return rejectWithTelemetry(
               env,
@@ -397,7 +414,8 @@ export default {
                   route: "/continuity",
                   continuity_id,
                   parent_continuity_id,
-                  scope_key: key
+                  violating_scope_key: key,
+                  indicator: "recursive_scope_mutation_blocked"
                 },
                 drift_class: "authority_drift"
               }
