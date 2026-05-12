@@ -1,0 +1,92 @@
+{
+  "spec_id": "cryptographic-provenance-hardening-v2",
+  "canonical_position": "attestation evidence is verification evidence, not authority",
+  "non_bypassability": {
+    "creates_authority": false,
+    "creates_proof_legitimacy": false,
+    "bypasses_validation": false,
+    "bypasses_reconciliation": false,
+    "bypasses_replay_protection": false,
+    "bypasses_execution_boundaries": false,
+    "implies_remote_legitimacy": false,
+    "mutates_runtime_legitimacy_state": false
+  },
+  "dsse_verification_layer": {
+    "payload_type": "application/vnd.mindshift.cryptographic-provenance.v1+json",
+    "signature_algorithm": "HMAC-SHA256",
+    "signature_comparison": "constant_time",
+    "payload_hashing": "canonical",
+    "required_invariant": "validated payload == canonical payload else NULL"
+  },
+  "attestation_registry": {
+    "fields": [
+      "attestation_id",
+      "envelope_hash",
+      "payload_hash",
+      "payload_type",
+      "signer_identity",
+      "decision_id",
+      "validated_object_hash",
+      "workflow_run_id",
+      "workflow_sha",
+      "canonical_aeo_hash",
+      "transparency_log_id",
+      "transparency_integrated_time",
+      "status",
+      "created_at"
+    ],
+    "unique_constraints": [
+      "envelope_hash",
+      "workflow_run_id",
+      "decision_id + validated_object_hash"
+    ]
+  },
+  "drift_taxonomy_expansion": [
+    "attestation_drift",
+    "signature_drift",
+    "signer_identity_drift",
+    "payload_drift",
+    "transparency_drift"
+  ],
+  "reconciliation_compatibility": {
+    "recursive_reconciliation_traversal": "preserved",
+    "reconciliation_scheduler": "preserved",
+    "reconciliation_report_surfaces": "preserved",
+    "portable_reconciliation_envelopes": "preserved",
+    "federated_lineage_verification": "preserved",
+    "replay_lineage_validation": "preserved",
+    "preo_lineage_validation": "preserved",
+    "revocation_propagation": "preserved"
+  },
+  "federation_constraints": {
+    "remote_signatures_create_authority": false,
+    "remote_signatures_imply_local_validation": false,
+    "remote_signatures_imply_execution_legitimacy": false,
+    "ambiguous_federation_lineage": "NULL"
+  },
+  "replay_guarantees": {
+    "envelope_hash_replay": "NULL",
+    "workflow_run_id_replay": "NULL",
+    "decision_id_validated_object_hash_duplication": "NULL",
+    "ambiguous_signer_lineage": "NULL"
+  },
+  "observability_rules": {
+    "repair": false,
+    "authorize": false,
+    "mutate": false,
+    "consume_replay_state": false,
+    "create_legitimacy": false
+  },
+  "fate_coverage": [
+    { "test_id": "invalid_signature", "expected_result": "NULL" },
+    { "test_id": "signer_mismatch", "expected_result": "NULL" },
+    { "test_id": "payload_drift", "expected_result": "NULL" },
+    { "test_id": "transparency_proof_absence", "expected_result": "NULL" },
+    { "test_id": "replayed_attestation", "expected_result": "NULL" },
+    { "test_id": "workflow_replay_collision", "expected_result": "NULL" },
+    { "test_id": "canonical_payload_instability", "expected_result": "NULL" },
+    { "test_id": "federated_attestation_ambiguity", "expected_result": "NULL" },
+    { "test_id": "remote_legitimacy_inference", "expected_result": "NULL" },
+    { "test_id": "reconciliation_compatibility", "expected_result": "NULL" }
+  ]
+}
