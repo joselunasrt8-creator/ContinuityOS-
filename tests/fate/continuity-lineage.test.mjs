@@ -50,6 +50,6 @@ test('proof persists continuity lineage', () => {
 
 test('proof lineage must equal execution lineage', () => {
   assert.match(source, /authority_lineage,execution_lineage/)
-  assert.match(source, /JSON\.stringify\(\{ session_id, continuity_id: "runtime-bound", execution_id, decision_id, validated_object_hash \}\),JSON\.stringify\(\{ session_id, continuity_id: "runtime-bound", execution_id, decision_id, validated_object_hash \}\)/)
+  assert.match(source, /authorityLineage, executionLineage/)
   assert.match(authoritySchema, /continuity_id/)
 })

@@ -15,7 +15,7 @@ test('execute route is bound to stored canonical AEO and validated hash', () => 
 test('runtime contains exact-object mismatch failure signals', () => {
   const exactObjectSignals = [
     'hash_mismatch',
-    'scope_mismatch',
+    'scope_constraints_mismatch',
     'workflow_mismatch',
     'validated_object_hash'
   ];

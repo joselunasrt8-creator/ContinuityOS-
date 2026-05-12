@@ -330,7 +330,7 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     const hashCompiled = await prepareDecision(hashDecision, 'nonce-hash')
     runSqlite([dbPath, `UPDATE aeo_registry SET canonical_aeo='{}' WHERE decision_id='${hashDecision}'`])
     const hashExecution = await post('/execute', { session_id: hashCompiled.session_id, decision_id: hashDecision, validated_object_hash: hashCompiled.validated_object_hash, invocation_nonce: 'nonce-hash' })
-    assert.equal(hashExecution.reason, 'wrong_hash')
+    assert.equal(hashExecution.reason, 'hash_mismatch')
     assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${hashDecision}' AND event_type='HASH_MISMATCH'`]).trim(), 'HASH_MISMATCH')
     assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${hashDecision}'`]).trim(), 'hash_drift')
 

@@ -27,7 +27,7 @@ test('proof creation requires matching execution lineage', () => {
 
   assert.match(
     source,
-    /if \(!execution\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_execution" \}/,
+    /return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"execution_missing" \}/,
     'orphaned proof without matching execution must return NULL / INVALID',
   )
 

@@ -45,8 +45,8 @@ test('execution requires decision_id, validated_object_hash, and a VALID validat
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"hash_mismatch\" \}/,
-    'missing validation hash match must return NULL / INVALID with hash_mismatch',
+    /if \(!valid\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"no_validation\" \}/,
+    'missing validation evidence must return NULL / INVALID with no_validation',
   )
 
   assert.match(
