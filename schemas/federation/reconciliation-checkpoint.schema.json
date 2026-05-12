@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/federation/reconciliation-checkpoint.schema.json",
+  "title": "MindShift Reconciliation Checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["checkpoint_id", "runtime_id", "reconciliation_merkle_root", "traversal_position", "deterministic_hash", "lineage_count", "replay_snapshot_hash", "drift_snapshot_hash", "created_at"],
+  "properties": {
+    "checkpoint_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "runtime_id": { "type": "string", "minLength": 1 },
+    "reconciliation_merkle_root": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "traversal_position": { "type": "integer", "minimum": 0 },
+    "deterministic_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "lineage_count": { "type": "integer", "minimum": 0 },
+    "replay_snapshot_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "drift_snapshot_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

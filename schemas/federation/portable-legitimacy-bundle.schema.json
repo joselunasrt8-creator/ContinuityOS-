@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/federation/portable-legitimacy-bundle.schema.json",
+  "title": "MindShift Portable Legitimacy Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runtime_id",
+    "reconciliation_id",
+    "decision_id",
+    "validated_object_hash",
+    "proof_id",
+    "execution_id",
+    "invocation_nonce",
+    "continuity_id",
+    "authority_lineage_hash",
+    "proof_lineage_hash",
+    "replay_lineage_hash",
+    "preo_lineage_hash",
+    "attestation_hash",
+    "reconciliation_merkle_root",
+    "federation_boundary",
+    "emitted_at"
+  ],
+  "properties": {
+    "runtime_id": { "type": "string", "minLength": 1 },
+    "reconciliation_id": { "type": "string", "minLength": 1 },
+    "decision_id": { "type": "string", "minLength": 1 },
+    "validated_object_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "proof_id": { "type": "string", "minLength": 1 },
+    "execution_id": { "type": "string", "minLength": 1 },
+    "invocation_nonce": { "type": "string", "minLength": 1 },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "authority_lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "proof_lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "replay_lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "preo_lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "attestation_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "reconciliation_merkle_root": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "federation_boundary": { "const": "portable_evidence_not_portable_authority" },
+    "emitted_at": { "type": "string", "format": "date-time" }
+  }
+}

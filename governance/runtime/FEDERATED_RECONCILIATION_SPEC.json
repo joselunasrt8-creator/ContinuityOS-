@@ -1,0 +1,139 @@
+{
+  "federated_reconciliation_registry": {
+    "purpose": "observability-only cross-runtime reconciliation evidence index",
+    "mutation_policy": "append_only_runtime_schema_only_no_legitimacy_mutation",
+    "authority_policy": "portable_evidence_not_portable_authority",
+    "columns": [
+      "reconciliation_id",
+      "runtime_id",
+      "remote_runtime_id",
+      "classification",
+      "validated_object_hash",
+      "reconciliation_merkle_root",
+      "bundle_hash",
+      "verification_status",
+      "drift_class",
+      "created_at"
+    ]
+  },
+  "required_routes": [
+    "GET /federation/reconcile",
+    "GET /federation/reconcile/report",
+    "GET /federation/reconcile/drift",
+    "GET /federation/reconcile/checkpoint"
+  ],
+  "route_semantics": {
+    "read_only": true,
+    "mutates_legitimacy": false,
+    "creates_authority": false,
+    "reserves_replay_state": false,
+    "consumes_replay_state": false,
+    "repairs_drift": false,
+    "infers_legitimacy": false
+  },
+  "portable_legitimacy_bundle": {
+    "schema": "schemas/federation/portable-legitimacy-bundle.schema.json",
+    "canonical_serialization": "JCS",
+    "deterministic_ordering": true,
+    "replay_neutral": true,
+    "exact_object_bound": true,
+    "required_fields": [
+      "runtime_id",
+      "reconciliation_id",
+      "decision_id",
+      "validated_object_hash",
+      "proof_id",
+      "execution_id",
+      "invocation_nonce",
+      "continuity_id",
+      "authority_lineage_hash",
+      "proof_lineage_hash",
+      "replay_lineage_hash",
+      "preo_lineage_hash",
+      "attestation_hash",
+      "reconciliation_merkle_root",
+      "federation_boundary",
+      "emitted_at"
+    ]
+  },
+  "remote_runtime_classification": [
+    "LOCAL_RUNTIME",
+    "FEDERATED_RUNTIME",
+    "EXTERNAL_REFERENCE",
+    "UNTRUSTED_RUNTIME",
+    "PORTABLE_EVIDENCE_ONLY"
+  ],
+  "bounded_federation_trust_semantics": {
+    "trust_is_authority": false,
+    "remote_evidence_can_grant_legitimacy": false,
+    "remote_evidence_can_narrow_acceptance_only": true,
+    "local_validation_remains_mandatory": true
+  },
+  "verification_requirements": [
+    "canonical_payload_equality",
+    "DSSE_envelope_verification",
+    "attestation_replay_checks",
+    "reconciliation_Merkle_verification",
+    "runtime_id_continuity",
+    "decision_id_continuity",
+    "validated_object_hash_equality",
+    "invocation_nonce_continuity",
+    "proof_continuity",
+    "PREO_continuity",
+    "continuity_ancestry_verification"
+  ],
+  "forbidden_semantics": [
+    "inferred_legitimacy",
+    "remote_replay_trust",
+    "implicit_authority",
+    "remote_execution_inheritance",
+    "mutation_capable_reconciliation",
+    "alternate_execution_path"
+  ],
+  "reconciliation_merkle_layer": {
+    "layers": ["session", "continuity", "authority", "AEO", "validation", "execution", "proof", "attestation", "PREO"],
+    "deterministic_traversal_order": true,
+    "deterministic_hashing": true,
+    "canonical_serialization": true,
+    "recursive_ancestry_verification": true,
+    "mismatch_result": "NULL"
+  },
+  "checkpoint": {
+    "schema": "schemas/federation/reconciliation-checkpoint.schema.json",
+    "append_only": true,
+    "deterministic": true,
+    "mutation_capable": false,
+    "rollback_overwrite": false
+  },
+  "federated_drift_taxonomy": [
+    "federated_checkpoint_drift",
+    "federated_merkle_drift",
+    "federated_bundle_drift",
+    "federated_attestation_drift",
+    "federated_reconciliation_drift",
+    "federated_runtime_divergence_drift",
+    "federated_replay_drift",
+    "federated_preo_drift",
+    "federated_continuity_drift",
+    "federated_exact_object_drift"
+  ],
+  "fate_matrix": [
+    { "test_id": "federated_merkle_mismatch", "expected_result": "NULL" },
+    { "test_id": "federated_checkpoint_divergence", "expected_result": "NULL" },
+    { "test_id": "federated_replay_collision", "expected_result": "NULL" },
+    { "test_id": "federated_exact_object_divergence", "expected_result": "NULL" },
+    { "test_id": "federated_attestation_replay", "expected_result": "NULL" },
+    { "test_id": "federated_runtime_identity_drift", "expected_result": "NULL" },
+    { "test_id": "federated_preo_divergence", "expected_result": "NULL" },
+    { "test_id": "federated_continuity_divergence", "expected_result": "NULL" },
+    { "test_id": "federated_bundle_payload_drift", "expected_result": "NULL" },
+    { "test_id": "remote_authority_inference", "expected_result": "NULL" },
+    { "test_id": "remote_execution_legitimacy_inference", "expected_result": "NULL" },
+    { "test_id": "non_deterministic_reconciliation_order", "expected_result": "NULL" }
+  ],
+  "canonical_runtime_position": {
+    "execution_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+    "federation_reconciliation_outside_execution_authority": true,
+    "may_only": ["observe", "verify", "classify", "emit_evidence"]
+  }
+}
