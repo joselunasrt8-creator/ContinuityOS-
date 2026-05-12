@@ -381,9 +381,10 @@ export default {
           isPlainRecord(parent?.canonical?.scope)
             ? canonicalRecord(parent.canonical.scope)
             : {}
+        const childScope = canonicalRecord(requestedScope)
 
-        for (const [key, value] of Object.entries(requestedScope)) {
-          if (!(key in parentScope)) {
+        for (const [key, value] of Object.entries(childScope)) {
+          if (!Object.prototype.hasOwnProperty.call(parentScope, key)) {
             return rejectWithTelemetry(
               env,
               { status: "NULL", reason: "scope_expansion_detected" },
@@ -394,16 +395,13 @@ export default {
                   route: "/continuity",
                   continuity_id,
                   parent_continuity_id,
-                  violating_scope_key: key,
-                  indicator: "recursive_scope_expansion_blocked"
+                  indicator: "recursive_scope_expansion_detected"
                 },
                 drift_class: "authority_drift"
               }
             )
           }
-          if (
-            canonicalize(parentScope[key]) !== canonicalize(value)
-          ) {
+          if (canonicalize(parentScope[key]) !== canonicalize(value)) {
             return rejectWithTelemetry(
               env,
               { status: "NULL", reason: "scope_expansion_detected" },
@@ -414,8 +412,7 @@ export default {
                   route: "/continuity",
                   continuity_id,
                   parent_continuity_id,
-                  violating_scope_key: key,
-                  indicator: "recursive_scope_mutation_blocked"
+                  indicator: "recursive_scope_expansion_detected"
                 },
                 drift_class: "authority_drift"
               }
