@@ -852,11 +852,11 @@ export default {
         await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash } })
         return json({ status: "COMPILED", decision_id, validated_object_hash, canonical_aeo: JSON.parse(canonical_aeo_json) })
       } catch (error: any) {
-        await recordDrift(env, { drift_class: "registry_drift", severity: "CRITICAL", payload: { route: "/compile", error: String(error?.message || error || "unknown_error") } })
+        await recordDrift(env, { drift_class: "registry_drift", severity: "CRITICAL", payload: { route: "/compile", error: "internal_error" } })
         return json({
           status: "FAILED",
           route: "/compile",
-          error: String(error?.message || error || "unknown_error"),
+          error: "internal_error",
           reason: "compile_exception"
         })
       }
