@@ -186,7 +186,12 @@
       "portable_serialization_mismatch_drift",
       "federated_replay_discontinuity_drift",
       "deterministic_traversal_instability_drift",
-      "reconciliation_payload_corruption_drift"
+      "reconciliation_payload_corruption_drift",
+      "federated_revocation_divergence_drift",
+      "federated_revocation_projection_drift",
+      "federated_revocation_replay_drift",
+      "federated_checkpoint_revocation_drift",
+      "federated_expiration_visibility_drift"
     ],
     "observability_only": true
   },
@@ -321,6 +326,36 @@
     {
       "test_id": "reconciliation_payload_corruption",
       "corruption": "portable reconciliation payload hash or drift class is corrupted",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_identity_mismatch",
+      "corruption": "federated revocation observability corruption",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_replay_collision",
+      "corruption": "federated revocation observability corruption",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_without_lineage",
+      "corruption": "federated revocation observability corruption",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_remote_revocation_authority_inference",
+      "corruption": "federated revocation observability corruption",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_checkpoint_revocation_divergence",
+      "corruption": "federated revocation observability corruption",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_expired_lineage_visibility_corruption",
+      "corruption": "federated revocation observability corruption",
       "expected_result": "NULL"
     }
   ],
@@ -479,5 +514,16 @@
       "content_addressed_lineage_hash"
     ],
     "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity"
+  },
+  "federated_revocation_observability": {
+    "mode": "observability federation not authority federation",
+    "remote_revocation_evidence": "foreign evidence != local authority",
+    "replay_neutral": true,
+    "read_only": true,
+    "mutation_capable": false,
+    "remote_authority_inherited": false,
+    "remote_execution_legitimacy": false,
+    "replay_state_consumed": false,
+    "checkpoint_identity": "sha256(JCS({runtime_id,reconciliation_merkle_root,deterministic_hash,created_at})) with revocation_snapshot_hash included in deterministic_hash material"
   }
 }

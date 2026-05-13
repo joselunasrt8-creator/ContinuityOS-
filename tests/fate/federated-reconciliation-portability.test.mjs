@@ -96,3 +96,17 @@ test('expanded reconciliation FATE and drift taxonomy fail closed to NULL', () =
     assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
   }
 })
+
+test('portable revocation evidence uses persisted identifiers without authority portability', () => {
+  assert.match(reconciliationSource, /type FederatedRevocationEvidence/)
+  assert.match(reconciliationSource, /canonicalFederatedRevocationEvidence/)
+  assert.match(reconciliationSource, /deterministicFederatedRevocationEvidenceHash/)
+  assert.match(reconciliationSource, /portable_evidence_not_portable_authority/)
+  assert.match(reconciliationSource, /remote_authority_inherited: false/)
+  assert.match(reconciliationSource, /remote_execution_legitimacy: false/)
+  assert.match(reconciliationSource, /replay_state_consumed: false/)
+  assert.match(reconciliationSource, /replay_neutral: true/)
+  assert.doesNotMatch(source, /remote.*revoke.*local.*authority/)
+  assert.equal(spec.federated_revocation_observability.replay_neutral, true)
+  assert.equal(spec.federated_revocation_observability.mutation_capable, false)
+})

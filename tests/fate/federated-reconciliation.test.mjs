@@ -106,3 +106,53 @@ test('federated drift taxonomy and FATE cases fail closed to NULL', () => {
     assert.ok(doc.includes('`' + fate + '`'))
   }
 })
+
+const revocationDriftClasses = [
+  'federated_revocation_divergence_drift',
+  'federated_revocation_projection_drift',
+  'federated_revocation_replay_drift',
+  'federated_checkpoint_revocation_drift',
+  'federated_expiration_visibility_drift'
+]
+
+const revocationFateCases = [
+  'federated_revocation_identity_mismatch',
+  'federated_revocation_replay_collision',
+  'federated_revocation_without_lineage',
+  'federated_remote_revocation_authority_inference',
+  'federated_checkpoint_revocation_divergence',
+  'federated_expired_lineage_visibility_corruption'
+]
+
+test('federated revocation evidence remains observability-only and non-authoritative', () => {
+  const revocationSchema = JSON.parse(readFileSync(new URL('../../schemas/federation/federated-revocation-evidence.schema.json', import.meta.url), 'utf8'))
+  assert.match(source, /type FederatedRevocationEvidence = \{[\s\S]*runtime_id: string[\s\S]*remote_runtime_id: string[\s\S]*observed_at: string[\s\S]*\}/)
+  assert.match(source, /portable_evidence_not_portable_authority/)
+  assert.match(source, /remote_authority_inherited: false/)
+  assert.match(source, /remote_execution_legitimacy: false/)
+  assert.match(source, /replay_state_consumed: false/)
+  assert.match(source, /replay_neutral: true/)
+  assert.match(source, /read_only: true/)
+  assert.match(source, /mutation_capable: false/)
+  assert.doesNotMatch(source, /remote.*revoke.*local.*authority/)
+  for (const field of spec.federated_revocation_evidence.required_fields) {
+    assert.ok(revocationSchema.required.includes(field), `revocation schema missing ${field}`)
+    assert.ok(doc.includes('`' + field + '`'), `revocation doc missing ${field}`)
+  }
+  assert.equal(spec.federated_revocation_evidence.replay_neutral, true)
+  assert.equal(spec.federated_revocation_evidence.read_only, true)
+  assert.equal(spec.federated_revocation_evidence.mutation_capable, false)
+})
+
+test('federated revocation drift taxonomy and FATE cases fail closed to NULL', () => {
+  const fateById = new Map(spec.fate_matrix.map((entry) => [entry.test_id, entry.expected_result]))
+  for (const drift of revocationDriftClasses) {
+    assert.ok(spec.federated_drift_taxonomy.includes(drift), `spec missing ${drift}`)
+    assert.match(source, new RegExp(`"${drift}"`), `runtime missing ${drift}`)
+    assert.ok(doc.includes('`' + drift + '`'), `doc missing ${drift}`)
+  }
+  for (const fate of revocationFateCases) {
+    assert.equal(fateById.get(fate), 'NULL', `${fate} must fail closed`)
+    assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
+  }
+})

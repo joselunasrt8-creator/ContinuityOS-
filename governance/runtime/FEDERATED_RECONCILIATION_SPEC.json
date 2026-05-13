@@ -20,7 +20,8 @@
     "GET /federation/reconcile",
     "GET /federation/reconcile/report",
     "GET /federation/reconcile/drift",
-    "GET /federation/reconcile/checkpoint"
+    "GET /federation/reconcile/checkpoint",
+    "GET /federation/reconcile/revocation"
   ],
   "route_semantics": {
     "read_only": true,
@@ -29,7 +30,8 @@
     "reserves_replay_state": false,
     "consumes_replay_state": false,
     "repairs_drift": false,
-    "infers_legitimacy": false
+    "infers_legitimacy": false,
+    "revocation_observability_only": true
   },
   "portable_legitimacy_bundle": {
     "schema": "schemas/federation/portable-legitimacy-bundle.schema.json",
@@ -91,7 +93,17 @@
     "alternate_execution_path"
   ],
   "reconciliation_merkle_layer": {
-    "layers": ["session", "continuity", "authority", "AEO", "validation", "execution", "proof", "attestation", "PREO"],
+    "layers": [
+      "session",
+      "continuity",
+      "authority",
+      "AEO",
+      "validation",
+      "execution",
+      "proof",
+      "attestation",
+      "PREO"
+    ],
     "deterministic_traversal_order": true,
     "deterministic_hashing": true,
     "canonical_serialization": true,
@@ -115,25 +127,159 @@
     "federated_replay_drift",
     "federated_preo_drift",
     "federated_continuity_drift",
-    "federated_exact_object_drift"
+    "federated_exact_object_drift",
+    "federated_revocation_divergence_drift",
+    "federated_revocation_projection_drift",
+    "federated_revocation_replay_drift",
+    "federated_checkpoint_revocation_drift",
+    "federated_expiration_visibility_drift"
   ],
   "fate_matrix": [
-    { "test_id": "federated_merkle_mismatch", "expected_result": "NULL" },
-    { "test_id": "federated_checkpoint_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_replay_collision", "expected_result": "NULL" },
-    { "test_id": "federated_exact_object_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_attestation_replay", "expected_result": "NULL" },
-    { "test_id": "federated_runtime_identity_drift", "expected_result": "NULL" },
-    { "test_id": "federated_preo_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_continuity_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_bundle_payload_drift", "expected_result": "NULL" },
-    { "test_id": "remote_authority_inference", "expected_result": "NULL" },
-    { "test_id": "remote_execution_legitimacy_inference", "expected_result": "NULL" },
-    { "test_id": "non_deterministic_reconciliation_order", "expected_result": "NULL" }
+    {
+      "test_id": "federated_merkle_mismatch",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_checkpoint_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_replay_collision",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_exact_object_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_attestation_replay",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_runtime_identity_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_preo_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_continuity_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_bundle_payload_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "remote_authority_inference",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "remote_execution_legitimacy_inference",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "non_deterministic_reconciliation_order",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_identity_mismatch",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_replay_collision",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_without_lineage",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_remote_revocation_authority_inference",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_checkpoint_revocation_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_expired_lineage_visibility_corruption",
+      "expected_result": "NULL"
+    }
   ],
   "canonical_runtime_position": {
-    "execution_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+    "execution_path": [
+      "/session",
+      "/continuity",
+      "/authority",
+      "/compile",
+      "/validate",
+      "/execute",
+      "/proof"
+    ],
     "federation_reconciliation_outside_execution_authority": true,
-    "may_only": ["observe", "verify", "classify", "emit_evidence"]
+    "may_only": [
+      "observe",
+      "verify",
+      "classify",
+      "emit_evidence"
+    ],
+    "governance_position": "observability federation not authority federation; distributed awareness without distributed authority collapse",
+    "may_not": [
+      "grant authority",
+      "inherit legitimacy",
+      "consume replay state",
+      "bypass local validation",
+      "mutate local runtime legitimacy"
+    ]
+  },
+  "federated_revocation_observability_registry": {
+    "purpose": "append-only observability index for remote revocation evidence",
+    "authority_policy": "portable_evidence_not_portable_authority",
+    "replay_neutral": true,
+    "read_only": true,
+    "mutation_capable": false,
+    "columns": [
+      "revocation_evidence_id",
+      "runtime_id",
+      "remote_runtime_id",
+      "continuity_id",
+      "decision_id",
+      "validated_object_hash",
+      "revocation_class",
+      "revocation_reason",
+      "lineage_hash",
+      "reconciliation_merkle_root",
+      "attestation_hash",
+      "observed_at",
+      "evidence_hash",
+      "created_at"
+    ]
+  },
+  "federated_revocation_evidence": {
+    "schema": "schemas/federation/federated-revocation-evidence.schema.json",
+    "required_fields": [
+      "runtime_id",
+      "remote_runtime_id",
+      "continuity_id",
+      "decision_id",
+      "validated_object_hash",
+      "revocation_class",
+      "revocation_reason",
+      "lineage_hash",
+      "reconciliation_merkle_root",
+      "attestation_hash",
+      "observed_at"
+    ],
+    "replay_neutral": true,
+    "read_only": true,
+    "mutation_capable": false,
+    "federation_boundary": "portable_evidence_not_portable_authority",
+    "deterministic_serialization": true,
+    "exact_object_bound": true,
+    "remote_authority_inherited": false,
+    "remote_execution_legitimacy": false,
+    "replay_state_consumed": false
   }
 }

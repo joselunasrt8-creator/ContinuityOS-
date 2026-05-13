@@ -195,3 +195,15 @@ Expanded failure classifications:
 | Federated replay discontinuity | `federated_replay_discontinuity_drift` | `NULL` |
 | Deterministic traversal instability | `deterministic_traversal_instability_drift` | `NULL` |
 | Reconciliation payload corruption | `reconciliation_payload_corruption_drift` | `NULL` |
+
+## Federated revocation propagation observability
+
+Federated revocation propagation extends reconciliation with distributed revocation awareness while preserving sovereignty: foreign evidence is not local authority. The runtime may observe, verify, classify, and emit evidence, but it does not grant authority, inherit legitimacy, consume replay state, bypass local validation, or mutate runtime legitimacy.
+
+The observability registry is `federated_revocation_observability_registry`. Its evidence object is `FederatedRevocationEvidence` with `runtime_id`, `remote_runtime_id`, `continuity_id`, `decision_id`, `validated_object_hash`, `revocation_class`, `revocation_reason`, `lineage_hash`, `reconciliation_merkle_root`, `attestation_hash`, and `observed_at`.
+
+Revocation evidence is `replay_neutral`, `read_only`, `mutation_capable: false`, `portable_evidence_not_portable_authority`, `deterministic_serialization`, and `exact_object_bound`. Runtime assertions keep `remote_authority_inherited: false`, `remote_execution_legitimacy: false`, and `replay_state_consumed: false`.
+
+New drift classes are `federated_revocation_divergence_drift`, `federated_revocation_projection_drift`, `federated_revocation_replay_drift`, `federated_checkpoint_revocation_drift`, and `federated_expiration_visibility_drift`.
+
+New FATE cases all produce `NULL`: `federated_revocation_identity_mismatch`, `federated_revocation_replay_collision`, `federated_revocation_without_lineage`, `federated_remote_revocation_authority_inference`, `federated_checkpoint_revocation_divergence`, and `federated_expired_lineage_visibility_corruption`.

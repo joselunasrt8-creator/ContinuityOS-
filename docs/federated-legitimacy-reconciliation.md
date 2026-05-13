@@ -115,3 +115,34 @@ Every failure returns `NULL`.
 ## Forbidden semantics labels
 
 The implementation explicitly rejects `inferred_legitimacy`, `remote_replay_trust`, `implicit_authority`, `remote_execution_inheritance`, `mutation_capable_reconciliation`, and `alternate_execution_path`.
+
+## Federated revocation observability
+
+Federated revocation propagation is observability federation, not authority federation. Foreign evidence is not local authority; distributed awareness is allowed without distributed authority collapse.
+
+Additional route:
+
+- `GET /federation/reconcile/revocation`
+
+`FederatedRevocationEvidence` contains `runtime_id`, `remote_runtime_id`, `continuity_id`, `decision_id`, `validated_object_hash`, `revocation_class`, `revocation_reason`, `lineage_hash`, `reconciliation_merkle_root`, `attestation_hash`, and `observed_at`.
+
+The revocation evidence envelope is `replay_neutral`, `read_only`, `mutation_capable: false`, `portable_evidence_not_portable_authority`, `deterministic_serialization`, and `exact_object_bound`. It carries `remote_authority_inherited: false`, `remote_execution_legitimacy: false`, and `replay_state_consumed: false` so remote revocation remains evidence only.
+
+Federated revocation drift taxonomy additions:
+
+- `federated_revocation_divergence_drift`
+- `federated_revocation_projection_drift`
+- `federated_revocation_replay_drift`
+- `federated_checkpoint_revocation_drift`
+- `federated_expiration_visibility_drift`
+
+Federated revocation FATE additions all fail closed to `NULL`:
+
+- `federated_revocation_identity_mismatch`
+- `federated_revocation_replay_collision`
+- `federated_revocation_without_lineage`
+- `federated_remote_revocation_authority_inference`
+- `federated_checkpoint_revocation_divergence`
+- `federated_expired_lineage_visibility_corruption`
+
+Revocation checkpoints include `revocation_snapshot_hash` in deterministic checkpoint material, preserving deterministic checkpoint identity while remaining append-only and replay-neutral.

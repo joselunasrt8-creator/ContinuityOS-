@@ -90,3 +90,9 @@ The traversal engine classifies the first fail-closed drift deterministically:
 - `traversal_instability_drift`
 
 Federated lineage and reporting APIs remain future phases and must consume this deterministic traversal substrate rather than bypassing it.
+
+## Recursive revocation lineage observability
+
+Recursive reconciliation now exposes federated revocation lineage as observability-only evidence. `FederatedRevocationEvidence` is hashed deterministically and bound to the reconciliation Merkle root, attestation hash, and lineage hash. Remote revocation evidence can narrow acceptance and trigger reconciliation, but local validation remains sovereign and replay state remains local.
+
+Revocation-aware reconciliation adds deterministic classes `federated_revocation_divergence_drift`, `federated_revocation_projection_drift`, `federated_revocation_replay_drift`, `federated_checkpoint_revocation_drift`, and `federated_expiration_visibility_drift`. These classes preserve recursive lineage integrity and return `NULL` for identity mismatch, replay collision, missing lineage, checkpoint divergence, or expiration visibility corruption.

@@ -63,3 +63,14 @@ test('adapter targets match approved workflow targets', () => {
 test('proofless external execution paths are flagged', () => {
   assert.ok(gaps.failure_classes.includes('proofless external execution'))
 })
+
+test('federated revocation observability does not collapse sovereignty boundaries', () => {
+  const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+  assert.match(source, /portable_evidence_not_portable_authority/)
+  assert.match(source, /remote_authority_inherited: false/)
+  assert.match(source, /remote_execution_legitimacy: false/)
+  assert.match(source, /replay_state_consumed: false/)
+  assert.match(source, /replay_neutral: true/)
+  assert.match(source, /mutation_capable: false/)
+  assert.doesNotMatch(source, /remote.*revoke.*local.*authority/)
+})
