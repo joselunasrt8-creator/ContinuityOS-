@@ -140,9 +140,9 @@ The implementation explicitly rejects `inferred_legitimacy`, `remote_replay_trus
 - `attestation_hash`
 - `observed_at`
 
-The object is `replay_neutral: true`, `read_only: true`, `mutation_capable: false`, deterministic-serialization only, exact-object-bound, and explicitly marked `portable_evidence_not_portable_authority`.
+The object is `replay_neutral: true`, `read_only: true`, `mutation_capable: false`, deterministic-serialization only, exact-object-bound, and explicitly marked `portable_evidence_not_portable_authority`. Revocation evidence identity hashes canonical lineage fields only; `observed_at`, `emitted_at`, and `created_at` are metadata excluded from deterministic evidence identity, `revocation_id`, and replay-neutral equivalence.
 
-Remote revocation evidence may narrow acceptance, emit drift evidence, trigger reconciliation, and emit observability telemetry. It must not change local authority, invalidate local replay state, consume invocation lineage, mutate local legitimacy, or bypass local validation. Revocation reconciliation therefore remains replay-neutral and GET-only.
+Remote revocation evidence envelopes are exact-object verified by comparing supplied `evidence_hash`, `exact_object_hash`, and `envelope_hash` against recomputed canonical hashes with `canonical_hash_locked: true`. Remote revocation evidence may narrow acceptance, emit drift evidence, trigger reconciliation, and emit observability telemetry. It must not change local authority, invalidate local replay state, consume invocation lineage, mutate local legitimacy, or bypass local validation. Revocation reconciliation therefore remains replay-neutral and GET-only.
 
 ## `federated_revocation_registry`
 
@@ -162,7 +162,7 @@ Remote revocation evidence may narrow acceptance, emit drift evidence, trigger r
 - `drift_class`
 - `created_at`
 
-Federation routes project registry entries as evidence envelopes only; they do not persist during GET reconciliation and do not mutate legitimacy.
+Federation routes project registry entries as evidence envelopes only; they do not persist during GET reconciliation and do not mutate legitimacy. `revocation_id` excludes `observed_at`, `emitted_at`, and `created_at`; timestamps remain append-only observational metadata.
 
 ## Revocation-aware reconciliation flow
 
@@ -170,7 +170,7 @@ All federated revocation reconciliation follows:
 
 `deterministic traversal` → `revocation evidence resolution` → `drift augmentation` → `normalized federation response`
 
-Raw traversal output is never returned as the federation response. Revocation checkpoints derive identity only from deterministic reconciliation state; `created_at` remains append-only observational metadata and is excluded from checkpoint identity.
+Raw traversal output is never returned as the federation response. Revocation anchors derive only from canonical persisted registry row identifiers and canonical legitimacy lineage; `lookup_key` and composite traversal selectors are never portable revocation identity material. Revocation checkpoints derive identity only from deterministic reconciliation state; `created_at` remains append-only observational metadata and is excluded from checkpoint identity.
 
 ## Revocation drift taxonomy
 
@@ -178,6 +178,8 @@ The revocation-aware federated drift classes are:
 
 - `federated_revocation_divergence_drift`
 - `federated_revocation_projection_drift`
+- `federated_revocation_exact_object_drift`
+- `federated_revocation_anchor_drift`
 - `federated_revocation_replay_drift`
 - `federated_checkpoint_revocation_drift`
 - `federated_expiration_visibility_drift`
@@ -192,6 +194,8 @@ The revocation fail-closed FATE cases are:
 - `federated_remote_revocation_authority_inference`
 - `federated_checkpoint_revocation_divergence`
 - `federated_expired_lineage_visibility_corruption`
+- `federated_revocation_exact_object_drift`
+- `federated_revocation_anchor_drift`
 
 Every case returns `NULL`.
 

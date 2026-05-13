@@ -129,6 +129,8 @@
     "federated_identifier_resolution_drift",
     "federated_revocation_divergence_drift",
     "federated_revocation_projection_drift",
+    "federated_revocation_anchor_drift",
+    "federated_revocation_exact_object_drift",
     "federated_revocation_replay_drift",
     "federated_checkpoint_revocation_drift",
     "federated_expiration_visibility_drift"
@@ -225,6 +227,14 @@
     {
       "test_id": "federated_expired_lineage_visibility_corruption",
       "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_exact_object_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_revocation_anchor_drift",
+      "expected_result": "NULL"
     }
   ],
   "canonical_runtime_position": {
@@ -286,7 +296,10 @@
       "reconciliation_merkle_root",
       "attestation_hash",
       "observed_at"
-    ]
+    ],
+    "identity_policy": "revocation evidence identity hashes canonical lineage fields only; observed_at, emitted_at, and created_at are metadata excluded from deterministic identity",
+    "exact_object_validation": "supplied evidence_hash, exact_object_hash, and envelope_hash must match recomputed canonical hashes or verification returns NULL",
+    "canonical_anchor_policy": "revocation anchors derive only from canonical persisted registry row identifiers; lookup_key and composite traversal selectors are never identity material"
   },
   "revocation_reconciliation_flow": [
     "deterministic traversal",

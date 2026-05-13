@@ -195,14 +195,14 @@ test('federated revocation registry and drift/FATE extensions fail closed', () =
     assert.match(source, new RegExp(field), `source missing ${field}`)
     assert.ok(doc.includes('`' + field + '`'), `doc missing ${field}`)
   }
-  const revocationDrifts = ['federated_revocation_divergence_drift','federated_revocation_projection_drift','federated_revocation_replay_drift','federated_checkpoint_revocation_drift','federated_expiration_visibility_drift']
+  const revocationDrifts = ['federated_revocation_divergence_drift','federated_revocation_projection_drift','federated_revocation_exact_object_drift','federated_revocation_anchor_drift','federated_revocation_replay_drift','federated_checkpoint_revocation_drift','federated_expiration_visibility_drift']
   for (const drift of revocationDrifts) {
     assert.ok(spec.federated_drift_taxonomy.includes(drift), `spec missing ${drift}`)
     assert.match(source, new RegExp(`"${drift}"`), `source missing ${drift}`)
     assert.ok(doc.includes('`' + drift + '`'), `doc missing ${drift}`)
   }
   const fateById = new Map(spec.fate_matrix.map((entry) => [entry.test_id, entry.expected_result]))
-  for (const fate of ['federated_revocation_identity_mismatch','federated_revocation_replay_collision','federated_revocation_without_lineage','federated_remote_revocation_authority_inference','federated_checkpoint_revocation_divergence','federated_expired_lineage_visibility_corruption']) {
+  for (const fate of ['federated_revocation_identity_mismatch','federated_revocation_replay_collision','federated_revocation_without_lineage','federated_remote_revocation_authority_inference','federated_checkpoint_revocation_divergence','federated_expired_lineage_visibility_corruption','federated_revocation_exact_object_drift','federated_revocation_anchor_drift']) {
     assert.equal(fateById.get(fate), 'NULL', `${fate} must fail closed`)
     assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
   }
@@ -217,4 +217,36 @@ test('federated revocation reconciliation follows normalized flow and determinis
   assert.match(source, /async function deterministicRevocationEvidenceHash/)
   assert.match(source, /created_at is observational metadata and MUST NEVER participate in checkpoint identity hashing/)
   assert.deepEqual(spec.revocation_reconciliation_flow, ['deterministic traversal','revocation evidence resolution','drift augmentation','normalized federation response'])
+})
+
+test('revocation evidence identity excludes timestamps and validates exact object envelopes', () => {
+  const identityStart = source.indexOf('function canonicalRevocationEvidenceIdentity')
+  const identityEnd = source.indexOf('async function deterministicRevocationEvidenceHash')
+  assert.ok(identityStart > -1 && identityEnd > identityStart)
+  const identityFunction = source.slice(identityStart, identityEnd)
+  assert.match(identityFunction, /observed_at is append-only observational metadata and MUST NEVER participate in revocation evidence identity/)
+  assert.doesNotMatch(identityFunction, /observed_at:/)
+  assert.match(source, /async function exactRevocationEvidenceObjectHash/)
+  assert.match(source, /canonical_hash_locked: true/)
+  assert.match(source, /supplied vs recomputed envelope verification preserves exact-object revocation envelope validation/)
+  assert.match(source, /String\(envelope\.evidence_hash \|\| ""\) !== recomputed_evidence_hash/)
+  assert.match(source, /String\(envelope\.exact_object_hash \|\| ""\) !== recomputed_exact_object_hash/)
+  assert.match(source, /String\(envelope\.envelope_hash \|\| ""\) !== recomputed_envelope_hash/)
+  assert.equal(spec.federated_revocation_evidence.identity_policy, 'revocation evidence identity hashes canonical lineage fields only; observed_at, emitted_at, and created_at are metadata excluded from deterministic identity')
+})
+
+test('revocation anchors derive from canonical lineage only and never lookup selectors', () => {
+  const anchorStart = source.indexOf('function canonicalRevocationAnchorFromCanonicalRows')
+  const anchorEnd = source.indexOf('async function canonicalRevocationAnchorHash')
+  assert.ok(anchorStart > -1 && anchorEnd > anchorStart)
+  const anchorFunction = source.slice(anchorStart, anchorEnd)
+  assert.match(anchorFunction, /canonical_identifiers/)
+  assert.match(anchorFunction, /canonical_identity/)
+  assert.match(anchorFunction, /canonicalIdentifiersForRegistry/)
+  assert.match(anchorFunction, /Canonical revocation anchors derive only from persisted registry row identifiers/)
+  assert.doesNotMatch(anchorFunction, /lookup_key:/)
+  assert.doesNotMatch(anchorFunction, /split\(":"\)/)
+  assert.match(source, /federated_revocation_anchor_drift/)
+  assert.match(source, /federated_revocation_exact_object_drift/)
+  assert.equal(spec.federated_revocation_evidence.canonical_anchor_policy, 'revocation anchors derive only from canonical persisted registry row identifiers; lookup_key and composite traversal selectors are never identity material')
 })
