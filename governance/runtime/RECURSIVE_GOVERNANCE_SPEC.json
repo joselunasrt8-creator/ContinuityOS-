@@ -31,7 +31,8 @@
   "required_sco_enforcement": {
     "all_mutation_classes_require_sco": true,
     "missing_sco_decision": "NULL",
-    "runtime_mutation_without_sco": "NULL_OR_REJECTED_FAIL_CLOSED"
+    "runtime_mutation_without_sco": "NULL_OR_REJECTED_FAIL_CLOSED",
+    "required_preo_for_activation": true
   },
   "recursive_proof_requirements": {
     "proof_required": true,
@@ -45,8 +46,19 @@
     "mutation_after_validation_rejected": true
   },
   "canonical_execution_path_guarantees": {
-    "path": ["/authority", "/compile", "/validate", "/execute", "/proof"],
-    "execution_remains_valid_only_if": ["VALID", "AUTHORIZED", "UNUSED", "POLICY_VALID"],
+    "path": [
+      "/authority",
+      "/compile",
+      "/validate",
+      "/execute",
+      "/proof"
+    ],
+    "execution_remains_valid_only_if": [
+      "VALID",
+      "AUTHORIZED",
+      "UNUSED",
+      "POLICY_VALID"
+    ],
     "recursive_governance_cannot_bypass_path": true
   },
   "non_bypassability_guarantees": {
@@ -71,7 +83,10 @@
     "replay_weakening",
     "authority_inheritance_expansion",
     "mutation_capable_observability_route",
-    "exact_object_violation"
+    "exact_object_violation",
+    "missing_preo",
+    "schema_weakening",
+    "policy_semantics_mutation"
   ],
   "registry": {
     "name": "recursive_governance_registry",
@@ -79,6 +94,43 @@
     "updates_allowed": false,
     "deletes_allowed": false,
     "exact_object_required": true,
-    "replay_consumption_allowed": false
+    "replay_consumption_allowed": false,
+    "activation_lock_registry": "runtime_governance_lock_registry",
+    "replay_registry": "recursive_governance_replay_registry"
+  },
+  "admission_route": {
+    "path": "/governance/recursive/admit",
+    "method": "POST",
+    "read_only": false,
+    "allowed_mutation": "append_only_recursive_governance_evidence_plus_activation_lock",
+    "activation_requires": [
+      "VALID_SCO",
+      "VALID_PREO",
+      "EXACT_OBJECT",
+      "CANONICAL_PATH_PRESERVED",
+      "RECURSIVE_GOVERNANCE_VALIDATED"
+    ]
+  },
+  "runtime_activation_lock": {
+    "registry": "runtime_governance_lock_registry",
+    "activation_allowed_requires_lock": true,
+    "partial_activation_allowed": false,
+    "mutation_before_validation_allowed": false
+  },
+  "replay_protection": {
+    "registry": "recursive_governance_replay_registry",
+    "reused_sco_preo_mutation_tuple_result": "NULL",
+    "replayed_runtime_mutation_approval_result": "NULL"
+  },
+  "runtime_surface_hashing": {
+    "function": "deriveRuntimeSurfaceHash",
+    "includes": [
+      "routes",
+      "validators",
+      "schemas",
+      "governance_policies",
+      "observability_boundaries"
+    ],
+    "mismatch_result": "NULL"
   }
 }
