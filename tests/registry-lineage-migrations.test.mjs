@@ -75,11 +75,11 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'session_registry', ['identity_id', 'owner', 'trust_tier', 'continuity_status', 'created_at', 'expires_at'])
     assertIndex(dbPath, 'session_registry', 'idx_session_registry_status_expiry', ['continuity_status', 'expires_at'])
 
-    assertColumns(dbPath, 'authority_registry', ['authority_id', 'decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at', 'continuity_id', 'identity_id'])
+    assertColumns(dbPath, 'authority_registry', ['authority_id', 'decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at', 'continuity_id', 'identity_id', 'delegated_authority_id', 'parent_authority_id', 'delegation_depth', 'delegation_scope_subset', 'delegation_expiry', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash'])
     assertNotNull(dbPath, 'authority_registry', ['decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'authority_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'authority_registry must retain UNIQUE(decision_id) lifecycle guard')
 
-    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id'])
+    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash'])
     assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at'])
     assertIndex(dbPath, 'aeo_registry', 'idx_aeo_registry_decision_hash', ['decision_id', 'validated_object_hash'])
 
@@ -87,16 +87,16 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'preo_registry', ['decision_id', 'authority_id', 'continuity_id', 'reviewed_hash', 'canonical_preo', 'status', 'created_at'])
     assertIndex(dbPath, 'preo_registry', 'idx_preo_registry_decision_hash', ['decision_id', 'reviewed_hash'])
 
-    assertColumns(dbPath, 'validation_registry', ['validation_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'environment', 'result', 'reason', 'status', 'created_at', 'continuity_id'])
+    assertColumns(dbPath, 'validation_registry', ['validation_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'environment', 'result', 'reason', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegated_replay_chain_hash'])
     assertNotNull(dbPath, 'validation_registry', ['session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'result', 'status', 'created_at'])
     assertIndex(dbPath, 'validation_registry', 'idx_validation_registry_decision_hash_nonce', ['decision_id', 'validated_object_hash', 'invocation_nonce'])
 
-    assertColumns(dbPath, 'execution_registry', ['execution_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at', 'continuity_id', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha'])
+    assertColumns(dbPath, 'execution_registry', ['execution_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at', 'continuity_id', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash'])
     assertNotNull(dbPath, 'execution_registry', ['session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assertIndex(dbPath, 'execution_registry', 'idx_execution_registry_decision_hash', ['decision_id', 'validated_object_hash'])
     assert.ok(indexList(dbPath, 'execution_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'execution_registry must retain UNIQUE(decision_id, validated_object_hash) replay guard')
 
-    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha'])
+    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash'])
     assertNotNull(dbPath, 'proof_registry', ['session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_execution_decision_hash', ['execution_id', 'decision_id', 'validated_object_hash'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
