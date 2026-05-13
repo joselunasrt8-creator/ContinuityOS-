@@ -123,6 +123,7 @@ test('portable revocation evidence uses persisted identifiers without authority 
   assert.equal(spec.federated_revocation_observability.mutation_capable, false)
   assert.equal(spec.federated_revocation_observability.canonical_hash_locked, true)
   assert.match(source, /federated_identifier_resolution_drift/)
+})
 
 test('portable reconciliation identity hardening preserves portability and exact-object boundaries', () => {
   assert.match(source, /function resolvedPortableIdentifiersFromCanonicalRows/)

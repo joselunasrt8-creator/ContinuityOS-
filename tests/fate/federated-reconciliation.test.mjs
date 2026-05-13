@@ -198,6 +198,7 @@ test('federated revocation anchors use canonical persisted identifiers only', ()
   assert.doesNotMatch(revocationGeneration, /validated_object_hash:[\s\S]*lookup_key/)
   assert.doesNotMatch(revocationGeneration, /validated_object_hash:[\s\S]*checkpoint/i)
   assert.doesNotMatch(revocationGeneration, /validated_object_hash:[\s\S]*reconciliation/i)
+})
 test('portable bundle identifiers resolve only from canonical persisted row identifiers', () => {
   const bundleStart = source.indexOf('async function portableLegitimacyBundleFromResult')
   const bundleEnd = source.indexOf('async function verifyFederatedProofEnvelope')
