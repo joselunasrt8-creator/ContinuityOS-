@@ -42,6 +42,7 @@ const requiredDriftClasses = [
   'federated_lineage_drift',
   'traversal_instability_drift',
   'telemetry_payload_drift',
+  'federated_identifier_resolution_drift',
 ]
 
 const fateIds = [
@@ -55,6 +56,11 @@ const fateIds = [
   'deterministic_traversal_stability',
   'reconciliation_hash_instability',
   'observability_payload_drift',
+  'federated_identifier_resolution_drift',
+  'federated_composite_lookup_identifier',
+  'federated_missing_canonical_identifier',
+  'non_deterministic_checkpoint_identity',
+  'timestamp_dependent_checkpoint_identity',
 ]
 
 test('continuous reconciliation hardening artifact exposes required output sections', () => {
@@ -112,4 +118,13 @@ test('recursive, replay, and revocation rules forbid inference and mutation', ()
   assert.ok(spec.replay_lineage_rules.some((rule) => /must not reserve, consume, or release replay state/i.test(rule)))
   assert.ok(spec.revocation_integrity_rules.some((rule) => /never auto-heals stale rows/i.test(rule)))
   assert.match(doc, /Reconciliation must never create legitimacy\./)
+})
+
+
+test('continuous reconciliation records portable identity and checkpoint invariants', () => {
+  assert.equal(spec.portability_layer.portable_identifier_policy, 'portable identifiers must resolve from canonical persisted registry row fields only; lookup_key and composite traversal anchors are not portable identity material')
+  assert.equal(spec.portability_layer.checkpoint_identity_policy, 'checkpoint_id hashes deterministic reconciliation state only; created_at is observational metadata excluded from identity')
+  assert.ok(doc.includes('Portable bundle identifiers must come from canonical persisted registry row fields only'))
+  assert.ok(doc.includes('Checkpoint identity hashes deterministic reconciliation state only'))
+  assert.match(source, /federatedDriftClassificationsAfterPortableBundleResolution/)
 })

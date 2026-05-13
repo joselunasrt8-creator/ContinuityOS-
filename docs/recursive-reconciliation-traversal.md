@@ -76,6 +76,8 @@ Invalid reconciliation carries a deterministic drift payload with:
 - `severity`
 - `deterministic_trace`
 
+Traversal trace entries may also carry `canonical_identifiers` extracted from persisted row fields. These identifiers are read-only evidence for portable reconciliation; they do not replace `lookup_key`, do not alter traversal ordering, and do not create authority.
+
 ## Drift Classification Coverage
 
 The traversal engine classifies the first fail-closed drift deterministically:

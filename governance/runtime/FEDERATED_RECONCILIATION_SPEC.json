@@ -91,7 +91,17 @@
     "alternate_execution_path"
   ],
   "reconciliation_merkle_layer": {
-    "layers": ["session", "continuity", "authority", "AEO", "validation", "execution", "proof", "attestation", "PREO"],
+    "layers": [
+      "session",
+      "continuity",
+      "authority",
+      "AEO",
+      "validation",
+      "execution",
+      "proof",
+      "attestation",
+      "PREO"
+    ],
     "deterministic_traversal_order": true,
     "deterministic_hashing": true,
     "canonical_serialization": true,
@@ -115,25 +125,95 @@
     "federated_replay_drift",
     "federated_preo_drift",
     "federated_continuity_drift",
-    "federated_exact_object_drift"
+    "federated_exact_object_drift",
+    "federated_identifier_resolution_drift"
   ],
   "fate_matrix": [
-    { "test_id": "federated_merkle_mismatch", "expected_result": "NULL" },
-    { "test_id": "federated_checkpoint_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_replay_collision", "expected_result": "NULL" },
-    { "test_id": "federated_exact_object_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_attestation_replay", "expected_result": "NULL" },
-    { "test_id": "federated_runtime_identity_drift", "expected_result": "NULL" },
-    { "test_id": "federated_preo_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_continuity_divergence", "expected_result": "NULL" },
-    { "test_id": "federated_bundle_payload_drift", "expected_result": "NULL" },
-    { "test_id": "remote_authority_inference", "expected_result": "NULL" },
-    { "test_id": "remote_execution_legitimacy_inference", "expected_result": "NULL" },
-    { "test_id": "non_deterministic_reconciliation_order", "expected_result": "NULL" }
+    {
+      "test_id": "federated_merkle_mismatch",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_checkpoint_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_replay_collision",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_exact_object_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_attestation_replay",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_runtime_identity_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_preo_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_continuity_divergence",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_bundle_payload_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "remote_authority_inference",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "remote_execution_legitimacy_inference",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "non_deterministic_reconciliation_order",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_identifier_resolution_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_composite_lookup_identifier",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_missing_canonical_identifier",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "non_deterministic_checkpoint_identity",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "timestamp_dependent_checkpoint_identity",
+      "expected_result": "NULL"
+    }
   ],
   "canonical_runtime_position": {
-    "execution_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+    "execution_path": [
+      "/session",
+      "/continuity",
+      "/authority",
+      "/compile",
+      "/validate",
+      "/execute",
+      "/proof"
+    ],
     "federation_reconciliation_outside_execution_authority": true,
-    "may_only": ["observe", "verify", "classify", "emit_evidence"]
+    "may_only": [
+      "observe",
+      "verify",
+      "classify",
+      "emit_evidence"
+    ]
   }
 }
