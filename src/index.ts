@@ -8,6 +8,10 @@ type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_PROOF_LINEAGE_RECONCILED"
   | "BOOTSTRAP_REGISTRY_STABILIZED"
   | "BOOTSTRAP_UNIQUENESS_ENFORCED"
+  | "BOOTSTRAP_RECURSIVE_GOVERNANCE_VERIFIED"
+  | "BOOTSTRAP_RUNTIME_SOVEREIGNTY_FROZEN"
+  | "BOOTSTRAP_SOVEREIGNTY_CHECKPOINT_GENERATED"
+  | "BOOTSTRAP_APPEND_ONLY_TRIGGERS_ACTIVATED"
   | "BOOTSTRAP_RUNTIME_READY"
 
 type CanonicalAEO = {
@@ -20,7 +24,11 @@ type CanonicalAEO = {
 
 const REQUIRED_AEO_KEYS = ["intent", "scope", "validation", "target", "finality"] as const
 const GOVERNED_WORKFLOW = "governed-deploy.yml"
+const RUNTIME_ID = "mindshift-worker-runtime" as const
+const RUNTIME_VERSION = "runtime-sovereignty-v1" as const
+const RUNTIME_SOVEREIGNTY_ROUTE = "/runtime/sovereignty" as const
 const BOOTSTRAP_READY_DATABASES = new WeakSet<D1Database>()
+const RUNTIME_SOVEREIGNTY_FREEZES = new WeakMap<D1Database, RuntimeSovereigntyManifest>()
 const PROVENANCE_PAYLOAD_TYPE = "application/vnd.mindshift.cryptographic-provenance.v1+json"
 const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
@@ -29,7 +37,7 @@ const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -79,6 +87,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   federated_checkpoint_registry: ["checkpoint_envelope_id", "checkpoint_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "reconciliation_merkle_root", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
   federation_conformance_registry: ["conformance_id", "envelope_id", "runtime_id", "remote_runtime_id", "fingerprint_hash", "checkpoint_hash", "compatibility_hash", "conformance_status", "drift_classes", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
   recursive_governance_registry: ["governance_id", "mutation_class", "mutation_scope", "target_surface", "mutation_hash", "sco_hash", "preo_hash", "governance_decision", "drift_classes", "exact_object_verified", "replay_neutral", "mutation_authorized", "proof_required", "canonical_path_preserved", "generated_at", "created_at"],
+  runtime_sovereignty_registry: ["sovereignty_id", "sovereignty_hash", "runtime_surface_hash", "governance_surface_hash", "replay_surface_hash", "proof_surface_hash", "validator_surface_hash", "schema_hash", "migration_chain_hash", "generated_at"],
   runtime_governance_lock_registry: ["lock_id", "mutation_hash", "governance_id", "lock_state", "activation_allowed", "canonical_hash", "created_at"],
   recursive_governance_replay_registry: ["replay_id", "mutation_hash", "sco_hash", "preo_hash", "governance_id", "activation_lock_id", "consumed_at"]
 }
@@ -169,6 +178,44 @@ type RecursiveGovernanceCheckpoint = {
   generated_at: string
 }
 
+
+
+
+type RuntimeSovereigntyManifest = {
+  runtime_id: string
+  runtime_version: string
+  canonical_routes: readonly string[]
+  observability_routes: readonly string[]
+  governance_routes: readonly string[]
+  validator_surface_hash: string
+  schema_hash: string
+  migration_chain_hash: string
+  replay_topology_hash: string
+  proof_topology_hash: string
+  governance_registry_hash: string
+  runtime_surface_hash: string
+  sovereignty_hash: string
+  generated_at: string
+}
+
+type RuntimeSovereigntyDriftClass =
+  | "route_mutation"
+  | "validator_mutation"
+  | "schema_mutation"
+  | "replay_topology_mutation"
+  | "governance_topology_mutation"
+  | "proof_topology_mutation"
+  | "hidden_executable_surface_introduction"
+  | "observability_route_mutation"
+  | "authority_inheritance_expansion"
+  | "runtime_surface_instability"
+
+type RuntimeSovereigntyDrift = {
+  status: "CANONICAL" | "RUNTIME_SOVEREIGNTY_VIOLATION"
+  drift_classes: RuntimeSovereigntyDriftClass[]
+  expected_sovereignty_hash?: string
+  actual_sovereignty_hash: string
+}
 
 type RuntimeSurfaceFingerprint = {
   routes: readonly string[]
@@ -534,6 +581,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS runtime_governance_lock_registry (lock_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, governance_id TEXT NOT NULL, lock_state TEXT NOT NULL CHECK (lock_state IN ('LOCKED','NULL')), activation_allowed TEXT NOT NULL CHECK (activation_allowed IN ('true','false')), canonical_hash TEXT NOT NULL, created_at TEXT NOT NULL, CHECK (activation_allowed='true' AND lock_state='LOCKED'))`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_runtime_governance_lock_activation ON runtime_governance_lock_registry(mutation_hash, governance_id)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_governance_lock_canonical_hash ON runtime_governance_lock_registry(canonical_hash)`,
+      `CREATE TABLE IF NOT EXISTS runtime_sovereignty_registry (sovereignty_id TEXT PRIMARY KEY, sovereignty_hash TEXT NOT NULL, runtime_surface_hash TEXT NOT NULL, governance_surface_hash TEXT NOT NULL, replay_surface_hash TEXT NOT NULL, proof_surface_hash TEXT NOT NULL, validator_surface_hash TEXT NOT NULL, schema_hash TEXT NOT NULL, migration_chain_hash TEXT NOT NULL, generated_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_runtime_sovereignty_registry_hash_unique ON runtime_sovereignty_registry(sovereignty_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_sovereignty_registry_surfaces ON runtime_sovereignty_registry(runtime_surface_hash, governance_surface_hash, replay_surface_hash, proof_surface_hash)`,
       `CREATE TABLE IF NOT EXISTS recursive_governance_replay_registry (replay_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, sco_hash TEXT NOT NULL, preo_hash TEXT NOT NULL, governance_id TEXT NOT NULL, activation_lock_id TEXT NOT NULL, consumed_at TEXT NOT NULL, UNIQUE(mutation_hash, sco_hash, preo_hash), UNIQUE(governance_id))`,
       `CREATE INDEX IF NOT EXISTS idx_recursive_governance_replay_lock ON recursive_governance_replay_registry(activation_lock_id)`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_update BEFORE UPDATE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
@@ -546,12 +596,14 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_registry_no_delete BEFORE DELETE ON recursive_governance_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_governance_lock_registry_no_update BEFORE UPDATE ON runtime_governance_lock_registry BEGIN SELECT RAISE(ABORT, 'runtime_governance_lock_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_governance_lock_registry_no_delete BEFORE DELETE ON runtime_governance_lock_registry BEGIN SELECT RAISE(ABORT, 'runtime_governance_lock_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_update BEFORE UPDATE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_delete BEFORE DELETE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_replay_registry_no_update BEFORE UPDATE ON recursive_governance_replay_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_replay_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_replay_registry_no_delete BEFORE DELETE ON recursive_governance_replay_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_replay_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
-      `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`
+      `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
       `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_semantics ON federation_conformance_registry(fingerprint_hash, checkpoint_hash, compatibility_hash)`
     ]
     for (const s of stmts) await env.DB.prepare(s).run()
@@ -574,11 +626,18 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_envelope_hash_unique ON attestation_registry(envelope_hash)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_workflow_run_unique ON attestation_registry(workflow_run_id)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_decision_object_unique ON attestation_registry(decision_id, validated_object_hash)`).run()
+    await emitBootstrapDiagnostic(env, "BOOTSTRAP_RECURSIVE_GOVERNANCE_VERIFIED")
+    const sovereigntyManifest = await freezeRuntimeSovereignty(env)
+    await emitBootstrapDiagnostic(env, "BOOTSTRAP_RUNTIME_SOVEREIGNTY_FROZEN")
+    await appendRuntimeSovereigntyCheckpoint(env, sovereigntyManifest)
+    await emitBootstrapDiagnostic(env, "BOOTSTRAP_SOVEREIGNTY_CHECKPOINT_GENERATED")
     await activateAppendOnlyRegistryEnforcement(env)
+    await emitBootstrapDiagnostic(env, "BOOTSTRAP_APPEND_ONLY_TRIGGERS_ACTIVATED")
     BOOTSTRAP_READY_DATABASES.add(env.DB)
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_RUNTIME_READY")
   } catch (error) {
     if (error instanceof BootstrapRegistryUnstableError) throw error
+    if (error instanceof RuntimeSovereigntyViolationError) throw error
     throw new SchemaInitializationError(schemaDiagnosticReason(error), error)
   }
 }
@@ -594,7 +653,9 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
-    `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`
+    `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_update BEFORE UPDATE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_delete BEFORE DELETE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`
   ]
   for (const trigger of triggers) await env.DB.prepare(trigger).run()
 }
@@ -2862,6 +2923,121 @@ async function runtimeSelfIntegrityCheckpoint(expectedRuntimeSurfaceHash = ""): 
   return Object.freeze({ runtime_surface_hash, governance_checkpoint_hash, recursive_integrity_hash, runtime_ready })
 }
 
+
+const RUNTIME_VALIDATOR_SURFACE = Object.freeze(["activeContinuity", "activeSession", "authorized", "deploymentPreoLineage", "enforceRecursiveGovernanceBoundary", "validateDsseProvenanceEnvelope", "validateExecutionProvenance", "verifyRecursiveGovernanceIntegrity"].sort())
+const RUNTIME_REPLAY_TOPOLOGY = Object.freeze(["authority_registry.status", "execution_registry.unique_decision_object", "invocation_registry.nonce", "proof_registry.unique_decision_object", "proof_registry.unique_workflow_run", "recursive_governance_replay_registry"].sort())
+const RUNTIME_PROOF_TOPOLOGY = Object.freeze(["attestation_registry", "proof_quarantine_registry", "proof_registry", "proof_registry_duplicate_archive"].sort())
+const RUNTIME_GOVERNANCE_TOPOLOGY = Object.freeze(["recursive_governance_registry", "runtime_governance_lock_registry", "runtime_sovereignty_registry", REQUIRE_PREO_LINEAGE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_ROUTE].sort())
+const CANONICAL_EXECUTION_AUTHORITY_SURFACE = Object.freeze(["authority:create", "compile:aeo", "validate:exact-object", "execute:governed-deploy", "proof:persist-consume"].sort())
+const CANONICAL_MIGRATION_CHAIN = Object.freeze([
+  "0001_init.sql", "0002_governed_deploy_schema.sql", "0003_authority_registry_schema_fix.sql", "0004_enforcement_lock.sql", "0004_execution_replay_protection.sql", "0005_invocation_registry.sql", "0006_enforcement_reboot_v1.sql", "0007_canonical_aeo_registry_rebuild.sql", "0008_canonical_runtime_registry_rebuild.sql", "0009_runtime_observability_and_drift_registry.sql", "0010_identity_session_continuity.sql", "0011_proof_atomicity_unique_guard.sql", "0012_continuity_registry.sql", "0013_preo_registry.sql", "0014_deployment_provenance_lineage.sql", "0015_cryptographic_provenance_attestations.sql", "0016_federated_revocation_observability.sql", "0017_federated_trust_topology_observability.sql", "0018_distributed_legitimacy_interoperability.sql", "0019_distributed_reconciliation_governance.sql", "0020_governance_compression.sql", "0021_federation_conformance.sql", "0022_proof_quarantine_registry.sql", "0022_recursive_governance_registry.sql", "0023_recursive_governance_enforcement_boundary.sql", "0024_runtime_sovereignty_registry.sql"
+].sort())
+
+function canonicalSovereigntyRoutes(): { canonical_routes: readonly string[], observability_routes: readonly string[], governance_routes: readonly string[] } {
+  return Object.freeze({
+    canonical_routes: Object.freeze([...CANONICAL_RUNTIME_ROUTES].sort()),
+    observability_routes: Object.freeze([...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort()),
+    governance_routes: Object.freeze([...GOVERNANCE_EVIDENCE_ROUTES, RECURSIVE_GOVERNANCE_ROUTE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE].sort())
+  })
+}
+
+function runtimeSovereigntyIdentityMaterial(manifest: Omit<RuntimeSovereigntyManifest, "sovereignty_hash" | "generated_at">): Record<string, unknown> {
+  return canonicalRecord(manifest)
+}
+
+async function generateRuntimeSovereigntyManifest(generated_at = new Date().toISOString()): Promise<RuntimeSovereigntyManifest> {
+  const routes = canonicalSovereigntyRoutes()
+  const validator_surface_hash = await sha256Hex(canonicalize(RUNTIME_VALIDATOR_SURFACE))
+  const schema_hash = await sha256Hex(canonicalize(REQUIRED_SCHEMA_COLUMNS))
+  const migration_chain_hash = await sha256Hex(canonicalize(CANONICAL_MIGRATION_CHAIN))
+  const replay_topology_hash = await sha256Hex(canonicalize(RUNTIME_REPLAY_TOPOLOGY))
+  const proof_topology_hash = await sha256Hex(canonicalize(RUNTIME_PROOF_TOPOLOGY))
+  const governance_registry_hash = await sha256Hex(canonicalize(RUNTIME_GOVERNANCE_TOPOLOGY))
+  const runtime_surface_hash = await sha256Hex(canonicalize({ routes, execution_authority_surface: CANONICAL_EXECUTION_AUTHORITY_SURFACE }))
+  const identity = {
+    runtime_id: RUNTIME_ID,
+    runtime_version: RUNTIME_VERSION,
+    canonical_routes: routes.canonical_routes,
+    observability_routes: routes.observability_routes,
+    governance_routes: routes.governance_routes,
+    validator_surface_hash,
+    schema_hash,
+    migration_chain_hash,
+    replay_topology_hash,
+    proof_topology_hash,
+    governance_registry_hash,
+    runtime_surface_hash
+  }
+  const sovereignty_hash = await sha256Hex(canonicalize(runtimeSovereigntyIdentityMaterial(identity)))
+  return Object.freeze({ ...identity, sovereignty_hash, generated_at })
+}
+
+function runtimeSovereigntyRegistryRow(manifest: RuntimeSovereigntyManifest) {
+  return Object.freeze({
+    sovereignty_id: manifest.sovereignty_hash,
+    sovereignty_hash: manifest.sovereignty_hash,
+    runtime_surface_hash: manifest.runtime_surface_hash,
+    governance_surface_hash: manifest.governance_registry_hash,
+    replay_surface_hash: manifest.replay_topology_hash,
+    proof_surface_hash: manifest.proof_topology_hash,
+    validator_surface_hash: manifest.validator_surface_hash,
+    schema_hash: manifest.schema_hash,
+    migration_chain_hash: manifest.migration_chain_hash,
+    generated_at: manifest.generated_at
+  })
+}
+
+async function appendRuntimeSovereigntyCheckpoint(env: Env, manifest: RuntimeSovereigntyManifest) {
+  const row = runtimeSovereigntyRegistryRow(manifest)
+  await env.DB.prepare(`INSERT OR IGNORE INTO runtime_sovereignty_registry (sovereignty_id,sovereignty_hash,runtime_surface_hash,governance_surface_hash,replay_surface_hash,proof_surface_hash,validator_surface_hash,schema_hash,migration_chain_hash,generated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`)
+    .bind(row.sovereignty_id, row.sovereignty_hash, row.runtime_surface_hash, row.governance_surface_hash, row.replay_surface_hash, row.proof_surface_hash, row.validator_surface_hash, row.schema_hash, row.migration_chain_hash, row.generated_at)
+    .run()
+}
+
+function classifyRuntimeSovereigntyDrift(expected: RuntimeSovereigntyManifest, actual: RuntimeSovereigntyManifest): RuntimeSovereigntyDriftClass[] {
+  const drift = new Set<RuntimeSovereigntyDriftClass>()
+  if (canonicalize(expected.canonical_routes) !== canonicalize(actual.canonical_routes)) drift.add("route_mutation")
+  if (canonicalize(expected.observability_routes) !== canonicalize(actual.observability_routes)) drift.add("observability_route_mutation")
+  if (canonicalize(expected.governance_routes) !== canonicalize(actual.governance_routes)) drift.add("governance_topology_mutation")
+  if (expected.validator_surface_hash !== actual.validator_surface_hash) drift.add("validator_mutation")
+  if (expected.schema_hash !== actual.schema_hash || expected.migration_chain_hash !== actual.migration_chain_hash) drift.add("schema_mutation")
+  if (expected.replay_topology_hash !== actual.replay_topology_hash) drift.add("replay_topology_mutation")
+  if (expected.proof_topology_hash !== actual.proof_topology_hash) drift.add("proof_topology_mutation")
+  if (expected.governance_registry_hash !== actual.governance_registry_hash) drift.add("governance_topology_mutation")
+  if (expected.runtime_surface_hash !== actual.runtime_surface_hash) drift.add("runtime_surface_instability")
+  const routeUniverse = new Set([...actual.canonical_routes, ...actual.observability_routes, ...actual.governance_routes])
+  for (const route of actual.canonical_routes) if (!routeUniverse.has(route)) drift.add("hidden_executable_surface_introduction")
+  if (!CANONICAL_EXECUTION_AUTHORITY_SURFACE.every((surface) => ["authority:create", "compile:aeo", "validate:exact-object", "execute:governed-deploy", "proof:persist-consume"].includes(surface))) drift.add("authority_inheritance_expansion")
+  return Array.from(drift).sort()
+}
+
+async function freezeRuntimeSovereignty(env: Env, generated_at = new Date().toISOString()): Promise<RuntimeSovereigntyManifest> {
+  const manifest = await generateRuntimeSovereigntyManifest(generated_at)
+  const frozen = RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB)
+  if (frozen) {
+    const drift = classifyRuntimeSovereigntyDrift(frozen, manifest)
+    if (drift.length > 0) throw new RuntimeSovereigntyViolationError(drift, frozen.sovereignty_hash, manifest.sovereignty_hash)
+    return frozen
+  }
+  RUNTIME_SOVEREIGNTY_FREEZES.set(env.DB, manifest)
+  await appendRuntimeSovereigntyCheckpoint(env, manifest)
+  return manifest
+}
+
+async function assertRuntimeSovereigntyCanonical(env: Env): Promise<RuntimeSovereigntyDrift> {
+  const expected = RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)
+  const actual = await generateRuntimeSovereigntyManifest(expected.generated_at)
+  const drift_classes = classifyRuntimeSovereigntyDrift(expected, actual)
+  if (drift_classes.length > 0) return Object.freeze({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", drift_classes, expected_sovereignty_hash: expected.sovereignty_hash, actual_sovereignty_hash: actual.sovereignty_hash })
+  return Object.freeze({ status: "CANONICAL", drift_classes, expected_sovereignty_hash: expected.sovereignty_hash, actual_sovereignty_hash: actual.sovereignty_hash })
+}
+
+class RuntimeSovereigntyViolationError extends Error {
+  constructor(readonly drift_classes: RuntimeSovereigntyDriftClass[], readonly expected_sovereignty_hash: string, readonly actual_sovereignty_hash: string) {
+    super("RUNTIME_SOVEREIGNTY_VIOLATION")
+  }
+}
+
 async function issueRuntimeGovernanceLock(env: Env, proof: RecursiveGovernanceProof, envelope: GovernanceMutationEnvelope, created_at: string): Promise<RuntimeGovernanceLock> {
   const canonical_hash = await deriveRecursiveGovernanceHash({ mutation_hash: envelope.mutation_hash, governance_id: proof.governance_id, target_surface: envelope.target_surface, canonical_path: envelope.canonical_execution_path })
   const lock_id = await deriveRecursiveGovernanceHash({ lock: "runtime_governance_lock", canonical_hash })
@@ -3345,7 +3521,7 @@ export default {
         return json({ status: "NULL", route: "/federation/interoperability/checkpoint", reason: "reconciliation_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
-    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
+    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
@@ -3358,8 +3534,19 @@ export default {
     try {
       await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
     } catch (error) {
+      if (error instanceof RuntimeSovereigntyViolationError) return json({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", reason: "runtime_sovereignty_drift", drift_classes: error.drift_classes, expected_sovereignty_hash: error.expected_sovereignty_hash, actual_sovereignty_hash: error.actual_sovereignty_hash, runtime_ready: false }, 503)
       if (error instanceof BootstrapRegistryUnstableError) return json({ status: "NULL", reason: "bootstrap_registry_unstable" }, 500)
       return json({ status: "NULL", reason: schemaDiagnosticReason(error) }, 500)
+    }
+
+    const sovereigntyState = await assertRuntimeSovereigntyCanonical(env)
+    if (sovereigntyState.status !== "CANONICAL") return json({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", reason: "runtime_sovereignty_drift", drift_classes: sovereigntyState.drift_classes, expected_sovereignty_hash: sovereigntyState.expected_sovereignty_hash, actual_sovereignty_hash: sovereigntyState.actual_sovereignty_hash, runtime_ready: false }, 503)
+
+    if (url.pathname === RUNTIME_SOVEREIGNTY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: RUNTIME_SOVEREIGNTY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
+    if (url.pathname === RUNTIME_SOVEREIGNTY_ROUTE && request.method === "GET") {
+      const manifest = RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)
+      await appendRuntimeSovereigntyCheckpoint(env, manifest)
+      return json({ status: "RUNTIME_SOVEREIGNTY_CANONICAL", route: RUNTIME_SOVEREIGNTY_ROUTE, manifest, sovereignty: sovereigntyState, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
     }
 
     try {
