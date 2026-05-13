@@ -29,7 +29,7 @@ const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -53,6 +53,7 @@ const REVOCATION_TOPOLOGY_REGISTRY = "revocation_topology_registry" as const
 const DISTRIBUTED_LEGITIMACY_REGISTRY = "distributed_legitimacy_registry" as const
 const FEDERATED_CHECKPOINT_REGISTRY = "federated_checkpoint_registry" as const
 const FEDERATION_CONFORMANCE_REGISTRY = "federation_conformance_registry" as const
+const FEDERATED_SOVEREIGNTY_REGISTRY = "federated_sovereignty_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -78,6 +79,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   distributed_legitimacy_registry: ["envelope_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
   federated_checkpoint_registry: ["checkpoint_envelope_id", "checkpoint_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "reconciliation_merkle_root", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
   federation_conformance_registry: ["conformance_id", "envelope_id", "runtime_id", "remote_runtime_id", "fingerprint_hash", "checkpoint_hash", "compatibility_hash", "conformance_status", "drift_classes", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
+  federated_sovereignty_registry: ["federation_id", "local_runtime_id", "remote_runtime_id", "sovereignty_hash", "equivalence_hash", "drift_summary", "replay_indicators", "verification_status", "evidence_only", "remote_authority_denied", "generated_at"],
   recursive_governance_registry: ["governance_id", "mutation_class", "mutation_scope", "target_surface", "mutation_hash", "sco_hash", "preo_hash", "governance_decision", "drift_classes", "exact_object_verified", "replay_neutral", "mutation_authorized", "proof_required", "canonical_path_preserved", "generated_at", "created_at"],
   runtime_governance_lock_registry: ["lock_id", "mutation_hash", "governance_id", "lock_state", "activation_allowed", "canonical_hash", "created_at"],
   recursive_governance_replay_registry: ["replay_id", "mutation_hash", "sco_hash", "preo_hash", "governance_id", "activation_lock_id", "consumed_at"]
@@ -527,6 +529,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_federation_conformance_registry_envelope_unique ON federation_conformance_registry(envelope_id)`,
       `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_runtime ON federation_conformance_registry(runtime_id, remote_runtime_id, conformance_status)`,
       `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_semantics ON federation_conformance_registry(fingerprint_hash, checkpoint_hash, compatibility_hash)`,
+      `CREATE TABLE IF NOT EXISTS federated_sovereignty_registry (federation_id TEXT PRIMARY KEY, local_runtime_id TEXT NOT NULL, remote_runtime_id TEXT NOT NULL, sovereignty_hash TEXT NOT NULL, equivalence_hash TEXT NOT NULL, drift_summary TEXT NOT NULL, replay_indicators TEXT NOT NULL, verification_status TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), generated_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_federated_sovereignty_registry_runtime ON federated_sovereignty_registry(local_runtime_id, remote_runtime_id, verification_status)`,
+      `CREATE INDEX IF NOT EXISTS idx_federated_sovereignty_registry_hash ON federated_sovereignty_registry(sovereignty_hash, equivalence_hash)`,
       `CREATE TABLE IF NOT EXISTS recursive_governance_registry (governance_id TEXT PRIMARY KEY, mutation_class TEXT NOT NULL CHECK (mutation_class IN ('runtime_route_mutation','validator_mutation','schema_mutation','authority_semantics_mutation','proof_semantics_mutation','replay_semantics_mutation','policy_mutation','observability_mutation','federation_semantics_mutation','governance_surface_expansion')), mutation_scope TEXT NOT NULL, target_surface TEXT NOT NULL, mutation_hash TEXT NOT NULL, sco_hash TEXT NOT NULL, preo_hash TEXT NOT NULL, governance_decision TEXT NOT NULL CHECK (governance_decision IN ('GOVERNANCE_OBSERVED','GOVERNANCE_VALIDATED','GOVERNANCE_QUARANTINED','GOVERNANCE_REJECTED','NULL')), drift_classes TEXT NOT NULL, exact_object_verified TEXT NOT NULL CHECK (exact_object_verified IN ('true','false')), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_authorized TEXT NOT NULL CHECK (mutation_authorized IN ('true','false')), proof_required TEXT NOT NULL CHECK (proof_required='true'), canonical_path_preserved TEXT NOT NULL CHECK (canonical_path_preserved IN ('true','false')), generated_at TEXT NOT NULL, created_at TEXT NOT NULL, CHECK (governance_decision != 'GOVERNANCE_VALIDATED' OR (sco_hash != '' AND exact_object_verified='true' AND replay_neutral='true' AND mutation_authorized='true' AND proof_required='true' AND canonical_path_preserved='true')), CHECK (governance_decision = 'GOVERNANCE_VALIDATED' OR mutation_authorized='false'))`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_recursive_governance_registry_governance_unique ON recursive_governance_registry(governance_id)`,
       `CREATE INDEX IF NOT EXISTS idx_recursive_governance_registry_mutation ON recursive_governance_registry(mutation_class, mutation_scope, target_surface)`,
@@ -551,7 +556,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
-      `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`
+      `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_federated_sovereignty_registry_no_update BEFORE UPDATE ON federated_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'federated_sovereignty_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_federated_sovereignty_registry_no_delete BEFORE DELETE ON federated_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'federated_sovereignty_registry is append-only'); END`,
       `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_semantics ON federation_conformance_registry(fingerprint_hash, checkpoint_hash, compatibility_hash)`
     ]
     for (const s of stmts) await env.DB.prepare(s).run()
@@ -591,6 +598,8 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_delete BEFORE DELETE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_update BEFORE UPDATE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_delete BEFORE DELETE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_federated_sovereignty_registry_no_update BEFORE UPDATE ON federated_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'federated_sovereignty_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_federated_sovereignty_registry_no_delete BEFORE DELETE ON federated_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'federated_sovereignty_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
@@ -1648,7 +1657,7 @@ type FederatedCheckpointEnvelope = {
 }
 
 
-type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
+type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "runtime_divergence" | "governance_divergence" | "replay_discontinuity" | "proof_topology_mismatch" | "validator_instability" | "schema_mismatch" | "sovereignty_corruption" | "hidden_execution_expansion" | "authority_inheritance_attempt"
 type DistributedCheckpointComparison = {
   comparison_id: string
   local_checkpoint_hash: string
@@ -2174,6 +2183,100 @@ async function buildFederationCompatibilityEnvelope(result: ReconciliationResult
   const core = { envelope_type: "FederationCompatibilityEnvelope", runtime_id, remote_runtime_id, runtime_semantic_fingerprint: fingerprint, conformance_checkpoint: checkpoint, conformance_result, generated_at, evidence_only: true, remote_authority_denied: true, replay_neutral: true, read_only: true, mutation_capable: false }
   const compatibility_hash = await sha256Hex(canonicalize(core))
   return Object.freeze({ ...core, compatibility_hash, envelope_id: await sha256Hex(canonicalize({ envelope_type: "FederationCompatibilityEnvelope", compatibility_hash })) } as FederationCompatibilityEnvelope)
+}
+
+
+type FederatedSovereigntyDriftClass = "runtime_divergence" | "governance_divergence" | "replay_discontinuity" | "proof_topology_mismatch" | "validator_instability" | "schema_mismatch" | "sovereignty_corruption" | "hidden_execution_expansion" | "authority_inheritance_attempt"
+type FederatedSovereigntyEnvelope = {
+  envelope_type: "FederatedSovereigntyEnvelope"
+  runtime_id: string
+  sovereignty_hash: string
+  runtime_surface_hash: string
+  governance_surface_hash: string
+  replay_surface_hash: string
+  validator_surface_hash: string
+  schema_hash: string
+  migration_chain_hash: string
+  checkpoint_hash: string
+  federation_tier: "bounded_evidence"
+  replay_neutral: true
+  evidence_only: true
+  remote_authority_denied: true
+  generated_at: string
+}
+type SovereigntyEquivalenceVerification = {
+  verification_status: "SOVEREIGNTY_EQUIVALENT" | "SOVEREIGNTY_DIVERGENT" | "NULL"
+  local_runtime_id: string
+  remote_runtime_id: string
+  equivalence_hash: string
+  drift_summary: FederatedSovereigntyDriftClass[]
+  replay_indicators: string[]
+  evidence_only: true
+  remote_authority_denied: true
+  replay_neutral: true
+  read_only: true
+  mutation_capable: false
+  remote_authority_inherited: false
+  remote_execution_legitimacy: false
+  local_governance_mutated: false
+}
+
+function sovereigntySchemaSurface(): Record<string, unknown> {
+  return Object.freeze(Object.keys(REQUIRED_SCHEMA_COLUMNS).sort().reduce<Record<string, unknown>>((schema, table) => {
+    schema[table] = [...REQUIRED_SCHEMA_COLUMNS[table]].sort()
+    return schema
+  }, {}))
+}
+
+async function deriveFederatedSovereigntySurfaces(result: ReconciliationResult, runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<Record<string, string>> {
+  const proofTopology = canonicalRecord({ registries: CANONICAL_RECONCILIATION_REGISTRY_ORDER, proof_columns: REQUIRED_SCHEMA_COLUMNS.proof_registry, attestation_columns: REQUIRED_SCHEMA_COLUMNS.attestation_registry, exact_object_required: true })
+  const governanceSurface = canonicalRecord({ recursive_governance_route: RECURSIVE_GOVERNANCE_ROUTE, recursive_governance_admission_route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, preo_routes: GOVERNANCE_EVIDENCE_ROUTES, evidence_only_routes: NON_EXECUTABLE_OBSERVABILITY_ROUTES, remote_authority_denied: true })
+  const replaySurface = canonicalRecord({ replay_neutral: true, invocation_registry: REQUIRED_SCHEMA_COLUMNS.invocation_registry, replay_indicators: replayIndicatorsForInteroperability(result), replay_consumed: false })
+  const validatorSurface = canonicalRecord({ required_aeo_keys: REQUIRED_AEO_KEYS, drift_taxonomy: ["runtime_divergence", "governance_divergence", "replay_discontinuity", "proof_topology_mismatch", "validator_instability", "schema_mismatch", "sovereignty_corruption", "hidden_execution_expansion", "authority_inheritance_attempt"], validation_results: ["VALID", "NULL"], exact_object_discipline: true })
+  const runtimeSurface = canonicalRecord({ canonical_runtime_routes: CANONICAL_RUNTIME_ROUTES, non_executable_observability_routes: NON_EXECUTABLE_OBSERVABILITY_ROUTES, governed_workflow: GOVERNED_WORKFLOW, remote_execution_allowed: false })
+  return Object.freeze({
+    runtime_surface_hash: await sha256Hex(canonicalize(runtimeSurface)),
+    governance_surface_hash: await sha256Hex(canonicalize(governanceSurface)),
+    replay_surface_hash: await sha256Hex(canonicalize(replaySurface)),
+    validator_surface_hash: await sha256Hex(canonicalize(validatorSurface)),
+    schema_hash: await sha256Hex(canonicalize(sovereigntySchemaSurface())),
+    migration_chain_hash: await sha256Hex(canonicalize({ schema: sovereigntySchemaSurface(), proof_topology: proofTopology, append_only_registries: [FEDERATED_SOVEREIGNTY_REGISTRY, FEDERATION_CONFORMANCE_REGISTRY, FEDERATED_CHECKPOINT_REGISTRY, DISTRIBUTED_LEGITIMACY_REGISTRY] }))
+  })
+}
+
+async function buildFederatedSovereigntyEnvelope(result: ReconciliationResult, generated_at = deterministicInteroperabilityGeneratedAt(result), runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<FederatedSovereigntyEnvelope> {
+  const surfaces = await deriveFederatedSovereigntySurfaces(result, runtime_id)
+  const checkpoint = await deterministicReconciliationCheckpoint(result, generated_at, runtime_id)
+  const identity = { envelope_type: "FederatedSovereigntyEnvelope", runtime_id, ...surfaces, checkpoint_hash: checkpoint.checkpoint_id, federation_tier: "bounded_evidence", replay_neutral: true, evidence_only: true, remote_authority_denied: true }
+  const sovereignty_hash = await sha256Hex(canonicalize(identity))
+  return Object.freeze({ ...identity, sovereignty_hash, generated_at } as FederatedSovereigntyEnvelope)
+}
+
+async function sovereigntyEquivalenceHash(envelope: FederatedSovereigntyEnvelope): Promise<string> {
+  return sha256Hex(canonicalize({ runtime_surface_hash: envelope.runtime_surface_hash, governance_surface_hash: envelope.governance_surface_hash, replay_surface_hash: envelope.replay_surface_hash, validator_surface_hash: envelope.validator_surface_hash, schema_hash: envelope.schema_hash, migration_chain_hash: envelope.migration_chain_hash, checkpoint_hash: envelope.checkpoint_hash, federation_tier: envelope.federation_tier, replay_neutral: envelope.replay_neutral, evidence_only: envelope.evidence_only, remote_authority_denied: envelope.remote_authority_denied }))
+}
+
+async function recomputeSovereigntyHash(envelope: any): Promise<string> {
+  return sha256Hex(canonicalize({ envelope_type: "FederatedSovereigntyEnvelope", runtime_id: String(envelope.runtime_id || ""), runtime_surface_hash: String(envelope.runtime_surface_hash || ""), governance_surface_hash: String(envelope.governance_surface_hash || ""), replay_surface_hash: String(envelope.replay_surface_hash || ""), validator_surface_hash: String(envelope.validator_surface_hash || ""), schema_hash: String(envelope.schema_hash || ""), migration_chain_hash: String(envelope.migration_chain_hash || ""), checkpoint_hash: String(envelope.checkpoint_hash || ""), federation_tier: String(envelope.federation_tier || ""), replay_neutral: envelope.replay_neutral === true, evidence_only: envelope.evidence_only === true, remote_authority_denied: envelope.remote_authority_denied === true }))
+}
+
+async function verifyFederatedSovereigntyEquivalence(local: FederatedSovereigntyEnvelope, remote: any): Promise<SovereigntyEquivalenceVerification> {
+  const drift = new Set<FederatedSovereigntyDriftClass>()
+  const replay = new Set<string>()
+  if (!isPlainRecord(remote)) remote = local
+  const remote_runtime_id = String(remote.runtime_id || "UNKNOWN_REMOTE_RUNTIME")
+  if (remote.evidence_only !== true || remote.remote_authority_denied !== true || remote.replay_neutral !== true || remote.remote_authority_inherited === true || remote.remote_execution_legitimacy === true || remote.accepted_authority === true || remote.local_execution_authority === true || remote.mutation_capable === true) drift.add("authority_inheritance_attempt")
+  if (String(remote.sovereignty_hash || "") !== await recomputeSovereigntyHash(remote)) drift.add("sovereignty_corruption")
+  if (String(remote.runtime_surface_hash || "") !== local.runtime_surface_hash) drift.add("runtime_divergence")
+  if (String(remote.governance_surface_hash || "") !== local.governance_surface_hash) drift.add("governance_divergence")
+  if (String(remote.replay_surface_hash || "") !== local.replay_surface_hash || Array.isArray(remote.replay_indicators) && remote.replay_indicators.length > 0) { drift.add("replay_discontinuity"); for (const item of Array.isArray(remote.replay_indicators) ? remote.replay_indicators : []) replay.add(String(item)) }
+  if (String(remote.validator_surface_hash || "") !== local.validator_surface_hash) drift.add("validator_instability")
+  if (String(remote.schema_hash || "") !== local.schema_hash) drift.add("schema_mismatch")
+  if (String(remote.migration_chain_hash || "") !== local.migration_chain_hash || String(remote.checkpoint_hash || "") !== local.checkpoint_hash) drift.add("proof_topology_mismatch")
+  const remoteRoutes = Array.isArray(remote.executable_routes) ? remote.executable_routes.map(String) : Array.isArray(remote.runtime_routes) ? remote.runtime_routes.map(String) : []
+  if (remoteRoutes.some((route: string) => !CANONICAL_RUNTIME_ROUTES.includes(route as any))) drift.add("hidden_execution_expansion")
+  const equivalence_hash = drift.size === 0 ? await sovereigntyEquivalenceHash(local) : await sha256Hex(canonicalize({ local: await sovereigntyEquivalenceHash(local), remote: isPlainRecord(remote) ? await sovereigntyEquivalenceHash(remote as FederatedSovereigntyEnvelope) : "NULL", drift: Array.from(drift).sort() }))
+  return Object.freeze({ verification_status: drift.size === 0 ? "SOVEREIGNTY_EQUIVALENT" : "SOVEREIGNTY_DIVERGENT", local_runtime_id: local.runtime_id, remote_runtime_id, equivalence_hash, drift_summary: Array.from(drift).sort(), replay_indicators: Array.from(replay).sort(), evidence_only: true, remote_authority_denied: true, replay_neutral: true, read_only: true, mutation_capable: false, remote_authority_inherited: false, remote_execution_legitimacy: false, local_governance_mutated: false } as SovereigntyEquivalenceVerification)
 }
 
 async function detectFederatedCheckpointDrift(envelope: FederatedCheckpointEnvelope, remote?: any): Promise<InteroperabilityDriftClassification[]> {
@@ -2924,6 +3027,13 @@ async function appendFederatedReconciliationObservation(env: Env, envelope: Fede
 }
 
 
+
+async function appendFederatedSovereigntyConsensusObservation(env: Env, envelope: FederatedSovereigntyEnvelope, verification: SovereigntyEquivalenceVerification) {
+  await env.DB.prepare(`INSERT INTO federated_sovereignty_registry (federation_id,local_runtime_id,remote_runtime_id,sovereignty_hash,equivalence_hash,drift_summary,replay_indicators,verification_status,evidence_only,remote_authority_denied,generated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'true','true',?9)`)
+    .bind(await deterministicReconciliationId("federated_sovereignty_consensus", { sovereignty_hash: envelope.sovereignty_hash, equivalence_hash: verification.equivalence_hash, remote_runtime_id: verification.remote_runtime_id, generated_at: envelope.generated_at }), verification.local_runtime_id, verification.remote_runtime_id, envelope.sovereignty_hash, verification.equivalence_hash, canonicalize(verification.drift_summary), canonicalize(verification.replay_indicators), verification.verification_status, envelope.generated_at)
+    .run()
+}
+
 async function appendFederationConformanceObservation(env: Env, envelope: FederationCompatibilityEnvelope) {
   await env.DB.prepare(`INSERT OR IGNORE INTO federation_conformance_registry (conformance_id,envelope_id,runtime_id,remote_runtime_id,fingerprint_hash,checkpoint_hash,compatibility_hash,conformance_status,drift_classes,evidence_only,remote_authority_denied,read_only,mutation_capable,replay_neutral,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'true','true','true','false','true',?10,?11)`)
     .bind(await deterministicReconciliationId("federation_conformance_observation", { envelope_id: envelope.envelope_id, compatibility_hash: envelope.compatibility_hash }), envelope.envelope_id, envelope.runtime_id, envelope.remote_runtime_id, envelope.runtime_semantic_fingerprint.fingerprint_hash, envelope.conformance_checkpoint.checkpoint_hash, envelope.compatibility_hash, envelope.conformance_result.conformance_status, canonicalize(envelope.conformance_result.drift_classes), envelope.generated_at, envelope.generated_at)
@@ -3304,6 +3414,25 @@ export default {
         return json({ status: consensus.consensus_status, route: "/federation/reconcile/distributed", reason: "observability_only", reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, replay_indicators: reconciliation_envelope.replay_indicators, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/distributed", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      }
+    }
+
+
+    if (url.pathname === "/federation/sovereignty/checkpoint" && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: "/federation/sovereignty/checkpoint", reason: "database_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        const anchor = reconciliationAnchorFromRequest(url)
+        const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
+        const generated_at = deterministicInteroperabilityGeneratedAt(result)
+        const sovereignty_envelope = await buildFederatedSovereigntyEnvelope(result, generated_at)
+        const remoteSupplied = url.searchParams.get("remote_envelope")
+        const remoteEnvelope = remoteSupplied ? JSON.parse(new TextDecoder().decode(base64ToBytes(String(remoteSupplied)) || utf8Bytes("{}"))) : null
+        const equivalence = await verifyFederatedSovereigntyEquivalence(sovereignty_envelope, remoteEnvelope || sovereignty_envelope)
+        await appendFederatedSovereigntyConsensusObservation(env, sovereignty_envelope, equivalence)
+        return json({ status: equivalence.verification_status, route: "/federation/sovereignty/checkpoint", reason: "observability_only", sovereignty_envelope, equivalence, sovereignty_hash: sovereignty_envelope.sovereignty_hash, equivalence_hash: equivalence.equivalence_hash, drift_summary: equivalence.drift_summary, replay_indicators: equivalence.replay_indicators, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_authority_inherited: false, remote_execution_legitimacy: false, local_governance_mutated: false, local_validation_required: true, append_only: true })
+      } catch {
+        return json({ status: "NULL", route: "/federation/sovereignty/checkpoint", reason: "sovereignty_checkpoint_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
 
