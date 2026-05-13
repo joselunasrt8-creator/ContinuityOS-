@@ -1,0 +1,20 @@
+{
+  "suite_id": "append_only_registry_conformance_v1",
+  "description": "Verifies distributed legitimacy registries are append-only evidence stores with update/delete blockers.",
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "append_only": true,
+  "registries": [
+    {
+      "name": "distributed_legitimacy_registry",
+      "required_columns": ["envelope_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral"],
+      "required_triggers": ["trg_distributed_legitimacy_registry_no_update", "trg_distributed_legitimacy_registry_no_delete"]
+    },
+    {
+      "name": "federated_checkpoint_registry",
+      "required_columns": ["checkpoint_envelope_id", "checkpoint_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "reconciliation_merkle_root", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral"],
+      "required_triggers": ["trg_federated_checkpoint_registry_no_update", "trg_federated_checkpoint_registry_no_delete"]
+    }
+  ],
+  "forbidden_operations": ["UPDATE distributed_legitimacy_registry", "DELETE FROM distributed_legitimacy_registry", "UPDATE federated_checkpoint_registry", "DELETE FROM federated_checkpoint_registry"]
+}

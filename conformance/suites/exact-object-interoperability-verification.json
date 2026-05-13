@@ -1,0 +1,25 @@
+{
+  "suite_id": "exact_object_interoperability_verification_v1",
+  "description": "Verifies validated_object_hash equals executed_object_hash before an interoperable object is only observed.",
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "exact_object_preserving": true,
+  "checks": [
+    {
+      "check_id": "valid_exact_object_observed",
+      "kind": "hash_equality",
+      "vector_ids": ["legitimacy_exact_object_valid"],
+      "left": "object.validated_object_hash",
+      "right": "object.executed_object_hash",
+      "expected_result": "EVIDENCE_OBSERVED"
+    },
+    {
+      "check_id": "mismatched_exact_object_null",
+      "kind": "hash_inequality_fails_closed",
+      "vector_ids": ["legitimacy_exact_object_mismatch"],
+      "left": "object.validated_object_hash",
+      "right": "object.executed_object_hash",
+      "expected_result": "NULL"
+    }
+  ]
+}

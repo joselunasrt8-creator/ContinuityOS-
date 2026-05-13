@@ -1,0 +1,26 @@
+{
+  "suite_id": "federation_boundary_verification_v1",
+  "description": "Ensures federation evidence is quarantined at the trust boundary and never inherited as local execution legitimacy.",
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "local_validation_required": true,
+  "remote_authority_denied": true,
+  "checks": [
+    {
+      "check_id": "remote_authority_claim_quarantined",
+      "kind": "vector_expected_result",
+      "vector_ids": ["legitimacy_remote_authority_claim"],
+      "expected_result": "NULL"
+    },
+    {
+      "check_id": "remote_execution_legitimacy_denied",
+      "kind": "authority_forbidden",
+      "forbidden_true_fields": ["object.remote_execution_legitimacy", "object.remote_authority_inherited"]
+    },
+    {
+      "check_id": "local_validation_remains_required",
+      "kind": "invariant",
+      "requires": ["local_validation_required", "remote_evidence_local_authority_false"]
+    }
+  ]
+}

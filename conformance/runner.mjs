@@ -1,0 +1,121 @@
+import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+const root = process.cwd()
+const NULL_STATUS = 'NULL'
+
+function readJson(relativePath) {
+  return JSON.parse(readFileSync(join(root, relativePath), 'utf8'))
+}
+
+function isPlainRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeCanonicalValue(value) {
+  if (value === undefined) return null
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (Array.isArray(value)) return value.map(normalizeCanonicalValue)
+  if (isPlainRecord(value)) {
+    return Object.freeze(Object.keys(value).sort().reduce((normalized, key) => {
+      normalized[key] = normalizeCanonicalValue(value[key])
+      return normalized
+    }, {}))
+  }
+  return null
+}
+
+function canonicalize(value) {
+  const normalized = normalizeCanonicalValue(value)
+  if (Array.isArray(normalized)) return `[${normalized.map(canonicalize).join(',')}]`
+  if (isPlainRecord(normalized)) return `{${Object.keys(normalized).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(normalized[key])}`).join(',')}}`
+  return JSON.stringify(normalized)
+}
+
+function sha256Hex(value) {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function getPath(source, path) {
+  return path.split('.').reduce((value, segment) => (value == null ? undefined : value[segment]), source)
+}
+
+function failClosed(reason) {
+  const error = new Error(`${NULL_STATUS}: ${reason}`)
+  error.conformance_status = NULL_STATUS
+  throw error
+}
+
+function verifyVectorHashes(bundle) {
+  assert.equal(bundle.invariants.fail_closed, true)
+  assert.equal(bundle.invariants.non_authoritative, true)
+  assert.equal(bundle.invariants.replay_neutral, true)
+  assert.equal(bundle.invariants.append_only, true)
+  assert.equal(bundle.invariants.exact_object_preserving, true)
+  assert.equal(bundle.invariants.observability_only, true)
+  assert.equal(bundle.invariants.runtime_mutation_capable, false)
+  assert.equal(bundle.invariants.remote_evidence_local_authority, false)
+
+  for (const vector of bundle.vectors) {
+    const canonical = canonicalize(vector.object)
+    if (canonical !== vector.canonical_form) failClosed(`canonical drift for ${vector.vector_id}`)
+    if (sha256Hex(canonical) !== vector.expected_sha256) failClosed(`hash drift for ${vector.vector_id}`)
+    if (vector.object.mutation_capable === true) assert.equal(vector.expected_result, NULL_STATUS)
+    if (vector.object.remote_execution_legitimacy === true) assert.equal(vector.expected_result, NULL_STATUS)
+    if (vector.object.remote_authority_inherited === true) assert.equal(vector.expected_result, NULL_STATUS)
+    if (Array.isArray(vector.object.replay_indicators) && vector.object.replay_indicators.length > 0) assert.equal(vector.expected_result, NULL_STATUS)
+    if (vector.object.validated_object_hash !== vector.object.executed_object_hash) assert.equal(vector.expected_result, NULL_STATUS)
+  }
+}
+
+function verifySuites(bundle, suites) {
+  const vectorById = new Map(bundle.vectors.map((vector) => [vector.vector_id, vector]))
+  for (const suite of suites) {
+    assert.equal(suite.observability_only, true, `${suite.suite_id} must be observability-only`)
+    assert.equal(suite.runtime_mutation_capable, false, `${suite.suite_id} must be incapable of runtime mutation`)
+    for (const check of suite.checks || []) {
+      for (const vectorId of check.vector_ids || []) {
+        const vector = vectorById.get(vectorId)
+        if (!vector) failClosed(`missing vector ${vectorId}`)
+        if (check.expected_result) assert.equal(vector.expected_result, check.expected_result)
+        if (check.kind === 'hash_equality') assert.equal(getPath(vector, check.left), getPath(vector, check.right))
+        if (check.kind === 'hash_inequality_fails_closed') assert.notEqual(getPath(vector, check.left), getPath(vector, check.right))
+      }
+    }
+  }
+}
+
+function verifyAppendOnlyMigration(suite) {
+  const migration = readFileSync(join(root, 'migrations/0018_distributed_legitimacy_interoperability.sql'), 'utf8')
+  for (const registry of suite.registries) {
+    assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${registry.name}`))
+    for (const column of registry.required_columns) assert.match(migration, new RegExp(`\\b${column}\\b`))
+    for (const trigger of registry.required_triggers) assert.match(migration, new RegExp(trigger))
+  }
+  assert.match(migration, /BEFORE UPDATE ON distributed_legitimacy_registry/)
+  assert.match(migration, /BEFORE DELETE ON distributed_legitimacy_registry/)
+  assert.match(migration, /BEFORE UPDATE ON federated_checkpoint_registry/)
+  assert.match(migration, /BEFORE DELETE ON federated_checkpoint_registry/)
+}
+
+try {
+  const bundle = readJson('conformance/vectors/deterministic-legitimacy-vectors.json')
+  const suites = [
+    readJson('conformance/suites/portability-verification.json'),
+    readJson('conformance/suites/replay-neutrality-certification.json'),
+    readJson('conformance/suites/exact-object-interoperability-verification.json'),
+    readJson('conformance/suites/federation-boundary-verification.json'),
+    readJson('conformance/suites/append-only-registry-conformance.json')
+  ]
+
+  verifyVectorHashes(bundle)
+  verifySuites(bundle, suites)
+  verifyAppendOnlyMigration(suites.at(-1))
+  console.log('CONFORMANCE_EVIDENCE_OBSERVED')
+} catch (error) {
+  console.error(error?.conformance_status || NULL_STATUS, error?.message || error)
+  process.exitCode = 1
+}

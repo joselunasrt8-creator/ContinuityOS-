@@ -1,0 +1,112 @@
+{
+  "conformance_version": "distributed-legitimacy-conformance-v1",
+  "canonicalization": "mindshift-canonical-json-v1",
+  "purpose": "Deterministic observability-only legitimacy vectors for portable conformance verification. Vectors are evidence and never authority.",
+  "invariants": {
+    "fail_closed": true,
+    "non_authoritative": true,
+    "replay_neutral": true,
+    "append_only": true,
+    "exact_object_preserving": true,
+    "observability_only": true,
+    "runtime_mutation_capable": false,
+    "remote_evidence_local_authority": false
+  },
+  "vectors": [
+    {
+      "vector_id": "legitimacy_exact_object_valid",
+      "description": "A local exact-object proof projection that remains evidence-only when exported.",
+      "expected_result": "EVIDENCE_OBSERVED",
+      "object": {
+        "envelope_type": "DistributedLegitimacyConformanceVector",
+        "decision_id": "decision-conformance-0001",
+        "authority_id": "authority-conformance-0001",
+        "aeo_id": "aeo-conformance-0001",
+        "validation_id": "validation-conformance-0001",
+        "execution_id": "execution-conformance-0001",
+        "proof_id": "proof-conformance-0001",
+        "validated_object_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executed_object_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "invocation_nonce": "nonce-conformance-0001",
+        "continuity_id": "continuity-conformance-0001",
+        "replay_state": "unused_observation_only",
+        "federation_boundary": "portable_evidence_not_portable_authority",
+        "evidence_only": true,
+        "remote_authority_denied": true,
+        "read_only": true,
+        "mutation_capable": false,
+        "replay_neutral": true
+      },
+      "canonical_form": "{\"aeo_id\":\"aeo-conformance-0001\",\"authority_id\":\"authority-conformance-0001\",\"continuity_id\":\"continuity-conformance-0001\",\"decision_id\":\"decision-conformance-0001\",\"envelope_type\":\"DistributedLegitimacyConformanceVector\",\"evidence_only\":true,\"executed_object_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"execution_id\":\"execution-conformance-0001\",\"federation_boundary\":\"portable_evidence_not_portable_authority\",\"invocation_nonce\":\"nonce-conformance-0001\",\"mutation_capable\":false,\"proof_id\":\"proof-conformance-0001\",\"read_only\":true,\"remote_authority_denied\":true,\"replay_neutral\":true,\"replay_state\":\"unused_observation_only\",\"validated_object_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"validation_id\":\"validation-conformance-0001\"}",
+      "expected_sha256": "3278b3680a1518052fb7563c7d9fbe9fa453031cff805f8d8e44afcb4df06e46"
+    },
+    {
+      "vector_id": "legitimacy_remote_authority_claim",
+      "description": "A remote envelope that attempts to carry execution legitimacy across the boundary and must be quarantined.",
+      "expected_result": "NULL",
+      "object": {
+        "envelope_type": "DistributedLegitimacyConformanceVector",
+        "decision_id": "remote-decision-claim",
+        "validated_object_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executed_object_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "continuity_id": "remote-continuity-claim",
+        "replay_indicators": [],
+        "federation_boundary": "portable_evidence_not_portable_authority",
+        "evidence_only": false,
+        "remote_authority_denied": false,
+        "remote_execution_legitimacy": true,
+        "remote_authority_inherited": true,
+        "mutation_capable": true,
+        "replay_neutral": false
+      },
+      "canonical_form": "{\"continuity_id\":\"remote-continuity-claim\",\"decision_id\":\"remote-decision-claim\",\"envelope_type\":\"DistributedLegitimacyConformanceVector\",\"evidence_only\":false,\"executed_object_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"federation_boundary\":\"portable_evidence_not_portable_authority\",\"mutation_capable\":true,\"remote_authority_denied\":false,\"remote_authority_inherited\":true,\"remote_execution_legitimacy\":true,\"replay_indicators\":[],\"replay_neutral\":false,\"validated_object_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}",
+      "expected_sha256": "bb8294a1b37e28b40d36cbe177099a4b8a902e3d02b149cfe423e3d50c8614e4"
+    },
+    {
+      "vector_id": "legitimacy_replay_collision",
+      "description": "A reused invocation observation that must be replay-neutral and never consume local replay state.",
+      "expected_result": "NULL",
+      "object": {
+        "envelope_type": "DistributedLegitimacyConformanceVector",
+        "decision_id": "decision-conformance-0001",
+        "validated_object_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executed_object_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "invocation_nonce": "nonce-conformance-0001",
+        "continuity_id": "continuity-conformance-0001",
+        "replay_indicators": [
+          "duplicate_invocation_nonce",
+          "duplicate_validated_object_hash"
+        ],
+        "replay_consumed": false,
+        "evidence_only": true,
+        "remote_authority_denied": true,
+        "read_only": true,
+        "mutation_capable": false,
+        "replay_neutral": true
+      },
+      "canonical_form": "{\"continuity_id\":\"continuity-conformance-0001\",\"decision_id\":\"decision-conformance-0001\",\"envelope_type\":\"DistributedLegitimacyConformanceVector\",\"evidence_only\":true,\"executed_object_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"invocation_nonce\":\"nonce-conformance-0001\",\"mutation_capable\":false,\"read_only\":true,\"remote_authority_denied\":true,\"replay_consumed\":false,\"replay_indicators\":[\"duplicate_invocation_nonce\",\"duplicate_validated_object_hash\"],\"replay_neutral\":true,\"validated_object_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+      "expected_sha256": "cdf9189265369ef18185eddcd830903640c8db345e3ae794f757ecd40aa982d7"
+    },
+    {
+      "vector_id": "legitimacy_exact_object_mismatch",
+      "description": "A projection where executed object differs from validated object and must fail closed.",
+      "expected_result": "NULL",
+      "object": {
+        "envelope_type": "DistributedLegitimacyConformanceVector",
+        "decision_id": "decision-conformance-0002",
+        "validated_object_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "executed_object_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "invocation_nonce": "nonce-conformance-0002",
+        "continuity_id": "continuity-conformance-0002",
+        "exact_object_preserved": false,
+        "evidence_only": true,
+        "remote_authority_denied": true,
+        "read_only": true,
+        "mutation_capable": false,
+        "replay_neutral": true
+      },
+      "canonical_form": "{\"continuity_id\":\"continuity-conformance-0002\",\"decision_id\":\"decision-conformance-0002\",\"envelope_type\":\"DistributedLegitimacyConformanceVector\",\"evidence_only\":true,\"exact_object_preserved\":false,\"executed_object_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"invocation_nonce\":\"nonce-conformance-0002\",\"mutation_capable\":false,\"read_only\":true,\"remote_authority_denied\":true,\"replay_neutral\":true,\"validated_object_hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}",
+      "expected_sha256": "ba3bcf2d5b510405f72f89db149605d52a2d173060a3418a467c0f243ad7123f"
+    }
+  ]
+}
