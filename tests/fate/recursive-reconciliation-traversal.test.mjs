@@ -88,3 +88,14 @@ test('recursive integrity verification covers ancestry, replay, proof, PREO, rev
   assert.match(traversalSource, /JSON\.parse\(String\(row\.authority_lineage/)
   assert.match(traversalSource, /String\(row\.reviewed_hash \|\| ""\) !== String\(context\.aeo\.validated_object_hash \|\| ""\)/)
 })
+
+
+test('canonical identifier extraction is row-payload-only and preserves traversal determinism', () => {
+  assert.match(traversalSource, /type CanonicalReconciliationIdentifiers/)
+  assert.match(traversalSource, /canonical_identifiers\?: CanonicalReconciliationIdentifiers/)
+  assert.match(traversalSource, /canonical_identifiers: row \? canonicalIdentifiersFromReconciliationRow\(registry, row\) : undefined/)
+  assert.match(traversalSource, /function canonicalIdentifiersFromReconciliationRow/)
+  assert.doesNotMatch(traversalSource, /canonical_identifiers: .*lookup_key/)
+  assert.ok(doc.includes('`canonical_identifiers`'))
+  assert.ok(doc.includes('do not alter traversal ordering'))
+})

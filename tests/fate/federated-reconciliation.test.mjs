@@ -21,7 +21,12 @@ const fateCases = [
   'federated_bundle_payload_drift',
   'remote_authority_inference',
   'remote_execution_legitimacy_inference',
-  'non_deterministic_reconciliation_order'
+  'non_deterministic_reconciliation_order',
+  'federated_identifier_resolution_drift',
+  'federated_composite_lookup_identifier',
+  'federated_missing_canonical_identifier',
+  'non_deterministic_checkpoint_identity',
+  'timestamp_dependent_checkpoint_identity'
 ]
 
 const driftClasses = [
@@ -34,7 +39,8 @@ const driftClasses = [
   'federated_replay_drift',
   'federated_preo_drift',
   'federated_continuity_drift',
-  'federated_exact_object_drift'
+  'federated_exact_object_drift',
+  'federated_identifier_resolution_drift'
 ]
 
 test('federation routes are observability-only and outside execution authority', () => {
@@ -102,6 +108,62 @@ test('federated drift taxonomy and FATE cases fail closed to NULL', () => {
     assert.ok(doc.includes('`' + drift + '`'))
   }
   for (const fate of fateCases) {
+    assert.equal(fateById.get(fate), 'NULL')
+    assert.ok(doc.includes('`' + fate + '`'))
+  }
+})
+
+test('portable bundle identifiers resolve only from canonical persisted row identifiers', () => {
+  const bundleStart = source.indexOf('async function portableLegitimacyBundleFromResult')
+  const bundleEnd = source.indexOf('async function verifyFederatedProofEnvelope')
+  assert.ok(bundleStart > -1 && bundleEnd > bundleStart)
+  const bundleFunction = source.slice(bundleStart, bundleEnd)
+
+  assert.match(source, /type CanonicalReconciliationIdentifiers/)
+  assert.match(source, /function canonicalIdentifiersFromReconciliationRow/)
+  assert.match(source, /function resolvedPortableIdentifiersFromCanonicalRows/)
+  assert.match(source, /canonical_identifiers: row \? canonicalIdentifiersFromReconciliationRow\(registry, row\) : undefined/)
+  assert.match(source, /lookup_key is traversal-only evidence and MUST NEVER be emitted as canonical portable identity/)
+  assert.match(source, /if \(!identifiers\) return null/)
+  assert.doesNotMatch(bundleFunction, /lookup_key/)
+  assert.doesNotMatch(bundleFunction, /split\(":"\)/)
+  assert.doesNotMatch(bundleFunction, /proof-observed|nonce-observed/)
+  assert.ok(spec.federated_drift_taxonomy.includes('federated_identifier_resolution_drift'))
+  assert.match(source, /async function federatedIdentifierResolutionDrift/)
+  assert.match(source, /reconciliationDriftId\("federated_identifier_resolution_drift"/)
+  assert.match(source, /federatedDriftClassificationsAfterPortableBundleResolution\(result, bundle\)/)
+  assert.match(source, /reconciliationStatusAfterPortableBundleResolution\(result, bundle\)/)
+  assert.ok(doc.includes('portable_identifier == canonical_persisted_identifier'))
+})
+
+test('identifier resolution FATE cases fail closed to NULL', () => {
+  const fateById = new Map(spec.fate_matrix.map((entry) => [entry.test_id, entry.expected_result]))
+  for (const fate of ['federated_composite_lookup_identifier', 'federated_missing_canonical_identifier']) {
+    assert.equal(fateById.get(fate), 'NULL')
+    assert.ok(doc.includes('`' + fate + '`'))
+  }
+})
+
+test('checkpoint identity excludes created_at and uses deterministic reconciliation state only', () => {
+  const checkpointStart = source.indexOf('async function deterministicReconciliationCheckpoint')
+  const checkpointEnd = source.indexOf('function canonicalIdentifiersForRegistry')
+  assert.ok(checkpointStart > -1 && checkpointEnd > checkpointStart)
+  const checkpointFunction = source.slice(checkpointStart, checkpointEnd)
+  const identityMatch = checkpointFunction.match(/const checkpoint_identity = \{([^}]+)\}/)
+  assert.ok(identityMatch, 'checkpoint identity object missing')
+  const identityFields = identityMatch[1]
+
+  for (const field of ['runtime_id', 'reconciliation_merkle_root', 'deterministic_hash', 'traversal_position', 'lineage_count', 'replay_snapshot_hash', 'drift_snapshot_hash']) {
+    assert.match(identityFields, new RegExp(`\\b${field}\\b`), `checkpoint identity missing ${field}`)
+  }
+  assert.doesNotMatch(identityFields, /created_at/)
+  assert.match(checkpointFunction, /created_at is observational metadata and MUST NEVER participate in checkpoint identity hashing/)
+  assert.match(doc, /`created_at` is observational metadata only/)
+})
+
+test('checkpoint determinism FATE cases fail closed to NULL', () => {
+  const fateById = new Map(spec.fate_matrix.map((entry) => [entry.test_id, entry.expected_result]))
+  for (const fate of ['non_deterministic_checkpoint_identity', 'timestamp_dependent_checkpoint_identity']) {
     assert.equal(fateById.get(fate), 'NULL')
     assert.ok(doc.includes('`' + fate + '`'))
   }

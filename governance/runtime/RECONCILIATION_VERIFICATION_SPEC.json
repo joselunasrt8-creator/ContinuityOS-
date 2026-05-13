@@ -186,7 +186,8 @@
       "portable_serialization_mismatch_drift",
       "federated_replay_discontinuity_drift",
       "deterministic_traversal_instability_drift",
-      "reconciliation_payload_corruption_drift"
+      "reconciliation_payload_corruption_drift",
+      "federated_identifier_resolution_drift"
     ],
     "observability_only": true
   },
@@ -321,6 +322,31 @@
     {
       "test_id": "reconciliation_payload_corruption",
       "corruption": "portable reconciliation payload hash or drift class is corrupted",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_identifier_resolution_drift",
+      "corruption": "portable identifier resolution cannot bind to canonical persisted row identifiers",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_composite_lookup_identifier",
+      "corruption": "composite traversal lookup key is offered as portable identity material",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_missing_canonical_identifier",
+      "corruption": "canonical persisted row identifier is absent during portable bundle emission",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "non_deterministic_checkpoint_identity",
+      "corruption": "identical reconciliation lineage emits divergent checkpoint identity",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "timestamp_dependent_checkpoint_identity",
+      "corruption": "checkpoint identity changes because observation timestamp changed",
       "expected_result": "NULL"
     }
   ],
@@ -476,8 +502,12 @@
       "validated_object_hash",
       "invocation_nonce",
       "proof_id",
-      "content_addressed_lineage_hash"
+      "content_addressed_lineage_hash",
+      "execution_id",
+      "continuity_id"
     ],
-    "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity"
+    "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity",
+    "portable_identifier_policy": "portable identifiers must resolve from canonical persisted registry row fields only; lookup_key and composite traversal anchors are not portable identity material",
+    "checkpoint_identity_policy": "checkpoint_id hashes deterministic reconciliation state only; created_at is observational metadata excluded from identity"
   }
 }

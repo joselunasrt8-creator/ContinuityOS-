@@ -19,6 +19,15 @@ const expandedDrifts = [
   'reconciliation_payload_corruption_drift',
 ]
 
+
+const identityHardeningFate = [
+  'federated_identifier_resolution_drift',
+  'federated_composite_lookup_identifier',
+  'federated_missing_canonical_identifier',
+  'non_deterministic_checkpoint_identity',
+  'timestamp_dependent_checkpoint_identity',
+]
+
 const expandedFate = [
   'federated_lineage_divergence',
   'foreign_ancestry_mismatch',
@@ -92,6 +101,31 @@ test('expanded reconciliation FATE and drift taxonomy fail closed to NULL', () =
     assert.ok(doc.includes('`' + drift + '`'), `doc missing ${drift}`)
   }
   for (const fate of expandedFate) {
+    assert.equal(fateById.get(fate)?.expected_result, 'NULL', `${fate} must fail closed`)
+    assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
+  }
+})
+
+
+test('portable reconciliation identity hardening preserves portability and exact-object boundaries', () => {
+  assert.match(source, /function resolvedPortableIdentifiersFromCanonicalRows/)
+  assert.match(source, /lookup_key is traversal-only evidence and MUST NEVER be emitted as canonical portable identity/)
+  assert.match(source, /if \(!identifiers\) return null/)
+  assert.equal(spec.portability_layer.portable_identifier_policy, 'portable identifiers must resolve from canonical persisted registry row fields only; lookup_key and composite traversal anchors are not portable identity material')
+  assert.ok(doc.includes('Portable bundle identifiers must come from canonical persisted registry row fields only'))
+  assert.ok(doc.includes('`lookup_key` and composite traversal anchors are not portable identity material'))
+})
+
+test('checkpoint portability identity is deterministic and timestamp independent', () => {
+  assert.match(source, /const checkpoint_identity = \{ runtime_id, reconciliation_merkle_root, deterministic_hash, traversal_position, lineage_count, replay_snapshot_hash, drift_snapshot_hash \}/)
+  assert.match(source, /created_at is observational metadata and MUST NEVER participate in checkpoint identity hashing/)
+  assert.equal(spec.portability_layer.checkpoint_identity_policy, 'checkpoint_id hashes deterministic reconciliation state only; created_at is observational metadata excluded from identity')
+  assert.ok(doc.includes('Checkpoint identity hashes deterministic reconciliation state only'))
+})
+
+test('portable identity hardening FATE cases remain fail-closed to NULL', () => {
+  const fateById = new Map(spec.reconciliation_fate_matrix.map((entry) => [entry.test_id, entry]))
+  for (const fate of identityHardeningFate) {
     assert.equal(fateById.get(fate)?.expected_result, 'NULL', `${fate} must fail closed`)
     assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
   }
