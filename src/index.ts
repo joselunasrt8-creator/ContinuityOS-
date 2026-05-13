@@ -77,7 +77,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_divergence_drift" | "federated_revocation_projection_drift" | "federated_revocation_replay_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_anchor_drift"
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -575,6 +575,20 @@ type ReconciliationAnchor = {
   validated_object_hash?: string
   invocation_nonce?: string
 }
+type CanonicalReconciliationIdentifiers = {
+  session_id?: string
+  continuity_id?: string
+  authority_id?: string
+  decision_id?: string
+  aeo_id?: string
+  validation_id?: string
+  validated_object_hash?: string
+  execution_id?: string
+  proof_id?: string
+  invocation_nonce?: string
+  preo_id?: string
+  reviewed_hash?: string
+}
 type ReconciliationTraceEntry = {
   registry: ReconciliationRegistry
   canonical_traversal_position: number
@@ -582,7 +596,7 @@ type ReconciliationTraceEntry = {
   lookup_key: string
   row_count: number
   lineage_hash?: string
-  canonical_persisted_identifiers?: Record<string, string>
+  canonical_identifiers?: CanonicalReconciliationIdentifiers
 }
 type ReconciliationDrift = {
   drift_id: string
@@ -835,40 +849,31 @@ async function verifyReconciliationRegistryRow(env: Env, registry: Reconciliatio
   }
 }
 
-function canonicalPersistedIdentifiersForRegistry(registry: ReconciliationRegistry, row: any): Record<string, string> {
-  const ids: Record<string, string> = {}
-  for (const key of ["session_id", "continuity_id", "authority_id", "decision_id", "aeo_id", "validation_id", "execution_id", "proof_id", "invocation_nonce", "validated_object_hash", "identity_id"] as const) {
-    const value = String(row?.[key] || "")
-    if (value) ids[key] = value
+function populatedCanonicalIdentifiers(input: CanonicalReconciliationIdentifiers): CanonicalReconciliationIdentifiers {
+  return canonicalRecord(Object.fromEntries(Object.entries(input).filter(([, value]) => typeof value === "string" && value.length > 0))) as CanonicalReconciliationIdentifiers
+}
+
+function canonicalIdentifiersFromReconciliationRow(registry: ReconciliationRegistry, row: any): CanonicalReconciliationIdentifiers {
+  switch (registry) {
+    case "session_registry":
+      return populatedCanonicalIdentifiers({ session_id: String(row?.session_id || "") })
+    case "continuity_registry":
+      return populatedCanonicalIdentifiers({ continuity_id: String(row?.continuity_id || ""), session_id: String(row?.session_id || "") })
+    case "authority_registry":
+      return populatedCanonicalIdentifiers({ authority_id: String(row?.authority_id || ""), continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), session_id: String(row?.session_id || "") })
+    case "aeo_registry":
+      return populatedCanonicalIdentifiers({ aeo_id: String(row?.aeo_id || ""), authority_id: String(row?.authority_id || ""), continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), validated_object_hash: String(row?.validated_object_hash || "") })
+    case "validation_registry":
+      return populatedCanonicalIdentifiers({ validation_id: String(row?.validation_id || ""), continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), invocation_nonce: String(row?.invocation_nonce || ""), session_id: String(row?.session_id || ""), validated_object_hash: String(row?.validated_object_hash || "") })
+    case "execution_registry":
+      return populatedCanonicalIdentifiers({ continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), execution_id: String(row?.execution_id || ""), invocation_nonce: String(row?.invocation_nonce || ""), session_id: String(row?.session_id || ""), validated_object_hash: String(row?.validated_object_hash || "") })
+    case "proof_registry":
+      return populatedCanonicalIdentifiers({ continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), execution_id: String(row?.execution_id || ""), proof_id: String(row?.proof_id || ""), session_id: String(row?.session_id || ""), validated_object_hash: String(row?.validated_object_hash || "") })
+    case "invocation_registry":
+      return populatedCanonicalIdentifiers({ continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), invocation_nonce: String(row?.invocation_nonce || ""), validated_object_hash: String(row?.validated_object_hash || "") })
+    case "preo_registry":
+      return populatedCanonicalIdentifiers({ preo_id: String(row?.preo_id || ""), authority_id: String(row?.authority_id || ""), continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), reviewed_hash: String(row?.reviewed_hash || "") })
   }
-  ids.registry = registry
-  return Object.freeze(ids)
-}
-
-function canonicalPersistedIdentifierMap(result: ReconciliationResult): Map<ReconciliationRegistry, Record<string, string>> {
-  return new Map(result.deterministic_traversal_trace.map((entry) => [entry.registry, entry.canonical_persisted_identifiers || {}]))
-}
-
-function resolveCanonicalPortableIdentifiers(result: ReconciliationResult): ReconciliationAnchor | null {
-  const ids = canonicalPersistedIdentifierMap(result)
-  const proof = ids.get("proof_registry") || {}
-  const validation = ids.get("validation_registry") || {}
-  const aeo = ids.get("aeo_registry") || {}
-  const authority = ids.get("authority_registry") || {}
-  const continuity = ids.get("continuity_registry") || {}
-  const execution = ids.get("execution_registry") || {}
-  const invocation = ids.get("invocation_registry") || {}
-  const continuity_id = String(proof.continuity_id || continuity.continuity_id || "")
-  const decision_id = String(proof.decision_id || authority.decision_id || validation.decision_id || aeo.decision_id || "")
-  const validated_object_hash = String(proof.validated_object_hash || validation.validated_object_hash || aeo.validated_object_hash || "")
-  const execution_id = String(proof.execution_id || execution.execution_id || "")
-  const proof_id = String(proof.proof_id || "")
-  const invocation_nonce = String(invocation.invocation_nonce || validation.invocation_nonce || execution.invocation_nonce || "")
-  if (!continuity_id || !decision_id || !validated_object_hash || !execution_id || !proof_id || !invocation_nonce) return null
-  if (validation.validated_object_hash && validation.validated_object_hash !== validated_object_hash) return null
-  if (aeo.validated_object_hash && aeo.validated_object_hash !== validated_object_hash) return null
-  if (execution.validated_object_hash && execution.validated_object_hash !== validated_object_hash) return null
-  return { continuity_id, decision_id, validated_object_hash, execution_id, proof_id, invocation_nonce }
 }
 
 async function deterministicRecursiveReconciliationTraversal(env: Env, anchor: ReconciliationAnchor): Promise<ReconciliationResult> {
@@ -878,18 +883,20 @@ async function deterministicRecursiveReconciliationTraversal(env: Env, anchor: R
   for (const registry of CANONICAL_RECONCILIATION_REGISTRY_ORDER) {
     if (trace.length >= RECONCILIATION_MAX_RECURSION_DEPTH) return reconciliationInvalid("traversal_instability_drift", registry, anchor, trace, "CRITICAL")
     const { rows, lookup_key } = await readReconciliationRows(env, anchor, context, registry)
+    const row = rows.length === 1 ? rows[0] : null
     const traceEntry: ReconciliationTraceEntry = {
       registry,
       canonical_traversal_position: CANONICAL_RECONCILIATION_REGISTRY_ORDER.indexOf(registry),
       reconciliation_depth: trace.length + 1,
       lookup_key,
       row_count: rows.length,
-      lineage_hash: String(rows[0]?.continuity_hash || rows[0]?.validated_object_hash || rows[0]?.reviewed_hash || "")
+      lineage_hash: String(row?.continuity_hash || row?.validated_object_hash || row?.reviewed_hash || ""),
+      canonical_identifiers: row ? canonicalIdentifiersFromReconciliationRow(registry, row) : undefined
     }
     trace.push(traceEntry)
     if (rows.length === 0) return reconciliationInvalid("orphan_legitimacy_object_drift", registry, anchor, trace)
     if (rows.length > 1) return reconciliationInvalid("traversal_instability_drift", registry, anchor, trace)
-    const rowDrift = await verifyReconciliationRegistryRow(env, registry, rows[0], context)
+    const rowDrift = await verifyReconciliationRegistryRow(env, registry, row, context)
     if (rowDrift !== "VALID") return reconciliationInvalid(rowDrift, registry, anchor, trace)
   }
   return reconciliationValid(anchor, trace)
@@ -1366,13 +1373,18 @@ async function deterministicReconciliationCheckpoint(result: ReconciliationResul
   const revocation_snapshot_hash = await sha256Hex(canonicalize({ replay_neutral: true, revocation_classes: result.drift_classifications.filter((drift) => String(drift.drift_class).includes("revocation") || String(drift.drift_class).includes("expiration")).map((drift) => drift.drift_class).sort() }))
   const deterministic_hash = await sha256Hex(canonicalize({ runtime_id, snapshot, replay_snapshot_hash, drift_snapshot_hash, revocation_snapshot_hash }))
   const reconciliation_merkle_root = String(snapshot.reconciliation_merkle_root || "")
+  const traversal_position = result.deterministic_traversal_trace.length
+  const lineage_count = result.deterministic_traversal_trace.length
+  // Checkpoint identity is deterministic reconciliation state only: same lineage state yields the same checkpoint_id.
+  // created_at is observational metadata and MUST NEVER participate in checkpoint identity hashing.
+  const checkpoint_identity = { runtime_id, reconciliation_merkle_root, deterministic_hash, traversal_position, lineage_count, replay_snapshot_hash, drift_snapshot_hash }
   return {
-    checkpoint_id: await sha256Hex(canonicalize({ runtime_id, reconciliation_merkle_root, deterministic_hash, traversal_position: result.deterministic_traversal_trace.length, lineage_count: result.deterministic_traversal_trace.length })),
+    checkpoint_id: await sha256Hex(canonicalize(checkpoint_identity)),
     runtime_id,
     reconciliation_merkle_root,
-    traversal_position: result.deterministic_traversal_trace.length,
+    traversal_position,
     deterministic_hash,
-    lineage_count: result.deterministic_traversal_trace.length,
+    lineage_count,
     replay_snapshot_hash,
     drift_snapshot_hash,
     revocation_snapshot_hash,
@@ -1380,30 +1392,80 @@ async function deterministicReconciliationCheckpoint(result: ReconciliationResul
   }
 }
 
+function canonicalIdentifiersForRegistry(byRegistry: Map<ReconciliationRegistry, ReconciliationTraceEntry>, registry: ReconciliationRegistry): CanonicalReconciliationIdentifiers | null {
+  const identifiers = byRegistry.get(registry)?.canonical_identifiers
+  return identifiers && Object.keys(identifiers).length > 0 ? identifiers : null
+}
+
+function requiredCanonicalIdentifier(identifiers: CanonicalReconciliationIdentifiers | null, field: keyof CanonicalReconciliationIdentifiers): string | null {
+  const value = String(identifiers?.[field] || "")
+  return value ? value : null
+}
+
+function resolvedPortableIdentifiersFromCanonicalRows(byRegistry: Map<ReconciliationRegistry, ReconciliationTraceEntry>): Pick<PortableLegitimacyBundle, "decision_id" | "validated_object_hash" | "proof_id" | "execution_id" | "invocation_nonce" | "continuity_id"> | null {
+  // lookup_key is traversal-only evidence and MUST NEVER be emitted as canonical portable identity.
+  // Portable bundle identifiers resolve exclusively from persisted registry row fields observed in the deterministic traversal.
+  const authority = canonicalIdentifiersForRegistry(byRegistry, "authority_registry")
+  const aeo = canonicalIdentifiersForRegistry(byRegistry, "aeo_registry")
+  const validation = canonicalIdentifiersForRegistry(byRegistry, "validation_registry")
+  const execution = canonicalIdentifiersForRegistry(byRegistry, "execution_registry")
+  const proof = canonicalIdentifiersForRegistry(byRegistry, "proof_registry")
+  const invocation = canonicalIdentifiersForRegistry(byRegistry, "invocation_registry")
+  const continuity = canonicalIdentifiersForRegistry(byRegistry, "continuity_registry")
+  const decision_id = requiredCanonicalIdentifier(authority, "decision_id")
+  const validated_object_hash = requiredCanonicalIdentifier(aeo, "validated_object_hash") || requiredCanonicalIdentifier(validation, "validated_object_hash")
+  const proof_id = requiredCanonicalIdentifier(proof, "proof_id")
+  const execution_id = requiredCanonicalIdentifier(execution, "execution_id")
+  const invocation_nonce = requiredCanonicalIdentifier(invocation, "invocation_nonce")
+  const continuity_id = requiredCanonicalIdentifier(continuity, "continuity_id")
+  if (!decision_id || !validated_object_hash || !proof_id || !execution_id || !invocation_nonce || !continuity_id) return null
+  return { decision_id, validated_object_hash, proof_id, execution_id, invocation_nonce, continuity_id }
+}
+
 async function portableLegitimacyBundleFromResult(result: ReconciliationResult, emitted_at: string, runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<PortableLegitimacyBundle | null> {
   const merkle = await reconciliationMerkleEvidence(result)
   const canonical = resolveCanonicalPortableIdentifiers(result)
   if (!canonical) return null
   const byRegistry = new Map(result.deterministic_traversal_trace.map((entry) => [entry.registry, entry]))
+  const identifiers = resolvedPortableIdentifiersFromCanonicalRows(byRegistry)
+  if (!identifiers) return null
   const bundle = canonicalPortableLegitimacyBundle({
     runtime_id,
     reconciliation_id: await deterministicReconciliationId("federated_bundle", { runtime_id, root: merkle.root, anchor: result.lineage_anchor }),
-    decision_id: canonical.decision_id,
-    validated_object_hash: canonical.validated_object_hash,
-    proof_id: canonical.proof_id,
-    execution_id: canonical.execution_id,
-    invocation_nonce: canonical.invocation_nonce,
-    continuity_id: canonical.continuity_id,
-    authority_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("authority_registry")?.canonical_persisted_identifiers || null)),
-    proof_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("proof_registry")?.canonical_persisted_identifiers || null)),
-    replay_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("invocation_registry")?.canonical_persisted_identifiers || null)),
-    preo_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("preo_registry")?.canonical_persisted_identifiers || null)),
+    ...identifiers,
+    authority_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("authority_registry") || null)),
+    proof_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("proof_registry") || null)),
+    replay_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("invocation_registry") || null)),
+    preo_lineage_hash: await sha256Hex(canonicalize(byRegistry.get("preo_registry") || null)),
     attestation_hash: await sha256Hex(canonicalize({ attestation: "observed", root: merkle.root })),
     reconciliation_merkle_root: merkle.root,
     federation_boundary: "portable_evidence_not_portable_authority",
     emitted_at
   })
   return bundle
+}
+
+async function federatedIdentifierResolutionDrift(result: ReconciliationResult): Promise<ReconciliationDrift> {
+  const deterministic_trace = result.deterministic_traversal_trace.map((entry) => ({ ...entry }))
+  return {
+    drift_id: await reconciliationDriftId("federated_identifier_resolution_drift", "proof_registry", result.lineage_anchor, deterministic_trace),
+    drift_class: "federated_identifier_resolution_drift",
+    lineage_anchor: result.lineage_anchor,
+    registry_origin: "proof_registry",
+    detected_at: "DETERMINISTIC_RECONCILIATION_TRAVERSAL",
+    severity: "HIGH",
+    deterministic_trace
+  }
+}
+
+async function federatedDriftClassificationsAfterPortableBundleResolution(result: ReconciliationResult, bundle: PortableLegitimacyBundle | null): Promise<ReconciliationDrift[]> {
+  const drift = result.drift_classifications.map((entry) => ({ ...entry, deterministic_trace: entry.deterministic_trace.map((trace) => ({ ...trace })) }))
+  if (bundle) return drift
+  return [...drift, await federatedIdentifierResolutionDrift(result)]
+}
+
+function reconciliationStatusAfterPortableBundleResolution(result: ReconciliationResult, bundle: PortableLegitimacyBundle | null): ReconciliationStatus {
+  return bundle ? result.result : "NULL"
 }
 
 async function verifyFederatedProofEnvelope(envelope: any, bundle: PortableLegitimacyBundle, hmac_secret?: string): Promise<boolean> {
@@ -1720,7 +1782,8 @@ export default {
           ? await verifyFederatedLegitimacyBundle(JSON.parse(new TextDecoder().decode(base64ToBytes(String(url.searchParams.get("bundle"))) || utf8Bytes("{}"))), anchor, LOCAL_FEDERATION_RUNTIME_ID, env.PROVENANCE_HMAC_SECRET)
           : null
         const witness = await reconciliationWitnessEnvelope(bundle, checkpoint, classifyRemoteRuntime(String(bundle?.runtime_id || LOCAL_FEDERATION_RUNTIME_ID)))
-        return json({ status: result.result, route: "/federation/reconcile", reason: "observability_only", authority_boundary: "portable_evidence_not_portable_authority", local_validation_required: true, remote_execution_legitimacy: false, replay_neutral: true, bundle, checkpoint, witness, verification })
+        const drift = await federatedDriftClassificationsAfterPortableBundleResolution(result, bundle)
+        return json({ status: reconciliationStatusAfterPortableBundleResolution(result, bundle), route: "/federation/reconcile", reason: "observability_only", authority_boundary: "portable_evidence_not_portable_authority", local_validation_required: true, remote_execution_legitimacy: false, replay_neutral: true, bundle, checkpoint, witness, verification, drift })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile", reason: "reconciliation_unavailable" })
       }
@@ -1733,7 +1796,8 @@ export default {
         const summary = await reconciliationSummaryObject(result, emitted_at)
         const snapshot = await deterministicReconciliationSnapshot(result)
         const bundle = await portableLegitimacyBundleFromResult(result, emitted_at)
-        return json({ status: result.result, route: "/federation/reconcile/report", reason: "observability_only", report: summary, deterministic_snapshot: snapshot, portable_legitimacy_bundle: bundle, federation_boundary: "portable_evidence_not_portable_authority" })
+        const drift = await federatedDriftClassificationsAfterPortableBundleResolution(result, bundle)
+        return json({ status: reconciliationStatusAfterPortableBundleResolution(result, bundle), route: "/federation/reconcile/report", reason: "observability_only", report: summary, deterministic_snapshot: snapshot, portable_legitimacy_bundle: bundle, drift, federation_boundary: "portable_evidence_not_portable_authority" })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/report", reason: "reconciliation_unavailable" })
       }
@@ -1742,10 +1806,8 @@ export default {
       try {
         const anchor = reconciliationAnchorFromRequest(url)
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
-        const federated_drift_taxonomy: DriftClass[] = ["federated_checkpoint_drift", "federated_merkle_drift", "federated_bundle_drift", "federated_attestation_drift", "federated_reconciliation_drift", "federated_runtime_divergence_drift", "federated_replay_drift", "federated_preo_drift", "federated_continuity_drift", "federated_exact_object_drift", "federated_identifier_resolution_drift", "federated_revocation_divergence_drift", "federated_revocation_projection_drift", "federated_revocation_replay_drift", "federated_checkpoint_revocation_drift", "federated_expiration_visibility_drift", "federated_revocation_exact_object_drift", "federated_revocation_anchor_drift"]
-        const normalized_bundle = await portableLegitimacyBundleFromResult(result, new Date().toISOString())
-        const normalized_drift = normalized_bundle ? result.drift_classifications : [...result.drift_classifications.map((entry) => entry.drift_class), "federated_identifier_resolution_drift"]
-        return json({ status: normalized_bundle ? result.result : "NULL", route: "/federation/reconcile/drift", reason: "observability_only", drift: normalized_drift, federated_drift_taxonomy, normalized_bundle_resolution: Boolean(normalized_bundle), repairs: false, legitimacy_inference: false, revocation_observability: true })
+        const federated_drift_taxonomy: DriftClass[] = ["federated_checkpoint_drift", "federated_merkle_drift", "federated_bundle_drift", "federated_attestation_drift", "federated_reconciliation_drift", "federated_runtime_divergence_drift", "federated_replay_drift", "federated_preo_drift", "federated_continuity_drift", "federated_exact_object_drift", "federated_identifier_resolution_drift"]
+        return json({ status: result.result, route: "/federation/reconcile/drift", reason: "observability_only", drift: result.drift_classifications, federated_drift_taxonomy, repairs: false, legitimacy_inference: false })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/drift", reason: "reconciliation_unavailable" })
       }

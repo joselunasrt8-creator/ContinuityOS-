@@ -159,7 +159,7 @@ Reports preserve exact-object discipline by hashing the exact canonical summary 
 
 Federated lineage verification treats remote evidence as bounded evidence, never inherited trust. Trust-domain boundaries are explicit: `local_runtime`, `foreign_runtime`, and `portable_proof_bundle`. A foreign lineage claim must include `runtime_id`, `trust_domain`, `lineage_hash`, `parent_lineage_hash`, `decision_id`, `validated_object_hash`, `invocation_nonce`, `proof_id`, and `revocation_state`. Federation recursion is bounded by the same reconciliation maximum depth, and remote replay state is isolated: it is not reserved, consumed, released, or inferred locally.
 
-Portable reconciliation exchange uses JCS canonicalization, a DSSE-compatible payload type, and content-addressed lineage hashes. Portable structures cover reconciliation payloads, lineage evidence, drift reports, reconciliation proofs, and federated reconciliation exchange. A portable object is valid evidence only when its `exact_object_hash` matches the exact canonical payload being exchanged.
+Portable reconciliation exchange uses JCS canonicalization, a DSSE-compatible payload type, and content-addressed lineage hashes. Portable structures cover reconciliation payloads, lineage evidence, drift reports, reconciliation proofs, and federated reconciliation exchange. A portable object is valid evidence only when its `exact_object_hash` matches the exact canonical payload being exchanged. Portable bundle identifiers must come from canonical persisted registry row fields only; `lookup_key` and composite traversal anchors are not portable identity material. Checkpoint identity hashes deterministic reconciliation state only; `created_at` is observational metadata excluded from identity.
 
 Additional reconciliation drift classes:
 
@@ -170,6 +170,7 @@ Additional reconciliation drift classes:
 - `federated_replay_discontinuity_drift`
 - `deterministic_traversal_instability_drift`
 - `reconciliation_payload_corruption_drift`
+- `federated_identifier_resolution_drift`
 
 Additional FATE coverage:
 
@@ -183,6 +184,11 @@ Additional FATE coverage:
 | `federated_replay_discontinuity` | Foreign replay tuple diverges from local decision/object/nonce lineage. | `NULL` |
 | `deterministic_traversal_instability_expanded` | Canonical traversal sequence changes across equivalent inputs. | `NULL` |
 | `reconciliation_payload_corruption` | Portable reconciliation payload hash or drift class is corrupted. | `NULL` |
+| `federated_identifier_resolution_drift` | Portable identifier resolution cannot bind to canonical persisted row identifiers. | `NULL` |
+| `federated_composite_lookup_identifier` | Composite traversal lookup key is offered as portable identity material. | `NULL` |
+| `federated_missing_canonical_identifier` | Canonical persisted row identifier is absent during portable bundle emission. | `NULL` |
+| `non_deterministic_checkpoint_identity` | Identical reconciliation lineage emits divergent checkpoint identity. | `NULL` |
+| `timestamp_dependent_checkpoint_identity` | Checkpoint identity changes because observation timestamp changed. | `NULL` |
 
 Expanded failure classifications:
 
@@ -211,3 +217,4 @@ New FATE cases all produce `NULL`: `federated_revocation_identity_mismatch`, `fe
 Revocation envelope verification is exact-object-bound. The runtime recomputes `evidence_hash` and `envelope_hash`, requires `exact_object_bound` and `canonical_hash_locked`, and fails closed with `federated_revocation_exact_object_drift` on mismatch. Revocation evidence uses canonical persisted identifiers only; `lookup_key` remains traversal-only evidence and must not be projected into portable identity.
 
 Additional revocation drift classes are `federated_revocation_exact_object_drift`, `federated_revocation_anchor_drift`, and `federated_identifier_resolution_drift`. Additional FATE cases producing `NULL` are `federated_revocation_envelope_hash_mismatch`, `federated_revocation_exact_object_flag_drift`, `federated_revocation_anchor_mismatch`, `federated_revocation_reconciliation_hash_as_validated_hash`, and `federated_revocation_stale_envelope_replay`.
+| Federated identifier resolution failure | `federated_identifier_resolution_drift` | `NULL` |

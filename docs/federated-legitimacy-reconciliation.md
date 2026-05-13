@@ -44,6 +44,8 @@ They do not mutate legitimacy, create authority, reserve replay state, consume r
 
 The bundle uses canonical serialization and deterministic ordering only. It is replay-neutral and bound to the exact validated object hash.
 
+Portable identifiers (`decision_id`, `execution_id`, `proof_id`, `continuity_id`, `invocation_nonce`, and `validated_object_hash`) must resolve only from canonical persisted registry row fields observed during deterministic traversal. `lookup_key` is a traversal helper only and MUST NEVER be emitted as canonical portable identity. If canonical row identifiers cannot be deterministically resolved, bundle emission fails closed to `NULL` with `federated_identifier_resolution_drift`; portable_identifier == canonical_persisted_identifier.
+
 ## Runtime classification
 
 Remote runtimes are classified as:
@@ -74,7 +76,7 @@ Each node is canonically serialized and hashed with its traversal position and p
 
 `ReconciliationCheckpoint` contains `checkpoint_id`, `runtime_id`, `reconciliation_merkle_root`, `traversal_position`, `deterministic_hash`, `lineage_count`, `replay_snapshot_hash`, `drift_snapshot_hash`, `revocation_snapshot_hash`, and `created_at`.
 
-Checkpoints are deterministic, append-only evidence. They are not rollback overwrites and they do not mutate legitimacy.
+Checkpoints are deterministic, append-only evidence. Checkpoint identity derives only from `runtime_id`, `reconciliation_merkle_root`, `deterministic_hash`, `traversal_position`, `lineage_count`, `replay_snapshot_hash`, and `drift_snapshot_hash`; `created_at` is observational metadata only and never participates in checkpoint identity hashing. Same lineage state therefore yields the same checkpoint identity, while a different observation time alone is not a different checkpoint. They are not rollback overwrites and they do not mutate legitimacy.
 
 ## Federated drift taxonomy
 
@@ -90,6 +92,7 @@ The federated drift classes are:
 - `federated_preo_drift`
 - `federated_continuity_drift`
 - `federated_exact_object_drift`
+- `federated_identifier_resolution_drift`
 
 All existing drift classes remain preserved.
 
@@ -109,6 +112,11 @@ The fail-closed FATE cases are:
 - `remote_authority_inference`
 - `remote_execution_legitimacy_inference`
 - `non_deterministic_reconciliation_order`
+- `federated_identifier_resolution_drift`
+- `federated_composite_lookup_identifier`
+- `federated_missing_canonical_identifier`
+- `non_deterministic_checkpoint_identity`
+- `timestamp_dependent_checkpoint_identity`
 
 Every failure returns `NULL`.
 

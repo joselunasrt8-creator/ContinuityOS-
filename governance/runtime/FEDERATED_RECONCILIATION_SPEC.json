@@ -138,6 +138,7 @@
     "federated_identifier_resolution_drift",
     "federated_revocation_exact_object_drift",
     "federated_revocation_anchor_drift"
+    "federated_identifier_resolution_drift"
   ],
   "fate_matrix": [
     {
@@ -230,6 +231,23 @@
     },
     {
       "test_id": "federated_revocation_stale_envelope_replay",
+      "test_id": "federated_identifier_resolution_drift",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_composite_lookup_identifier",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "federated_missing_canonical_identifier",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "non_deterministic_checkpoint_identity",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "timestamp_dependent_checkpoint_identity",
       "expected_result": "NULL"
     }
   ],
@@ -310,5 +328,6 @@
     "canonical_hash_locked": true,
     "envelope_hash_validation": "supplied evidence_hash and envelope_hash must equal deterministic recomputation or resolve NULL with federated_revocation_exact_object_drift",
     "validated_object_hash_anchor": "canonical persisted validation_registry, aeo_registry, or proof_registry legitimacy lineage only; never traversal, checkpoint, or Merkle material"
+    ]
   }
 }
