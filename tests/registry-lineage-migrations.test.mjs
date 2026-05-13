@@ -141,8 +141,14 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertIndex(dbPath, 'federated_checkpoint_registry', 'idx_federated_checkpoint_registry_hash_unique', ['canonical_hash'], true)
     assertIndex(dbPath, 'federated_checkpoint_registry', 'idx_federated_checkpoint_registry_lineage', ['lineage_root', 'continuity_id', 'reconciliation_id'])
 
+    assertColumns(dbPath, 'federated_reconciliation_registry', ['reconciliation_id', 'checkpoint_hash', 'canonical_hash', 'lineage_root', 'continuity_root', 'federation_classification', 'drift_summary', 'replay_indicators', 'topology_hash', 'generated_at'])
+    assertNotNull(dbPath, 'federated_reconciliation_registry', ['checkpoint_hash', 'canonical_hash', 'lineage_root', 'continuity_root', 'federation_classification', 'drift_summary', 'replay_indicators', 'topology_hash', 'generated_at'])
+    assertIndex(dbPath, 'federated_reconciliation_registry', 'idx_federated_reconciliation_checkpoint_hash', ['checkpoint_hash', 'canonical_hash'])
+    assertIndex(dbPath, 'federated_reconciliation_registry', 'idx_federated_reconciliation_lineage_topology', ['lineage_root', 'continuity_root', 'topology_hash'])
+
     assert.throws(() => runSqlite([dbPath, "INSERT INTO distributed_legitimacy_registry (envelope_id,canonical_hash,lineage_root,continuity_id,reconciliation_id,federation_classification,replay_indicators,drift_indicators,evidence_only,remote_authority_denied,read_only,mutation_capable,replay_neutral,generated_at,created_at) VALUES ('e1','hash1','root','cont','rec','{}','[]','[]','true','true','true','false','true','deterministic','created'); UPDATE distributed_legitimacy_registry SET canonical_hash='changed' WHERE envelope_id='e1';"]), /append-only/)
     assert.throws(() => runSqlite([dbPath, "INSERT INTO federated_checkpoint_registry (checkpoint_envelope_id,checkpoint_id,canonical_hash,lineage_root,continuity_id,reconciliation_id,reconciliation_merkle_root,federation_classification,replay_indicators,drift_indicators,evidence_only,remote_authority_denied,read_only,mutation_capable,replay_neutral,generated_at,created_at) VALUES ('c1','checkpoint','hash2','root','cont','rec','merkle','{}','[]','[]','true','true','true','false','true','deterministic','created'); DELETE FROM federated_checkpoint_registry WHERE checkpoint_envelope_id='c1';"]), /append-only/)
+    assert.throws(() => runSqlite([dbPath, "INSERT INTO federated_reconciliation_registry (reconciliation_id,checkpoint_hash,canonical_hash,lineage_root,continuity_root,federation_classification,drift_summary,replay_indicators,topology_hash,generated_at) VALUES ('r1','checkpoint','hash3','root','cont','{}','[]','[]','topology','deterministic'); UPDATE federated_reconciliation_registry SET canonical_hash='changed' WHERE reconciliation_id='r1';"]), /append-only/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
