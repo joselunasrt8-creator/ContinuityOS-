@@ -36,6 +36,10 @@ const GRAPH_VERIFY_ROUTE = "/registry/graph/verify" as const
 const GRAPH_TOPOLOGY_ROUTE = "/registry/graph/topology" as const
 const GRAPH_CHECKPOINT_ROUTE = "/registry/graph/checkpoint" as const
 const GRAPH_ORPHANS_ROUTE = "/registry/graph/orphans" as const
+const RECONCILIATION_CLOSURE_ROUTE = "/reconcile/closure" as const
+const RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE = "/reconcile/closure/checkpoint" as const
+const RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE = "/reconcile/closure/equivalence" as const
+const RECONCILIATION_CLOSURE_DRIFT_ROUTE = "/reconcile/closure/drift" as const
 const BOOTSTRAP_READY_DATABASES = new WeakSet<D1Database>()
 const RUNTIME_SOVEREIGNTY_FREEZES = new WeakMap<D1Database, RuntimeSovereigntyManifest>()
 const PROVENANCE_PAYLOAD_TYPE = "application/vnd.mindshift.cryptographic-provenance.v1+json"
@@ -48,7 +52,7 @@ const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as co
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -74,6 +78,7 @@ const FEDERATED_CHECKPOINT_REGISTRY = "federated_checkpoint_registry" as const
 const FEDERATION_CONFORMANCE_REGISTRY = "federation_conformance_registry" as const
 const FEDERATED_SOVEREIGNTY_REGISTRY = "federated_sovereignty_registry" as const
 const BOOTSTRAP_SOVEREIGNTY_REGISTRY = "bootstrap_sovereignty_registry" as const
+const RECONCILIATION_CLOSURE_REGISTRY = "reconciliation_closure_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -107,7 +112,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   runtime_governance_lock_registry: ["lock_id", "mutation_hash", "governance_id", "lock_state", "activation_allowed", "canonical_hash", "created_at"],
   recursive_governance_replay_registry: ["replay_id", "mutation_hash", "sco_hash", "preo_hash", "governance_id", "activation_lock_id", "consumed_at"],
   runtime_evolution_consensus_registry: ["consensus_id", "mutation_hash", "canonical_hash", "governance_scope", "quorum_threshold", "approval_count", "approval_hash", "consensus_status", "replay_neutral", "evidence_only", "generated_at", "created_at"],
-  legitimacy_graph_registry: ["graph_checkpoint_id", "graph_checkpoint_hash", "graph_coherence_hash", "node_count", "edge_count", "orphan_count", "drift_classes", "checkpoint_object_hash", "cross_registry_replay_continuity", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"]
+  legitimacy_graph_registry: ["graph_checkpoint_id", "graph_checkpoint_hash", "graph_coherence_hash", "node_count", "edge_count", "orphan_count", "drift_classes", "checkpoint_object_hash", "cross_registry_replay_continuity", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"],
+  reconciliation_closure_registry: ["closure_id", "closure_hash", "deterministic_reconciliation_anchor", "recursive_checkpoint_identity", "reconciliation_equivalence_state", "lineage_depth", "bounded_window", "graph_checkpoint_hash", "bootstrap_checkpoint_hash", "runtime_sovereignty_checkpoint_hash", "federation_conformance_checkpoint_hash", "drift_classes", "closure_object_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -761,6 +767,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_bootstrap_sovereignty_registry_manifest ON bootstrap_sovereignty_registry(manifest_hash, lineage_checkpoint_hash, conformance_status)`,
       `CREATE INDEX IF NOT EXISTS idx_bootstrap_sovereignty_registry_topology ON bootstrap_sovereignty_registry(deployment_lineage_root, bootstrap_trust_root_hash, startup_topology_hash)`,
       `CREATE TABLE IF NOT EXISTS legitimacy_graph_registry (graph_checkpoint_id TEXT PRIMARY KEY, graph_checkpoint_hash TEXT NOT NULL, graph_coherence_hash TEXT NOT NULL, node_count TEXT NOT NULL, edge_count TEXT NOT NULL, orphan_count TEXT NOT NULL, drift_classes TEXT NOT NULL, checkpoint_object_hash TEXT NOT NULL, cross_registry_replay_continuity TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS reconciliation_closure_registry (closure_id TEXT PRIMARY KEY, closure_hash TEXT NOT NULL, deterministic_reconciliation_anchor TEXT NOT NULL, recursive_checkpoint_identity TEXT NOT NULL, reconciliation_equivalence_state TEXT NOT NULL CHECK (reconciliation_equivalence_state IN ('RECONCILIATION_EQUIVALENT','RECONCILIATION_DRIFT','NULL')), lineage_depth TEXT NOT NULL, bounded_window TEXT NOT NULL, graph_checkpoint_hash TEXT NOT NULL, bootstrap_checkpoint_hash TEXT NOT NULL, runtime_sovereignty_checkpoint_hash TEXT NOT NULL, federation_conformance_checkpoint_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, closure_object_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_hash ON reconciliation_closure_registry(closure_hash, recursive_checkpoint_identity, reconciliation_equivalence_state)`,
+      `CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_bindings ON reconciliation_closure_registry(graph_checkpoint_hash, bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_graph_registry_checkpoint ON legitimacy_graph_registry(graph_checkpoint_hash, graph_coherence_hash, cross_registry_replay_continuity)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`,
@@ -815,6 +824,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_RECURSIVE_GOVERNANCE_VERIFIED")
     await validateRuntimeEvolutionConsensusRegistry(env)
     await validateLegitimacyGraphRegistry(env)
+    await validateReconciliationClosureRegistry(env)
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_RUNTIME_EVOLUTION_CONSENSUS_REGISTRY_VALIDATED")
     const sovereigntyManifest = await freezeRuntimeSovereignty(env)
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_RUNTIME_SOVEREIGNTY_FROZEN")
@@ -855,7 +865,9 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_bootstrap_sovereignty_registry_no_update BEFORE UPDATE ON bootstrap_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'bootstrap_sovereignty_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_bootstrap_sovereignty_registry_no_delete BEFORE DELETE ON bootstrap_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'bootstrap_sovereignty_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_legitimacy_graph_registry_no_update BEFORE UPDATE ON legitimacy_graph_registry BEGIN SELECT RAISE(ABORT, 'legitimacy_graph_registry is append-only'); END`,
-    `CREATE TRIGGER IF NOT EXISTS trg_legitimacy_graph_registry_no_delete BEFORE DELETE ON legitimacy_graph_registry BEGIN SELECT RAISE(ABORT, 'legitimacy_graph_registry is append-only'); END`
+    `CREATE TRIGGER IF NOT EXISTS trg_legitimacy_graph_registry_no_delete BEFORE DELETE ON legitimacy_graph_registry BEGIN SELECT RAISE(ABORT, 'legitimacy_graph_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_update BEFORE UPDATE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_delete BEFORE DELETE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`
   ]
   for (const trigger of triggers) await env.DB.prepare(trigger).run()
 }
@@ -1359,6 +1371,150 @@ async function appendGraphClosureCheckpoint(env: Env, checkpoint: LegitimacyGrap
   await env.DB.prepare(`INSERT OR IGNORE INTO legitimacy_graph_registry (graph_checkpoint_id,graph_checkpoint_hash,graph_coherence_hash,node_count,edge_count,orphan_count,drift_classes,checkpoint_object_hash,cross_registry_replay_continuity,evidence_only,replay_neutral,mutation_capable,remote_authority_denied,read_only,creates_authority,execution_started,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'true','true','false','true','true','false','false',?10,?11)`)
     .bind(checkpoint.checkpoint_id, checkpoint.graph_checkpoint_hash, checkpoint.graph_coherence_hash, String(checkpoint.nodes.length), String(checkpoint.edges.length), String(checkpoint.orphans.length), canonicalize(checkpoint.drift_classes), await sha256Hex(canonicalize(checkpoint.nodes.map((node) => node.exact_object_hash))), checkpoint.cross_registry_replay_continuity, checkpoint.generated_at, checkpoint.generated_at)
     .run()
+}
+
+type ReconciliationClosureDriftClass =
+  | "recursive_reconciliation_divergence"
+  | "reconciliation_equivalence_drift"
+  | "recursive_lineage_fragmentation"
+  | "recursive_checkpoint_instability"
+  | "reconciliation_closure_failure"
+  | "reconciliation_anchor_instability"
+  | "reconciliation_graph_binding_drift"
+  | "reconciliation_bootstrap_binding_drift"
+  | "reconciliation_sovereignty_binding_drift"
+  | "reconciliation_federation_binding_drift"
+  | "reconciliation_replay_resurrection_attempt"
+  | "reconciliation_window_overflow"
+  | "reconciliation_closure_hash_mismatch"
+
+type ReconciliationEquivalenceState = "RECONCILIATION_EQUIVALENT" | "RECONCILIATION_DRIFT" | "NULL"
+
+type RecursiveReconciliationClosureObject = {
+  closure_id: string
+  closure_hash: string
+  deterministic_reconciliation_anchor: string
+  recursive_checkpoint_identity: string
+  reconciliation_equivalence_state: ReconciliationEquivalenceState
+  lineage_depth: number
+  bounded_window: number
+  graph_checkpoint_hash: string
+  bootstrap_checkpoint_hash: string
+  runtime_sovereignty_checkpoint_hash: string
+  federation_conformance_checkpoint_hash: string
+  graph_checkpoint_binding: string
+  bootstrap_checkpoint_binding: string
+  runtime_sovereignty_checkpoint_binding: string
+  federation_conformance_checkpoint_binding: string
+  recursive_lineage_depth_evidence: readonly string[]
+  drift_classes: ReconciliationClosureDriftClass[]
+  closure_object_hash: string
+  evidence_only: true
+  replay_neutral: true
+  mutation_capable: false
+  remote_authority_denied: true
+  read_only: true
+  creates_authority: false
+  execution_started: false
+  replay_consumed: false
+  generated_at: string
+}
+
+const RECONCILIATION_CLOSURE_ROUTES = [RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE] as const
+const RECONCILIATION_CLOSURE_MAX_WINDOW = SYSTEM_MAX_CONTINUITY_DEPTH
+
+function reconciliationClosureFlags(): { evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false } {
+  return { evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false }
+}
+
+function latestDeterministicRow(rows: Record<string, unknown>[], hashKeys: string[]): Record<string, unknown> | null {
+  const candidates = rows.map((row) => canonicalRecord(row)).filter((row) => hashKeys.some((key) => String(row[key] || "")))
+  candidates.sort((a, b) => hashKeys.map((key) => String(a[key] || "")).join(":").localeCompare(hashKeys.map((key) => String(b[key] || "")).join(":")))
+  return candidates.at(-1) || null
+}
+
+async function deterministicRegistryRows(env: Env, registry: string): Promise<Record<string, unknown>[]> {
+  const columns = await tableColumns(env, registry)
+  if (columns.size === 0) return []
+  const orderBy = Array.from(columns).sort().map((column) => `${column} ASC`).join(", ")
+  const result = await env.DB.prepare(`SELECT * FROM ${registry} ORDER BY ${orderBy}`).all<any>()
+  return Array.isArray(result?.results) ? result.results.map((row: any) => canonicalRecord(row)) : []
+}
+
+async function latestCheckpointBinding(env: Env, registry: string, hashKeys: string[]): Promise<string> {
+  const row = latestDeterministicRow(await deterministicRegistryRows(env, registry), hashKeys)
+  if (!row) return ""
+  for (const key of hashKeys) {
+    const value = String(row[key] || "")
+    if (value) return value
+  }
+  return ""
+}
+
+async function buildRecursiveReconciliationClosureObject(env: Env, url: URL, generated_at = new Date().toISOString()): Promise<RecursiveReconciliationClosureObject> {
+  const drift = new Set<ReconciliationClosureDriftClass>()
+  const requestedWindow = Number(url.searchParams.get("window") || RECONCILIATION_CLOSURE_MAX_WINDOW)
+  const bounded_window = Number.isFinite(requestedWindow) && requestedWindow > 0 ? Math.floor(requestedWindow) : RECONCILIATION_CLOSURE_MAX_WINDOW
+  if (bounded_window > RECONCILIATION_CLOSURE_MAX_WINDOW) drift.add("reconciliation_window_overflow")
+
+  const graph = await deterministicGraphTraversalEngine(env)
+  if (graph.drift_classes.length > 0 || graph.orphans.length > 0) drift.add("recursive_lineage_fragmentation")
+  if (graph.traversal_depth_limit > RECONCILIATION_CLOSURE_MAX_WINDOW) drift.add("recursive_reconciliation_divergence")
+
+  const graph_checkpoint_hash = await latestCheckpointBinding(env, LEGITIMACY_GRAPH_REGISTRY, ["graph_checkpoint_hash", "graph_coherence_hash"])
+  const bootstrap_checkpoint_hash = await latestCheckpointBinding(env, BOOTSTRAP_SOVEREIGNTY_REGISTRY, ["lineage_checkpoint_hash", "manifest_hash"])
+  const runtime_sovereignty_checkpoint_hash = await latestCheckpointBinding(env, "runtime_sovereignty_registry", ["sovereignty_hash", "runtime_surface_hash"])
+  const federation_conformance_checkpoint_hash = await latestCheckpointBinding(env, FEDERATION_CONFORMANCE_REGISTRY, ["compatibility_hash", "checkpoint_hash", "fingerprint_hash"])
+
+  if (graph_checkpoint_hash && graph_checkpoint_hash !== graph.graph_checkpoint_hash) drift.add("reconciliation_graph_binding_drift")
+  if (!graph_checkpoint_hash && graph.nodes.length > 0) drift.add("reconciliation_graph_binding_drift")
+  if (url.searchParams.get("bootstrap_checkpoint_hash") && url.searchParams.get("bootstrap_checkpoint_hash") !== bootstrap_checkpoint_hash) drift.add("reconciliation_bootstrap_binding_drift")
+  if (url.searchParams.get("runtime_sovereignty_checkpoint_hash") && url.searchParams.get("runtime_sovereignty_checkpoint_hash") !== runtime_sovereignty_checkpoint_hash) drift.add("reconciliation_sovereignty_binding_drift")
+  if (url.searchParams.get("federation_conformance_checkpoint_hash") && url.searchParams.get("federation_conformance_checkpoint_hash") !== federation_conformance_checkpoint_hash) drift.add("reconciliation_federation_binding_drift")
+  if (url.searchParams.get("consume_replay_state") === "true" || url.searchParams.get("replay_resurrection") === "true") drift.add("reconciliation_replay_resurrection_attempt")
+  if (url.searchParams.get("anchor") && url.searchParams.get("anchor") !== graph.graph_coherence_hash) drift.add("reconciliation_anchor_instability")
+  if (url.searchParams.get("checkpoint_identity") && url.searchParams.get("checkpoint_identity") !== graph.graph_checkpoint_hash) drift.add("recursive_checkpoint_instability")
+
+  const recursive_lineage_depth_evidence = graph.nodes.map((node) => `${node.registry}:${node.node_id}:${node.lineage_root}`).sort().slice(0, bounded_window)
+  const lineage_depth = Math.min(graph.nodes.length, bounded_window)
+  if (graph.nodes.length > bounded_window) drift.add("reconciliation_window_overflow")
+
+  const deterministic_reconciliation_anchor = await sha256Hex(canonicalize({ graph_coherence_hash: graph.graph_coherence_hash, graph_checkpoint_hash: graph.graph_checkpoint_hash, graph_checkpoint_binding: graph_checkpoint_hash || graph.graph_checkpoint_hash, bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash }))
+  const recursive_checkpoint_identity = await sha256Hex(canonicalize({ deterministic_reconciliation_anchor, lineage_depth, recursive_lineage_depth_evidence }))
+  const equivalence_material = { deterministic_reconciliation_anchor, recursive_checkpoint_identity, graph_checkpoint_hash: graph.graph_checkpoint_hash, graph_checkpoint_binding: graph_checkpoint_hash || graph.graph_checkpoint_hash, bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash, drift_classes: Array.from(drift).sort() }
+  const reconciliation_equivalence_state: ReconciliationEquivalenceState = drift.size === 0 ? "RECONCILIATION_EQUIVALENT" : "RECONCILIATION_DRIFT"
+  if (reconciliation_equivalence_state !== "RECONCILIATION_EQUIVALENT") drift.add("reconciliation_equivalence_drift")
+  const drift_classes = Array.from(drift).sort()
+  const closure_object_hash = await sha256Hex(canonicalize({ ...equivalence_material, drift_classes, reconciliation_equivalence_state }))
+  const closure_hash = await sha256Hex(canonicalize({ closure_object_hash, deterministic_reconciliation_anchor, recursive_checkpoint_identity, reconciliation_equivalence_state }))
+  if (url.searchParams.get("closure_hash") && url.searchParams.get("closure_hash") !== closure_hash) drift_classes.push("reconciliation_closure_hash_mismatch")
+  const normalized_drift_classes = Array.from(new Set(drift_classes)).sort()
+  const closure_id = `reconciliation-closure:${await sha256Hex(canonicalize({ closure_hash, generated_at }))}`
+  return Object.freeze({ closure_id, closure_hash, deterministic_reconciliation_anchor, recursive_checkpoint_identity, reconciliation_equivalence_state: normalized_drift_classes.length === 0 ? "RECONCILIATION_EQUIVALENT" : "RECONCILIATION_DRIFT", lineage_depth, bounded_window, graph_checkpoint_hash: graph.graph_checkpoint_hash, bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash, graph_checkpoint_binding: graph_checkpoint_hash || graph.graph_checkpoint_hash, bootstrap_checkpoint_binding: bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_binding: runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_binding: federation_conformance_checkpoint_hash, recursive_lineage_depth_evidence, drift_classes: normalized_drift_classes, closure_object_hash, ...reconciliationClosureFlags(), generated_at })
+}
+
+async function appendReconciliationClosureObservation(env: Env, closure: RecursiveReconciliationClosureObject) {
+  await env.DB.prepare(`INSERT INTO reconciliation_closure_registry (closure_id,closure_hash,deterministic_reconciliation_anchor,recursive_checkpoint_identity,reconciliation_equivalence_state,lineage_depth,bounded_window,graph_checkpoint_hash,bootstrap_checkpoint_hash,runtime_sovereignty_checkpoint_hash,federation_conformance_checkpoint_hash,drift_classes,closure_object_hash,evidence_only,replay_neutral,mutation_capable,remote_authority_denied,read_only,creates_authority,execution_started,replay_consumed,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,'true','true','false','true','true','false','false','false',?14,?15)`)
+    .bind(closure.closure_id, closure.closure_hash, closure.deterministic_reconciliation_anchor, closure.recursive_checkpoint_identity, closure.reconciliation_equivalence_state, String(closure.lineage_depth), String(closure.bounded_window), closure.graph_checkpoint_hash, closure.bootstrap_checkpoint_hash, closure.runtime_sovereignty_checkpoint_hash, closure.federation_conformance_checkpoint_hash, canonicalize(closure.drift_classes), closure.closure_object_hash, closure.generated_at, closure.generated_at)
+    .run()
+}
+
+async function ensureReconciliationClosureRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS reconciliation_closure_registry (closure_id TEXT PRIMARY KEY, closure_hash TEXT NOT NULL, deterministic_reconciliation_anchor TEXT NOT NULL, recursive_checkpoint_identity TEXT NOT NULL, reconciliation_equivalence_state TEXT NOT NULL CHECK (reconciliation_equivalence_state IN ('RECONCILIATION_EQUIVALENT','RECONCILIATION_DRIFT','NULL')), lineage_depth TEXT NOT NULL, bounded_window TEXT NOT NULL, graph_checkpoint_hash TEXT NOT NULL, bootstrap_checkpoint_hash TEXT NOT NULL, runtime_sovereignty_checkpoint_hash TEXT NOT NULL, federation_conformance_checkpoint_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, closure_object_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_hash ON reconciliation_closure_registry(closure_hash, recursive_checkpoint_identity, reconciliation_equivalence_state)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_bindings ON reconciliation_closure_registry(graph_checkpoint_hash, bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_drift ON reconciliation_closure_registry(reconciliation_equivalence_state, bounded_window)`).run()
+  await validateReconciliationClosureRegistry(env)
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_update BEFORE UPDATE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_delete BEFORE DELETE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`).run()
+}
+
+async function validateReconciliationClosureRegistry(env: Env) {
+  const columns = await tableColumns(env, RECONCILIATION_CLOSURE_REGISTRY)
+  if (columns.size === 0) return
+  for (const column of REQUIRED_SCHEMA_COLUMNS.reconciliation_closure_registry) {
+    if (!columns.has(column)) throw new SchemaInitializationError("missing_required_column")
+  }
 }
 
 async function ensureLegitimacyGraphRegistry(env: Env) {
@@ -3710,7 +3866,7 @@ const RUNTIME_PROOF_TOPOLOGY = Object.freeze(["attestation_registry", "proof_qua
 const RUNTIME_GOVERNANCE_TOPOLOGY = Object.freeze(["bootstrap_sovereignty_registry", "external_authority_registry", "recursive_governance_registry", "runtime_governance_lock_registry", "runtime_sovereignty_registry", REQUIRE_PREO_LINEAGE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_ROUTE].sort())
 const CANONICAL_EXECUTION_AUTHORITY_SURFACE = Object.freeze(["authority:create", "compile:aeo", "validate:exact-object", "execute:governed-deploy", "proof:persist-consume"].sort())
 const CANONICAL_MIGRATION_CHAIN = Object.freeze([
-  "0001_init.sql", "0002_governed_deploy_schema.sql", "0003_authority_registry_schema_fix.sql", "0004_enforcement_lock.sql", "0004_execution_replay_protection.sql", "0005_invocation_registry.sql", "0006_enforcement_reboot_v1.sql", "0007_canonical_aeo_registry_rebuild.sql", "0008_canonical_runtime_registry_rebuild.sql", "0009_runtime_observability_and_drift_registry.sql", "0010_identity_session_continuity.sql", "0011_proof_atomicity_unique_guard.sql", "0012_continuity_registry.sql", "0013_preo_registry.sql", "0014_deployment_provenance_lineage.sql", "0015_cryptographic_provenance_attestations.sql", "0016_federated_revocation_observability.sql", "0017_federated_trust_topology_observability.sql", "0018_distributed_legitimacy_interoperability.sql", "0019_distributed_reconciliation_governance.sql", "0020_governance_compression.sql", "0021_federation_conformance.sql", "0022_proof_quarantine_registry.sql", "0022_recursive_governance_registry.sql", "0023_recursive_governance_enforcement_boundary.sql", "0024_runtime_sovereignty_registry.sql", "0026_external_authority_registry.sql", "0027_bootstrap_sovereignty_registry.sql"
+  "0001_init.sql", "0002_governed_deploy_schema.sql", "0003_authority_registry_schema_fix.sql", "0004_enforcement_lock.sql", "0004_execution_replay_protection.sql", "0005_invocation_registry.sql", "0006_enforcement_reboot_v1.sql", "0007_canonical_aeo_registry_rebuild.sql", "0008_canonical_runtime_registry_rebuild.sql", "0009_runtime_observability_and_drift_registry.sql", "0010_identity_session_continuity.sql", "0011_proof_atomicity_unique_guard.sql", "0012_continuity_registry.sql", "0013_preo_registry.sql", "0014_deployment_provenance_lineage.sql", "0015_cryptographic_provenance_attestations.sql", "0016_federated_revocation_observability.sql", "0017_federated_trust_topology_observability.sql", "0018_distributed_legitimacy_interoperability.sql", "0019_distributed_reconciliation_governance.sql", "0020_governance_compression.sql", "0021_federation_conformance.sql", "0022_proof_quarantine_registry.sql", "0022_recursive_governance_registry.sql", "0023_recursive_governance_enforcement_boundary.sql", "0024_runtime_sovereignty_registry.sql", "0026_external_authority_registry.sql", "0027_bootstrap_sovereignty_registry.sql", "0028_legitimacy_graph_registry.sql", "0029_reconciliation_closure_registry.sql"
 ].sort())
 
 function canonicalSovereigntyRoutes(): { canonical_routes: readonly string[], observability_routes: readonly string[], governance_routes: readonly string[] } {
@@ -4512,6 +4668,25 @@ export default {
         return json({ status: "NULL", route: "/federation/interoperability/checkpoint", reason: "reconciliation_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
+    if (RECONCILIATION_CLOSURE_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...reconciliationClosureFlags() }, 405)
+
+    if (RECONCILIATION_CLOSURE_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...reconciliationClosureFlags() })
+        await ensureLegitimacyGraphRegistry(env)
+        await ensureReconciliationClosureRegistry(env)
+        const closure = await buildRecursiveReconciliationClosureObject(env, url)
+        await appendReconciliationClosureObservation(env, closure)
+        const status = closure.drift_classes.length > 0 ? "RECONCILIATION_CLOSURE_DRIFT" : "RECONCILIATION_CLOSURE_VERIFIED"
+        if (url.pathname === RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, reason: "observability_only", checkpoint: { closure_id: closure.closure_id, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, graph_checkpoint_hash: closure.graph_checkpoint_hash, bootstrap_checkpoint_hash: closure.bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash: closure.runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash: closure.federation_conformance_checkpoint_hash, lineage_depth: closure.lineage_depth, bounded_window: closure.bounded_window, generated_at: closure.generated_at }, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
+        if (url.pathname === RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, reason: "observability_only", reconciliation_equivalence_state: closure.reconciliation_equivalence_state, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
+        if (url.pathname === RECONCILIATION_CLOSURE_DRIFT_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_DRIFT_ROUTE, reason: "observability_only", drift_classes: closure.drift_classes, closure_divergence_classification: closure.drift_classes, closure_hash: closure.closure_hash, append_only: true, ...reconciliationClosureFlags() })
+        return json({ status, route: RECONCILIATION_CLOSURE_ROUTE, reason: "observability_only", closure, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, reconciliation_equivalence_state: closure.reconciliation_equivalence_state, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "reconciliation_closure_unavailable", drift_classes: ["reconciliation_closure_failure"], ...reconciliationClosureFlags() })
+      }
+    }
+
     if ([GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE].includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...legitimacyGraphStatusFlags() }, 405)
 
     if ([GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE].includes(url.pathname as any) && request.method === "GET") {
