@@ -1,0 +1,84 @@
+{
+  "spec_id": "mindshift-recursive-governance-v1",
+  "recursive_governance_invariant": "System mutation requires legitimacy; policy mutation requires validation; runtime mutation requires proof; if no valid object exists, nothing happens.",
+  "route": {
+    "path": "/governance/recursive/verify",
+    "method": "GET",
+    "execution_capability": false,
+    "authority_creation": false,
+    "read_only": true,
+    "allowed_mutation": "append_only_recursive_governance_evidence"
+  },
+  "governance_mutation_classes": [
+    "runtime_route_mutation",
+    "validator_mutation",
+    "schema_mutation",
+    "authority_semantics_mutation",
+    "proof_semantics_mutation",
+    "replay_semantics_mutation",
+    "policy_mutation",
+    "observability_mutation",
+    "federation_semantics_mutation",
+    "governance_surface_expansion"
+  ],
+  "governance_states": [
+    "GOVERNANCE_OBSERVED",
+    "GOVERNANCE_VALIDATED",
+    "GOVERNANCE_QUARANTINED",
+    "GOVERNANCE_REJECTED",
+    "NULL"
+  ],
+  "required_sco_enforcement": {
+    "all_mutation_classes_require_sco": true,
+    "missing_sco_decision": "NULL",
+    "runtime_mutation_without_sco": "NULL_OR_REJECTED_FAIL_CLOSED"
+  },
+  "recursive_proof_requirements": {
+    "proof_required": true,
+    "proof_is_evidence_only": true,
+    "replay_consumed": false,
+    "evidence_never_becomes_execution_authority": true
+  },
+  "exact_object_guarantees": {
+    "required": true,
+    "validated_object_must_equal_proposed_object": true,
+    "mutation_after_validation_rejected": true
+  },
+  "canonical_execution_path_guarantees": {
+    "path": ["/authority", "/compile", "/validate", "/execute", "/proof"],
+    "execution_remains_valid_only_if": ["VALID", "AUTHORIZED", "UNUSED", "POLICY_VALID"],
+    "recursive_governance_cannot_bypass_path": true
+  },
+  "non_bypassability_guarantees": {
+    "no_alternate_execution_paths": true,
+    "no_implicit_authority": true,
+    "observability_routes_non_executable": true,
+    "governance_evidence_non_authoritative": true,
+    "no_replay_consumption": true
+  },
+  "fail_closed_semantics": {
+    "invalid_or_missing_object_result": "NULL",
+    "detected_drift_result": "GOVERNANCE_REJECTED",
+    "database_unavailable_result": "NULL"
+  },
+  "drift_detection": [
+    "executable_surface_expansion",
+    "bypass_path_introduction",
+    "runtime_mutation_after_validation",
+    "canonical_route_mutation",
+    "validator_weakening",
+    "proof_weakening",
+    "replay_weakening",
+    "authority_inheritance_expansion",
+    "mutation_capable_observability_route",
+    "exact_object_violation"
+  ],
+  "registry": {
+    "name": "recursive_governance_registry",
+    "append_only": true,
+    "updates_allowed": false,
+    "deletes_allowed": false,
+    "exact_object_required": true,
+    "replay_consumption_allowed": false
+  }
+}

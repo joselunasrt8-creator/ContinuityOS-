@@ -15,7 +15,8 @@ const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
+const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/governance/recursive/verify", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -62,7 +63,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   revocation_topology_registry: ["topology_id", "authority_id", "continuity_id", "lineage_root", "topology_hash", "drift_summary", "observed_at", "created_at"],
   distributed_legitimacy_registry: ["envelope_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
   federated_checkpoint_registry: ["checkpoint_envelope_id", "checkpoint_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "reconciliation_merkle_root", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
-  federation_conformance_registry: ["conformance_id", "envelope_id", "runtime_id", "remote_runtime_id", "fingerprint_hash", "checkpoint_hash", "compatibility_hash", "conformance_status", "drift_classes", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"]
+  federation_conformance_registry: ["conformance_id", "envelope_id", "runtime_id", "remote_runtime_id", "fingerprint_hash", "checkpoint_hash", "compatibility_hash", "conformance_status", "drift_classes", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
+  recursive_governance_registry: ["governance_id", "mutation_class", "mutation_scope", "target_surface", "mutation_hash", "sco_hash", "preo_hash", "governance_decision", "drift_classes", "exact_object_verified", "replay_neutral", "mutation_authorized", "proof_required", "canonical_path_preserved", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -88,6 +90,59 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
+
+
+type RecursiveMutationClass = "runtime_route_mutation" | "validator_mutation" | "schema_mutation" | "authority_semantics_mutation" | "proof_semantics_mutation" | "replay_semantics_mutation" | "policy_mutation" | "observability_mutation" | "federation_semantics_mutation" | "governance_surface_expansion"
+type RecursiveGovernanceState = "GOVERNANCE_OBSERVED" | "GOVERNANCE_VALIDATED" | "GOVERNANCE_QUARANTINED" | "GOVERNANCE_REJECTED" | "NULL"
+type RecursiveMutationDriftClass = "executable_surface_expansion" | "bypass_path_introduction" | "runtime_mutation_after_validation" | "canonical_route_mutation" | "validator_weakening" | "proof_weakening" | "replay_weakening" | "authority_inheritance_expansion" | "mutation_capable_observability_route" | "exact_object_violation" | "missing_sco" | "canonical_path_violation"
+
+type RuntimeMutationEnvelope = {
+  mutation_class: RecursiveMutationClass
+  mutation_scope: string
+  target_surface: string
+  mutation_hash: string
+  sco_hash: string
+  preo_hash: string
+  proposed_object_hash: string
+  validated_object_hash: string
+  executable: boolean
+  method: string
+  validation_state: string
+}
+
+type GovernanceMutationEnvelope = RuntimeMutationEnvelope & {
+  recursive_governance_invariant: "system_mutation_requires_legitimacy"
+  canonical_execution_path: readonly string[]
+}
+
+type RecursiveGovernanceDecision = {
+  governance_decision: RecursiveGovernanceState
+  drift_classes: RecursiveMutationDriftClass[]
+  exact_object_verified: boolean
+  replay_neutral: true
+  mutation_authorized: boolean
+  proof_required: boolean
+  canonical_path_preserved: boolean
+}
+
+type RecursiveGovernanceProof = {
+  governance_id: string
+  mutation_hash: string
+  sco_hash: string
+  preo_hash: string
+  proof_hash: string
+  evidence_only: true
+  replay_consumed: false
+}
+
+type RecursiveGovernanceCheckpoint = {
+  checkpoint_id: string
+  governance_id: string
+  envelope_hash: string
+  decision_hash: string
+  generated_at: string
+}
+
 type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
 
 function json(data: unknown, status = 200) {
@@ -409,12 +464,18 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_federation_conformance_registry_envelope_unique ON federation_conformance_registry(envelope_id)`,
       `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_runtime ON federation_conformance_registry(runtime_id, remote_runtime_id, conformance_status)`,
       `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_semantics ON federation_conformance_registry(fingerprint_hash, checkpoint_hash, compatibility_hash)`,
+      `CREATE TABLE IF NOT EXISTS recursive_governance_registry (governance_id TEXT PRIMARY KEY, mutation_class TEXT NOT NULL CHECK (mutation_class IN ('runtime_route_mutation','validator_mutation','schema_mutation','authority_semantics_mutation','proof_semantics_mutation','replay_semantics_mutation','policy_mutation','observability_mutation','federation_semantics_mutation','governance_surface_expansion')), mutation_scope TEXT NOT NULL, target_surface TEXT NOT NULL, mutation_hash TEXT NOT NULL, sco_hash TEXT NOT NULL, preo_hash TEXT NOT NULL, governance_decision TEXT NOT NULL CHECK (governance_decision IN ('GOVERNANCE_OBSERVED','GOVERNANCE_VALIDATED','GOVERNANCE_QUARANTINED','GOVERNANCE_REJECTED','NULL')), drift_classes TEXT NOT NULL, exact_object_verified TEXT NOT NULL CHECK (exact_object_verified IN ('true','false')), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_authorized TEXT NOT NULL CHECK (mutation_authorized IN ('true','false')), proof_required TEXT NOT NULL CHECK (proof_required='true'), canonical_path_preserved TEXT NOT NULL CHECK (canonical_path_preserved IN ('true','false')), generated_at TEXT NOT NULL, created_at TEXT NOT NULL, CHECK (governance_decision != 'GOVERNANCE_VALIDATED' OR (sco_hash != '' AND exact_object_verified='true' AND replay_neutral='true' AND mutation_authorized='true' AND proof_required='true' AND canonical_path_preserved='true')), CHECK (governance_decision = 'GOVERNANCE_VALIDATED' OR mutation_authorized='false'))`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_recursive_governance_registry_governance_unique ON recursive_governance_registry(governance_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_recursive_governance_registry_mutation ON recursive_governance_registry(mutation_class, mutation_scope, target_surface)`,
+      `CREATE INDEX IF NOT EXISTS idx_recursive_governance_registry_legitimacy ON recursive_governance_registry(mutation_hash, sco_hash, preo_hash, governance_decision)`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_update BEFORE UPDATE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_delete BEFORE DELETE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_update BEFORE UPDATE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_delete BEFORE DELETE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_update BEFORE UPDATE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_delete BEFORE DELETE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_registry_no_update BEFORE UPDATE ON recursive_governance_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_registry_no_delete BEFORE DELETE ON recursive_governance_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
@@ -2459,6 +2520,91 @@ async function recordDrift(env: Env, drift: {
 }
 
 
+function recursiveMutationRequiresSCO(mutation_class: RecursiveMutationClass): boolean {
+  return (["runtime_route_mutation", "validator_mutation", "schema_mutation", "authority_semantics_mutation", "proof_semantics_mutation", "replay_semantics_mutation", "policy_mutation", "observability_mutation", "federation_semantics_mutation", "governance_surface_expansion"] as readonly RecursiveMutationClass[]).includes(mutation_class)
+}
+
+async function deriveRecursiveGovernanceHash(value: unknown): Promise<string> {
+  return sha256Hex(canonicalize(value))
+}
+
+function isRecursiveMutationClass(value: string): value is RecursiveMutationClass {
+  return (["runtime_route_mutation", "validator_mutation", "schema_mutation", "authority_semantics_mutation", "proof_semantics_mutation", "replay_semantics_mutation", "policy_mutation", "observability_mutation", "federation_semantics_mutation", "governance_surface_expansion"] as readonly string[]).includes(value)
+}
+
+function buildRecursiveGovernanceEnvelope(url: URL): GovernanceMutationEnvelope {
+  const mutationClassInput = String(url.searchParams.get("mutation_class") || "runtime_route_mutation")
+  const mutation_class: RecursiveMutationClass = isRecursiveMutationClass(mutationClassInput) ? mutationClassInput : "runtime_route_mutation"
+  const target_surface = String(url.searchParams.get("target_surface") || "")
+  const proposed_object_hash = String(url.searchParams.get("proposed_object_hash") || url.searchParams.get("object_hash") || url.searchParams.get("mutation_hash") || "")
+  const validated_object_hash = String(url.searchParams.get("validated_object_hash") || url.searchParams.get("object_hash") || "")
+  return Object.freeze({
+    mutation_class,
+    mutation_scope: String(url.searchParams.get("mutation_scope") || "runtime"),
+    target_surface,
+    mutation_hash: String(url.searchParams.get("mutation_hash") || proposed_object_hash || target_surface),
+    sco_hash: String(url.searchParams.get("sco_hash") || ""),
+    preo_hash: String(url.searchParams.get("preo_hash") || ""),
+    proposed_object_hash,
+    validated_object_hash,
+    executable: String(url.searchParams.get("executable") || "false") === "true",
+    method: String(url.searchParams.get("method") || "GET").toUpperCase(),
+    validation_state: String(url.searchParams.get("validation_state") || "OBSERVED").toUpperCase(),
+    recursive_governance_invariant: "system_mutation_requires_legitimacy",
+    canonical_execution_path: CANONICAL_RUNTIME_ROUTES
+  })
+}
+
+function classifyRecursiveMutation(envelope: GovernanceMutationEnvelope): RecursiveMutationDriftClass[] {
+  const drift = new Set<RecursiveMutationDriftClass>()
+  const canonicalRoute = (CANONICAL_RUNTIME_ROUTES as readonly string[]).includes(envelope.target_surface)
+  const observabilityRoute = (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(envelope.target_surface)
+  const knownRoute = canonicalRoute || observabilityRoute || (GOVERNANCE_EVIDENCE_ROUTES as readonly string[]).includes(envelope.target_surface)
+
+  if (recursiveMutationRequiresSCO(envelope.mutation_class) && !envelope.sco_hash) drift.add("missing_sco")
+  if (envelope.mutation_class === "governance_surface_expansion" || (envelope.executable && !knownRoute)) drift.add("executable_surface_expansion")
+  if (envelope.target_surface && !knownRoute && envelope.executable) drift.add("bypass_path_introduction")
+  if (envelope.validation_state === "VALIDATED" && envelope.mutation_hash && envelope.validated_object_hash && envelope.mutation_hash !== envelope.validated_object_hash) drift.add("runtime_mutation_after_validation")
+  if (canonicalRoute && envelope.mutation_class === "runtime_route_mutation") drift.add("canonical_route_mutation")
+  if (envelope.mutation_class === "validator_mutation") drift.add("validator_weakening")
+  if (envelope.mutation_class === "proof_semantics_mutation") drift.add("proof_weakening")
+  if (envelope.mutation_class === "replay_semantics_mutation") drift.add("replay_weakening")
+  if (envelope.mutation_class === "authority_semantics_mutation") drift.add("authority_inheritance_expansion")
+  if (observabilityRoute && (envelope.executable || envelope.method !== "GET")) drift.add("mutation_capable_observability_route")
+  if (!envelope.proposed_object_hash || !envelope.validated_object_hash || envelope.proposed_object_hash !== envelope.validated_object_hash) drift.add("exact_object_violation")
+  if (!CANONICAL_RUNTIME_ROUTES.every((route) => ["/authority", "/compile", "/validate", "/execute", "/proof"].includes(route) || route === "/session" || route === "/continuity")) drift.add("canonical_path_violation")
+  return Array.from(drift).sort()
+}
+
+function verifyRecursiveGovernanceIntegrity(envelope: GovernanceMutationEnvelope, drift_classes = classifyRecursiveMutation(envelope)): RecursiveGovernanceDecision {
+  const exact_object_verified = Boolean(envelope.proposed_object_hash && envelope.validated_object_hash && envelope.proposed_object_hash === envelope.validated_object_hash)
+  const canonical_path_preserved = !drift_classes.includes("canonical_path_violation") && !drift_classes.includes("bypass_path_introduction") && !drift_classes.includes("canonical_route_mutation")
+  const mutation_authorized = Boolean(envelope.sco_hash && exact_object_verified && canonical_path_preserved && drift_classes.length === 0)
+  const governance_decision: RecursiveGovernanceState = mutation_authorized ? "GOVERNANCE_VALIDATED" : drift_classes.includes("missing_sco") ? "NULL" : drift_classes.length > 0 ? "GOVERNANCE_REJECTED" : "NULL"
+  return Object.freeze({ governance_decision, drift_classes, exact_object_verified, replay_neutral: true, mutation_authorized, proof_required: true, canonical_path_preserved })
+}
+
+function detectRecursiveGovernanceDrift(envelope: GovernanceMutationEnvelope): RecursiveMutationDriftClass[] {
+  return classifyRecursiveMutation(envelope)
+}
+
+async function buildRecursiveGovernanceProof(envelope: GovernanceMutationEnvelope, decision: RecursiveGovernanceDecision): Promise<RecursiveGovernanceProof> {
+  const proof_hash = await deriveRecursiveGovernanceHash({ envelope, decision, evidence_only: true, replay_consumed: false })
+  return Object.freeze({ governance_id: await deriveRecursiveGovernanceHash({ proof_hash, mutation_hash: envelope.mutation_hash }), mutation_hash: envelope.mutation_hash, sco_hash: envelope.sco_hash, preo_hash: envelope.preo_hash, proof_hash, evidence_only: true, replay_consumed: false })
+}
+
+async function buildRecursiveGovernanceCheckpoint(envelope: GovernanceMutationEnvelope, decision: RecursiveGovernanceDecision, generated_at: string): Promise<RecursiveGovernanceCheckpoint> {
+  const envelope_hash = await deriveRecursiveGovernanceHash(envelope)
+  const decision_hash = await deriveRecursiveGovernanceHash(decision)
+  return Object.freeze({ checkpoint_id: await deriveRecursiveGovernanceHash({ envelope_hash, decision_hash, generated_at }), governance_id: await deriveRecursiveGovernanceHash({ envelope_hash, decision_hash }), envelope_hash, decision_hash, generated_at })
+}
+
+async function appendRecursiveGovernanceEvidence(env: Env, proof: RecursiveGovernanceProof, envelope: GovernanceMutationEnvelope, decision: RecursiveGovernanceDecision, generated_at: string) {
+  await env.DB.prepare(`INSERT INTO recursive_governance_registry (governance_id,mutation_class,mutation_scope,target_surface,mutation_hash,sco_hash,preo_hash,governance_decision,drift_classes,exact_object_verified,replay_neutral,mutation_authorized,proof_required,canonical_path_preserved,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'true',?11,'true',?12,?13,?14)`)
+    .bind(proof.governance_id, envelope.mutation_class, envelope.mutation_scope, envelope.target_surface, envelope.mutation_hash, envelope.sco_hash, envelope.preo_hash, decision.governance_decision, canonicalize(decision.drift_classes), String(decision.exact_object_verified), String(decision.mutation_authorized), String(decision.canonical_path_preserved), generated_at, generated_at)
+    .run()
+}
+
 async function appendFederatedTrustObservation(env: Env, result: FederationVerificationResult, created_at: string) {
   await env.DB.prepare(`INSERT INTO federated_trust_registry (trust_envelope_id,federation_origin,federation_tier,verification_status,evidence_only,remote_authority_denied,continuity_reference,lineage_root,observed_at,canonical_hash,created_at) VALUES (?1,?2,?3,?4,'true','true',?5,?6,?7,?8,?9)`)
     .bind(await deterministicReconciliationId("federated_trust_observation", { canonical_hash: result.canonical_hash, created_at }), result.envelope.federation_origin, result.envelope.federation_tier, result.envelope.verification_status, result.envelope.continuity_reference, result.envelope.lineage_root, result.envelope.observed_at, result.canonical_hash, created_at)
@@ -2664,6 +2810,22 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     if (url.pathname === "/health" && request.method === "GET") return json({ ok: true })
+    if (url.pathname === RECURSIVE_GOVERNANCE_ROUTE && request.method !== "GET") return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }, 405)
+    if (url.pathname === RECURSIVE_GOVERNANCE_ROUTE && request.method === "GET") {
+      try {
+        const generated_at = new Date().toISOString()
+        const envelope = buildRecursiveGovernanceEnvelope(url)
+        const drift_classes = detectRecursiveGovernanceDrift(envelope)
+        const decision = verifyRecursiveGovernanceIntegrity(envelope, drift_classes)
+        const proof = await buildRecursiveGovernanceProof(envelope, decision)
+        const checkpoint = await buildRecursiveGovernanceCheckpoint(envelope, decision, generated_at)
+        if (!hasDb(env)) return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ROUTE, reason: "database_unavailable", envelope, decision, proof, checkpoint, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false })
+        await appendRecursiveGovernanceEvidence(env, proof, envelope, decision, generated_at)
+        return json({ status: decision.governance_decision, route: RECURSIVE_GOVERNANCE_ROUTE, reason: "observability_only", envelope, decision, proof, checkpoint, drift_classes, recursive_governance_invariant: "system_mutation_requires_legitimacy", exact_object_verified: decision.exact_object_verified, canonical_path_preserved: decision.canonical_path_preserved, mutation_authorized: decision.mutation_authorized, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false, append_only: true })
+      } catch {
+        return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ROUTE, reason: "recursive_governance_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false })
+      }
+    }
     if (url.pathname === "/reconcile" && request.method === "GET") return json({ status: "NULL", route: "/reconcile", reason: "observability_only" })
     if (url.pathname === "/reconcile/schedule" && request.method === "GET") {
       try {
