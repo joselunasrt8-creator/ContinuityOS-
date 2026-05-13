@@ -176,3 +176,11 @@ Additional exact-object and anchor FATE cases all fail closed to `NULL`:
 - `federated_revocation_anchor_mismatch`
 - `federated_revocation_reconciliation_hash_as_validated_hash`
 - `federated_revocation_stale_envelope_replay`
+
+## Governance compression observability
+
+Governance compression converts federated reconciliation, checkpoint, replay, topology, and lineage observations into bounded deterministic summaries. These summaries remain observability evidence only: `remote_authority_denied`, `evidence_only`, `read_only`, and `replay_neutral` are always true while `mutation_capable` is always false.
+
+Compression drift classes are observable-only: `compression_divergence`, `reconciliation_instability`, `federated_summary_mismatch`, `topology_compression_corruption`, and `replay_summary_divergence`.
+
+Compression FATE additions all fail closed to `NULL`: `compression_determinism`, `compression_drift_classification`, `compression_replay_neutrality`, `compression_append_only_semantics`, `compression_summary_corruption`, `topology_compression_divergence`, `governance_summary_mismatch`, and `compression_remote_authority_denial`.

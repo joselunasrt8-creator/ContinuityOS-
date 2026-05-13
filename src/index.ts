@@ -15,7 +15,7 @@ const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/interoperability/checkpoint"] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -56,6 +56,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   drift_registry: ["drift_id", "drift_class", "severity", "decision_id", "execution_id", "payload", "detected_by", "resolution_status", "created_at"],
   federated_reconciliation_registry: ["reconciliation_id", "checkpoint_hash", "canonical_hash", "lineage_root", "continuity_root", "federation_classification", "drift_summary", "replay_indicators", "topology_hash", "generated_at"],
   federated_revocation_observability_registry: ["revocation_evidence_id", "runtime_id", "remote_runtime_id", "continuity_id", "decision_id", "validated_object_hash", "revocation_class", "revocation_reason", "lineage_hash", "reconciliation_merkle_root", "attestation_hash", "observed_at", "evidence_hash", "verification_status", "drift_class", "created_at"],
+  governance_compression_registry: ["compression_id", "reconciliation_root", "checkpoint_set_hash", "topology_root", "lineage_root", "federation_classification", "compressed_drift_summary", "compressed_replay_summary", "participating_runtimes", "canonical_hash", "generated_at", "created_at"],
   federated_trust_registry: ["trust_envelope_id", "federation_origin", "federation_tier", "verification_status", "evidence_only", "remote_authority_denied", "continuity_reference", "lineage_root", "observed_at", "canonical_hash", "created_at"],
   revocation_topology_registry: ["topology_id", "authority_id", "continuity_id", "lineage_root", "topology_hash", "drift_summary", "observed_at", "created_at"],
   distributed_legitimacy_registry: ["envelope_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
@@ -85,7 +86,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch"
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -386,6 +387,10 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_federated_reconciliation_checkpoint_hash ON federated_reconciliation_registry(checkpoint_hash, canonical_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_federated_reconciliation_lineage_topology ON federated_reconciliation_registry(lineage_root, continuity_root, topology_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_federated_reconciliation_runtime_hash ON federated_reconciliation_registry(checkpoint_hash, canonical_hash, topology_hash)`,
+      `CREATE TABLE IF NOT EXISTS governance_compression_registry (compression_id TEXT PRIMARY KEY, reconciliation_root TEXT NOT NULL, checkpoint_set_hash TEXT NOT NULL, topology_root TEXT NOT NULL, lineage_root TEXT NOT NULL, federation_classification TEXT NOT NULL, compressed_drift_summary TEXT NOT NULL, compressed_replay_summary TEXT NOT NULL, participating_runtimes TEXT NOT NULL, canonical_hash TEXT NOT NULL, generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_governance_compression_registry_hash_unique ON governance_compression_registry(canonical_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_compression_registry_reconciliation ON governance_compression_registry(reconciliation_root, checkpoint_set_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_compression_registry_topology_lineage ON governance_compression_registry(topology_root, lineage_root)`,
       `CREATE TABLE IF NOT EXISTS federated_revocation_observability_registry (revocation_evidence_id TEXT PRIMARY KEY, runtime_id TEXT NOT NULL, remote_runtime_id TEXT NOT NULL, continuity_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, revocation_class TEXT NOT NULL, revocation_reason TEXT NOT NULL, lineage_hash TEXT NOT NULL, reconciliation_merkle_root TEXT NOT NULL, attestation_hash TEXT NOT NULL, observed_at TEXT NOT NULL, evidence_hash TEXT NOT NULL, verification_status TEXT NOT NULL, drift_class TEXT, created_at TEXT NOT NULL)`,
       `CREATE INDEX IF NOT EXISTS idx_federated_revocation_observability_lineage ON federated_revocation_observability_registry(runtime_id, remote_runtime_id, decision_id, validated_object_hash)`,
       `CREATE TABLE IF NOT EXISTS federated_trust_registry (trust_envelope_id TEXT PRIMARY KEY, federation_origin TEXT NOT NULL, federation_tier TEXT NOT NULL, verification_status TEXT NOT NULL, evidence_only TEXT NOT NULL, remote_authority_denied TEXT NOT NULL, continuity_reference TEXT NOT NULL, lineage_root TEXT NOT NULL, observed_at TEXT NOT NULL, canonical_hash TEXT NOT NULL, created_at TEXT NOT NULL)`,
@@ -403,7 +408,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_update BEFORE UPDATE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_delete BEFORE DELETE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
-      `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`
+      `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`
     ]
     for (const s of stmts) await env.DB.prepare(s).run()
     await ensureRequiredSchemaColumns(env)
@@ -1470,7 +1477,7 @@ type FederatedCheckpointEnvelope = {
 }
 
 
-type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch"
+type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence"
 type DistributedCheckpointComparison = {
   comparison_id: string
   local_checkpoint_hash: string
@@ -1520,6 +1527,88 @@ type FederatedReconciliationEnvelope = {
   topology_hash: string
   generated_at: string
   canonical_hash: string
+  remote_authority_denied: true
+  evidence_only: true
+  read_only: true
+  mutation_capable: false
+  replay_neutral: true
+}
+
+type GovernanceCompressionDriftClass = "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence"
+type DriftCompressionSummary = {
+  summary_type: "DriftCompressionSummary"
+  drift_classes: GovernanceCompressionDriftClass[]
+  drift_counts: Record<string, number>
+  compressed_count: number
+  canonical_hash: string
+  remote_authority_denied: true
+  evidence_only: true
+  read_only: true
+  mutation_capable: false
+  replay_neutral: true
+}
+type ReplayCompressionSummary = {
+  summary_type: "ReplayCompressionSummary"
+  replay_indicators: string[]
+  replay_counts: Record<string, number>
+  compressed_count: number
+  canonical_hash: string
+  replay_consumed: false
+  remote_authority_denied: true
+  evidence_only: true
+  read_only: true
+  mutation_capable: false
+  replay_neutral: true
+}
+type TopologyCompressionSummary = {
+  summary_type: "TopologyCompressionSummary"
+  topology_root: string
+  lineage_root: string
+  participating_runtimes: string[]
+  runtime_count: number
+  topology_hashes: string[]
+  canonical_hash: string
+  remote_authority_denied: true
+  evidence_only: true
+  read_only: true
+  mutation_capable: false
+  replay_neutral: true
+}
+type FederatedGovernanceSummary = {
+  summary_type: "FederatedGovernanceSummary"
+  compression_id: string
+  reconciliation_root: string
+  checkpoint_set_hash: string
+  topology_root: string
+  lineage_root: string
+  federation_classification: FederationClassification
+  compressed_drift_summary: DriftCompressionSummary
+  compressed_replay_summary: ReplayCompressionSummary
+  compressed_topology_summary: TopologyCompressionSummary
+  participating_runtimes: string[]
+  canonical_hash: string
+  generated_at: string
+  remote_authority_denied: true
+  evidence_only: true
+  read_only: true
+  mutation_capable: false
+  replay_neutral: true
+}
+type GovernanceCompressionEnvelope = {
+  envelope_type: "GovernanceCompressionEnvelope"
+  compression_id: string
+  reconciliation_root: string
+  checkpoint_set_hash: string
+  topology_root: string
+  lineage_root: string
+  federation_classification: FederationClassification
+  compressed_drift_summary: DriftCompressionSummary
+  compressed_replay_summary: ReplayCompressionSummary
+  compressed_topology_summary: TopologyCompressionSummary
+  participating_runtimes: string[]
+  canonical_hash: string
+  generated_at: string
+  summary: FederatedGovernanceSummary
   remote_authority_denied: true
   evidence_only: true
   read_only: true
@@ -1815,6 +1904,69 @@ async function classifyTopologyDrift(local: FederatedCheckpointEnvelope, remotes
 async function deterministicReconciliationEnvelopeHash(envelope: Omit<FederatedReconciliationEnvelope, "canonical_hash"> | FederatedReconciliationEnvelope): Promise<string> {
   const { canonical_hash: _ignored_canonical_hash, ...canonical_material } = envelope as any
   return sha256Hex(canonicalize({ envelope_type: "FederatedReconciliationEnvelope", ...canonical_material, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }))
+}
+
+function normalizeCompressionDriftClass(drift: string): GovernanceCompressionDriftClass {
+  if (drift === "topology_divergence" || drift === "topology_compression_corruption") return "topology_compression_corruption"
+  if (drift === "federated_replay_collision" || drift === "replay_summary_divergence") return "replay_summary_divergence"
+  if (drift === "checkpoint_divergence" || drift === "lineage_instability" || drift === "reconciliation_instability") return "reconciliation_instability"
+  if (drift === "authority_conflict" || drift === "projection_corruption" || drift === "cross_runtime_hash_mismatch" || drift === "federated_summary_mismatch") return "federated_summary_mismatch"
+  return "compression_divergence"
+}
+
+async function compressFederatedDrift(...sources: Array<Array<string> | undefined>): Promise<DriftCompressionSummary> {
+  const drift_counts: Record<string, number> = {}
+  for (const drift of sources.flatMap((source) => source || []).map(String).filter(Boolean).sort()) {
+    const drift_class = normalizeCompressionDriftClass(drift)
+    drift_counts[drift_class] = (drift_counts[drift_class] || 0) + 1
+  }
+  const drift_classes = Object.keys(drift_counts).sort() as GovernanceCompressionDriftClass[]
+  const core = { summary_type: "DriftCompressionSummary", drift_classes, drift_counts: canonicalRecord(drift_counts), compressed_count: drift_classes.length }
+  const canonical_hash = await sha256Hex(canonicalize({ ...core, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }))
+  return Object.freeze({ ...core, canonical_hash, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true } as DriftCompressionSummary)
+}
+
+async function compressReplayIndicators(...sources: Array<Array<string> | undefined>): Promise<ReplayCompressionSummary> {
+  const replay_counts: Record<string, number> = {}
+  for (const indicator of sources.flatMap((source) => source || []).map(String).filter(Boolean).sort()) {
+    replay_counts[indicator] = (replay_counts[indicator] || 0) + 1
+  }
+  const replay_indicators = Object.keys(replay_counts).sort()
+  const core = { summary_type: "ReplayCompressionSummary", replay_indicators, replay_counts: canonicalRecord(replay_counts), compressed_count: replay_indicators.length, replay_consumed: false }
+  const canonical_hash = await sha256Hex(canonicalize({ ...core, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }))
+  return Object.freeze({ ...core, canonical_hash, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true } as ReplayCompressionSummary)
+}
+
+async function compressTopologyState(local: FederatedCheckpointEnvelope, topology: FederatedTopologyDrift, remotes: any[] = []): Promise<TopologyCompressionSummary> {
+  const participating_runtimes = Array.from(new Set([local.checkpoint.runtime_id, ...remotes.map(remoteRuntimeId)])).sort()
+  const topology_hashes = Array.from(new Set([topology.topology_hash, ...remotes.map((remote) => isPlainRecord(remote) ? String((remote as any).topology_hash || "") : "").filter(Boolean)])).sort()
+  const topology_root = await sha256Hex(canonicalize({ topology_hashes, participating_runtimes, local_topology_hash: topology.topology_hash }))
+  const lineage_root = String(topology.lineage_root || local.lineage_root || local.checkpoint.reconciliation_merkle_root || "")
+  const core = { summary_type: "TopologyCompressionSummary", topology_root, lineage_root, participating_runtimes, runtime_count: participating_runtimes.length, topology_hashes }
+  const canonical_hash = await sha256Hex(canonicalize({ ...core, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }))
+  return Object.freeze({ ...core, canonical_hash, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true } as TopologyCompressionSummary)
+}
+
+async function deterministicCompressionHash(envelope: Omit<GovernanceCompressionEnvelope, "canonical_hash" | "summary"> | Omit<FederatedGovernanceSummary, "canonical_hash"> | GovernanceCompressionEnvelope | FederatedGovernanceSummary): Promise<string> {
+  const { canonical_hash: _ignored_canonical_hash, summary: _ignored_summary, ...canonical_material } = envelope as any
+  return sha256Hex(canonicalize({ compression_type: "GovernanceCompressionEnvelope", ...canonical_material, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }))
+}
+
+async function deriveGovernanceCompression(reconciliation_envelope: FederatedReconciliationEnvelope, checkpoint_comparison_summary: DistributedCheckpointComparison, topology_drift_summary: FederatedTopologyDrift, local: FederatedCheckpointEnvelope, remotes: any[] = [], generated_at = reconciliation_envelope.generated_at): Promise<GovernanceCompressionEnvelope> {
+  const compressed_drift_summary = await compressFederatedDrift(reconciliation_envelope.drift_summary, checkpoint_comparison_summary.drift_summary, topology_drift_summary.drift_summary)
+  const compressed_replay_summary = await compressReplayIndicators(reconciliation_envelope.replay_indicators, checkpoint_comparison_summary.replay_indicators, local.replay_indicators, remotes.flatMap(remoteReplayIndicators))
+  const compressed_topology_summary = await compressTopologyState(local, topology_drift_summary, remotes)
+  const participating_runtimes = compressed_topology_summary.participating_runtimes.slice().sort()
+  const checkpoint_set_hash = await sha256Hex(canonicalize({ local_checkpoint_hash: checkpoint_comparison_summary.local_checkpoint_hash, remote_checkpoint_hashes: checkpoint_comparison_summary.remote_checkpoint_hashes }))
+  const reconciliation_root = await sha256Hex(canonicalize({ reconciliation_id: reconciliation_envelope.reconciliation_id, canonical_hash: reconciliation_envelope.canonical_hash, checkpoint_set_hash }))
+  const topology_root = compressed_topology_summary.topology_root
+  const lineage_root = String(reconciliation_envelope.lineage_root || compressed_topology_summary.lineage_root || "")
+  const compression_id = await deterministicReconciliationId("governance_compression", { reconciliation_root, checkpoint_set_hash, topology_root, lineage_root, participating_runtimes })
+  const core = { envelope_type: "GovernanceCompressionEnvelope" as const, compression_id, reconciliation_root, checkpoint_set_hash, topology_root, lineage_root, federation_classification: reconciliation_envelope.federation_classification, compressed_drift_summary, compressed_replay_summary, compressed_topology_summary, participating_runtimes, generated_at, remote_authority_denied: true as const, evidence_only: true as const, read_only: true as const, mutation_capable: false as const, replay_neutral: true as const }
+  const canonical_hash = await deterministicCompressionHash(core)
+  const summaryCore = { summary_type: "FederatedGovernanceSummary" as const, compression_id, reconciliation_root, checkpoint_set_hash, topology_root, lineage_root, federation_classification: reconciliation_envelope.federation_classification, compressed_drift_summary, compressed_replay_summary, compressed_topology_summary, participating_runtimes, generated_at, remote_authority_denied: true as const, evidence_only: true as const, read_only: true as const, mutation_capable: false as const, replay_neutral: true as const }
+  const summary = Object.freeze({ ...summaryCore, canonical_hash: await deterministicCompressionHash(summaryCore) } as FederatedGovernanceSummary)
+  return Object.freeze({ ...core, canonical_hash, summary } as GovernanceCompressionEnvelope)
 }
 
 async function buildFederatedReconciliationEnvelope(local: FederatedCheckpointEnvelope, comparison: DistributedCheckpointComparison, consensus: FederatedConsensusResult, topology: FederatedTopologyDrift, remotes: any[] = [], generated_at = local.generated_at): Promise<FederatedReconciliationEnvelope> {
@@ -2142,6 +2294,12 @@ async function appendFederatedReconciliationObservation(env: Env, envelope: Fede
     .run()
 }
 
+async function appendGovernanceCompressionObservation(env: Env, envelope: GovernanceCompressionEnvelope) {
+  await env.DB.prepare(`INSERT INTO governance_compression_registry (compression_id,reconciliation_root,checkpoint_set_hash,topology_root,lineage_root,federation_classification,compressed_drift_summary,compressed_replay_summary,participating_runtimes,canonical_hash,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)`)
+    .bind(envelope.compression_id, envelope.reconciliation_root, envelope.checkpoint_set_hash, envelope.topology_root, envelope.lineage_root, canonicalize(envelope.federation_classification), canonicalize(envelope.compressed_drift_summary), canonicalize(envelope.compressed_replay_summary), canonicalize(envelope.participating_runtimes), envelope.canonical_hash, envelope.generated_at, envelope.generated_at)
+    .run()
+}
+
 async function rejectWithTelemetry(env: Env, response: Record<string, unknown>, telemetry: {
   event_type?: TelemetryEventType
   decision_id?: string
@@ -2431,6 +2589,28 @@ export default {
         return json({ status: result.result, route: "/federation/reconcile/checkpoint", reason: "observability_only", append_only: true, rollback_overwrite: false, replay_neutral: true, checkpoint })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/checkpoint", reason: "reconciliation_unavailable" })
+      }
+    }
+
+    if (url.pathname === "/federation/reconcile/compression" && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: "/federation/reconcile/compression", reason: "database_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+        const anchor = reconciliationAnchorFromRequest(url)
+        const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
+        const generated_at = deterministicInteroperabilityGeneratedAt(result)
+        const checkpoint = await buildFederatedCheckpoint(result, generated_at)
+        const remoteSupplied = url.searchParams.get("remote_envelope")
+        const remoteEnvelope = remoteSupplied ? JSON.parse(new TextDecoder().decode(base64ToBytes(String(remoteSupplied)) || utf8Bytes("{}"))) : null
+        const remote_envelopes = Array.isArray(remoteEnvelope) ? remoteEnvelope : remoteEnvelope ? [remoteEnvelope] : []
+        const checkpoint_comparison_summary = await compareFederatedCheckpoints(checkpoint, remote_envelopes)
+        const consensus = await deriveCheckpointConsensus(checkpoint_comparison_summary)
+        const topology_drift_summary = await classifyTopologyDrift(checkpoint, remote_envelopes)
+        const reconciliation_envelope = await buildFederatedReconciliationEnvelope(checkpoint, checkpoint_comparison_summary, consensus, topology_drift_summary, remote_envelopes, generated_at)
+        const governance_compression_envelope = await deriveGovernanceCompression(reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, checkpoint, remote_envelopes, generated_at)
+        await appendGovernanceCompressionObservation(env, governance_compression_envelope)
+        return json({ status: "GOVERNANCE_COMPRESSION_OBSERVED", route: "/federation/reconcile/compression", reason: "observability_only", governance_compression_envelope, federated_governance_summary: governance_compression_envelope.summary, compressed_drift_summary: governance_compression_envelope.compressed_drift_summary, compressed_replay_summary: governance_compression_envelope.compressed_replay_summary, compressed_topology_summary: governance_compression_envelope.compressed_topology_summary, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
+      } catch {
+        return json({ status: "NULL", route: "/federation/reconcile/compression", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
 

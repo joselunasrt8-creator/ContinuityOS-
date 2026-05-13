@@ -194,7 +194,12 @@
       "federated_expiration_visibility_drift",
       "federated_identifier_resolution_drift",
       "federated_revocation_exact_object_drift",
-      "federated_revocation_anchor_drift"
+      "federated_revocation_anchor_drift",
+      "compression_divergence",
+      "reconciliation_instability",
+      "federated_summary_mismatch",
+      "topology_compression_corruption",
+      "replay_summary_divergence"
     ],
     "observability_only": true
   },
@@ -410,6 +415,46 @@
       "test_id": "timestamp_dependent_checkpoint_identity",
       "corruption": "checkpoint identity changes because observation timestamp changed",
       "expected_result": "NULL"
+    },
+    {
+      "test_id": "compression_determinism",
+      "corruption": "same federated reconciliation state yields different governance compression hash",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "compression_drift_classification",
+      "corruption": "compression drift cannot be represented as observable-only classification",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "compression_replay_neutrality",
+      "corruption": "compression attempts to consume replay indicators",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "compression_append_only_semantics",
+      "corruption": "governance compression evidence can be updated or deleted",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "compression_summary_corruption",
+      "corruption": "compressed summary canonical hash does not match exact summary object",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "topology_compression_divergence",
+      "corruption": "compressed topology root diverges from deterministic topology state",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "governance_summary_mismatch",
+      "corruption": "federated governance summary diverges from compression envelope material",
+      "expected_result": "NULL"
+    },
+    {
+      "test_id": "compression_remote_authority_denial",
+      "corruption": "remote compression evidence attempts to create local authority",
+      "expected_result": "NULL"
     }
   ],
   "recursive_traversal_rules": [
@@ -588,5 +633,17 @@
     "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity",
     "portable_identifier_policy": "portable identifiers must resolve from canonical persisted registry row fields only; lookup_key and composite traversal anchors are not portable identity material",
     "checkpoint_identity_policy": "checkpoint_id hashes deterministic reconciliation state only; created_at is observational metadata excluded from identity"
+  },
+  "governance_compression": {
+    "registry": "governance_compression_registry",
+    "route": "GET /federation/reconcile/compression",
+    "deterministic": true,
+    "append_only": true,
+    "evidence_only": true,
+    "remote_authority_denied": true,
+    "read_only": true,
+    "mutation_capable": false,
+    "replay_neutral": true,
+    "remote_legitimacy_evidence_policy": "remote legitimacy evidence never becomes local execution authority"
   }
 }
