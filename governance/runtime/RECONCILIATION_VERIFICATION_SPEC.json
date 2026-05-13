@@ -195,7 +195,6 @@
       "federated_identifier_resolution_drift",
       "federated_revocation_exact_object_drift",
       "federated_revocation_anchor_drift"
-      "federated_identifier_resolution_drift"
     ],
     "observability_only": true
   },
@@ -385,6 +384,9 @@
     {
       "test_id": "federated_revocation_stale_envelope_replay",
       "corruption": "federated revocation exact-object or anchor corruption",
+      "expected_result": "NULL"
+    },
+    {
       "test_id": "federated_identifier_resolution_drift",
       "corruption": "portable identifier resolution cannot bind to canonical persisted row identifiers",
       "expected_result": "NULL"
@@ -566,7 +568,9 @@
       "execution_id",
       "continuity_id"
     ],
-    "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity"
+    "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity",
+    "portable_identifier_policy": "portable identifiers must resolve from canonical persisted registry row fields only; lookup_key and composite traversal anchors are not portable identity material",
+    "checkpoint_identity_policy": "checkpoint_id hashes deterministic reconciliation state only; created_at is observational metadata excluded from identity"
   },
   "federated_revocation_observability": {
     "mode": "observability federation not authority federation",
@@ -580,7 +584,7 @@
     "checkpoint_identity": "sha256(JCS({runtime_id,reconciliation_merkle_root,deterministic_hash,traversal_position,lineage_count}))",
     "created_at_identity_material": false,
     "canonical_hash_locked": true,
-    "validated_object_hash_anchor": "canonical persisted validation_registry, aeo_registry, or proof_registry legitimacy lineage only"
+    "validated_object_hash_anchor": "canonical persisted validation_registry, aeo_registry, or proof_registry legitimacy lineage only",
     "drift_classification_semantics": "portable drift classes remain enumerated and fail closed to NULL on ambiguity",
     "portable_identifier_policy": "portable identifiers must resolve from canonical persisted registry row fields only; lookup_key and composite traversal anchors are not portable identity material",
     "checkpoint_identity_policy": "checkpoint_id hashes deterministic reconciliation state only; created_at is observational metadata excluded from identity"

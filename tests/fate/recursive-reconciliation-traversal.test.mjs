@@ -102,6 +102,7 @@ test('recursive revocation lineage observability is deterministic and replay-neu
     assert.match(traversalSource, new RegExp(`"${drift}"`), `traversal source missing ${drift}`)
     assert.ok(doc.includes('`' + drift + '`'), `doc missing ${drift}`)
   }
+})
 
 test('canonical identifier extraction is row-payload-only and preserves traversal determinism', () => {
   assert.match(traversalSource, /type CanonicalReconciliationIdentifiers/)
