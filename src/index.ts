@@ -15,7 +15,7 @@ const SESSION_TTL_MS = 3600_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint"] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -38,6 +38,7 @@ const FEDERATED_TRUST_REGISTRY = "federated_trust_registry" as const
 const REVOCATION_TOPOLOGY_REGISTRY = "revocation_topology_registry" as const
 const DISTRIBUTED_LEGITIMACY_REGISTRY = "distributed_legitimacy_registry" as const
 const FEDERATED_CHECKPOINT_REGISTRY = "federated_checkpoint_registry" as const
+const FEDERATION_CONFORMANCE_REGISTRY = "federation_conformance_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -60,7 +61,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   federated_trust_registry: ["trust_envelope_id", "federation_origin", "federation_tier", "verification_status", "evidence_only", "remote_authority_denied", "continuity_reference", "lineage_root", "observed_at", "canonical_hash", "created_at"],
   revocation_topology_registry: ["topology_id", "authority_id", "continuity_id", "lineage_root", "topology_hash", "drift_summary", "observed_at", "created_at"],
   distributed_legitimacy_registry: ["envelope_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
-  federated_checkpoint_registry: ["checkpoint_envelope_id", "checkpoint_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "reconciliation_merkle_root", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"]
+  federated_checkpoint_registry: ["checkpoint_envelope_id", "checkpoint_id", "canonical_hash", "lineage_root", "continuity_id", "reconciliation_id", "reconciliation_merkle_root", "federation_classification", "replay_indicators", "drift_indicators", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
+  federation_conformance_registry: ["conformance_id", "envelope_id", "runtime_id", "remote_runtime_id", "fingerprint_hash", "checkpoint_hash", "compatibility_hash", "conformance_status", "drift_classes", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -86,7 +88,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence"
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -403,10 +405,16 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS federated_checkpoint_registry (checkpoint_envelope_id TEXT PRIMARY KEY, checkpoint_id TEXT NOT NULL, canonical_hash TEXT NOT NULL, lineage_root TEXT NOT NULL, continuity_id TEXT NOT NULL, reconciliation_id TEXT NOT NULL, reconciliation_merkle_root TEXT NOT NULL, federation_classification TEXT NOT NULL, replay_indicators TEXT NOT NULL, drift_indicators TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_federated_checkpoint_registry_hash_unique ON federated_checkpoint_registry(canonical_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_federated_checkpoint_registry_lineage ON federated_checkpoint_registry(lineage_root, continuity_id, reconciliation_id)`,
+      `CREATE TABLE IF NOT EXISTS federation_conformance_registry (conformance_id TEXT PRIMARY KEY, envelope_id TEXT NOT NULL, runtime_id TEXT NOT NULL, remote_runtime_id TEXT NOT NULL, fingerprint_hash TEXT NOT NULL, checkpoint_hash TEXT NOT NULL, compatibility_hash TEXT NOT NULL, conformance_status TEXT NOT NULL, drift_classes TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_federation_conformance_registry_envelope_unique ON federation_conformance_registry(envelope_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_runtime ON federation_conformance_registry(runtime_id, remote_runtime_id, conformance_status)`,
+      `CREATE INDEX IF NOT EXISTS idx_federation_conformance_registry_semantics ON federation_conformance_registry(fingerprint_hash, checkpoint_hash, compatibility_hash)`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_update BEFORE UPDATE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_delete BEFORE DELETE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_update BEFORE UPDATE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_delete BEFORE DELETE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_update BEFORE UPDATE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_delete BEFORE DELETE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
@@ -1477,7 +1485,7 @@ type FederatedCheckpointEnvelope = {
 }
 
 
-type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence"
+type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
 type DistributedCheckpointComparison = {
   comparison_id: string
   local_checkpoint_hash: string
@@ -1532,6 +1540,89 @@ type FederatedReconciliationEnvelope = {
   read_only: true
   mutation_capable: false
   replay_neutral: true
+}
+
+
+
+type FederationConformanceDriftClass = "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
+type RuntimeSemanticFingerprint = {
+  fingerprint_type: "RuntimeSemanticFingerprint"
+  runtime_id: string
+  canonical_runtime_path_hash: string
+  observability_route_hash: string
+  registry_order_hash: string
+  policy_hash: string
+  drift_taxonomy_hash: string
+  semantic_version: "federation_conformance_v1"
+  fingerprint_hash: string
+  evidence_only: true
+  remote_authority_denied: true
+  replay_neutral: true
+  read_only: true
+  mutation_capable: false
+}
+type FederationSemanticMismatch = {
+  mismatch_id: string
+  drift_class: FederationConformanceDriftClass
+  field: string
+  local_hash: string
+  remote_hash: string
+  remote_authority_denied: true
+  evidence_only: true
+  replay_neutral: true
+  read_only: true
+  mutation_capable: false
+}
+type ConformanceCheckpoint = {
+  checkpoint_type: "ConformanceCheckpoint"
+  checkpoint_id: string
+  runtime_id: string
+  reconciliation_id: string
+  lineage_root: string
+  runtime_fingerprint_hash: string
+  semantic_policy_hash: string
+  replay_neutrality_hash: string
+  checkpoint_hash: string
+  generated_at: string
+  evidence_only: true
+  remote_authority_denied: true
+  replay_neutral: true
+  read_only: true
+  mutation_capable: false
+}
+type FederationConformanceResult = {
+  result_type: "FederationConformanceResult"
+  conformance_status: "CONFORMANT_EVIDENCE_OBSERVED" | "CONFORMANCE_QUARANTINED" | "NULL"
+  local_runtime_id: string
+  remote_runtime_id: string
+  semantic_mismatches: FederationSemanticMismatch[]
+  drift_classes: FederationConformanceDriftClass[]
+  compatible: boolean
+  remote_authority_inherited: false
+  remote_execution_legitimacy: false
+  local_validation_required: true
+  replay_consumed: false
+  evidence_only: true
+  remote_authority_denied: true
+  replay_neutral: true
+  read_only: true
+  mutation_capable: false
+}
+type FederationCompatibilityEnvelope = {
+  envelope_type: "FederationCompatibilityEnvelope"
+  envelope_id: string
+  runtime_id: string
+  remote_runtime_id: string
+  runtime_semantic_fingerprint: RuntimeSemanticFingerprint
+  conformance_checkpoint: ConformanceCheckpoint
+  conformance_result: FederationConformanceResult
+  compatibility_hash: string
+  generated_at: string
+  evidence_only: true
+  remote_authority_denied: true
+  replay_neutral: true
+  read_only: true
+  mutation_capable: false
 }
 
 type GovernanceCompressionDriftClass = "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence"
@@ -1827,6 +1918,99 @@ function verifyDistributedLineageCompatibility(local: DistributedLegitimacyEnvel
   if (Array.isArray((remote as any).replay_indicators) && (remote as any).replay_indicators.length > 0) return { compatible: false, drift_class: "interoperability_replay_attempt", quarantined: true, ...denied }
   if (String((remote as any).lineage_root || "") !== String(local.lineage_root || "")) return { compatible: false, drift_class: "distributed_lineage_divergence", quarantined: true, ...denied }
   return { compatible: true, quarantined: false, ...denied }
+}
+
+
+async function deriveRuntimeSemanticFingerprint(result: ReconciliationResult, runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<RuntimeSemanticFingerprint> {
+  const policy = canonicalRecord({
+    canonical_invariant: "remote_legitimacy_evidence_never_becomes_local_execution_authority",
+    canonical_runtime_routes: CANONICAL_RUNTIME_ROUTES,
+    evidence_only: true,
+    local_validation_required: true,
+    mutation_capable: false,
+    read_only: true,
+    remote_authority_denied: true,
+    replay_neutral: true,
+    replay_consumed: false
+  })
+  const driftTaxonomy: FederationConformanceDriftClass[] = ["semantic_conformance_drift", "checkpoint_semantic_mismatch", "federation_policy_divergence", "compression_semantic_instability", "runtime_fingerprint_mismatch"]
+  const core = {
+    fingerprint_type: "RuntimeSemanticFingerprint",
+    runtime_id,
+    canonical_runtime_path_hash: await sha256Hex(canonicalize(CANONICAL_RUNTIME_ROUTES)),
+    observability_route_hash: await sha256Hex(canonicalize(NON_EXECUTABLE_OBSERVABILITY_ROUTES)),
+    registry_order_hash: await sha256Hex(canonicalize(result.canonical_registry_ordering)),
+    policy_hash: await sha256Hex(canonicalize(policy)),
+    drift_taxonomy_hash: await sha256Hex(canonicalize(driftTaxonomy)),
+    semantic_version: "federation_conformance_v1" as const,
+    evidence_only: true as const,
+    remote_authority_denied: true as const,
+    replay_neutral: true as const,
+    read_only: true as const,
+    mutation_capable: false as const
+  }
+  return Object.freeze({ ...core, fingerprint_hash: await sha256Hex(canonicalize(core)) } as RuntimeSemanticFingerprint)
+}
+
+async function federationSemanticMismatch(drift_class: FederationConformanceDriftClass, field: string, localValue: unknown, remoteValue: unknown): Promise<FederationSemanticMismatch> {
+  const local_hash = await sha256Hex(canonicalize(localValue))
+  const remote_hash = await sha256Hex(canonicalize(remoteValue))
+  const core = { drift_class, field, local_hash, remote_hash }
+  return Object.freeze({ mismatch_id: await sha256Hex(canonicalize(core)), ...core, remote_authority_denied: true, evidence_only: true, replay_neutral: true, read_only: true, mutation_capable: false } as FederationSemanticMismatch)
+}
+
+async function compareFederationSemantics(local: RuntimeSemanticFingerprint, remote: any): Promise<FederationSemanticMismatch[]> {
+  const mismatches: FederationSemanticMismatch[] = []
+  if (!isPlainRecord(remote)) return [await federationSemanticMismatch("semantic_conformance_drift", "remote_envelope", local.fingerprint_hash, null)]
+  const remoteFingerprint = isPlainRecord(remote.runtime_semantic_fingerprint) ? remote.runtime_semantic_fingerprint : remote
+  if ((remote as any).evidence_only !== true || (remote as any).remote_authority_denied !== true || (remote as any).read_only !== true || (remote as any).mutation_capable !== false || (remote as any).replay_neutral !== true) mismatches.push(await federationSemanticMismatch("federation_policy_divergence", "required_conformance_flags", true, canonicalRecord(remote)))
+  if ((remote as any).remote_authority_inherited === true || (remote as any).remote_execution_legitimacy === true || (remote as any).local_execution_authority === true || (remote as any).accepted_authority === true) mismatches.push(await federationSemanticMismatch("federation_policy_divergence", "remote_authority_claim", false, true))
+  if ((remote as any).replay_consumed === true || (remote as any).replay_state_consumed === true) mismatches.push(await federationSemanticMismatch("semantic_conformance_drift", "replay_neutrality", false, true))
+  if (isPlainRecord(remoteFingerprint)) {
+    for (const field of ["canonical_runtime_path_hash", "registry_order_hash", "policy_hash", "drift_taxonomy_hash", "semantic_version"] as const) {
+      if (String((remoteFingerprint as any)[field] || "") !== String((local as any)[field] || "")) mismatches.push(await federationSemanticMismatch(field === "policy_hash" ? "federation_policy_divergence" : "runtime_fingerprint_mismatch", field, (local as any)[field] || "", (remoteFingerprint as any)[field] || ""))
+    }
+  } else {
+    mismatches.push(await federationSemanticMismatch("runtime_fingerprint_mismatch", "runtime_semantic_fingerprint", local.fingerprint_hash, null))
+  }
+  if (isPlainRecord(remote.conformance_checkpoint)) {
+    const remoteCheckpoint = remote.conformance_checkpoint
+    if (String(remoteCheckpoint.runtime_fingerprint_hash || "") && String(remoteCheckpoint.runtime_fingerprint_hash || "") !== String((remoteFingerprint as any).fingerprint_hash || "")) mismatches.push(await federationSemanticMismatch("checkpoint_semantic_mismatch", "checkpoint_runtime_fingerprint_hash", (remoteFingerprint as any).fingerprint_hash || "", remoteCheckpoint.runtime_fingerprint_hash || ""))
+    if ((remoteCheckpoint as any).replay_neutral !== true || (remoteCheckpoint as any).mutation_capable !== false) mismatches.push(await federationSemanticMismatch("checkpoint_semantic_mismatch", "checkpoint_required_flags", true, canonicalRecord(remoteCheckpoint)))
+  }
+  if (isPlainRecord(remote.governance_compression_envelope) && ((remote.governance_compression_envelope as any).replay_neutral !== true || (remote.governance_compression_envelope as any).mutation_capable !== false)) mismatches.push(await federationSemanticMismatch("compression_semantic_instability", "governance_compression_envelope", true, remote.governance_compression_envelope))
+  return mismatches.sort((a, b) => a.mismatch_id.localeCompare(b.mismatch_id))
+}
+
+async function deriveConformanceCheckpoint(result: ReconciliationResult, fingerprint: RuntimeSemanticFingerprint, generated_at = deterministicInteroperabilityGeneratedAt(result), runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<ConformanceCheckpoint> {
+  const canonical = resolveCanonicalPortableIdentifiers(result)
+  const replay_neutrality_hash = await sha256Hex(canonicalize({ replay_neutral: true, replay_indicators: replayIndicatorsForInteroperability(result), invocation_trace: result.deterministic_traversal_trace.filter((entry) => entry.registry === "invocation_registry") }))
+  const core = { checkpoint_type: "ConformanceCheckpoint", runtime_id, reconciliation_id: canonical?.decision_id || await deterministicReconciliationId("federation_conformance", { lineage_anchor: result.lineage_anchor }), lineage_root: result.lineage_anchor, runtime_fingerprint_hash: fingerprint.fingerprint_hash, semantic_policy_hash: fingerprint.policy_hash, replay_neutrality_hash, generated_at, evidence_only: true, remote_authority_denied: true, replay_neutral: true, read_only: true, mutation_capable: false }
+  const checkpoint_hash = await sha256Hex(canonicalize(core))
+  return Object.freeze({ ...core, checkpoint_hash, checkpoint_id: await sha256Hex(canonicalize({ checkpoint_type: "ConformanceCheckpoint", checkpoint_hash })) } as ConformanceCheckpoint)
+}
+
+function detectSemanticConformanceDrift(mismatches: FederationSemanticMismatch[], result: ReconciliationResult): FederationConformanceDriftClass[] {
+  const drift = new Set<FederationConformanceDriftClass>(mismatches.map((mismatch) => mismatch.drift_class))
+  for (const item of result.drift_classifications) {
+    if (item.drift_class === "compression_divergence" || item.drift_class === "replay_summary_divergence" || item.drift_class === "topology_compression_corruption") drift.add("compression_semantic_instability")
+    if (item.drift_class === "checkpoint_hash_instability" || item.drift_class === "checkpoint_divergence") drift.add("checkpoint_semantic_mismatch")
+    if (item.drift_class === "cross_runtime_hash_mismatch" || item.drift_class === "federated_runtime_divergence_drift") drift.add("runtime_fingerprint_mismatch")
+    if (item.drift_class === "remote_authority_claim" || item.drift_class === "authority_conflict") drift.add("federation_policy_divergence")
+  }
+  return Array.from(drift).sort()
+}
+
+async function buildFederationCompatibilityEnvelope(result: ReconciliationResult, remote: any = null, generated_at = deterministicInteroperabilityGeneratedAt(result), runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<FederationCompatibilityEnvelope> {
+  const fingerprint = await deriveRuntimeSemanticFingerprint(result, runtime_id)
+  const checkpoint = await deriveConformanceCheckpoint(result, fingerprint, generated_at, runtime_id)
+  const semantic_mismatches = await compareFederationSemantics(fingerprint, remote || { ...fingerprint, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+  const drift_classes = detectSemanticConformanceDrift(semantic_mismatches, result)
+  const remote_runtime_id = String(remote?.runtime_id || remote?.remote_runtime_id || remote?.runtime_semantic_fingerprint?.runtime_id || runtime_id)
+  const conformance_result: FederationConformanceResult = Object.freeze({ result_type: "FederationConformanceResult", conformance_status: drift_classes.length > 0 ? "CONFORMANCE_QUARANTINED" : "CONFORMANT_EVIDENCE_OBSERVED", local_runtime_id: runtime_id, remote_runtime_id, semantic_mismatches, drift_classes, compatible: drift_classes.length === 0, remote_authority_inherited: false, remote_execution_legitimacy: false, local_validation_required: true, replay_consumed: false, evidence_only: true, remote_authority_denied: true, replay_neutral: true, read_only: true, mutation_capable: false })
+  const core = { envelope_type: "FederationCompatibilityEnvelope", runtime_id, remote_runtime_id, runtime_semantic_fingerprint: fingerprint, conformance_checkpoint: checkpoint, conformance_result, generated_at, evidence_only: true, remote_authority_denied: true, replay_neutral: true, read_only: true, mutation_capable: false }
+  const compatibility_hash = await sha256Hex(canonicalize(core))
+  return Object.freeze({ ...core, compatibility_hash, envelope_id: await sha256Hex(canonicalize({ envelope_type: "FederationCompatibilityEnvelope", compatibility_hash })) } as FederationCompatibilityEnvelope)
 }
 
 async function detectFederatedCheckpointDrift(envelope: FederatedCheckpointEnvelope, remote?: any): Promise<InteroperabilityDriftClassification[]> {
@@ -2294,6 +2478,13 @@ async function appendFederatedReconciliationObservation(env: Env, envelope: Fede
     .run()
 }
 
+
+async function appendFederationConformanceObservation(env: Env, envelope: FederationCompatibilityEnvelope) {
+  await env.DB.prepare(`INSERT OR IGNORE INTO federation_conformance_registry (conformance_id,envelope_id,runtime_id,remote_runtime_id,fingerprint_hash,checkpoint_hash,compatibility_hash,conformance_status,drift_classes,evidence_only,remote_authority_denied,read_only,mutation_capable,replay_neutral,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'true','true','true','false','true',?10,?11)`)
+    .bind(await deterministicReconciliationId("federation_conformance_observation", { envelope_id: envelope.envelope_id, compatibility_hash: envelope.compatibility_hash }), envelope.envelope_id, envelope.runtime_id, envelope.remote_runtime_id, envelope.runtime_semantic_fingerprint.fingerprint_hash, envelope.conformance_checkpoint.checkpoint_hash, envelope.compatibility_hash, envelope.conformance_result.conformance_status, canonicalize(envelope.conformance_result.drift_classes), envelope.generated_at, envelope.generated_at)
+    .run()
+}
+
 async function appendGovernanceCompressionObservation(env: Env, envelope: GovernanceCompressionEnvelope) {
   await env.DB.prepare(`INSERT INTO governance_compression_registry (compression_id,reconciliation_root,checkpoint_set_hash,topology_root,lineage_root,federation_classification,compressed_drift_summary,compressed_replay_summary,participating_runtimes,canonical_hash,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)`)
     .bind(envelope.compression_id, envelope.reconciliation_root, envelope.checkpoint_set_hash, envelope.topology_root, envelope.lineage_root, canonicalize(envelope.federation_classification), canonicalize(envelope.compressed_drift_summary), canonicalize(envelope.compressed_replay_summary), canonicalize(envelope.participating_runtimes), envelope.canonical_hash, envelope.generated_at, envelope.generated_at)
@@ -2632,6 +2823,22 @@ export default {
         return json({ status: consensus.consensus_status, route: "/federation/reconcile/distributed", reason: "observability_only", reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, replay_indicators: reconciliation_envelope.replay_indicators, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/distributed", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      }
+    }
+
+    if (url.pathname === "/federation/conformance" && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: "/federation/conformance", reason: "database_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+        const anchor = reconciliationAnchorFromRequest(url)
+        const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
+        const generated_at = deterministicInteroperabilityGeneratedAt(result)
+        const remoteSupplied = url.searchParams.get("remote_envelope")
+        const remoteEnvelope = remoteSupplied ? JSON.parse(new TextDecoder().decode(base64ToBytes(String(remoteSupplied)) || utf8Bytes("{}"))) : null
+        const federation_compatibility_envelope = await buildFederationCompatibilityEnvelope(result, remoteEnvelope, generated_at)
+        await appendFederationConformanceObservation(env, federation_compatibility_envelope)
+        return json({ status: federation_compatibility_envelope.conformance_result.conformance_status, route: "/federation/conformance", reason: "observability_only", federation_compatibility_envelope, runtime_semantic_fingerprint: federation_compatibility_envelope.runtime_semantic_fingerprint, conformance_checkpoint: federation_compatibility_envelope.conformance_checkpoint, conformance_result: federation_compatibility_envelope.conformance_result, drift_classes: federation_compatibility_envelope.conformance_result.drift_classes, semantic_mismatches: federation_compatibility_envelope.conformance_result.semantic_mismatches, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, replay_consumed: false, append_only: true })
+      } catch {
+        return json({ status: "NULL", route: "/federation/conformance", reason: "conformance_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
 

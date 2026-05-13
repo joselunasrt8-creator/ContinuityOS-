@@ -1,0 +1,55 @@
+{
+  "spec_id": "mindshift-federation-conformance-v1",
+  "canonical_invariant": "Remote legitimacy evidence MUST NEVER become local execution authority.",
+  "route": {
+    "method": "GET",
+    "path": "/federation/conformance",
+    "execution_capability": false,
+    "observability_only": true,
+    "canonical_execution_path_bypass": false
+  },
+  "required_flags": {
+    "evidence_only": true,
+    "remote_authority_denied": true,
+    "replay_neutral": true,
+    "read_only": true,
+    "mutation_capable": false
+  },
+  "objects": [
+    "FederationConformanceResult",
+    "FederationSemanticMismatch",
+    "RuntimeSemanticFingerprint",
+    "FederationCompatibilityEnvelope",
+    "ConformanceCheckpoint"
+  ],
+  "drift_classes": [
+    "semantic_conformance_drift",
+    "checkpoint_semantic_mismatch",
+    "federation_policy_divergence",
+    "compression_semantic_instability",
+    "runtime_fingerprint_mismatch"
+  ],
+  "deterministic_helpers": [
+    "deriveRuntimeSemanticFingerprint",
+    "compareFederationSemantics",
+    "deriveConformanceCheckpoint",
+    "buildFederationCompatibilityEnvelope",
+    "detectSemanticConformanceDrift"
+  ],
+  "registry": {
+    "name": "federation_conformance_registry",
+    "append_only": true,
+    "replay_consumption": false,
+    "mutation_capable_federation_objects": false,
+    "authority_inheritance": false,
+    "trust_expansion": false
+  },
+  "governance_confirmations": {
+    "no_new_executable_routes": true,
+    "no_authority_inheritance": true,
+    "no_replay_consumption": true,
+    "no_mutation_capable_federation_objects": true,
+    "no_trust_expansion": true,
+    "no_bypass_of_canonical_execution_path": true
+  }
+}
