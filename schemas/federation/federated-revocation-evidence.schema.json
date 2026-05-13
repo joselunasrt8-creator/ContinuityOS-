@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/federation/federated-revocation-evidence.schema.json",
+  "title": "MindShift Federated Revocation Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runtime_id",
+    "remote_runtime_id",
+    "continuity_id",
+    "decision_id",
+    "validated_object_hash",
+    "revocation_class",
+    "revocation_reason",
+    "lineage_hash",
+    "reconciliation_merkle_root",
+    "attestation_hash",
+    "observed_at"
+  ],
+  "properties": {
+    "runtime_id": { "type": "string", "minLength": 1 },
+    "remote_runtime_id": { "type": "string", "minLength": 1 },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "decision_id": { "type": "string", "minLength": 1 },
+    "validated_object_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "revocation_class": { "type": "string", "minLength": 1 },
+    "revocation_reason": { "type": "string", "minLength": 1 },
+    "lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "reconciliation_merkle_root": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "attestation_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "observed_at": { "type": "string", "format": "date-time" }
+  }
+}

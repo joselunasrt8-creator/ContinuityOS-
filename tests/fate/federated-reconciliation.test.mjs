@@ -168,3 +168,53 @@ test('checkpoint determinism FATE cases fail closed to NULL', () => {
     assert.ok(doc.includes('`' + fate + '`'))
   }
 })
+
+test('federated revocation evidence is observability-only, exact-object-bound, and replay neutral', () => {
+  const revocationSchema = JSON.parse(readFileSync(new URL('../../schemas/federation/federated-revocation-evidence.schema.json', import.meta.url), 'utf8'))
+  for (const field of spec.federated_revocation_evidence.required_fields) {
+    assert.ok(revocationSchema.required.includes(field), `revocation schema missing ${field}`)
+    assert.ok(doc.includes('`' + field + '`'), `revocation doc missing ${field}`)
+  }
+  assert.equal(spec.federated_revocation_evidence.replay_neutral, true)
+  assert.equal(spec.federated_revocation_evidence.read_only, true)
+  assert.equal(spec.federated_revocation_evidence.mutation_capable, false)
+  assert.equal(spec.federated_revocation_evidence.exact_object_bound, true)
+  assert.match(source, /type FederatedRevocationEvidence = \{[\s\S]*runtime_id: string[\s\S]*remote_runtime_id: string[\s\S]*observed_at: string[\s\S]*\}/)
+  assert.match(source, /portable_evidence_not_portable_authority/)
+  assert.match(source, /remote_authority_inherited: false/)
+  assert.match(source, /remote_execution_legitimacy: false/)
+  assert.match(source, /replay_state_consumed: false/)
+  assert.match(source, /replay_neutral: true/)
+  assert.doesNotMatch(source, /remote.*revoke.*local.*authority/)
+})
+
+test('federated revocation registry and drift/FATE extensions fail closed', () => {
+  const registryFields = ['revocation_id','runtime_id','remote_runtime_id','continuity_id','decision_id','validated_object_hash','revocation_class','lineage_hash','reconciliation_merkle_root','evidence_hash','verification_status','drift_class','created_at']
+  for (const field of registryFields) {
+    assert.ok(spec.federated_revocation_registry.columns.includes(field), `registry missing ${field}`)
+    assert.match(source, new RegExp(field), `source missing ${field}`)
+    assert.ok(doc.includes('`' + field + '`'), `doc missing ${field}`)
+  }
+  const revocationDrifts = ['federated_revocation_divergence_drift','federated_revocation_projection_drift','federated_revocation_replay_drift','federated_checkpoint_revocation_drift','federated_expiration_visibility_drift']
+  for (const drift of revocationDrifts) {
+    assert.ok(spec.federated_drift_taxonomy.includes(drift), `spec missing ${drift}`)
+    assert.match(source, new RegExp(`"${drift}"`), `source missing ${drift}`)
+    assert.ok(doc.includes('`' + drift + '`'), `doc missing ${drift}`)
+  }
+  const fateById = new Map(spec.fate_matrix.map((entry) => [entry.test_id, entry.expected_result]))
+  for (const fate of ['federated_revocation_identity_mismatch','federated_revocation_replay_collision','federated_revocation_without_lineage','federated_remote_revocation_authority_inference','federated_checkpoint_revocation_divergence','federated_expired_lineage_visibility_corruption']) {
+    assert.equal(fateById.get(fate), 'NULL', `${fate} must fail closed`)
+    assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
+  }
+})
+
+test('federated revocation reconciliation follows normalized flow and deterministic checkpoint identity', () => {
+  assert.match(source, /async function normalizedFederatedReconciliationResponse/)
+  assert.match(source, /deterministic traversal -> revocation evidence resolution -> drift augmentation -> normalized federation response/)
+  assert.match(source, /federatedRevocationEvidenceFromResult/)
+  assert.match(source, /revocationAwareFederatedDriftAugmentation/)
+  assert.match(source, /federated_revocation_checkpoint/)
+  assert.match(source, /async function deterministicRevocationEvidenceHash/)
+  assert.match(source, /created_at is observational metadata and MUST NEVER participate in checkpoint identity hashing/)
+  assert.deepEqual(spec.revocation_reconciliation_flow, ['deterministic traversal','revocation evidence resolution','drift augmentation','normalized federation response'])
+})

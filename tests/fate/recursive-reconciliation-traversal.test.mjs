@@ -99,3 +99,11 @@ test('canonical identifier extraction is row-payload-only and preserves traversa
   assert.ok(doc.includes('`canonical_identifiers`'))
   assert.ok(doc.includes('do not alter traversal ordering'))
 })
+
+test('recursive reconciliation exposes revocation lineage visibility without traversal mutation', () => {
+  assert.match(traversalSource, /federatedRevocationEvidenceFromResult/)
+  assert.match(traversalSource, /lineage_hash/)
+  assert.match(traversalSource, /deterministic_traversal_trace: result\.deterministic_traversal_trace/)
+  assert.match(traversalSource, /revocationAwareFederatedDriftAugmentation/)
+  assert.doesNotMatch(traversalSource, /remote.*revoke.*local.*authority/)
+})

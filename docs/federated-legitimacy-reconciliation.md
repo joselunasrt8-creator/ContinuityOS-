@@ -123,3 +123,78 @@ Every failure returns `NULL`.
 ## Forbidden semantics labels
 
 The implementation explicitly rejects `inferred_legitimacy`, `remote_replay_trust`, `implicit_authority`, `remote_execution_inheritance`, `mutation_capable_reconciliation`, and `alternate_execution_path`.
+
+## Federated revocation propagation observability
+
+`FederatedRevocationEvidence` extends reconciliation with deterministic cross-runtime revocation awareness while preserving the invariant that foreign evidence is not local authority. The evidence object contains:
+
+- `runtime_id`
+- `remote_runtime_id`
+- `continuity_id`
+- `decision_id`
+- `validated_object_hash`
+- `revocation_class`
+- `revocation_reason`
+- `lineage_hash`
+- `reconciliation_merkle_root`
+- `attestation_hash`
+- `observed_at`
+
+The object is `replay_neutral: true`, `read_only: true`, `mutation_capable: false`, deterministic-serialization only, exact-object-bound, and explicitly marked `portable_evidence_not_portable_authority`.
+
+Remote revocation evidence may narrow acceptance, emit drift evidence, trigger reconciliation, and emit observability telemetry. It must not change local authority, invalidate local replay state, consume invocation lineage, mutate local legitimacy, or bypass local validation. Revocation reconciliation therefore remains replay-neutral and GET-only.
+
+## `federated_revocation_registry`
+
+`federated_revocation_registry` is an append-only observability-only revocation evidence index. Its required fields are:
+
+- `revocation_id`
+- `runtime_id`
+- `remote_runtime_id`
+- `continuity_id`
+- `decision_id`
+- `validated_object_hash`
+- `revocation_class`
+- `lineage_hash`
+- `reconciliation_merkle_root`
+- `evidence_hash`
+- `verification_status`
+- `drift_class`
+- `created_at`
+
+Federation routes project registry entries as evidence envelopes only; they do not persist during GET reconciliation and do not mutate legitimacy.
+
+## Revocation-aware reconciliation flow
+
+All federated revocation reconciliation follows:
+
+`deterministic traversal` → `revocation evidence resolution` → `drift augmentation` → `normalized federation response`
+
+Raw traversal output is never returned as the federation response. Revocation checkpoints derive identity only from deterministic reconciliation state; `created_at` remains append-only observational metadata and is excluded from checkpoint identity.
+
+## Revocation drift taxonomy
+
+The revocation-aware federated drift classes are:
+
+- `federated_revocation_divergence_drift`
+- `federated_revocation_projection_drift`
+- `federated_revocation_replay_drift`
+- `federated_checkpoint_revocation_drift`
+- `federated_expiration_visibility_drift`
+
+## Revocation FATE coverage
+
+The revocation fail-closed FATE cases are:
+
+- `federated_revocation_identity_mismatch`
+- `federated_revocation_replay_collision`
+- `federated_revocation_without_lineage`
+- `federated_remote_revocation_authority_inference`
+- `federated_checkpoint_revocation_divergence`
+- `federated_expired_lineage_visibility_corruption`
+
+Every case returns `NULL`.
+
+## Governance position
+
+The architecture remains observability federation, not authority federation: distributed legitimacy awareness WITHOUT distributed authority collapse.

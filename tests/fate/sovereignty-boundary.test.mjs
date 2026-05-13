@@ -63,3 +63,16 @@ test('adapter targets match approved workflow targets', () => {
 test('proofless external execution paths are flagged', () => {
   assert.ok(gaps.failure_classes.includes('proofless external execution'))
 })
+
+test('federated revocation observability does not create an authority federation surface', () => {
+  const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+  const spec = JSON.parse(readFileSync(new URL('../../governance/runtime/FEDERATED_RECONCILIATION_SPEC.json', import.meta.url), 'utf8'))
+  assert.match(source, /observability_federation_not_authority_federation/)
+  assert.match(source, /distributed_legitimacy_awareness_without_distributed_authority_collapse/)
+  assert.match(source, /read_only: true/)
+  assert.match(source, /mutation_capable: false/)
+  assert.match(source, /remote_authority_inherited: false/)
+  assert.match(source, /remote_execution_legitimacy: false/)
+  assert.match(source, /replay_state_consumed: false/)
+  assert.equal(spec.governance_position, 'observability federation, not authority federation; distributed legitimacy awareness WITHOUT distributed authority collapse')
+})

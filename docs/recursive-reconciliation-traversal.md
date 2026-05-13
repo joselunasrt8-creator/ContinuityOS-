@@ -92,3 +92,15 @@ The traversal engine classifies the first fail-closed drift deterministically:
 - `traversal_instability_drift`
 
 Federated lineage and reporting APIs remain future phases and must consume this deterministic traversal substrate rather than bypassing it.
+
+## Federated revocation lineage visibility
+
+Recursive reconciliation supplies deterministic traversal trace material for federated revocation observability. Revocation evidence uses canonical persisted identifiers and the `deterministic_traversal_trace` to derive a `lineage_hash`; it does not change traversal ordering, consume replay state, or mutate runtime legitimacy.
+
+Additional revocation visibility drift classes surfaced above federation are:
+
+- `federated_revocation_divergence_drift`
+- `federated_revocation_projection_drift`
+- `federated_revocation_replay_drift`
+- `federated_checkpoint_revocation_drift`
+- `federated_expiration_visibility_drift`

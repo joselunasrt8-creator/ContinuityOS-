@@ -130,3 +130,12 @@ test('portable identity hardening FATE cases remain fail-closed to NULL', () => 
     assert.ok(doc.includes('`' + fate + '`'), `doc missing ${fate}`)
   }
 })
+
+test('portable revocation evidence uses canonical persisted identifiers only', () => {
+  assert.match(source, /federatedRevocationEvidenceFromResult/)
+  assert.match(source, /resolvedPortableIdentifiersFromCanonicalRows\(byRegistry\)/)
+  assert.match(source, /Portable bundle identifiers resolve exclusively from persisted registry row fields/)
+  assert.match(source, /deterministicRevocationEvidenceHash\(evidence\)/)
+  assert.match(source, /portable_evidence_not_portable_authority/)
+  assert.doesNotMatch(source, /revocation_evidence.*lookup_key/)
+})

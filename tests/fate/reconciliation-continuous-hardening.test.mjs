@@ -128,3 +128,12 @@ test('continuous reconciliation records portable identity and checkpoint invaria
   assert.ok(doc.includes('Checkpoint identity hashes deterministic reconciliation state only'))
   assert.match(source, /federatedDriftClassificationsAfterPortableBundleResolution/)
 })
+
+test('continuous hardening includes revocation observability checkpoints and append-only metadata', () => {
+  assert.match(source, /federated_revocation_checkpoint/)
+  assert.match(source, /federatedRevocationRegistryProjection/)
+  assert.match(source, /append-only observability-only evidence projection/)
+  assert.match(source, /created_at is observational metadata and MUST NEVER participate in checkpoint identity hashing/)
+  assert.match(source, /remote_authority_inherited: false/)
+  assert.match(source, /replay_state_consumed: false/)
+})
