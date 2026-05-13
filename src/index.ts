@@ -28,6 +28,7 @@ const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const RUNTIME_ID = "mindshift-worker-runtime" as const
 const RUNTIME_VERSION = "runtime-sovereignty-v1" as const
 const RUNTIME_SOVEREIGNTY_ROUTE = "/runtime/sovereignty" as const
+const EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE = "/runtime/sovereignty/external-authority" as const
 const BOOTSTRAP_READY_DATABASES = new WeakSet<D1Database>()
 const RUNTIME_SOVEREIGNTY_FREEZES = new WeakMap<D1Database, RuntimeSovereigntyManifest>()
 const PROVENANCE_PAYLOAD_TYPE = "application/vnd.mindshift.cryptographic-provenance.v1+json"
@@ -40,7 +41,7 @@ const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as co
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint"] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -93,6 +94,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   federated_sovereignty_registry: ["federation_id", "local_runtime_id", "remote_runtime_id", "sovereignty_hash", "equivalence_hash", "drift_summary", "replay_indicators", "verification_status", "evidence_only", "remote_authority_denied", "generated_at"],
   recursive_governance_registry: ["governance_id", "mutation_class", "mutation_scope", "target_surface", "mutation_hash", "sco_hash", "preo_hash", "governance_decision", "drift_classes", "exact_object_verified", "replay_neutral", "mutation_authorized", "proof_required", "canonical_path_preserved", "generated_at", "created_at"],
   runtime_sovereignty_registry: ["sovereignty_id", "sovereignty_hash", "runtime_surface_hash", "governance_surface_hash", "replay_surface_hash", "proof_surface_hash", "validator_surface_hash", "schema_hash", "migration_chain_hash", "generated_at"],
+  external_authority_registry: ["sovereignty_dependency_id", "external_authority_surface", "authority_origin", "infrastructure_scope", "bootstrap_trust_hash", "sovereignty_classification", "containment_state", "observability_only", "replay_neutral", "evidence_hash", "drift_classes", "created_at"],
   runtime_governance_lock_registry: ["lock_id", "mutation_hash", "governance_id", "lock_state", "activation_allowed", "canonical_hash", "created_at"],
   recursive_governance_replay_registry: ["replay_id", "mutation_hash", "sco_hash", "preo_hash", "governance_id", "activation_lock_id", "consumed_at"],
   runtime_evolution_consensus_registry: ["consensus_id", "mutation_hash", "canonical_hash", "governance_scope", "quorum_threshold", "approval_count", "approval_hash", "consensus_status", "replay_neutral", "evidence_only", "generated_at", "created_at"]
@@ -205,6 +207,13 @@ type RuntimeSovereigntyManifest = {
 }
 
 type RuntimeSovereigntyDriftClass =
+  | "external_authority_drift"
+  | "sovereignty_boundary_fragmentation"
+  | "deploy_authority_escape"
+  | "bootstrap_trust_divergence"
+  | "undeclared_execution_surface"
+  | "infrastructure_authority_expansion"
+  | "hidden_mutation_surface"
   | "route_mutation"
   | "validator_mutation"
   | "schema_mutation"
@@ -215,6 +224,36 @@ type RuntimeSovereigntyDriftClass =
   | "observability_route_mutation"
   | "authority_inheritance_expansion"
   | "runtime_surface_instability"
+
+type ExternalAuthoritySovereigntyDependency = {
+  sovereignty_dependency_id: string
+  external_authority_surface: string
+  authority_origin: string
+  infrastructure_scope: string
+  bootstrap_trust_hash: string
+  sovereignty_classification: "BOUNDED_HOST" | "BOUNDED_TRANSPORT" | "BOUNDED_OBSERVER" | "BOUNDED_SCHEDULER" | "CONTAINED_DEPLOY_ENVELOPE" | "NULL"
+  containment_state: "CLASSIFIED_BOUNDED_OBSERVABLE_REPLAY_NEUTRAL" | "DRIFT_BLOCKED" | "NULL"
+  observability_only: true
+  replay_neutral: true
+  allowed_infrastructure_functions: readonly ("host" | "transport" | "observe" | "schedule")[]
+  prohibited_authority_functions: readonly ("create_authority" | "bypass_validation" | "mutate_legitimacy" | "consume_replay_state" | "inherit_execution_legitimacy")[]
+  deploy_authority_containment_envelope: {
+    canonical_runtime_path: readonly string[]
+    governed_workflow: string
+    local_validation_supremacy: true
+    exact_object_required: true
+    remote_authority_inherited: false
+    direct_deploy_allowed: false
+  }
+  bootstrap_trust_evidence: {
+    evidence_type: "bootstrap_trust_evidence"
+    authority_origin: string
+    infrastructure_scope: string
+    trust_material_hash: string
+    replay_neutral: true
+    observability_only: true
+  }
+}
 
 type RuntimeSovereigntyDrift = {
   status: "CANONICAL" | "RUNTIME_SOVEREIGNTY_VIOLATION"
@@ -300,7 +339,7 @@ type RuntimeEvolutionConsensusEnvelope = {
   remote_authority_inherited: false
 }
 
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt"
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt" | "external_authority_drift" | "sovereignty_boundary_fragmentation" | "deploy_authority_escape" | "bootstrap_trust_divergence" | "undeclared_execution_surface" | "infrastructure_authority_expansion" | "hidden_mutation_surface"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -639,6 +678,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS recursive_governance_replay_registry (replay_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, sco_hash TEXT NOT NULL, preo_hash TEXT NOT NULL, governance_id TEXT NOT NULL, activation_lock_id TEXT NOT NULL, consumed_at TEXT NOT NULL, UNIQUE(mutation_hash, sco_hash, preo_hash), UNIQUE(governance_id))`,
       `CREATE INDEX IF NOT EXISTS idx_recursive_governance_replay_lock ON recursive_governance_replay_registry(activation_lock_id)`,
       `CREATE TABLE IF NOT EXISTS runtime_evolution_consensus_registry (consensus_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, canonical_hash TEXT NOT NULL, governance_scope TEXT NOT NULL, quorum_threshold TEXT NOT NULL, approval_count TEXT NOT NULL, approval_hash TEXT NOT NULL, consensus_status TEXT NOT NULL CHECK (consensus_status IN ('VALID_CONSENSUS','NULL')), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS external_authority_registry (sovereignty_dependency_id TEXT PRIMARY KEY, external_authority_surface TEXT NOT NULL, authority_origin TEXT NOT NULL, infrastructure_scope TEXT NOT NULL, bootstrap_trust_hash TEXT NOT NULL, sovereignty_classification TEXT NOT NULL, containment_state TEXT NOT NULL, observability_only TEXT NOT NULL CHECK (observability_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_hash TEXT NOT NULL UNIQUE, drift_classes TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_external_authority_registry_surface ON external_authority_registry(external_authority_surface, authority_origin, containment_state)`,
+      `CREATE INDEX IF NOT EXISTS idx_external_authority_registry_bootstrap ON external_authority_registry(bootstrap_trust_hash, sovereignty_classification)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_update BEFORE UPDATE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
@@ -657,6 +699,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_replay_registry_no_delete BEFORE DELETE ON recursive_governance_replay_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_replay_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_update BEFORE UPDATE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_delete BEFORE DELETE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_external_authority_registry_no_update BEFORE UPDATE ON external_authority_registry BEGIN SELECT RAISE(ABORT, 'external_authority_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_external_authority_registry_no_delete BEFORE DELETE ON external_authority_registry BEGIN SELECT RAISE(ABORT, 'external_authority_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
@@ -3301,12 +3345,12 @@ async function runtimeSelfIntegrityCheckpoint(expectedRuntimeSurfaceHash = ""): 
 
 
 const RUNTIME_VALIDATOR_SURFACE = Object.freeze(["activeContinuity", "activeSession", "authorized", "deploymentPreoLineage", "enforceRecursiveGovernanceBoundary", "validateDsseProvenanceEnvelope", "validateExecutionProvenance", "verifyRecursiveGovernanceIntegrity"].sort())
-const RUNTIME_REPLAY_TOPOLOGY = Object.freeze(["authority_registry.status", "execution_registry.unique_decision_object", "invocation_registry.nonce", "proof_registry.unique_decision_object", "proof_registry.unique_workflow_run", "recursive_governance_replay_registry"].sort())
+const RUNTIME_REPLAY_TOPOLOGY = Object.freeze(["authority_registry.status", "execution_registry.unique_decision_object", "external_authority_registry.replay_neutral", "invocation_registry.nonce", "proof_registry.unique_decision_object", "proof_registry.unique_workflow_run", "recursive_governance_replay_registry"].sort())
 const RUNTIME_PROOF_TOPOLOGY = Object.freeze(["attestation_registry", "proof_quarantine_registry", "proof_registry", "proof_registry_duplicate_archive"].sort())
-const RUNTIME_GOVERNANCE_TOPOLOGY = Object.freeze(["recursive_governance_registry", "runtime_governance_lock_registry", "runtime_sovereignty_registry", REQUIRE_PREO_LINEAGE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_ROUTE].sort())
+const RUNTIME_GOVERNANCE_TOPOLOGY = Object.freeze(["external_authority_registry", "recursive_governance_registry", "runtime_governance_lock_registry", "runtime_sovereignty_registry", REQUIRE_PREO_LINEAGE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_ROUTE].sort())
 const CANONICAL_EXECUTION_AUTHORITY_SURFACE = Object.freeze(["authority:create", "compile:aeo", "validate:exact-object", "execute:governed-deploy", "proof:persist-consume"].sort())
 const CANONICAL_MIGRATION_CHAIN = Object.freeze([
-  "0001_init.sql", "0002_governed_deploy_schema.sql", "0003_authority_registry_schema_fix.sql", "0004_enforcement_lock.sql", "0004_execution_replay_protection.sql", "0005_invocation_registry.sql", "0006_enforcement_reboot_v1.sql", "0007_canonical_aeo_registry_rebuild.sql", "0008_canonical_runtime_registry_rebuild.sql", "0009_runtime_observability_and_drift_registry.sql", "0010_identity_session_continuity.sql", "0011_proof_atomicity_unique_guard.sql", "0012_continuity_registry.sql", "0013_preo_registry.sql", "0014_deployment_provenance_lineage.sql", "0015_cryptographic_provenance_attestations.sql", "0016_federated_revocation_observability.sql", "0017_federated_trust_topology_observability.sql", "0018_distributed_legitimacy_interoperability.sql", "0019_distributed_reconciliation_governance.sql", "0020_governance_compression.sql", "0021_federation_conformance.sql", "0022_proof_quarantine_registry.sql", "0022_recursive_governance_registry.sql", "0023_recursive_governance_enforcement_boundary.sql", "0024_runtime_sovereignty_registry.sql"
+  "0001_init.sql", "0002_governed_deploy_schema.sql", "0003_authority_registry_schema_fix.sql", "0004_enforcement_lock.sql", "0004_execution_replay_protection.sql", "0005_invocation_registry.sql", "0006_enforcement_reboot_v1.sql", "0007_canonical_aeo_registry_rebuild.sql", "0008_canonical_runtime_registry_rebuild.sql", "0009_runtime_observability_and_drift_registry.sql", "0010_identity_session_continuity.sql", "0011_proof_atomicity_unique_guard.sql", "0012_continuity_registry.sql", "0013_preo_registry.sql", "0014_deployment_provenance_lineage.sql", "0015_cryptographic_provenance_attestations.sql", "0016_federated_revocation_observability.sql", "0017_federated_trust_topology_observability.sql", "0018_distributed_legitimacy_interoperability.sql", "0019_distributed_reconciliation_governance.sql", "0020_governance_compression.sql", "0021_federation_conformance.sql", "0022_proof_quarantine_registry.sql", "0022_recursive_governance_registry.sql", "0023_recursive_governance_enforcement_boundary.sql", "0024_runtime_sovereignty_registry.sql", "0026_external_authority_registry.sql"
 ].sort())
 
 function canonicalSovereigntyRoutes(): { canonical_routes: readonly string[], observability_routes: readonly string[], governance_routes: readonly string[] } {
@@ -3412,6 +3456,107 @@ class RuntimeSovereigntyViolationError extends Error {
   constructor(readonly drift_classes: RuntimeSovereigntyDriftClass[], readonly expected_sovereignty_hash: string, readonly actual_sovereignty_hash: string) {
     super("RUNTIME_SOVEREIGNTY_VIOLATION")
   }
+}
+
+const ALLOWED_EXTERNAL_INFRASTRUCTURE_FUNCTIONS = Object.freeze(["host", "observe", "schedule", "transport"].sort()) as readonly ("host" | "transport" | "observe" | "schedule")[]
+const PROHIBITED_EXTERNAL_AUTHORITY_FUNCTIONS = Object.freeze(["bypass_validation", "consume_replay_state", "create_authority", "inherit_execution_legitimacy", "mutate_legitimacy"].sort()) as readonly ("create_authority" | "bypass_validation" | "mutate_legitimacy" | "consume_replay_state" | "inherit_execution_legitimacy")[]
+
+const EXTERNAL_AUTHORITY_BASELINES = Object.freeze([
+  Object.freeze({ external_authority_surface: "cloudflare_worker_runtime", authority_origin: "cloudflare_workers", infrastructure_scope: "host:runtime_http;observe:request_boundary", sovereignty_classification: "BOUNDED_HOST" as const, allowed: ["host", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "cloudflare_d1_registry", authority_origin: "cloudflare_d1", infrastructure_scope: "host:append_only_registries;observe:proof_persistence", sovereignty_classification: "BOUNDED_HOST" as const, allowed: ["host", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "github_actions_governed_deploy", authority_origin: "github_actions", infrastructure_scope: "schedule:governed-deploy.yml;transport:runtime_execute_and_proof_calls;observe:workflow_run", sovereignty_classification: "CONTAINED_DEPLOY_ENVELOPE" as const, allowed: ["schedule", "transport", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "github_hosted_runner", authority_origin: "github_actions", infrastructure_scope: "host:ephemeral_runner;schedule:workflow_jobs;observe:logs", sovereignty_classification: "BOUNDED_SCHEDULER" as const, allowed: ["host", "schedule", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "github_secrets_transport", authority_origin: "github_actions", infrastructure_scope: "transport:api_key_and_provenance_secret;observe:masked_logs", sovereignty_classification: "BOUNDED_TRANSPORT" as const, allowed: ["transport", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "wrangler_deploy_cli", authority_origin: "cloudflare_wrangler", infrastructure_scope: "transport:deployment_artifact_only;contained_by:governed-deploy.yml", sovereignty_classification: "CONTAINED_DEPLOY_ENVELOPE" as const, allowed: ["transport", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "npm_dependency_graph", authority_origin: "npm_registry", infrastructure_scope: "host:package_install_inputs;observe:lockfile_resolution", sovereignty_classification: "BOUNDED_HOST" as const, allowed: ["host", "observe"] as const }),
+  Object.freeze({ external_authority_surface: "docker_base_image", authority_origin: "container_registry", infrastructure_scope: "host:build_base_layers;observe:image_digest", sovereignty_classification: "BOUNDED_HOST" as const, allowed: ["host", "observe"] as const })
+].sort((a, b) => a.external_authority_surface.localeCompare(b.external_authority_surface)))
+
+async function bootstrapTrustHash(authority_origin: string, infrastructure_scope: string, external_authority_surface: string): Promise<string> {
+  return sha256Hex(canonicalize({ authority_origin, external_authority_surface, infrastructure_scope, local_validation_supremacy: true, replay_neutral: true }))
+}
+
+async function buildExternalAuthorityDependency(base: typeof EXTERNAL_AUTHORITY_BASELINES[number]): Promise<ExternalAuthoritySovereigntyDependency> {
+  const bootstrap_trust_hash = await bootstrapTrustHash(base.authority_origin, base.infrastructure_scope, base.external_authority_surface)
+  const sovereignty_dependency_id = `sovereignty-dependency:${await sha256Hex(canonicalize({ external_authority_surface: base.external_authority_surface, bootstrap_trust_hash }))}`
+  const trust_material_hash = await sha256Hex(canonicalize({ allowed: [...base.allowed].sort(), prohibited: PROHIBITED_EXTERNAL_AUTHORITY_FUNCTIONS, canonical_runtime_path: CANONICAL_RUNTIME_ROUTES }))
+  return Object.freeze({
+    sovereignty_dependency_id,
+    external_authority_surface: base.external_authority_surface,
+    authority_origin: base.authority_origin,
+    infrastructure_scope: base.infrastructure_scope,
+    bootstrap_trust_hash,
+    sovereignty_classification: base.sovereignty_classification,
+    containment_state: "CLASSIFIED_BOUNDED_OBSERVABLE_REPLAY_NEUTRAL",
+    observability_only: true,
+    replay_neutral: true,
+    allowed_infrastructure_functions: Object.freeze([...base.allowed].sort()) as ExternalAuthoritySovereigntyDependency["allowed_infrastructure_functions"],
+    prohibited_authority_functions: PROHIBITED_EXTERNAL_AUTHORITY_FUNCTIONS,
+    deploy_authority_containment_envelope: Object.freeze({ canonical_runtime_path: CANONICAL_RUNTIME_ROUTES, governed_workflow: GOVERNED_WORKFLOW, local_validation_supremacy: true, exact_object_required: true, remote_authority_inherited: false, direct_deploy_allowed: false }),
+    bootstrap_trust_evidence: Object.freeze({ evidence_type: "bootstrap_trust_evidence", authority_origin: base.authority_origin, infrastructure_scope: base.infrastructure_scope, trust_material_hash, replay_neutral: true, observability_only: true })
+  })
+}
+
+async function canonicalExternalAuthorityRegistry(): Promise<ExternalAuthoritySovereigntyDependency[]> {
+  return Promise.all(EXTERNAL_AUTHORITY_BASELINES.map(buildExternalAuthorityDependency))
+}
+
+async function classifyExternalAuthorityDrift(dependency: any, expected?: ExternalAuthoritySovereigntyDependency): Promise<RuntimeSovereigntyDriftClass[]> {
+  const drift = new Set<RuntimeSovereigntyDriftClass>()
+  const observedSurface = String(dependency?.external_authority_surface || "")
+  const observedOrigin = String(dependency?.authority_origin || "")
+  const observedScope = String(dependency?.infrastructure_scope || "")
+  if (!expected) drift.add("undeclared_execution_surface")
+  if (!observedSurface || !observedOrigin || !observedScope) drift.add("external_authority_drift")
+  if (dependency?.observability_only !== true || dependency?.replay_neutral !== true || dependency?.sovereignty_classification === "NULL" || dependency?.containment_state === "DRIFT_BLOCKED") drift.add("external_authority_drift")
+  if (dependency?.replay_neutral === false || dependency?.consume_replay_state === true || dependency?.replay_consumed === true || dependency?.replay_state_consumed === true) drift.add("external_authority_drift")
+  if (dependency?.creates_authority === true || dependency?.create_authority === true || dependency?.bypass_validation === true || dependency?.mutate_legitimacy === true || dependency?.inherit_execution_legitimacy === true || dependency?.remote_execution_legitimacy === true || dependency?.remote_authority_inherited === true) drift.add("infrastructure_authority_expansion")
+  if (dependency?.direct_deploy_allowed === true || dependency?.deploy_capable === true || String(dependency?.route || dependency?.command || "").includes("wrangler deploy")) drift.add("deploy_authority_escape")
+  if (dependency?.mutation_capable === true || dependency?.hidden_mutation === true || String(dependency?.infrastructure_scope || "").includes("mutate:")) drift.add("hidden_mutation_surface")
+  if (observedScope.includes("*") || observedScope.includes("global") || observedScope.includes("federation_authority") || observedScope.includes("remote_authority")) drift.add("sovereignty_boundary_fragmentation")
+  if (expected) {
+    if (observedOrigin !== expected.authority_origin || observedScope !== expected.infrastructure_scope) drift.add("bootstrap_trust_divergence")
+    const expectedHash = await bootstrapTrustHash(expected.authority_origin, expected.infrastructure_scope, expected.external_authority_surface)
+    if (String(dependency?.bootstrap_trust_hash || "") !== expectedHash) drift.add("bootstrap_trust_divergence")
+  }
+  return Array.from(drift).sort()
+}
+
+async function externalAuthorityObservationFromUrl(url: URL): Promise<ExternalAuthoritySovereigntyDependency> {
+  const registry = await canonicalExternalAuthorityRegistry()
+  const surface = url.searchParams.get("surface") || "github_actions_governed_deploy"
+  const expected = registry.find((item) => item.external_authority_surface === surface) || registry.find((item) => item.external_authority_surface === "github_actions_governed_deploy")!
+  const observed = {
+    ...expected,
+    external_authority_surface: surface,
+    authority_origin: url.searchParams.get("authority_origin") || expected.authority_origin,
+    infrastructure_scope: url.searchParams.get("infrastructure_scope") || expected.infrastructure_scope,
+    bootstrap_trust_hash: url.searchParams.get("bootstrap_trust_hash") || expected.bootstrap_trust_hash,
+    observability_only: url.searchParams.get("observability_only") === "false" ? false : true,
+    replay_neutral: url.searchParams.get("replay_neutral") === "false" ? false : true,
+    creates_authority: url.searchParams.get("creates_authority") === "true",
+    bypass_validation: url.searchParams.get("bypass_validation") === "true",
+    mutate_legitimacy: url.searchParams.get("mutate_legitimacy") === "true",
+    consume_replay_state: url.searchParams.get("consume_replay_state") === "true",
+    inherit_execution_legitimacy: url.searchParams.get("inherit_execution_legitimacy") === "true",
+    direct_deploy_allowed: url.searchParams.get("direct_deploy_allowed") === "true",
+    deploy_capable: url.searchParams.get("deploy_capable") === "true",
+    mutation_capable: url.searchParams.get("mutation_capable") === "true",
+    hidden_mutation: url.searchParams.get("hidden_mutation") === "true",
+    command: url.searchParams.get("command") || ""
+  }
+  const drift = await classifyExternalAuthorityDrift(observed, registry.find((item) => item.external_authority_surface === surface))
+  if (drift.length === 0) return expected
+  const driftHash = await sha256Hex(canonicalize({ surface, authority_origin: observed.authority_origin, infrastructure_scope: observed.infrastructure_scope, bootstrap_trust_hash: observed.bootstrap_trust_hash, drift }))
+  return Object.freeze({ ...expected, sovereignty_dependency_id: `sovereignty-dependency:${driftHash}`, external_authority_surface: surface, authority_origin: observed.authority_origin, infrastructure_scope: observed.infrastructure_scope, bootstrap_trust_hash: String(observed.bootstrap_trust_hash), sovereignty_classification: "NULL", containment_state: "DRIFT_BLOCKED", observability_only: true, replay_neutral: true })
+}
+
+async function appendExternalAuthorityObservation(env: Env, dependency: ExternalAuthoritySovereigntyDependency, drift_classes: RuntimeSovereigntyDriftClass[], created_at = new Date().toISOString()) {
+  const evidence_hash = await sha256Hex(canonicalize({ dependency, drift_classes }))
+  await env.DB.prepare(`INSERT OR IGNORE INTO external_authority_registry (sovereignty_dependency_id,external_authority_surface,authority_origin,infrastructure_scope,bootstrap_trust_hash,sovereignty_classification,containment_state,observability_only,replay_neutral,evidence_hash,drift_classes,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'true','true',?8,?9,?10)`)
+    .bind(dependency.sovereignty_dependency_id, dependency.external_authority_surface, dependency.authority_origin, dependency.infrastructure_scope, dependency.bootstrap_trust_hash, dependency.sovereignty_classification, dependency.containment_state, evidence_hash, canonicalize(drift_classes), created_at)
+    .run()
+  return evidence_hash
 }
 
 async function issueRuntimeGovernanceLock(env: Env, proof: RecursiveGovernanceProof, envelope: GovernanceMutationEnvelope, created_at: string): Promise<RuntimeGovernanceLock> {
@@ -3936,7 +4081,9 @@ export default {
         return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "consensus_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
-    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
+    if (url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
+
+    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE && url.pathname !== EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
@@ -3962,6 +4109,17 @@ export default {
       const manifest = RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)
       await appendRuntimeSovereigntyCheckpoint(env, manifest)
       return json({ status: "RUNTIME_SOVEREIGNTY_CANONICAL", route: RUNTIME_SOVEREIGNTY_ROUTE, manifest, sovereignty: sovereigntyState, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
+    }
+
+    if (url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && request.method === "GET") {
+      const registry = await canonicalExternalAuthorityRegistry()
+      const dependency = await externalAuthorityObservationFromUrl(url)
+      const expected = registry.find((item) => item.external_authority_surface === dependency.external_authority_surface)
+      const driftProbe = { ...dependency, creates_authority: url.searchParams.get("creates_authority") === "true", bypass_validation: url.searchParams.get("bypass_validation") === "true", mutate_legitimacy: url.searchParams.get("mutate_legitimacy") === "true", consume_replay_state: url.searchParams.get("consume_replay_state") === "true", inherit_execution_legitimacy: url.searchParams.get("inherit_execution_legitimacy") === "true", direct_deploy_allowed: url.searchParams.get("direct_deploy_allowed") === "true", deploy_capable: url.searchParams.get("deploy_capable") === "true", mutation_capable: url.searchParams.get("mutation_capable") === "true", hidden_mutation: url.searchParams.get("hidden_mutation") === "true", command: url.searchParams.get("command") || "" }
+      const drift_classes = await classifyExternalAuthorityDrift(driftProbe, expected)
+      const evidence_hash = await appendExternalAuthorityObservation(env, dependency, drift_classes)
+      const status = drift_classes.length > 0 ? "EXTERNAL_AUTHORITY_DRIFT" : "EXTERNAL_AUTHORITY_CONTAINED"
+      return json({ status, route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, external_authority_registry: registry, dependency, drift_classes, evidence_hash, fail_closed: drift_classes.length > 0, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
     }
 
     try {
