@@ -9,6 +9,7 @@ type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_REGISTRY_STABILIZED"
   | "BOOTSTRAP_UNIQUENESS_ENFORCED"
   | "BOOTSTRAP_RECURSIVE_GOVERNANCE_VERIFIED"
+  | "BOOTSTRAP_RUNTIME_EVOLUTION_CONSENSUS_REGISTRY_VALIDATED"
   | "BOOTSTRAP_RUNTIME_SOVEREIGNTY_FROZEN"
   | "BOOTSTRAP_SOVEREIGNTY_CHECKPOINT_GENERATED"
   | "BOOTSTRAP_APPEND_ONLY_TRIGGERS_ACTIVATED"
@@ -37,8 +38,9 @@ const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = ["/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint"] as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance"] as const
+const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
+const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint"] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -92,7 +94,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   recursive_governance_registry: ["governance_id", "mutation_class", "mutation_scope", "target_surface", "mutation_hash", "sco_hash", "preo_hash", "governance_decision", "drift_classes", "exact_object_verified", "replay_neutral", "mutation_authorized", "proof_required", "canonical_path_preserved", "generated_at", "created_at"],
   runtime_sovereignty_registry: ["sovereignty_id", "sovereignty_hash", "runtime_surface_hash", "governance_surface_hash", "replay_surface_hash", "proof_surface_hash", "validator_surface_hash", "schema_hash", "migration_chain_hash", "generated_at"],
   runtime_governance_lock_registry: ["lock_id", "mutation_hash", "governance_id", "lock_state", "activation_allowed", "canonical_hash", "created_at"],
-  recursive_governance_replay_registry: ["replay_id", "mutation_hash", "sco_hash", "preo_hash", "governance_id", "activation_lock_id", "consumed_at"]
+  recursive_governance_replay_registry: ["replay_id", "mutation_hash", "sco_hash", "preo_hash", "governance_id", "activation_lock_id", "consumed_at"],
+  runtime_evolution_consensus_registry: ["consensus_id", "mutation_hash", "canonical_hash", "governance_scope", "quorum_threshold", "approval_count", "approval_hash", "consensus_status", "replay_neutral", "evidence_only", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -254,7 +257,50 @@ type RuntimeSelfIntegrityCheckpoint = {
   runtime_ready: boolean
 }
 
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
+type RuntimeEvolutionConsensusDriftClass = "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt"
+
+type RuntimeEvolutionApproval = {
+  maintainer_id: string
+  approval_hash: string
+  reviewed_commit_hash: string
+  mutation_hash: string
+  canonical_hash: string
+  lineage_hash: string
+}
+
+type RuntimeEvolutionConsensusObject = {
+  consensus_id: string
+  sco_hash: string
+  preo_hash: string
+  mutation_hash: string
+  canonical_hash: string
+  reviewed_commit_hash: string
+  runtime_scope: string
+  governance_scope: string
+  quorum_threshold: number
+  maintainer_set_hash: string
+  approval_lineage: RuntimeEvolutionApproval[]
+  replay_neutral: true
+  evidence_only: true
+  generated_at: string
+}
+
+type RuntimeEvolutionConsensusEnvelope = {
+  envelope_type: "RuntimeEvolutionConsensusEnvelope"
+  consensus_object: RuntimeEvolutionConsensusObject
+  maintainer_set: string[]
+  approval_hash: string
+  consensus_result: "VALID_CONSENSUS" | "NULL"
+  drift_classes: RuntimeEvolutionConsensusDriftClass[]
+  replay_neutral: true
+  evidence_only: true
+  read_only: true
+  mutation_capable: false
+  execution_authority: false
+  remote_authority_inherited: false
+}
+
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt"
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -592,6 +638,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_runtime_sovereignty_registry_surfaces ON runtime_sovereignty_registry(runtime_surface_hash, governance_surface_hash, replay_surface_hash, proof_surface_hash)`,
       `CREATE TABLE IF NOT EXISTS recursive_governance_replay_registry (replay_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, sco_hash TEXT NOT NULL, preo_hash TEXT NOT NULL, governance_id TEXT NOT NULL, activation_lock_id TEXT NOT NULL, consumed_at TEXT NOT NULL, UNIQUE(mutation_hash, sco_hash, preo_hash), UNIQUE(governance_id))`,
       `CREATE INDEX IF NOT EXISTS idx_recursive_governance_replay_lock ON recursive_governance_replay_registry(activation_lock_id)`,
+      `CREATE TABLE IF NOT EXISTS runtime_evolution_consensus_registry (consensus_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, canonical_hash TEXT NOT NULL, governance_scope TEXT NOT NULL, quorum_threshold TEXT NOT NULL, approval_count TEXT NOT NULL, approval_hash TEXT NOT NULL, consensus_status TEXT NOT NULL CHECK (consensus_status IN ('VALID_CONSENSUS','NULL')), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_update BEFORE UPDATE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_distributed_legitimacy_registry_no_delete BEFORE DELETE ON distributed_legitimacy_registry BEGIN SELECT RAISE(ABORT, 'distributed_legitimacy_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_checkpoint_registry_no_update BEFORE UPDATE ON federated_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'federated_checkpoint_registry is append-only'); END`,
@@ -606,6 +655,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_delete BEFORE DELETE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_replay_registry_no_update BEFORE UPDATE ON recursive_governance_replay_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_replay_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_replay_registry_no_delete BEFORE DELETE ON recursive_governance_replay_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_replay_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_update BEFORE UPDATE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_delete BEFORE DELETE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_update BEFORE UPDATE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_federated_reconciliation_registry_no_delete BEFORE DELETE ON federated_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'federated_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
@@ -635,6 +686,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_workflow_run_unique ON attestation_registry(workflow_run_id)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_decision_object_unique ON attestation_registry(decision_id, validated_object_hash)`).run()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_RECURSIVE_GOVERNANCE_VERIFIED")
+    await validateRuntimeEvolutionConsensusRegistry(env)
+    await emitBootstrapDiagnostic(env, "BOOTSTRAP_RUNTIME_EVOLUTION_CONSENSUS_REGISTRY_VALIDATED")
     const sovereigntyManifest = await freezeRuntimeSovereignty(env)
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_RUNTIME_SOVEREIGNTY_FROZEN")
     await appendRuntimeSovereigntyCheckpoint(env, sovereigntyManifest)
@@ -665,7 +718,9 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_update BEFORE UPDATE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_governance_compression_registry_no_delete BEFORE DELETE ON governance_compression_registry BEGIN SELECT RAISE(ABORT, 'governance_compression_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_update BEFORE UPDATE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
-    `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_delete BEFORE DELETE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_delete BEFORE DELETE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_update BEFORE UPDATE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_delete BEFORE DELETE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`
   ]
   for (const trigger of triggers) await env.DB.prepare(trigger).run()
 }
@@ -698,6 +753,223 @@ async function tableColumns(env: Env, table: string): Promise<Set<string>> {
   const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all<any>()
   const rows = Array.isArray(info?.results) ? info.results : []
   return new Set(rows.map((row: any) => String(row?.name || "")).filter(Boolean))
+}
+
+async function ensureRuntimeEvolutionConsensusRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS runtime_evolution_consensus_registry (consensus_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, canonical_hash TEXT NOT NULL, governance_scope TEXT NOT NULL, quorum_threshold TEXT NOT NULL, approval_count TEXT NOT NULL, approval_hash TEXT NOT NULL, consensus_status TEXT NOT NULL CHECK (consensus_status IN ('VALID_CONSENSUS','NULL')), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`).run()
+  await validateRuntimeEvolutionConsensusRegistry(env)
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_update BEFORE UPDATE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_runtime_evolution_consensus_registry_no_delete BEFORE DELETE ON runtime_evolution_consensus_registry BEGIN SELECT RAISE(ABORT, 'runtime_evolution_consensus_registry is append-only'); END`).run()
+}
+
+async function validateRuntimeEvolutionConsensusRegistry(env: Env) {
+  const columns = await tableColumns(env, RUNTIME_EVOLUTION_CONSENSUS_REGISTRY)
+  if (columns.size === 0) return
+  for (const column of REQUIRED_SCHEMA_COLUMNS.runtime_evolution_consensus_registry) {
+    if (!columns.has(column)) throw new SchemaInitializationError("missing_required_column")
+  }
+}
+
+function runtimeEvolutionConsensusHashMaterial(object: RuntimeEvolutionConsensusObject): Record<string, unknown> {
+  return {
+    approval_lineage: object.approval_lineage.map((approval) => ({
+      maintainer_id: String(approval.maintainer_id || ""),
+      mutation_hash: String(approval.mutation_hash || ""),
+      reviewed_commit_hash: String(approval.reviewed_commit_hash || "")
+    })),
+    evidence_only: true,
+    governance_scope: String(object.governance_scope || ""),
+    maintainer_set_hash: String(object.maintainer_set_hash || ""),
+    mutation_hash: String(object.mutation_hash || ""),
+    preo_hash: String(object.preo_hash || ""),
+    quorum_threshold: Number(object.quorum_threshold || 0),
+    replay_neutral: true,
+    reviewed_commit_hash: String(object.reviewed_commit_hash || ""),
+    runtime_scope: String(object.runtime_scope || ""),
+    sco_hash: String(object.sco_hash || "")
+  }
+}
+
+async function deriveRuntimeEvolutionConsensusHash(object: RuntimeEvolutionConsensusObject): Promise<string> {
+  return sha256Hex(canonicalize(runtimeEvolutionConsensusHashMaterial(object)))
+}
+
+async function runtimeEvolutionApprovalHash(input: { maintainer_id: string, sco_hash: string, preo_hash: string, mutation_hash: string, canonical_hash: string, reviewed_commit_hash: string, runtime_scope: string, governance_scope: string }): Promise<string> {
+  return sha256Hex(canonicalize({
+    approval_type: "runtime_evolution_exact_object_approval",
+    canonical_hash: input.canonical_hash,
+    governance_scope: input.governance_scope,
+    maintainer_id: input.maintainer_id,
+    mutation_hash: input.mutation_hash,
+    preo_hash: input.preo_hash,
+    reviewed_commit_hash: input.reviewed_commit_hash,
+    runtime_scope: input.runtime_scope,
+    sco_hash: input.sco_hash
+  }))
+}
+
+async function runtimeEvolutionApprovalLineageHash(approval: RuntimeEvolutionApproval): Promise<string> {
+  return sha256Hex(canonicalize({
+    approval_hash: approval.approval_hash,
+    canonical_hash: approval.canonical_hash,
+    maintainer_id: approval.maintainer_id,
+    mutation_hash: approval.mutation_hash,
+    reviewed_commit_hash: approval.reviewed_commit_hash
+  }))
+}
+
+function orderedMaintainerSet(value: unknown): string[] {
+  const raw = Array.isArray(value) ? value : String(value || "").split(",")
+  return Array.from(new Set(raw.map((entry) => String(entry || "").trim()).filter(Boolean))).sort()
+}
+
+function approvalsFromInput(value: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(value)) return value.filter(isPlainRecord)
+  const encoded = String(value || "")
+  if (!encoded) return []
+  try {
+    const bytes = base64ToBytes(encoded)
+    const decoded = bytes ? new TextDecoder().decode(bytes) : encoded
+    const parsed = JSON.parse(decoded)
+    return Array.isArray(parsed) ? parsed.filter(isPlainRecord) : []
+  } catch {
+    return []
+  }
+}
+
+async function buildRuntimeEvolutionConsensusEnvelope(input: Record<string, unknown> = {}): Promise<RuntimeEvolutionConsensusEnvelope> {
+  const maintainer_set = orderedMaintainerSet(input.maintainer_set || input.maintainers)
+  const quorum_threshold = Math.max(0, Math.trunc(Number(input.quorum_threshold || 0)))
+  const sco_hash = String(input.sco_hash || "")
+  const preo_hash = String(input.preo_hash || "")
+  const mutation_hash = String(input.mutation_hash || "")
+  const reviewed_commit_hash = String(input.reviewed_commit_hash || "")
+  const runtime_scope = String(input.runtime_scope || "")
+  const governance_scope = String(input.governance_scope || "")
+  const maintainer_set_hash = await sha256Hex(canonicalize({ maintainer_set }))
+  const draftCanonical = await sha256Hex(canonicalize({ governance_scope, maintainer_set_hash, mutation_hash, preo_hash, quorum_threshold, reviewed_commit_hash, runtime_scope, sco_hash }))
+  const rawApprovals = approvalsFromInput(input.approvals || input.approval_lineage)
+  const approval_lineage = await Promise.all(rawApprovals.map(async (approval): Promise<RuntimeEvolutionApproval> => {
+    const maintainer_id = String(approval.maintainer_id || approval.signer || approval.signer_id || "")
+    const approvalCanonical = String(approval.canonical_hash || draftCanonical)
+    const expectedApprovalHash = await runtimeEvolutionApprovalHash({ maintainer_id, sco_hash, preo_hash, mutation_hash: String(approval.mutation_hash || mutation_hash), canonical_hash: approvalCanonical, reviewed_commit_hash: String(approval.reviewed_commit_hash || reviewed_commit_hash), runtime_scope, governance_scope })
+    const normalized: RuntimeEvolutionApproval = {
+      maintainer_id,
+      approval_hash: String(approval.approval_hash || expectedApprovalHash),
+      reviewed_commit_hash: String(approval.reviewed_commit_hash || reviewed_commit_hash),
+      mutation_hash: String(approval.mutation_hash || mutation_hash),
+      canonical_hash: approvalCanonical,
+      lineage_hash: String(approval.lineage_hash || "")
+    }
+    normalized.lineage_hash = normalized.lineage_hash || await runtimeEvolutionApprovalLineageHash(normalized)
+    return normalized
+  }))
+  const orderedApprovals = [...approval_lineage].sort((a, b) => a.maintainer_id.localeCompare(b.maintainer_id) || a.approval_hash.localeCompare(b.approval_hash))
+  let consensus_object: RuntimeEvolutionConsensusObject = {
+    consensus_id: "",
+    sco_hash,
+    preo_hash,
+    mutation_hash,
+    canonical_hash: draftCanonical,
+    reviewed_commit_hash,
+    runtime_scope,
+    governance_scope,
+    quorum_threshold,
+    maintainer_set_hash,
+    approval_lineage: orderedApprovals,
+    replay_neutral: true,
+    evidence_only: true,
+    generated_at: ""
+  }
+  const canonical_hash = await deriveRuntimeEvolutionConsensusHash(consensus_object)
+  consensus_object = { ...consensus_object, consensus_id: `runtime-evolution-consensus:${canonical_hash}`, canonical_hash, generated_at: `deterministic:${canonical_hash.slice(0, 16)}` }
+  consensus_object.approval_lineage = await Promise.all(consensus_object.approval_lineage.map(async (approval) => {
+    const approval_hash = await runtimeEvolutionApprovalHash({ maintainer_id: approval.maintainer_id, sco_hash, preo_hash, mutation_hash: approval.mutation_hash, canonical_hash, reviewed_commit_hash: approval.reviewed_commit_hash, runtime_scope, governance_scope })
+    const normalized = { ...approval, approval_hash, canonical_hash }
+    return { ...normalized, lineage_hash: await runtimeEvolutionApprovalLineageHash(normalized) }
+  }))
+  const final_hash = await deriveRuntimeEvolutionConsensusHash(consensus_object)
+  consensus_object = { ...consensus_object, consensus_id: `runtime-evolution-consensus:${final_hash}`, canonical_hash: final_hash, generated_at: `deterministic:${final_hash.slice(0, 16)}` }
+  const approval_hash = await sha256Hex(canonicalize(consensus_object.approval_lineage.map((approval) => approval.approval_hash)))
+  const verification = await verifyRuntimeEvolutionConsensus(consensus_object, maintainer_set)
+  return { envelope_type: "RuntimeEvolutionConsensusEnvelope", consensus_object, maintainer_set, approval_hash, consensus_result: verification.consensus_result, drift_classes: verification.drift_classes, replay_neutral: true, evidence_only: true, read_only: true, mutation_capable: false, execution_authority: false, remote_authority_inherited: false }
+}
+
+async function classifyRuntimeEvolutionDrift(object: RuntimeEvolutionConsensusObject, maintainer_set: string[], approval_hash?: string): Promise<RuntimeEvolutionConsensusDriftClass[]> {
+  const drift = new Set<RuntimeEvolutionConsensusDriftClass>()
+  const sortedMaintainers = orderedMaintainerSet(maintainer_set)
+  if (!object.sco_hash || !object.preo_hash || !object.mutation_hash || !object.canonical_hash || !object.reviewed_commit_hash) drift.add("runtime_evolution_bypass")
+  if (object.evidence_only !== true || object.replay_neutral !== true) drift.add("runtime_evolution_bypass")
+  if (object.runtime_scope.includes("federation_authority") || object.governance_scope.includes("remote_authority") || object.runtime_scope.includes("execute")) drift.add("federation_authority_inheritance_attempt")
+  if (object.governance_scope.includes("global") || object.runtime_scope.includes("*")) drift.add("mutation_scope_expansion")
+  const maintainerSetHash = await sha256Hex(canonicalize({ maintainer_set: sortedMaintainers }))
+  if (maintainerSetHash !== object.maintainer_set_hash) drift.add("maintainer_set_drift")
+  if (object.quorum_threshold <= 1 || object.quorum_threshold > sortedMaintainers.length) drift.add("quorum_divergence")
+  const signerSet = new Set<string>()
+  const lineageSet = new Set<string>()
+  const inputOrder = object.approval_lineage.map((approval) => approval.maintainer_id).join("\u0000")
+  const deterministicOrder = [...object.approval_lineage].sort((a, b) => a.maintainer_id.localeCompare(b.maintainer_id) || a.approval_hash.localeCompare(b.approval_hash)).map((approval) => approval.maintainer_id).join("\u0000")
+  if (inputOrder !== deterministicOrder) drift.add("non_deterministic_approval_order")
+  for (const approval of object.approval_lineage) {
+    if (!sortedMaintainers.includes(approval.maintainer_id)) drift.add("maintainer_set_drift")
+    if (signerSet.has(approval.maintainer_id)) drift.add("quorum_divergence")
+    signerSet.add(approval.maintainer_id)
+    if (lineageSet.has(approval.lineage_hash) || lineageSet.has(approval.approval_hash)) drift.add("governance_replay_attempt")
+    lineageSet.add(approval.lineage_hash)
+    lineageSet.add(approval.approval_hash)
+    if (approval.mutation_hash !== object.mutation_hash) drift.add("consensus_instability")
+    if (approval.reviewed_commit_hash !== object.reviewed_commit_hash) drift.add("reviewed_commit_drift")
+    if (approval.canonical_hash !== object.canonical_hash) drift.add("consensus_instability")
+    const expectedApprovalHash = await runtimeEvolutionApprovalHash({ maintainer_id: approval.maintainer_id, sco_hash: object.sco_hash, preo_hash: object.preo_hash, mutation_hash: object.mutation_hash, canonical_hash: object.canonical_hash, reviewed_commit_hash: object.reviewed_commit_hash, runtime_scope: object.runtime_scope, governance_scope: object.governance_scope })
+    if (approval.approval_hash !== expectedApprovalHash) drift.add("approval_hash_mismatch")
+    const expectedLineageHash = await runtimeEvolutionApprovalLineageHash(approval)
+    if (approval.lineage_hash !== expectedLineageHash) drift.add("governance_replay_attempt")
+  }
+  if (signerSet.size < object.quorum_threshold) drift.add("quorum_divergence")
+  if (approval_hash) {
+    const actualApprovalHash = await sha256Hex(canonicalize(object.approval_lineage.map((approval) => approval.approval_hash)))
+    if (actualApprovalHash !== approval_hash) drift.add("approval_hash_mismatch")
+  }
+  const derived = await deriveRuntimeEvolutionConsensusHash(object)
+  if (derived !== object.canonical_hash || object.consensus_id !== `runtime-evolution-consensus:${object.canonical_hash}` || object.generated_at !== `deterministic:${object.canonical_hash.slice(0, 16)}`) drift.add("consensus_instability")
+  return Array.from(drift).sort()
+}
+
+async function verifyRuntimeEvolutionConsensus(object: RuntimeEvolutionConsensusObject | null, maintainer_set: string[] = [], approval_hash?: string): Promise<{ consensus_result: "VALID_CONSENSUS" | "NULL", drift_classes: RuntimeEvolutionConsensusDriftClass[] }> {
+  if (!object) return { consensus_result: "NULL", drift_classes: ["runtime_evolution_bypass"] }
+  const drift_classes = await classifyRuntimeEvolutionDrift(object, maintainer_set, approval_hash)
+  return { consensus_result: drift_classes.length === 0 ? "VALID_CONSENSUS" : "NULL", drift_classes }
+}
+
+async function appendRuntimeEvolutionConsensusObservation(env: Env, envelope: RuntimeEvolutionConsensusEnvelope) {
+  await env.DB.prepare(`INSERT OR IGNORE INTO runtime_evolution_consensus_registry (consensus_id, mutation_hash, canonical_hash, governance_scope, quorum_threshold, approval_count, approval_hash, consensus_status, replay_neutral, evidence_only, generated_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'true', 'true', ?9, ?10)`).bind(
+    envelope.consensus_object.consensus_id,
+    envelope.consensus_object.mutation_hash,
+    envelope.consensus_object.canonical_hash,
+    envelope.consensus_object.governance_scope,
+    String(envelope.consensus_object.quorum_threshold),
+    String(envelope.consensus_object.approval_lineage.length),
+    envelope.approval_hash,
+    envelope.consensus_result,
+    envelope.consensus_object.generated_at,
+    envelope.consensus_object.generated_at
+  ).run()
+}
+
+function runtimeEvolutionConsensusInputFromUrl(url: URL): Record<string, unknown> {
+  return {
+    sco_hash: url.searchParams.get("sco_hash") || "",
+    preo_hash: url.searchParams.get("preo_hash") || "",
+    mutation_hash: url.searchParams.get("mutation_hash") || "",
+    reviewed_commit_hash: url.searchParams.get("reviewed_commit_hash") || "",
+    runtime_scope: url.searchParams.get("runtime_scope") || "",
+    governance_scope: url.searchParams.get("governance_scope") || "",
+    quorum_threshold: url.searchParams.get("quorum_threshold") || "0",
+    maintainer_set: url.searchParams.get("maintainer_set") || "",
+    approvals: url.searchParams.get("approvals") || ""
+  }
 }
 
 function continuityHashMaterial(input: any): Record<string, unknown> {
@@ -1719,7 +1991,7 @@ type FederatedCheckpointEnvelope = {
 }
 
 
-type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "runtime_divergence" | "governance_divergence" | "replay_discontinuity" | "proof_topology_mismatch" | "validator_instability" | "schema_mismatch" | "sovereignty_corruption" | "hidden_execution_expansion" | "authority_inheritance_attempt"
+type FederatedObservabilityDriftClass = "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt" | "runtime_divergence" | "governance_divergence" | "replay_discontinuity" | "proof_topology_mismatch" | "validator_instability" | "schema_mismatch" | "sovereignty_corruption" | "hidden_execution_expansion" | "authority_inheritance_attempt"
 type DistributedCheckpointComparison = {
   comparison_id: string
   local_checkpoint_hash: string
@@ -1778,7 +2050,7 @@ type FederatedReconciliationEnvelope = {
 
 
 
-type FederationConformanceDriftClass = "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch"
+type FederationConformanceDriftClass = "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt"
 type RuntimeSemanticFingerprint = {
   fingerprint_type: "RuntimeSemanticFingerprint"
   runtime_id: string
@@ -3649,6 +3921,19 @@ export default {
         return json({ status: interoperability_status, route: "/federation/interoperability/checkpoint", reason: "observability_only", interoperability_status, distributed_legitimacy_envelope, checkpoint_envelope, lineage_envelope, drift_indicators, replay_indicators, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, local_validation_required: true, remote_execution_legitimacy: false, remote_authority_inherited: false, append_only: false })
       } catch {
         return json({ status: "NULL", route: "/federation/interoperability/checkpoint", reason: "reconciliation_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      }
+    }
+    if (url.pathname === RUNTIME_EVOLUTION_CONSENSUS_ROUTE && request.method !== "GET") return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }, 405)
+
+    if (url.pathname === RUNTIME_EVOLUTION_CONSENSUS_ROUTE && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+        await ensureRuntimeEvolutionConsensusRegistry(env)
+        const envelope = await buildRuntimeEvolutionConsensusEnvelope(runtimeEvolutionConsensusInputFromUrl(url))
+        await appendRuntimeEvolutionConsensusObservation(env, envelope)
+        return json({ status: envelope.consensus_result, route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "observability_only", envelope, drift_classes: envelope.drift_classes, consensus_result: envelope.consensus_result, canonical_hash: envelope.consensus_object.canonical_hash, replay_neutral: true, evidence_only: true, read_only: true, mutation_capable: false, execution_authority: false, remote_authority_inherited: false, runtime_mutated: false, governance_state_altered: false, append_only: true })
+      } catch {
+        return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "consensus_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
     if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
