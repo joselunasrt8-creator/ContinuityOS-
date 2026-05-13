@@ -1,0 +1,29 @@
+{
+  "suite_id": "portability_verification_v1",
+  "description": "Verifies deterministic portable legitimacy evidence without accepting portable authority.",
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "remote_evidence_local_authority": false,
+  "fail_closed_result": "NULL",
+  "checks": [
+    {
+      "check_id": "canonical_form_stable",
+      "kind": "deterministic_hash",
+      "requires": ["canonical_form", "expected_sha256"],
+      "failure_result": "NULL"
+    },
+    {
+      "check_id": "portable_boundary_marker_present",
+      "kind": "field_const",
+      "path": "object.federation_boundary",
+      "const": "portable_evidence_not_portable_authority",
+      "failure_result": "NULL"
+    },
+    {
+      "check_id": "portability_does_not_grant_authority",
+      "kind": "invariant",
+      "requires": ["evidence_only", "remote_authority_denied", "mutation_capable_false", "replay_neutral"],
+      "failure_result": "NULL"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "suite_id": "replay_neutrality_certification_v1",
+  "description": "Certifies that conformance replay observations do not consume, reserve, or mutate local replay state.",
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "replay_neutral": true,
+  "state_consumption_allowed": false,
+  "checks": [
+    {
+      "check_id": "replay_vectors_fail_closed",
+      "kind": "vector_expected_result",
+      "vector_ids": ["legitimacy_replay_collision"],
+      "expected_result": "NULL"
+    },
+    {
+      "check_id": "remote_replay_state_not_consumed",
+      "kind": "field_not_true",
+      "path": "object.replay_consumed"
+    },
+    {
+      "check_id": "replay_observation_is_not_invocation_registry_write",
+      "kind": "mutation_forbidden",
+      "forbidden_operations": ["INSERT", "UPDATE", "DELETE", "DB.batch", ".run("]
+    }
+  ]
+}

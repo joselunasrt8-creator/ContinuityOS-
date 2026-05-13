@@ -7,7 +7,8 @@
     "deploy": "echo \"Direct deploy disabled as a convenience guard. Production deploys must use .github/workflows/governed-deploy.yml.\" && exit 1",
     "dev": "wrangler dev --local",
     "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local",
-    "test": "node --test tests/*.test.mjs tests/fate/*.test.mjs"
+    "test": "node --test tests/*.test.mjs tests/fate/*.test.mjs",
+    "conformance": "node conformance/runner.mjs"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
