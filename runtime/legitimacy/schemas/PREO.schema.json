@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.dev/schemas/PREO.schema.json",
+  "title": "PREO",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "version", "preo_id", "pull_request", "review_evidence", "reviewer_authority", "head_sha", "decision", "replay_semantics"],
+  "properties": {
+    "object_type": {"const": "PREO"},
+    "version": {"type": "string"},
+    "preo_id": {"type": "string"},
+    "pull_request": {"type": "string"},
+    "review_evidence": {"type": "object"},
+    "reviewer_authority": {"type": "string"},
+    "head_sha": {"type": "string"},
+    "decision": {"enum": ["APPROVED", "REJECTED", "CHANGES_REQUESTED", "NULL"]},
+    "replay_semantics": {"type": "string"}
+  },
+  "x-mindshift": {"failure_mode": "NULL", "canonicalization": "required", "hash_relevant_fields": ["object_type", "version", "preo_id", "pull_request", "review_evidence", "reviewer_authority", "head_sha", "decision", "replay_semantics"]}
+}
