@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "classification": "machine_readable_governance_graph",
+  "core_invariant": "No undeclared mutation capability may exist.",
+  "topology_registry": {
+    "purpose": "Persist canonical topology hashes and reconcile runtime topology against declared governance topology.",
+    "status": "SPECIFIED_NOT_MIGRATED",
+    "required_hashes": [
+      "surface_inventory_hash",
+      "authority_surface_hash",
+      "bypass_path_hash",
+      "trust_boundary_hash",
+      "federation_surface_hash",
+      "root_authority_surface_hash",
+      "policy_graph_hash",
+      "execution_graph_hash",
+      "reconciliation_graph_hash"
+    ]
+  },
+  "reconcile_topology": {
+    "route": "/reconcile/topology",
+    "mode": "read_only",
+    "outputs": [
+      "TOPOLOGY_MATCH",
+      "TOPOLOGY_DRIFT",
+      "UNKNOWN_SURFACE",
+      "MISSING_SURFACE"
+    ],
+    "failure_semantics": "DRIFT_OR_NULL"
+  },
+  "observability_class": "governance_grade_observability",
+  "read_only_routes": [
+    "/runtime/self-description",
+    "/runtime/snapshot",
+    "/reconcile/topology"
+  ],
+  "future_capabilities": [
+    "Runtime Equivalence Verification",
+    "Canonical Governance Compiler"
+  ],
+  "nodes": [
+    "execution_surfaces",
+    "bypass_paths",
+    "authority_surfaces",
+    "trust_boundaries",
+    "federation_surfaces",
+    "root_authority_surfaces",
+    "runtime_maps",
+    "governance_policies",
+    "topology_registry",
+    "reconcile_topology"
+  ],
+  "edges": [
+    {"from":"execution_surfaces","to":"bypass_paths","relation":"non_bypassability_check"},
+    {"from":"authority_surfaces","to":"execution_surfaces","relation":"authority_exposure"},
+    {"from":"trust_boundaries","to":"authority_surfaces","relation":"trust_not_authority"},
+    {"from":"federation_surfaces","to":"trust_boundaries","relation":"remote_evidence_not_local_authority"},
+    {"from":"governance_policies","to":"execution_surfaces","relation":"policy_constraints"},
+    {"from":"runtime_maps","to":"topology_registry","relation":"canonical_hash_source"},
+    {"from":"topology_registry","to":"reconcile_topology","relation":"drift_detection_source"}
+  ]
+}
