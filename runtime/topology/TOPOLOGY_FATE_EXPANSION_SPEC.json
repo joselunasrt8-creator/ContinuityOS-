@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "classification": "topology_fate_expansion_specification",
+  "status": "non_operative_specification",
+  "core_invariant": "Topology-aware FATE must fail closed when runtime topology diverges from canonical governance topology.",
+  "purpose": "Define future deterministic FATE coverage for topology registry, reconciliation, self-description, snapshots, runtime equivalence, governance compilation, and undeclared mutation capability detection.",
+  "fate_cases": [
+    {
+      "case_id": "topology_registry_hash_drift",
+      "expected_result": "TOPOLOGY_DRIFT"
+    },
+    {
+      "case_id": "unknown_runtime_surface_detected",
+      "expected_result": "UNKNOWN_SURFACE"
+    },
+    {
+      "case_id": "declared_surface_missing_from_runtime",
+      "expected_result": "MISSING_SURFACE"
+    },
+    {
+      "case_id": "runtime_self_description_incomplete",
+      "expected_result": "SELF_DESCRIPTION_INCOMPLETE"
+    },
+    {
+      "case_id": "runtime_snapshot_policy_hash_mismatch",
+      "expected_result": "SNAPSHOT_DRIFT"
+    },
+    {
+      "case_id": "runtime_equivalence_hash_divergence",
+      "expected_result": "RUNTIME_DIVERGENT"
+    },
+    {
+      "case_id": "governance_compiler_detects_undeclared_mutation",
+      "expected_result": "UNDECLARED_MUTATION_CAPABILITY"
+    }
+  ],
+  "required_failure_mode": "NULL",
+  "forbidden_behavior": [
+    "execution_triggering",
+    "authority_creation",
+    "runtime_state_mutation",
+    "proof_creation",
+    "remote_authority_inheritance"
+  ]
+}
