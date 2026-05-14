@@ -1,0 +1,49 @@
+{
+  "version": "1.0.0",
+  "classification": "undeclared_mutation_capability_policy",
+  "status": "non_operative_specification",
+  "core_invariant": "No undeclared mutation capability may exist.",
+  "purpose": "Define fail-closed governance behavior when runtime discovery identifies mutation-capable surfaces absent from canonical governance topology.",
+  "detection_inputs": [
+    "compiled_execution_surfaces",
+    "canonical_execution_surfaces",
+    "compiled_authority_topology",
+    "canonical_authority_surfaces",
+    "compiled_bypass_paths",
+    "canonical_bypass_paths",
+    "runtime_graph_hash",
+    "canonical_topology_hash"
+  ],
+  "violation_classes": [
+    "UNDECLARED_MUTATION_SURFACE",
+    "UNDECLARED_AUTHORITY_EDGE",
+    "UNDECLARED_BYPASS_PATH",
+    "UNDECLARED_ROOT_AUTHORITY",
+    "UNDECLARED_FEDERATION_AUTHORITY_PATH",
+    "UNDECLARED_DEPLOY_CAPABILITY",
+    "UNDECLARED_REGISTRY_WRITE_CAPABILITY"
+  ],
+  "required_response": [
+    "TOPOLOGY_DRIFT",
+    "QUARANTINE_OR_NULL",
+    "OBSERVABILITY_RECORD",
+    "NO_AUTHORITY_GRANT",
+    "NO_EXECUTION_TRIGGER"
+  ],
+  "allowed_behavior": [
+    "read_only_detection",
+    "drift_reporting",
+    "topology_reconciliation",
+    "human_review_routing",
+    "FATE_failure"
+  ],
+  "forbidden_behavior": [
+    "execution_triggering",
+    "authority_creation",
+    "automatic_trust_upgrade",
+    "runtime_state_mutation",
+    "proof_creation",
+    "remote_authority_inheritance"
+  ],
+  "failure_mode": "NULL"
+}
