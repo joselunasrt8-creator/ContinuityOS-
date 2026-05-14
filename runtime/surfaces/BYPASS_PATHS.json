@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "classification": "canonical_bypass_paths",
+  "core_invariant": "Any mutation path outside the canonical lifecycle is invalid",
+  "canonical_lifecycle": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "bypass_paths": [
+    {
+      "path_id": "direct_wrangler_deploy",
+      "severity": "CRITICAL"
+    },
+    {
+      "path_id": "raw_d1_write",
+      "severity": "CRITICAL"
+    },
+    {
+      "path_id": "agent_direct_tool_execution",
+      "severity": "CRITICAL"
+    }
+  ]
+}
