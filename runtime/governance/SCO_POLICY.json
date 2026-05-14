@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "policy": "SCO_POLICY",
+  "core_invariant": "No system mutation may exist without a validated System Change Object.",
+  "scope": [
+    "runtime_route_mutation",
+    "validator_mutation",
+    "schema_mutation",
+    "authority_semantics_mutation",
+    "proof_semantics_mutation",
+    "replay_semantics_mutation",
+    "policy_mutation",
+    "observability_mutation",
+    "federation_semantics_mutation",
+    "governance_surface_expansion"
+  ],
+  "requirements": [
+    "explicit mutation class",
+    "bounded mutation scope",
+    "target surface identification",
+    "PREO evidence binding",
+    "exact-object validation",
+    "rollback or quarantine semantics"
+  ],
+  "failure_mode": "NULL"
+}
