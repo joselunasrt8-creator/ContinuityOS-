@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "policy": "REPLAY_POLICY",
+  "core_invariant": "Reused authority or duplicated execution lineage is invalid.",
+  "replay_classes": [
+    "authority_reuse",
+    "duplicate_hash",
+    "nonce_reuse",
+    "cross-runtime_replay",
+    "parallel_execution_collision",
+    "orphaned_reinvocation"
+  ],
+  "requirements": [
+    "single-use authority lifecycle",
+    "nonce lineage persistence",
+    "exact-object replay hashing",
+    "cross-registry replay visibility",
+    "continuity-aware replay validation"
+  ],
+  "failure_mode": "NULL"
+}
