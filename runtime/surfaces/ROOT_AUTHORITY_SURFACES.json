@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "classification": "root_authority_surfaces",
+  "core_invariant": "Root authority must remain explicitly bounded and observable.",
+  "surfaces": [
+    {
+      "surface_id": "cloudflare_root_access",
+      "capability": ["deploy","database_access","environment_mutation"],
+      "containment_requirement": "signed deploy lineage + proof persistence"
+    },
+    {
+      "surface_id": "github_admin_access",
+      "capability": ["workflow_mutation","branch_override","secret_rotation"],
+      "containment_requirement": "PREO enforcement + branch governance"
+    },
+    {
+      "surface_id": "local_terminal_operator",
+      "capability": ["wrangler deploy","manual execution","runtime mutation"],
+      "containment_requirement": "explicit authority binding"
+    }
+  ]
+}
