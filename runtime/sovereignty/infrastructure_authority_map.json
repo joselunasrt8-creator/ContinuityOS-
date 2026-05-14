@@ -84,5 +84,16 @@
     }
   ],
   "secret_values_inspected": false,
-  "evidence_only": true
+  "evidence_only": true,
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "classification_authorizes_execution": false,
+    "classification_authorizes_merge": false,
+    "secret_values_inspected": false,
+    "evidence_only": true,
+    "non_authoritative": true,
+    "missing_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+  }
 }

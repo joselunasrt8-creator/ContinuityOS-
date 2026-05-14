@@ -1,0 +1,21 @@
+{
+  "artifact": "UNAUTHORIZED_MUTATION_PATH_CLOSURE_AUDIT",
+  "audit_id": "issue-342-unauthorized-mutation-path-closure-v1",
+  "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+  "bypass_hash": "1affab899d0e585cf79ff322b951b6b056d5dcae3902e7e2191d29cb944c809f",
+  "route_hash": "a7c2b77b4d457b9355938facdaf686362d8d5f6ce879c01b1a1587dfeb038dc9",
+  "workflow_hash": "1395b821a57bdf693a8e18962d86fb9e9d68a8b3ec65021db9c9aa30ee72e0f0",
+  "registry_hash": "c3813a3ef82b40ca122e03705a3154859bd9608c11746e9f6339aaba12ecea0a",
+  "drift_classes": [],
+  "unresolved_surfaces": [],
+  "containment_status": "CLOSED_CLASSIFICATION_COMPLETE",
+  "merge_legitimacy": "UNCHANGED",
+  "evidence_only": true,
+  "non_authoritative": true,
+  "replay_neutral": true,
+  "reconciliation": {
+    "execution_surfaces_hash": "3f12d8e9ca90dc45fa29a7010f9c0e6b30a0c01ab3cbecc7c6a2112b9d9678cf",
+    "root_authority_inventory_hash": "26d1763568a5ad04368ff09a9268f8f010413e4715f8cc3d08869a6c2ed81dbf",
+    "missing_mutation_surfaces_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+  }
+}

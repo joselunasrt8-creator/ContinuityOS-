@@ -76,6 +76,36 @@
       "proof_type": "execution_receipt",
       "risk_class": "P3",
       "classification": "canonical_runtime_surface"
+    },
+    {
+      "surface_id": "runtime_closure_inventory",
+      "type": "observability",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
+      "surface_id": "database_write_surface_inventory",
+      "type": "database",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
+      "surface_id": "workflow_package_deploy_inventory",
+      "type": "ci_cd",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
     }
   ]
 }
