@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.dev/schemas/AEO.schema.json",
+  "title": "AEO",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent", "scope", "validation", "target", "finality"],
+  "properties": {
+    "intent": {"type": "string"},
+    "scope": {"type": "array", "items": {"type": "string"}},
+    "validation": {"type": "string"},
+    "target": {"type": "string"},
+    "finality": {"type": "string"}
+  },
+  "x-mindshift": {
+    "failure_mode": "NULL",
+    "canonicalization": "required",
+    "exact_object_rule": "validated_object == executed_object",
+    "hash_relevant_fields": ["intent", "scope", "validation", "target", "finality"]
+  }
+}
