@@ -46,6 +46,12 @@ const DELEGATION_DRIFT_ROUTE = "/delegation/drift" as const
 const DELEGATION_REPLAY_ROUTE = "/delegation/replay" as const
 const DELEGATION_OBSERVABILITY_ROUTES = [DELEGATION_LINEAGE_ROUTE, DELEGATION_CHECKPOINT_ROUTE, DELEGATION_DRIFT_ROUTE, DELEGATION_REPLAY_ROUTE] as const
 const CONTINUOUS_FATE_ROUTES = ["/fate/continuous", "/fate/stress", "/fate/drift", "/fate/checkpoint", "/fate/topology"] as const
+const RUNTIME_CONTAINMENT_VERIFY_ROUTE = "/runtime/containment/verify" as const
+const RUNTIME_CONTAINMENT_ROUTES_ROUTE = "/runtime/containment/routes" as const
+const RUNTIME_CONTAINMENT_DEPLOY_ROUTE = "/runtime/containment/deploy" as const
+const RUNTIME_CONTAINMENT_DRIFT_ROUTE = "/runtime/containment/drift" as const
+const RUNTIME_CONTAINMENT_CHECKPOINT_ROUTE = "/runtime/containment/checkpoint" as const
+const RUNTIME_CONTAINMENT_ROUTES = [RUNTIME_CONTAINMENT_VERIFY_ROUTE, RUNTIME_CONTAINMENT_ROUTES_ROUTE, RUNTIME_CONTAINMENT_DEPLOY_ROUTE, RUNTIME_CONTAINMENT_DRIFT_ROUTE, RUNTIME_CONTAINMENT_CHECKPOINT_ROUTE] as const
 const BOOTSTRAP_READY_DATABASES = new WeakSet<D1Database>()
 const RUNTIME_SOVEREIGNTY_FREEZES = new WeakMap<D1Database, RuntimeSovereigntyManifest>()
 const PROVENANCE_PAYLOAD_TYPE = "application/vnd.mindshift.cryptographic-provenance.v1+json"
@@ -58,7 +64,7 @@ const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as co
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES, ...RUNTIME_CONTAINMENT_ROUTES] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -88,6 +94,7 @@ const RECONCILIATION_CLOSURE_REGISTRY = "reconciliation_closure_registry" as con
 const CONTINUOUS_FATE_REGISTRY = "continuous_fate_registry" as const
 const CONTINUOUS_FATE_MAX_STRESS_DEPTH = 32
 const DELEGATED_AUTHORITY_REGISTRY = "delegated_authority_registry" as const
+const RUNTIME_SURFACE_CONTAINMENT_REGISTRY = "runtime_surface_containment_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -124,7 +131,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   legitimacy_graph_registry: ["graph_checkpoint_id", "graph_checkpoint_hash", "graph_coherence_hash", "node_count", "edge_count", "orphan_count", "drift_classes", "checkpoint_object_hash", "cross_registry_replay_continuity", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"],
   delegated_authority_registry: ["registry_id", "object_type", "delegated_authority_id", "parent_authority_id", "authority_id", "decision_id", "continuity_id", "delegation_depth", "delegation_scope_subset", "delegation_expiry", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "canonical_delegation_object", "exact_object_hash", "projection_status", "revocation_reason", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "created_at"],
   reconciliation_closure_registry: ["closure_id", "closure_hash", "deterministic_reconciliation_anchor", "recursive_checkpoint_identity", "reconciliation_equivalence_state", "lineage_depth", "bounded_window", "graph_checkpoint_hash", "bootstrap_checkpoint_hash", "runtime_sovereignty_checkpoint_hash", "federation_conformance_checkpoint_hash", "drift_classes", "closure_object_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "generated_at", "created_at"],
-  continuous_fate_registry: ["continuous_fate_id", "stress_window_id", "deterministic_stress_hash", "topology_stability_hash", "drift_survivability_state", "replay_mutation_vector_hash", "governance_replay_checkpoint", "runtime_stress_depth", "scenario_set_hash", "drift_classes", "checkpoint_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"]
+  continuous_fate_registry: ["continuous_fate_id", "stress_window_id", "deterministic_stress_hash", "topology_stability_hash", "drift_survivability_state", "replay_mutation_vector_hash", "governance_replay_checkpoint", "runtime_stress_depth", "scenario_set_hash", "drift_classes", "checkpoint_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"],
+  runtime_surface_containment_registry: ["containment_id", "containment_hash", "route_surface_hash", "deployment_surface_hash", "package_surface_hash", "runtime_sovereignty_hash", "hidden_surface_count", "drift_classes", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -453,9 +461,18 @@ type RuntimeEvolutionConsensusEnvelope = {
   remote_authority_inherited: false
 }
 
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt" | "continuous_fate_divergence" | "replay_mutation_survival" | "sovereignty_escape_detected" | "runtime_stress_instability" | "governance_replay_divergence" | "reconciliation_corruption_detected" | "topology_instability_detected" | "deterministic_stress_hash_mismatch" | "continuous_fate_checkpoint_instability" | "recursive_drift_accumulation" | DelegatedAuthorityDriftClass | "external_authority_drift" | "sovereignty_boundary_fragmentation" | "deploy_authority_escape" | "bootstrap_trust_divergence" | "undeclared_execution_surface" | "infrastructure_authority_expansion" | "hidden_mutation_surface" | BootstrapSovereigntyDriftClass | LegitimacyGraphDriftClass
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt" | "continuous_fate_divergence" | "replay_mutation_survival" | "sovereignty_escape_detected" | "runtime_stress_instability" | "governance_replay_divergence" | "reconciliation_corruption_detected" | "topology_instability_detected" | "deterministic_stress_hash_mismatch" | "continuous_fate_checkpoint_instability" | "recursive_drift_accumulation" | RuntimeSurfaceContainmentDriftClass | DelegatedAuthorityDriftClass | "external_authority_drift" | "sovereignty_boundary_fragmentation" | "deploy_authority_escape" | "bootstrap_trust_divergence" | "undeclared_execution_surface" | "infrastructure_authority_expansion" | "hidden_mutation_surface" | BootstrapSovereigntyDriftClass | LegitimacyGraphDriftClass
 
 type ContinuousFATEDriftClass = "continuous_fate_divergence" | "replay_mutation_survival" | "sovereignty_escape_detected" | "runtime_stress_instability" | "governance_replay_divergence" | "reconciliation_corruption_detected" | "topology_instability_detected" | "deterministic_stress_hash_mismatch" | "continuous_fate_checkpoint_instability" | "recursive_drift_accumulation"
+
+type RuntimeSurfaceContainmentDriftClass = "hidden_execution_surface_detected" | "undeclared_mutation_surface_detected" | "runtime_route_containment_drift" | "deployment_surface_hash_drift" | "workflow_dispatch_escape_detected" | "adapter_authority_escape_detected" | "proofless_execution_surface_detected" | "canonical_route_boundary_drift" | "observability_route_execution_upgrade" | "sovereignty_containment_failure"
+type MutationSurfaceClassification = "canonical_runtime" | "governed_evidence" | "observability_only" | "external_adapter" | "webhook" | "package_script" | "workflow" | "hidden" | "NULL"
+type ExecutableSurfaceInventory = { declared_canonical_routes: readonly string[], declared_observability_routes: readonly string[], route_handlers: readonly string[], undeclared_route_handlers: readonly string[], non_get_observability_handlers: readonly string[], workflow_surfaces: readonly string[], package_surfaces: readonly string[], adapter_surfaces: readonly string[], webhook_surfaces: readonly string[] }
+type HiddenSurfaceProbe = { route?: string, method?: string, workflow?: string, package_command?: string, adapter?: string, webhook?: string, mutation_capable: boolean, deploy_capable: boolean, proof_bound: boolean }
+type DeploymentSurfaceHash = { workflow_surface_hash: string, package_surface_hash: string, deployment_surface_hash: string }
+type RouteContainmentCheckpoint = { checkpoint_hash: string, route_surface_hash: string, hidden_surface_count: number, drift_classes: RuntimeSurfaceContainmentDriftClass[] }
+type RuntimeSurfaceContainmentObject = { object_type: "RuntimeSurfaceContainmentObject", inventory: ExecutableSurfaceInventory, mutation_surface_classification: Record<string, MutationSurfaceClassification>, deployment_surface_hash: DeploymentSurfaceHash, route_surface_hash: string, package_surface_hash: string, hidden_surface_count: number, drift_classes: RuntimeSurfaceContainmentDriftClass[], runtime_sovereignty_hash: string, containment_hash: string, generated_at: string }
+type SovereigntyContainmentEnvelope = RuntimeSurfaceContainmentObject & { envelope_type: "SovereigntyContainmentEnvelope", checkpoint: RouteContainmentCheckpoint, evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false, authoritative: false }
 
 type ReplayMutationVector = {
   vector_id: string
@@ -897,6 +914,10 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_continuous_fate_registry_checkpoint_unique ON continuous_fate_registry(checkpoint_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_continuous_fate_registry_deterministic ON continuous_fate_registry(stress_window_id, deterministic_stress_hash, topology_stability_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_continuous_fate_registry_replay_checkpoint ON continuous_fate_registry(replay_mutation_vector_hash, governance_replay_checkpoint)`,
+      `CREATE TABLE IF NOT EXISTS runtime_surface_containment_registry (containment_id TEXT PRIMARY KEY, containment_hash TEXT NOT NULL UNIQUE, route_surface_hash TEXT NOT NULL, deployment_surface_hash TEXT NOT NULL, package_surface_hash TEXT NOT NULL, runtime_sovereignty_hash TEXT NOT NULL, hidden_surface_count INTEGER NOT NULL, drift_classes TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), authoritative TEXT NOT NULL CHECK (authoritative='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_surface_containment_registry_routes ON runtime_surface_containment_registry(route_surface_hash, hidden_surface_count)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_surface_containment_registry_deploy ON runtime_surface_containment_registry(deployment_surface_hash, package_surface_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_surface_containment_registry_sovereignty ON runtime_surface_containment_registry(runtime_sovereignty_hash, containment_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_graph_registry_checkpoint ON legitimacy_graph_registry(graph_checkpoint_hash, graph_coherence_hash, cross_registry_replay_continuity)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`,
@@ -997,6 +1018,8 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_delete BEFORE DELETE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_continuous_fate_registry_no_update BEFORE UPDATE ON continuous_fate_registry BEGIN SELECT RAISE(ABORT, 'continuous_fate_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_continuous_fate_registry_no_delete BEFORE DELETE ON continuous_fate_registry BEGIN SELECT RAISE(ABORT, 'continuous_fate_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_surface_containment_registry_no_update BEFORE UPDATE ON runtime_surface_containment_registry BEGIN SELECT RAISE(ABORT, 'runtime_surface_containment_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_surface_containment_registry_no_delete BEFORE DELETE ON runtime_surface_containment_registry BEGIN SELECT RAISE(ABORT, 'runtime_surface_containment_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_update BEFORE UPDATE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_delete BEFORE DELETE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`
   ]
@@ -1319,7 +1342,8 @@ const LEGITIMACY_GRAPH_REGISTRIES = [
   "federated_reconciliation_registry",
   "governance_compression_registry",
   "distributed_legitimacy_registry",
-  "runtime_evolution_consensus_registry"
+  "runtime_evolution_consensus_registry",
+  "runtime_surface_containment_registry"
 ] as const
 
 type LegitimacyGraphRegistry = typeof LEGITIMACY_GRAPH_REGISTRIES[number]
@@ -1347,7 +1371,8 @@ const LEGITIMACY_GRAPH_PRIMARY_KEYS: Record<LegitimacyGraphRegistry, string[]> =
   federated_reconciliation_registry: ["reconciliation_id"],
   governance_compression_registry: ["compression_id"],
   distributed_legitimacy_registry: ["envelope_id"],
-  runtime_evolution_consensus_registry: ["consensus_id"]
+  runtime_evolution_consensus_registry: ["consensus_id"],
+  runtime_surface_containment_registry: ["containment_id", "containment_hash"]
 }
 
 function legitimacyGraphStatusFlags(): { evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false } {
@@ -4740,6 +4765,109 @@ async function validateDeploymentProvenance(env: Env, params: {
   }
   return { ok: true, preo: preoLineage.preo, canonical_preo: preoLineage.canonical_preo }
 }
+
+function containmentFlags(): { evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false, authoritative: false } {
+  return { evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false, authoritative: false }
+}
+
+const DECLARED_RUNTIME_ROUTE_CONSTANTS = Object.freeze([...CANONICAL_RUNTIME_ROUTES, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
+const DECLARED_ROUTE_HANDLER_SURFACES = Object.freeze(["/health", ...CANONICAL_RUNTIME_ROUTES, ...GOVERNANCE_EVIDENCE_ROUTES, RECURSIVE_GOVERNANCE_ROUTE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
+const GOVERNED_DEPLOY_WORKFLOW_SURFACES = Object.freeze([".github/workflows/governed-deploy.yml", ".github/workflows/prepare-governed-deploy.yml"])
+const NON_DEPLOY_WORKFLOW_SURFACES = Object.freeze([".github/workflows/merge-governance-check.yml", ".github/workflows/preo-candidate.yml", ".github/workflows/sco-candidate.yml"])
+const PACKAGE_COMMAND_SURFACES = Object.freeze(["deploy:disabled-direct-deploy", "dev:local-only", "d1:migrate:local-only", "test:non-deploy", "conformance:non-deploy"])
+const ADAPTER_MUTATION_SURFACES = Object.freeze(["cloudflare-d1:canonical-registry-only", "github-actions:governed-deploy-only", "wrangler:governed-workflow-only"])
+const WEBHOOK_MUTATION_SURFACES = Object.freeze(["github-pull-request:review-observability-only", "github-workflow-dispatch:governed-deploy-only"])
+
+async function ensureRuntimeSurfaceContainmentRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS runtime_surface_containment_registry (containment_id TEXT PRIMARY KEY, containment_hash TEXT NOT NULL UNIQUE, route_surface_hash TEXT NOT NULL, deployment_surface_hash TEXT NOT NULL, package_surface_hash TEXT NOT NULL, runtime_sovereignty_hash TEXT NOT NULL, hidden_surface_count INTEGER NOT NULL, drift_classes TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), authoritative TEXT NOT NULL CHECK (authoritative='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_runtime_surface_containment_registry_routes ON runtime_surface_containment_registry(route_surface_hash, hidden_surface_count)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_runtime_surface_containment_registry_deploy ON runtime_surface_containment_registry(deployment_surface_hash, package_surface_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_runtime_surface_containment_registry_sovereignty ON runtime_surface_containment_registry(runtime_sovereignty_hash, containment_hash)`).run()
+}
+
+function hiddenSurfaceProbeFromUrl(url: URL): HiddenSurfaceProbe {
+  return Object.freeze({ route: url.searchParams.get("route") || undefined, method: url.searchParams.get("method") || undefined, workflow: url.searchParams.get("workflow") || undefined, package_command: url.searchParams.get("package_command") || undefined, adapter: url.searchParams.get("adapter") || undefined, webhook: url.searchParams.get("webhook") || undefined, mutation_capable: url.searchParams.get("mutation_capable") === "true", deploy_capable: url.searchParams.get("deploy_capable") === "true", proof_bound: url.searchParams.get("proof_bound") === "true" })
+}
+
+function runtimeSurfaceInventory(probe: HiddenSurfaceProbe): ExecutableSurfaceInventory {
+  const handlerSet = new Set<string>(DECLARED_ROUTE_HANDLER_SURFACES)
+  if (probe.route) handlerSet.add(probe.route)
+  const declaredRouteSet = new Set<string>(DECLARED_RUNTIME_ROUTE_CONSTANTS)
+  const undeclared_route_handlers = [...handlerSet].filter((route) => !declaredRouteSet.has(route)).sort()
+  const non_get_observability_handlers = probe.route && probe.method && probe.method.toUpperCase() !== "GET" && declaredRouteSet.has(probe.route) && (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(probe.route) ? [probe.route] : []
+  return Object.freeze({
+    declared_canonical_routes: Object.freeze([...CANONICAL_RUNTIME_ROUTES].sort()),
+    declared_observability_routes: Object.freeze([...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort()),
+    route_handlers: Object.freeze([...handlerSet].sort()),
+    undeclared_route_handlers: Object.freeze(undeclared_route_handlers),
+    non_get_observability_handlers: Object.freeze(non_get_observability_handlers),
+    workflow_surfaces: Object.freeze([...GOVERNED_DEPLOY_WORKFLOW_SURFACES, ...NON_DEPLOY_WORKFLOW_SURFACES, probe.workflow].filter(Boolean).sort() as string[]),
+    package_surfaces: Object.freeze([...PACKAGE_COMMAND_SURFACES, probe.package_command].filter(Boolean).sort() as string[]),
+    adapter_surfaces: Object.freeze([...ADAPTER_MUTATION_SURFACES, probe.adapter].filter(Boolean).sort() as string[]),
+    webhook_surfaces: Object.freeze([...WEBHOOK_MUTATION_SURFACES, probe.webhook].filter(Boolean).sort() as string[])
+  })
+}
+
+function classifyContainmentSurfaces(inventory: ExecutableSurfaceInventory): Record<string, MutationSurfaceClassification> {
+  const classification: Record<string, MutationSurfaceClassification> = {}
+  for (const route of inventory.route_handlers) {
+    if ((CANONICAL_RUNTIME_ROUTES as readonly string[]).includes(route)) classification[route] = "canonical_runtime"
+    else if ((GOVERNANCE_EVIDENCE_ROUTES as readonly string[]).includes(route)) classification[route] = "governed_evidence"
+    else if ((NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(route)) classification[route] = "observability_only"
+    else classification[route] = "hidden"
+  }
+  for (const workflow of inventory.workflow_surfaces) classification[workflow] = "workflow"
+  for (const command of inventory.package_surfaces) classification[command] = "package_script"
+  for (const adapter of inventory.adapter_surfaces) classification[adapter] = "external_adapter"
+  for (const webhook of inventory.webhook_surfaces) classification[webhook] = "webhook"
+  return canonicalRecord(classification) as Record<string, MutationSurfaceClassification>
+}
+
+function classifyRuntimeSurfaceContainmentDrift(inventory: ExecutableSurfaceInventory, probe: HiddenSurfaceProbe): RuntimeSurfaceContainmentDriftClass[] {
+  const drift = new Set<RuntimeSurfaceContainmentDriftClass>()
+  const canonicalUnchanged = canonicalize(CANONICAL_RUNTIME_ROUTES) === canonicalize(["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"])
+  if (!canonicalUnchanged) drift.add("canonical_route_boundary_drift")
+  if (inventory.undeclared_route_handlers.length > 0 || (probe.route && !(DECLARED_RUNTIME_ROUTE_CONSTANTS as readonly string[]).includes(probe.route))) drift.add("hidden_execution_surface_detected")
+  if (probe.mutation_capable && probe.route && !(CANONICAL_RUNTIME_ROUTES as readonly string[]).includes(probe.route) && !(GOVERNANCE_EVIDENCE_ROUTES as readonly string[]).includes(probe.route)) drift.add("undeclared_mutation_surface_detected")
+  if (inventory.non_get_observability_handlers.length > 0) drift.add("observability_route_execution_upgrade")
+  if (probe.route && (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(probe.route) && probe.mutation_capable) drift.add("runtime_route_containment_drift")
+  if (probe.workflow && probe.workflow !== ".github/workflows/governed-deploy.yml" && probe.deploy_capable) drift.add("workflow_dispatch_escape_detected")
+  if (probe.package_command && /deploy|wrangler publish|wrangler deploy/.test(probe.package_command) && probe.deploy_capable) drift.add("deployment_surface_hash_drift")
+  if ((probe.adapter || probe.webhook) && probe.mutation_capable) drift.add("adapter_authority_escape_detected")
+  if ((probe.deploy_capable || probe.mutation_capable) && !probe.proof_bound) drift.add("proofless_execution_surface_detected")
+  if (drift.size > 0) drift.add("sovereignty_containment_failure")
+  return [...drift].sort()
+}
+
+async function deploymentSurfaceHash(inventory: ExecutableSurfaceInventory): Promise<DeploymentSurfaceHash> {
+  const workflow_surface_hash = await sha256Hex(canonicalize(inventory.workflow_surfaces))
+  const package_surface_hash = await sha256Hex(canonicalize(inventory.package_surfaces))
+  const deployment_surface_hash = await sha256Hex(canonicalize({ governed_workflow: GOVERNED_WORKFLOW, workflows: inventory.workflow_surfaces, packages: inventory.package_surfaces, deploy_capable_outside_governed_path: false }))
+  return Object.freeze({ workflow_surface_hash, package_surface_hash, deployment_surface_hash })
+}
+
+async function buildSovereigntyContainmentEnvelope(env: Env, url: URL, generated_at = new Date().toISOString()): Promise<SovereigntyContainmentEnvelope> {
+  const probe = hiddenSurfaceProbeFromUrl(url)
+  const inventory = runtimeSurfaceInventory(probe)
+  const mutation_surface_classification = classifyContainmentSurfaces(inventory)
+  const deployment_surface_hash = await deploymentSurfaceHash(inventory)
+  const route_surface_hash = await sha256Hex(canonicalize({ canonical: inventory.declared_canonical_routes, observability: inventory.declared_observability_routes, handlers: inventory.route_handlers }))
+  const runtime_sovereignty_hash = (RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)).sovereignty_hash
+  const drift_classes = classifyRuntimeSurfaceContainmentDrift(inventory, probe)
+  const hidden_surface_count = inventory.undeclared_route_handlers.length
+  const objectMaterial = { object_type: "RuntimeSurfaceContainmentObject" as const, inventory, mutation_surface_classification, deployment_surface_hash, route_surface_hash, package_surface_hash: deployment_surface_hash.package_surface_hash, hidden_surface_count, drift_classes, runtime_sovereignty_hash }
+  const containment_hash = await sha256Hex(canonicalize(objectMaterial))
+  const checkpoint = Object.freeze({ checkpoint_hash: await sha256Hex(canonicalize({ containment_hash, route_surface_hash, deployment_surface_hash, drift_classes, hidden_surface_count })), route_surface_hash, hidden_surface_count, drift_classes })
+  return Object.freeze({ ...objectMaterial, containment_hash, generated_at, envelope_type: "SovereigntyContainmentEnvelope" as const, checkpoint, ...containmentFlags() }) as SovereigntyContainmentEnvelope
+}
+
+async function appendRuntimeSurfaceContainmentCheckpoint(env: Env, envelope: SovereigntyContainmentEnvelope) {
+  await ensureRuntimeSurfaceContainmentRegistry(env)
+  await env.DB.prepare(`INSERT OR IGNORE INTO runtime_surface_containment_registry (containment_id,containment_hash,route_surface_hash,deployment_surface_hash,package_surface_hash,runtime_sovereignty_hash,hidden_surface_count,drift_classes,evidence_only,replay_neutral,mutation_capable,remote_authority_denied,read_only,creates_authority,execution_started,replay_consumed,authoritative,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'true','true','false','true','true','false','false','false','false',?9,?10)`)
+    .bind(envelope.checkpoint.checkpoint_hash, envelope.containment_hash, envelope.route_surface_hash, envelope.deployment_surface_hash.deployment_surface_hash, envelope.package_surface_hash, envelope.runtime_sovereignty_hash, envelope.hidden_surface_count, canonicalize(envelope.drift_classes), envelope.generated_at, envelope.generated_at)
+    .run()
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -5083,6 +5211,24 @@ export default {
         return json({ status, route: url.pathname, reason: "observability_only", envelope, checkpoint_hash: envelope.checkpoint_hash, evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, replay_consumed: false })
       } catch {
         return json({ status: "NULL", route: url.pathname, reason: "delegation_observability_unavailable", evidence_only: true, replay_neutral: true, mutation_capable: false, replay_consumed: false })
+      }
+    }
+
+    if (RUNTIME_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...containmentFlags() }, 405)
+    if (RUNTIME_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...containmentFlags() }, 500)
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        const envelope = await buildSovereigntyContainmentEnvelope(env, url)
+        await appendRuntimeSurfaceContainmentCheckpoint(env, envelope)
+        const status = envelope.drift_classes.length > 0 ? "NULL" : "RUNTIME_SURFACE_CONTAINED"
+        if (url.pathname === RUNTIME_CONTAINMENT_ROUTES_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", route_inventory: envelope.inventory, route_surface_hash: envelope.route_surface_hash, hidden_surface_count: envelope.hidden_surface_count, drift_classes: envelope.drift_classes, append_only: true, ...containmentFlags() })
+        if (url.pathname === RUNTIME_CONTAINMENT_DEPLOY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", deployment_surface_hash: envelope.deployment_surface_hash, package_surface_hash: envelope.package_surface_hash, workflow_surfaces: envelope.inventory.workflow_surfaces, package_surfaces: envelope.inventory.package_surfaces, drift_classes: envelope.drift_classes, append_only: true, ...containmentFlags() })
+        if (url.pathname === RUNTIME_CONTAINMENT_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: envelope.drift_classes, drift_taxonomy: ["hidden_execution_surface_detected", "undeclared_mutation_surface_detected", "runtime_route_containment_drift", "deployment_surface_hash_drift", "workflow_dispatch_escape_detected", "adapter_authority_escape_detected", "proofless_execution_surface_detected", "canonical_route_boundary_drift", "observability_route_execution_upgrade", "sovereignty_containment_failure"], fail_closed: envelope.drift_classes.length > 0, append_only: true, ...containmentFlags() })
+        if (url.pathname === RUNTIME_CONTAINMENT_CHECKPOINT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", checkpoint: envelope.checkpoint, containment_hash: envelope.containment_hash, runtime_sovereignty_hash: envelope.runtime_sovereignty_hash, append_only: true, ...containmentFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_hash: envelope.containment_hash, runtime_sovereignty_hash: envelope.runtime_sovereignty_hash, append_only: true, ...containmentFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "sovereignty_containment_unavailable", drift_classes: ["sovereignty_containment_failure"], ...containmentFlags() }, 500)
       }
     }
 
