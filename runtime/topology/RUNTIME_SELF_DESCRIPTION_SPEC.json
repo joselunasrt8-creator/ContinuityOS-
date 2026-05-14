@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "classification": "runtime_self_description_specification",
+  "status": "non_operative_specification",
+  "route": "/runtime/self-description",
+  "method": "GET",
+  "mode": "read_only",
+  "core_invariant": "A runtime may describe its governance topology without granting authority or mutating state.",
+  "purpose": "Expose deterministic governance identity, topology hashes, policy hashes, federation mode, and replay semantics for observability and equivalence checks.",
+  "required_fields": [
+    "runtime_id",
+    "runtime_version",
+    "governance_topology_hash",
+    "runtime_graph_hash",
+    "policy_set_hash",
+    "surface_inventory_hash",
+    "authority_surface_hash",
+    "reconciliation_version",
+    "federation_mode",
+    "replay_semantics_version",
+    "proof_semantics_version",
+    "verification_status"
+  ],
+  "verification_status_values": [
+    "SELF_DESCRIPTION_VALID",
+    "SELF_DESCRIPTION_DRIFT",
+    "SELF_DESCRIPTION_INCOMPLETE",
+    "NULL"
+  ],
+  "forbidden_behavior": [
+    "authority_creation",
+    "runtime_state_mutation",
+    "proof_creation",
+    "execution_triggering",
+    "federation_authority_inheritance"
+  ],
+  "failure_mode": "NULL"
+}
