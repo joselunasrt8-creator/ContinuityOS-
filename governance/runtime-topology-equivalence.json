@@ -1,0 +1,45 @@
+{
+  "artifact": "runtime_topology_equivalence",
+  "version": "1.0.0",
+  "object_types": [
+    "RuntimeTopologyNode",
+    "RuntimeTopologyEdge",
+    "RuntimeTopologySnapshot",
+    "RuntimeTopologyFingerprint",
+    "RuntimeTopologyDrift",
+    "RuntimeTopologyEquivalence"
+  ],
+  "required_hash_fields": [
+    "topology_hash",
+    "topology_semantic_hash",
+    "topology_boundary_hash",
+    "topology_lineage_hash",
+    "topology_equivalence_hash"
+  ],
+  "equivalence_rule": {
+    "validated_topology_must_equal_executed_topology": true,
+    "compare_canonical_structure": true,
+    "compare_registry_lineage": true,
+    "compare_execution_boundaries": true,
+    "compare_governance_surfaces": true,
+    "compare_containment_inventories": true,
+    "mutation_after_reconciliation_class": "TOPOLOGY_EQUIVALENCE_DRIFT"
+  },
+  "hash_semantics": {
+    "topology_hash": "Canonical routes, execution surfaces, and observability surfaces sorted by exact object identity.",
+    "topology_semantic_hash": "Governance artifacts, governance inventories, and schema maps sorted canonically.",
+    "topology_boundary_hash": "Execution, observability, workflow mutation, and deploy mutation boundaries.",
+    "topology_lineage_hash": "Append-only registries, reconciliation registries, proof lineage, and topology ancestry.",
+    "topology_equivalence_hash": "Canonical hash over topology, semantic, boundary, lineage, containment, and traversal hashes."
+  },
+  "authority_constraints": {
+    "evidence_only": true,
+    "replay_neutral": true,
+    "executable": false,
+    "deployment_capable": false,
+    "creates_authority": false,
+    "authorizes_legitimacy": false,
+    "authorizes_execution": false,
+    "authorizes_deployment": false
+  }
+}
