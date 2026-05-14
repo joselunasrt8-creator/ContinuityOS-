@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/runtime/legitimacy/schemas/SCO.schema.json",
+  "title": "MindShift SCO Object",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "sco_id", "change_type", "target", "authority_id", "risk_class", "validation_requirements", "created_at"],
+  "properties": {
+    "object_type": { "const": "SCO" },
+    "sco_id": { "type": "string", "minLength": 1 },
+    "change_type": { "type": "string", "enum": ["SCHEMA_CHANGE", "VALIDATOR_CHANGE", "RUNTIME_CHANGE", "POLICY_CHANGE", "DOC_CHANGE"] },
+    "target": { "type": "object" },
+    "authority_id": { "type": "string", "minLength": 1 },
+    "risk_class": { "type": "string", "enum": ["P1", "P2", "P3"] },
+    "validation_requirements": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

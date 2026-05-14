@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/runtime/legitimacy/schemas/AUTHORITY.schema.json",
+  "title": "MindShift Authority Object",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "authority_id", "decision_id", "owner", "identity_id", "session_id", "continuity_id", "intent", "scope", "constraints", "expiry", "status"],
+  "properties": {
+    "object_type": { "const": "Authority" },
+    "authority_id": { "type": "string", "minLength": 1 },
+    "decision_id": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 },
+    "identity_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "intent": { "type": "string", "minLength": 1 },
+    "scope": { "type": "object" },
+    "constraints": { "type": "object" },
+    "expiry": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["ACTIVE", "VALIDATED", "RESERVED", "CONSUMED", "REVOKED", "EXPIRED"] }
+  }
+}

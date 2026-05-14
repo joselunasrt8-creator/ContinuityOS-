@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/runtime/legitimacy/schemas/PREO.schema.json",
+  "title": "MindShift PREO Object",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "preo_id", "repo", "pr_number", "review_state", "evidence", "created_at"],
+  "properties": {
+    "object_type": { "const": "PREO" },
+    "preo_id": { "type": "string", "minLength": 1 },
+    "repo": { "type": "string", "minLength": 1 },
+    "pr_number": { "type": ["integer", "string"] },
+    "review_state": { "type": "string", "enum": ["PENDING", "APPROVED", "CHANGES_REQUESTED", "REJECTED"] },
+    "evidence": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

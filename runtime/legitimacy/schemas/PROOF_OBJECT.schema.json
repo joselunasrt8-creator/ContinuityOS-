@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/runtime/legitimacy/schemas/PROOF_OBJECT.schema.json",
+  "title": "MindShift Proof Object",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "proof_id", "execution_id", "decision_id", "authority_id", "validated_object_hash", "execution_hash", "target_system", "target_action", "result", "timestamp", "proof_reference", "continuity_id", "continuity_hash", "identity_id", "session_id", "authority_lineage", "execution_lineage"],
+  "properties": {
+    "object_type": { "const": "ProofObject" },
+    "proof_id": { "type": "string", "minLength": 1 },
+    "execution_id": { "type": "string", "minLength": 1 },
+    "decision_id": { "type": "string", "minLength": 1 },
+    "authority_id": { "type": "string", "minLength": 1 },
+    "validated_object_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "execution_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "target_system": { "type": "string", "minLength": 1 },
+    "target_action": { "type": "string", "minLength": 1 },
+    "result": { "type": "string", "enum": ["success", "failure", "blocked"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "proof_reference": { "type": "object" },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "continuity_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "identity_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "authority_lineage": { "type": "object" },
+    "execution_lineage": { "type": "object" }
+  }
+}

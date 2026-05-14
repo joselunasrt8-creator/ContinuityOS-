@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/runtime/legitimacy/schemas/FEDERATION_ENVELOPE.schema.json",
+  "title": "MindShift Federation Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "runtime_id", "remote_runtime_id", "payload_hash", "evidence_hash", "authority_effect", "federation_boundary", "observed_at"],
+  "properties": {
+    "object_type": { "const": "FederationEnvelope" },
+    "runtime_id": { "type": "string", "minLength": 1 },
+    "remote_runtime_id": { "type": "string", "minLength": 1 },
+    "payload_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "evidence_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "authority_effect": { "const": "none" },
+    "federation_boundary": { "const": "remote_evidence_not_local_authority" },
+    "observed_at": { "type": "string", "format": "date-time" }
+  }
+}

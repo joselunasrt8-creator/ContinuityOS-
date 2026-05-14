@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/runtime/legitimacy/schemas/CONTINUITY_OBJECT.schema.json",
+  "title": "MindShift Continuity Object",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "continuity_id", "identity_id", "session_id", "parent_continuity_id", "authority_chain", "actor_chain", "scope", "constraints", "revocation", "issued_at", "expires_at", "continuity_hash"],
+  "properties": {
+    "object_type": { "const": "ContinuityObject" },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "identity_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "parent_continuity_id": { "type": ["string", "null"] },
+    "authority_chain": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "actor_chain": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "scope": { "type": "object", "required": ["environment"], "properties": { "environment": { "type": "string", "minLength": 1 } }, "additionalProperties": true },
+    "constraints": { "type": "object", "required": ["max_depth", "delegation_allowed"], "properties": { "max_depth": { "type": "integer", "minimum": 0 }, "delegation_allowed": { "type": "boolean" } }, "additionalProperties": true },
+    "revocation": { "type": "object", "additionalProperties": false, "required": ["status", "revoked_at"], "properties": { "status": { "type": "string", "enum": ["ACTIVE", "REVOKED", "EXPIRED"] }, "revoked_at": { "type": ["string", "null"], "format": "date-time" } } },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "continuity_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
