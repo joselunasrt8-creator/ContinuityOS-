@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "classification": "topology_registry_specification",
+  "status": "non_operative_specification",
+  "core_invariant": "No undeclared mutation capability may exist.",
+  "purpose": "Define canonical persistence requirements for topology hashes, graph lineage, and reconciliation evidence.",
+  "registry_name": "topology_registry",
+  "required_fields": [
+    "topology_id",
+    "runtime_id",
+    "surface_inventory_hash",
+    "authority_surface_hash",
+    "bypass_path_hash",
+    "trust_boundary_hash",
+    "federation_surface_hash",
+    "root_authority_surface_hash",
+    "policy_graph_hash",
+    "execution_graph_hash",
+    "reconciliation_graph_hash",
+    "runtime_graph_hash",
+    "created_at",
+    "verification_status"
+  ],
+  "verification_status_values": [
+    "TOPOLOGY_MATCH",
+    "TOPOLOGY_DRIFT",
+    "UNKNOWN_SURFACE",
+    "MISSING_SURFACE",
+    "NULL"
+  ],
+  "failure_mode": "NULL"
+}
