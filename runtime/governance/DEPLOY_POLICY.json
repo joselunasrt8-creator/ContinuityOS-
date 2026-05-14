@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "policy": "DEPLOY_POLICY",
+  "core_invariant": "Deployment is a governed reality mutation.",
+  "requirements": [
+    "VALID exact-object AEO",
+    "PREO verification",
+    "deployment authority binding",
+    "proof-of-deploy persistence",
+    "replay-resistant deployment lineage",
+    "rollback or quarantine capability"
+  ],
+  "governed_surfaces": [
+    "github_actions_governed_deploy",
+    "workflow_dispatch",
+    "wrangler_deploy"
+  ],
+  "forbidden_paths": [
+    "direct_ungoverned_deploy",
+    "unsigned_runtime_mutation",
+    "manual_bypass_execution"
+  ],
+  "failure_mode": "NULL"
+}
