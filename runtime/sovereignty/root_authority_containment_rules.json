@@ -7,7 +7,11 @@
     "root authority evidence != execution authority",
     "observability != sovereignty",
     "classification != authorization",
-    "containment evidence may invalidate legitimacy but may NEVER authorize merge"
+    "containment evidence may invalidate legitimacy but may NEVER authorize merge",
+    "ROOT_AUTHORITY_BYPASS_RISK -> containment required",
+    "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> merge legitimacy NULL when drift is present",
+    "workflow_dispatch classification is trigger-only and never execution authority",
+    "deployment token classification is observability-only and never inspects secret values"
   ],
   "executable": false,
   "deployment_capable": false,
