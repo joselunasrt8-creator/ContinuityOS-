@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "policy": "PREO_POLICY",
+  "core_invariant": "No merge legitimacy without review legitimacy.",
+  "requirements": [
+    "reviewer authority verification",
+    "head SHA binding",
+    "deterministic review evidence",
+    "replay-resistant review lineage"
+  ],
+  "failure_mode": "NULL"
+}
