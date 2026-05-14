@@ -543,7 +543,7 @@ type SovereigntyContainmentEnvelope = RuntimeSurfaceContainmentObject & { envelo
 
 
 type RootAuthorityClassification = "ROOT_DEPLOY_AUTHORITY" | "ROOT_REPOSITORY_AUTHORITY" | "ROOT_ENVIRONMENT_AUTHORITY" | "ROOT_WORKFLOW_AUTHORITY" | "ROOT_BRANCH_POLICY_AUTHORITY" | "ROOT_RUNTIME_CONFIGURATION_AUTHORITY" | "ROOT_FEDERATION_AUTHORITY" | "ROOT_LOCAL_EXECUTION_AUTHORITY" | "ROOT_PACKAGE_EXECUTION_AUTHORITY" | "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY" | "UNDECLARED_ROOT_SURFACE" | "SOVEREIGNTY_DRIFT_DETECTED" | "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE" | "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"
-type RootAuthoritySurface = { surface_id: string, authority_origin: string, declared_boundary: string, classifications: readonly RootAuthorityClassification[], mutation_capability_observed: boolean, declared: boolean, secret_material: "REDACTED" | "NOT_INSPECTED", executable: false, deployment_capable: false, creates_authority: false }
+type RootAuthoritySurface = { surface_id: string, authority_origin: string, declared_boundary: string, classifications: readonly RootAuthorityClassification[], mutation_capability_observed: boolean, declared: boolean, observed_executable: boolean, observed_deployment_capable: boolean, observed_creates_authority: boolean, observed_secret_values_inspected: boolean, observed_secret_material_persisted: boolean, observed_secret_material: string, normalized_secret_material: "NOT_INSPECTED", normalized_executable: false, normalized_deployment_capable: false, normalized_creates_authority: false, secret_material: "NOT_INSPECTED", executable: false, deployment_capable: false, creates_authority: false }
 type RootAuthorityInventory = { inventory_type: "RootAuthorityInventory", surfaces: readonly RootAuthoritySurface[], evidence_only: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false }
 type RootAuthorityBoundary = { boundary_type: "RootAuthorityContainmentBoundary", allowed_canonical_path: readonly string[], contained_surfaces: readonly string[], overflow_surfaces: readonly string[], merge_legitimacy: "NULL" | "UNCHANGED", preo_validity: "NULL" | "UNCHANGED", classification_authorizes: false, evidence_authorizes_merge: false, boundary_hash: string, evidence_only: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false }
 type RootAuthorityDrift = { drift_type: "RootAuthorityDrift", drift_classes: RootAuthorityClassification[], undeclared_surfaces: readonly string[], topology_hash: string, drift_hash: string, merge_legitimacy: "NULL" | "UNCHANGED", fail_closed: boolean, evidence_only: true, replay_neutral: true, non_authoritative: true, secret_material_persisted: false }
@@ -5336,18 +5336,31 @@ function classifyRootAuthoritySurface(surface: Partial<RootAuthoritySurface> & R
 }
 
 function canonicalizeRootAuthorityInventory(input: Partial<RootAuthorityInventory> = {}): RootAuthorityInventory {
-  const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length > 0 ? input.surfaces : ROOT_AUTHORITY_BASELINE_SURFACES).map((surface: any) => Object.freeze({
-    surface_id: String(surface.surface_id || "undeclared_root_surface"),
-    authority_origin: String(surface.authority_origin || "unknown"),
-    declared_boundary: String(surface.declared_boundary || "NULL"),
-    classifications: Object.freeze(classifyRootAuthoritySurface(surface)),
-    mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
-    declared: surface.declared === false ? false : true,
-    secret_material: "NOT_INSPECTED" as const,
-    executable: false as const,
-    deployment_capable: false as const,
-    creates_authority: false as const
-  })).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
+  const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length > 0 ? input.surfaces : ROOT_AUTHORITY_BASELINE_SURFACES).map((surface: any) => {
+    const observed_secret_material = String(surface.observed_secret_material ?? surface.secret_material ?? "NOT_INSPECTED")
+    return Object.freeze({
+      surface_id: String(surface.surface_id || "undeclared_root_surface"),
+      authority_origin: String(surface.authority_origin || "unknown"),
+      declared_boundary: String(surface.declared_boundary || "NULL"),
+      classifications: Object.freeze(classifyRootAuthoritySurface(surface)),
+      mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
+      declared: surface.declared === false ? false : true,
+      observed_executable: Boolean(surface.observed_executable ?? surface.executable ?? false),
+      observed_deployment_capable: Boolean(surface.observed_deployment_capable ?? surface.deployment_capable ?? false),
+      observed_creates_authority: Boolean(surface.observed_creates_authority ?? surface.creates_authority ?? false),
+      observed_secret_values_inspected: Boolean(surface.observed_secret_values_inspected ?? surface.secret_values_inspected ?? false),
+      observed_secret_material_persisted: Boolean(surface.observed_secret_material_persisted ?? surface.secret_material_persisted ?? false),
+      observed_secret_material,
+      normalized_secret_material: "NOT_INSPECTED" as const,
+      normalized_executable: false as const,
+      normalized_deployment_capable: false as const,
+      normalized_creates_authority: false as const,
+      secret_material: "NOT_INSPECTED" as const,
+      executable: false as const,
+      deployment_capable: false as const,
+      creates_authority: false as const
+    })
+  }).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
   return Object.freeze({ inventory_type: "RootAuthorityInventory" as const, surfaces: Object.freeze(surfaces), evidence_only: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const, secret_values_inspected: false as const })
 }
 
@@ -5370,8 +5383,10 @@ async function detectRootAuthorityDrift(inventory: RootAuthorityInventory, topol
   if (undeclared_surfaces.length > 0) drift.add("UNDECLARED_ROOT_SURFACE")
   if (undeclared_surfaces.length > 0) drift.add("SOVEREIGNTY_DRIFT_DETECTED")
   if (undeclared_surfaces.length > 0) drift.add("ROOT_AUTHORITY_BOUNDARY_OVERFLOW")
-  const topologyDivergence = inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== "NOT_INSPECTED" || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false)
+  const unsafeObservedSurface = inventory.surfaces.some((surface) => surface.observed_executable === true || surface.observed_deployment_capable === true || surface.observed_creates_authority === true || surface.observed_secret_values_inspected === true || surface.observed_secret_material_persisted === true || surface.observed_secret_material !== "NOT_INSPECTED")
+  const topologyDivergence = inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== "NOT_INSPECTED" || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false) || unsafeObservedSurface
   if (topologyDivergence) drift.add("ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE")
+  if (unsafeObservedSurface) drift.add("SOVEREIGNTY_DRIFT_DETECTED")
   const drift_classes = [...drift].sort()
   const drift_hash = await sha256Hex(canonicalize({ topology_hash, drift_classes, undeclared_surfaces, merge_legitimacy: drift_classes.length > 0 ? "NULL" : "UNCHANGED" }))
   return Object.freeze({ drift_type: "RootAuthorityDrift" as const, drift_classes, undeclared_surfaces, topology_hash, drift_hash, merge_legitimacy: drift_classes.length > 0 ? "NULL" as const : "UNCHANGED" as const, fail_closed: drift_classes.length > 0, evidence_only: true as const, replay_neutral: true as const, non_authoritative: true as const, secret_material_persisted: false as const })
@@ -5388,17 +5403,23 @@ async function buildRootAuthorityContainmentEnvelope(input: Partial<RootAuthorit
 }
 
 async function ensureRootAuthorityObservabilityRegistry(env: Env) {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS root_authority_observability_registry (observation_id TEXT PRIMARY KEY, observation_hash TEXT NOT NULL UNIQUE, topology_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, drift_hash TEXT NOT NULL, containment_identity TEXT NOT NULL, classification TEXT NOT NULL, inventory_object TEXT NOT NULL, boundary_object TEXT NOT NULL, drift_object TEXT NOT NULL, containment_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), secret_material_persisted TEXT NOT NULL CHECK (secret_material_persisted='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS root_authority_observability_registry (observation_id TEXT PRIMARY KEY, observation_hash TEXT NOT NULL UNIQUE, topology_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, drift_hash TEXT NOT NULL, containment_identity TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification IN ('ROOT_DEPLOY_AUTHORITY','ROOT_REPOSITORY_AUTHORITY','ROOT_ENVIRONMENT_AUTHORITY','ROOT_WORKFLOW_AUTHORITY','ROOT_BRANCH_POLICY_AUTHORITY','ROOT_RUNTIME_CONFIGURATION_AUTHORITY','ROOT_FEDERATION_AUTHORITY','ROOT_LOCAL_EXECUTION_AUTHORITY','ROOT_PACKAGE_EXECUTION_AUTHORITY','ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY','UNDECLARED_ROOT_SURFACE','SOVEREIGNTY_DRIFT_DETECTED','ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE','ROOT_AUTHORITY_BOUNDARY_OVERFLOW')), inventory_object TEXT NOT NULL, boundary_object TEXT NOT NULL, drift_object TEXT NOT NULL, containment_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), secret_material_persisted TEXT NOT NULL CHECK (secret_material_persisted='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_topology ON root_authority_observability_registry(topology_hash, containment_identity)`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_boundary ON root_authority_observability_registry(boundary_hash, classification)`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_drift ON root_authority_observability_registry(drift_hash, classification)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_update BEFORE UPDATE ON root_authority_observability_registry BEGIN SELECT RAISE(ABORT, 'root_authority_observability_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_delete BEFORE DELETE ON root_authority_observability_registry BEGIN SELECT RAISE(ABORT, 'root_authority_observability_registry is append-only'); END`).run()
 }
 
 async function appendRootAuthorityObservation(env: Env, envelope: RootAuthorityContainmentEnvelope) {
   await ensureRootAuthorityObservabilityRegistry(env)
   const classification = envelope.drift.drift_classes[0] || "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"
-  await env.DB.prepare(`INSERT OR IGNORE INTO root_authority_observability_registry (observation_id,observation_hash,topology_hash,boundary_hash,drift_hash,containment_identity,classification,inventory_object,boundary_object,drift_object,containment_envelope,evidence_only,append_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,secret_material_persisted,fail_closed_on_ambiguity,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','true','true','false','false','false','false','true',?12,?13)`)
-    .bind(envelope.containment_identity, envelope.containment_hash, envelope.topology_hash, envelope.boundary.boundary_hash, envelope.drift.drift_hash, envelope.containment_identity, classification, canonicalize(envelope.inventory), canonicalize(envelope.boundary), canonicalize(envelope.drift), canonicalize(envelope), envelope.generated_at, envelope.generated_at)
+  const created_at = new Date().toISOString()
+  const observation_nonce = crypto.randomUUID()
+  const observation_id = await sha256Hex(canonicalize({ containment_identity: envelope.containment_identity, created_at, observation_nonce, observation: "root_authority_containment" }))
+  const observation_hash = await sha256Hex(canonicalize({ observation_id, containment_hash: envelope.containment_hash, topology_hash: envelope.topology_hash, boundary_hash: envelope.boundary.boundary_hash, drift_hash: envelope.drift.drift_hash, created_at, observation_nonce, evidence_only: true, non_authoritative: true }))
+  await env.DB.prepare(`INSERT INTO root_authority_observability_registry (observation_id,observation_hash,topology_hash,boundary_hash,drift_hash,containment_identity,classification,inventory_object,boundary_object,drift_object,containment_envelope,evidence_only,append_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,secret_material_persisted,fail_closed_on_ambiguity,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','true','true','false','false','false','false','true',?12,?13)`)
+    .bind(observation_id, observation_hash, envelope.topology_hash, envelope.boundary.boundary_hash, envelope.drift.drift_hash, envelope.containment_identity, classification, canonicalize(envelope.inventory), canonicalize(envelope.boundary), canonicalize(envelope.drift), canonicalize(envelope), envelope.generated_at, created_at)
     .run()
 }
 

@@ -82,18 +82,31 @@ export function classifyRootAuthoritySurface(surface = {}) {
 
 export function canonicalizeRootAuthorityInventory(input = {}) {
   const source = Array.isArray(input.surfaces) && input.surfaces.length > 0 ? input.surfaces : ROOT_AUTHORITY_BASELINE_SURFACES
-  const surfaces = source.map((surface) => ({
-    surface_id: String(surface.surface_id || 'undeclared_root_surface'),
-    authority_origin: String(surface.authority_origin || 'unknown'),
-    declared_boundary: String(surface.declared_boundary || 'NULL'),
-    classifications: classifyRootAuthoritySurface(surface),
-    mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
-    declared: surface.declared === false ? false : true,
-    secret_material: 'NOT_INSPECTED',
-    executable: false,
-    deployment_capable: false,
-    creates_authority: false,
-  })).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
+  const surfaces = source.map((surface) => {
+    const observed_secret_material = String(surface.observed_secret_material ?? surface.secret_material ?? 'NOT_INSPECTED')
+    return {
+      surface_id: String(surface.surface_id || 'undeclared_root_surface'),
+      authority_origin: String(surface.authority_origin || 'unknown'),
+      declared_boundary: String(surface.declared_boundary || 'NULL'),
+      classifications: classifyRootAuthoritySurface(surface),
+      mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
+      declared: surface.declared === false ? false : true,
+      observed_executable: Boolean(surface.observed_executable ?? surface.executable ?? false),
+      observed_deployment_capable: Boolean(surface.observed_deployment_capable ?? surface.deployment_capable ?? false),
+      observed_creates_authority: Boolean(surface.observed_creates_authority ?? surface.creates_authority ?? false),
+      observed_secret_values_inspected: Boolean(surface.observed_secret_values_inspected ?? surface.secret_values_inspected ?? false),
+      observed_secret_material_persisted: Boolean(surface.observed_secret_material_persisted ?? surface.secret_material_persisted ?? false),
+      observed_secret_material,
+      normalized_secret_material: 'NOT_INSPECTED',
+      normalized_executable: false,
+      normalized_deployment_capable: false,
+      normalized_creates_authority: false,
+      secret_material: 'NOT_INSPECTED',
+      executable: false,
+      deployment_capable: false,
+      creates_authority: false,
+    }
+  }).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
   return Object.freeze({ inventory_type: 'RootAuthorityInventory', surfaces, evidence_only: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false })
 }
 
@@ -115,7 +128,9 @@ export function detectRootAuthorityDrift(inventory, topology_hash = hashRootAuth
     drift.add('SOVEREIGNTY_DRIFT_DETECTED')
     drift.add('ROOT_AUTHORITY_BOUNDARY_OVERFLOW')
   }
-  if (inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== 'NOT_INSPECTED' || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false)) drift.add('ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE')
+  const unsafeObservedSurface = inventory.surfaces.some((surface) => surface.observed_executable === true || surface.observed_deployment_capable === true || surface.observed_creates_authority === true || surface.observed_secret_values_inspected === true || surface.observed_secret_material_persisted === true || surface.observed_secret_material !== 'NOT_INSPECTED')
+  if (inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== 'NOT_INSPECTED' || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false) || unsafeObservedSurface) drift.add('ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE')
+  if (unsafeObservedSurface) drift.add('SOVEREIGNTY_DRIFT_DETECTED')
   const drift_classes = [...drift].sort()
   const drift_hash = hashCanonical({ topology_hash, drift_classes, undeclared_surfaces: boundary.overflow_surfaces, merge_legitimacy: drift_classes.length > 0 ? 'NULL' : 'UNCHANGED' })
   return Object.freeze({ drift_type: 'RootAuthorityDrift', drift_classes, undeclared_surfaces: boundary.overflow_surfaces, topology_hash, drift_hash, merge_legitimacy: drift_classes.length > 0 ? 'NULL' : 'UNCHANGED', fail_closed: drift_classes.length > 0, evidence_only: true, replay_neutral: true, non_authoritative: true, secret_material_persisted: false })
