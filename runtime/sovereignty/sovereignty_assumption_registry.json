@@ -2,10 +2,41 @@
   "artifact_type": "sovereignty_assumption_registry",
   "version": "1.0",
   "assumptions": [
-    { "assumption_id": "no_secret_value_inspection", "statement": "Containment observes declared authority surfaces only and never reads secret values.", "continuity": "stable" },
-    { "assumption_id": "classification_not_authorization", "statement": "Root authority classification may invalidate legitimacy but never authorizes execution or merge.", "continuity": "stable" },
-    { "assumption_id": "observability_not_sovereignty", "statement": "Observability evidence does not make infrastructure authority sovereign.", "continuity": "stable" },
-    { "assumption_id": "undeclared_surface_null", "statement": "Undeclared root mutation surface yields containment evidence and merge legitimacy NULL.", "continuity": "fail_closed" }
+    {
+      "assumption_id": "no_secret_value_inspection",
+      "statement": "Containment observes declared authority surfaces only and never reads secret values.",
+      "continuity": "stable"
+    },
+    {
+      "assumption_id": "classification_not_authorization",
+      "statement": "Root authority classification may invalidate legitimacy but never authorizes execution or merge.",
+      "continuity": "stable"
+    },
+    {
+      "assumption_id": "observability_not_sovereignty",
+      "statement": "Observability evidence does not make infrastructure authority sovereign.",
+      "continuity": "stable"
+    },
+    {
+      "assumption_id": "undeclared_surface_null",
+      "statement": "Undeclared root mutation surface yields containment evidence and merge legitimacy NULL.",
+      "continuity": "fail_closed"
+    },
+    {
+      "assumption_id": "workflow_dispatch_trigger_only",
+      "statement": "workflow_dispatch is observed as trigger-only and does not inspect secrets or authorize execution.",
+      "continuity": "stable"
+    },
+    {
+      "assumption_id": "deployment_token_observability_only",
+      "statement": "Deployment token authority is classified by surface metadata only; secret values are never inspected or persisted.",
+      "continuity": "fail_closed"
+    },
+    {
+      "assumption_id": "federation_root_runtime_containment_required",
+      "statement": "Federation and root runtime authority assumptions require containment and grant no inherited remote authority.",
+      "continuity": "fail_closed"
+    }
   ],
   "replay_neutral": true,
   "evidence_only": true

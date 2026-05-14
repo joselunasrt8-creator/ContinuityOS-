@@ -222,3 +222,30 @@ test('merge governance root authority rules invalidate legitimacy but never auth
   assert.equal(governance.root_authority_containment.may_authorize_merge, false)
   assert.equal(governance.root_authority_containment.secret_values_inspected, false)
 })
+
+test('expanded root authority closure preserves containment semantics without secret inspection', () => {
+  const envelope = buildRootAuthorityContainmentEnvelope()
+  const byId = new Map(envelope.inventory.surfaces.map((surface) => [surface.surface_id, surface]))
+  for (const surfaceId of [
+    'cloudflare_deployment_token_authority',
+    'wrangler_local_deploy_authority',
+    'github_actions_token_authority',
+    'github_workflow_file_mutation',
+    'repository_secret_mutation_authority',
+    'root_runtime_authority_assumption',
+  ]) assert.ok(byId.has(surfaceId), `missing expanded root authority surface ${surfaceId}`)
+
+  assert.ok(byId.get('cloudflare_deployment_token_authority').classifications.includes('ROOT_DEPLOY_AUTHORITY'))
+  assert.equal(byId.get('cloudflare_deployment_token_authority').deployment_token_observability, 'OBSERVABILITY_ONLY_NO_SECRET_INSPECTION')
+  assert.equal(byId.get('cloudflare_deployment_token_authority').observed_secret_material, 'NOT_INSPECTED')
+  assert.equal(byId.get('github_actions_workflow_dispatch').workflow_dispatch_semantics, 'TRIGGER_ONLY')
+  assert.ok(byId.get('repository_secret_mutation_authority').classifications.includes('ROOT_ENVIRONMENT_AUTHORITY'))
+  assert.ok(byId.get('wrangler_local_deploy_authority').classifications.includes('ROOT_AUTHORITY_BYPASS_RISK'))
+  assert.ok(byId.get('root_runtime_authority_assumption').classifications.includes('ROOT_FEDERATION_AUTHORITY'))
+  assert.equal(envelope.containment_status, 'ROOT_AUTHORITY_CONTAINMENT_REQUIRED')
+  assert.ok(envelope.declared_root_surfaces.includes('cloudflare_deployment_token_authority'))
+  assert.deepEqual(envelope.undeclared_root_surfaces, [])
+  assert.ok(envelope.drift_classes.includes('ROOT_AUTHORITY_BYPASS_RISK'))
+  assert.equal(envelope.secret_values_inspected, false)
+  assert.equal(envelope.secret_material_persisted, false)
+})
