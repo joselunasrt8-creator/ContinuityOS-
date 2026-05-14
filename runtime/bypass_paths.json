@@ -29,6 +29,46 @@
       "bypass_id": "raw_database_write",
       "risk": "state mutation without validation",
       "required_response": "NULL"
+    },
+    {
+      "path": "undeclared_mutation_surface",
+      "bypass_id": "undeclared_mutation_surface",
+      "risk": "mutation-capable path absent from canonical closure inventory",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+    },
+    {
+      "path": "unbound_database_write",
+      "bypass_id": "unbound_database_write",
+      "risk": "database write absent from mutation surface inventory",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+    },
+    {
+      "path": "observability_mutation_escalation",
+      "bypass_id": "observability_mutation_escalation",
+      "risk": "GET-only observability route becomes executable or authoritative",
+      "required_response": "OBSERVABILITY_MUTATION_ESCALATION -> NULL"
     }
-  ]
+  ],
+  "closure_verification": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "missing_mutation_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "drift_taxonomy": [
+      "UNDECLARED_MUTATION_SURFACE",
+      "UNCLASSIFIED_EXECUTION_SURFACE",
+      "UNBOUND_DATABASE_WRITE",
+      "UNBOUND_DEPLOYMENT_SURFACE",
+      "OBSERVABILITY_MUTATION_ESCALATION",
+      "GOVERNANCE_MUTATION_WITHOUT_SCO",
+      "AGENT_TOOL_MUTATION_UNCLASSIFIED",
+      "EXTERNAL_API_MUTATION_UNCLASSIFIED",
+      "RECONCILIATION_MUTATION_ESCAPE",
+      "PROOFLESS_MUTATION_PATH",
+      "AUTHORITYLESS_MUTATION_PATH",
+      "CLOSURE_INCOMPLETE"
+    ],
+    "evidence_only": true,
+    "non_authoritative": true
+  }
 }

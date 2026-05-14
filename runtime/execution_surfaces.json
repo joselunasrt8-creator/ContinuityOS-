@@ -56,6 +56,45 @@
       "required_path": "/validate -> /execute -> /proof",
       "proof_type": "execution_receipt",
       "risk_class": "P3"
+    },
+    {
+      "surface_id": "runtime_closure_inventory",
+      "type": "observability",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
+      "surface_id": "database_write_surface_inventory",
+      "type": "database",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
+      "surface_id": "workflow_package_deploy_inventory",
+      "type": "ci_cd",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
     }
-  ]
+  ],
+  "closure_verification": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+    "unclassified_mutation_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "evidence_only": true,
+    "non_authoritative": true
+  }
 }

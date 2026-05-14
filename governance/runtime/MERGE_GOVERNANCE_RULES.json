@@ -139,5 +139,18 @@
       "ROOT_AUTHORITY_BYPASS_RISK",
       "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
     ]
+  },
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "canonical_invariant": "If no valid object exists -> nothing happens.",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+    "closure_condition": "No unauthorized reality mutation path exists.",
+    "undeclared_mutation_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "merge_legitimacy": "UNCHANGED",
+    "evidence_only": true,
+    "non_authoritative": true,
+    "replay_neutral": true
   }
 }

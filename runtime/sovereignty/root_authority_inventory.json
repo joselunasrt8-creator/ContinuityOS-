@@ -272,5 +272,16 @@
   "containment_status": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
   "drift_classes": [
     "ROOT_AUTHORITY_BYPASS_RISK"
-  ]
+  ],
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "classification_authorizes_execution": false,
+    "classification_authorizes_merge": false,
+    "secret_values_inspected": false,
+    "evidence_only": true,
+    "non_authoritative": true,
+    "missing_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+  }
 }
