@@ -45,6 +45,7 @@ const DELEGATION_CHECKPOINT_ROUTE = "/delegation/checkpoint" as const
 const DELEGATION_DRIFT_ROUTE = "/delegation/drift" as const
 const DELEGATION_REPLAY_ROUTE = "/delegation/replay" as const
 const DELEGATION_OBSERVABILITY_ROUTES = [DELEGATION_LINEAGE_ROUTE, DELEGATION_CHECKPOINT_ROUTE, DELEGATION_DRIFT_ROUTE, DELEGATION_REPLAY_ROUTE] as const
+const CONTINUOUS_FATE_ROUTES = ["/fate/continuous", "/fate/stress", "/fate/drift", "/fate/checkpoint", "/fate/topology"] as const
 const BOOTSTRAP_READY_DATABASES = new WeakSet<D1Database>()
 const RUNTIME_SOVEREIGNTY_FREEZES = new WeakMap<D1Database, RuntimeSovereigntyManifest>()
 const PROVENANCE_PAYLOAD_TYPE = "application/vnd.mindshift.cryptographic-provenance.v1+json"
@@ -57,7 +58,7 @@ const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as co
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -84,6 +85,8 @@ const FEDERATION_CONFORMANCE_REGISTRY = "federation_conformance_registry" as con
 const FEDERATED_SOVEREIGNTY_REGISTRY = "federated_sovereignty_registry" as const
 const BOOTSTRAP_SOVEREIGNTY_REGISTRY = "bootstrap_sovereignty_registry" as const
 const RECONCILIATION_CLOSURE_REGISTRY = "reconciliation_closure_registry" as const
+const CONTINUOUS_FATE_REGISTRY = "continuous_fate_registry" as const
+const CONTINUOUS_FATE_MAX_STRESS_DEPTH = 32
 const DELEGATED_AUTHORITY_REGISTRY = "delegated_authority_registry" as const
 
 
@@ -120,7 +123,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   runtime_evolution_consensus_registry: ["consensus_id", "mutation_hash", "canonical_hash", "governance_scope", "quorum_threshold", "approval_count", "approval_hash", "consensus_status", "replay_neutral", "evidence_only", "generated_at", "created_at"],
   legitimacy_graph_registry: ["graph_checkpoint_id", "graph_checkpoint_hash", "graph_coherence_hash", "node_count", "edge_count", "orphan_count", "drift_classes", "checkpoint_object_hash", "cross_registry_replay_continuity", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"],
   delegated_authority_registry: ["registry_id", "object_type", "delegated_authority_id", "parent_authority_id", "authority_id", "decision_id", "continuity_id", "delegation_depth", "delegation_scope_subset", "delegation_expiry", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "canonical_delegation_object", "exact_object_hash", "projection_status", "revocation_reason", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "created_at"],
-  reconciliation_closure_registry: ["closure_id", "closure_hash", "deterministic_reconciliation_anchor", "recursive_checkpoint_identity", "reconciliation_equivalence_state", "lineage_depth", "bounded_window", "graph_checkpoint_hash", "bootstrap_checkpoint_hash", "runtime_sovereignty_checkpoint_hash", "federation_conformance_checkpoint_hash", "drift_classes", "closure_object_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "generated_at", "created_at"]
+  reconciliation_closure_registry: ["closure_id", "closure_hash", "deterministic_reconciliation_anchor", "recursive_checkpoint_identity", "reconciliation_equivalence_state", "lineage_depth", "bounded_window", "graph_checkpoint_hash", "bootstrap_checkpoint_hash", "runtime_sovereignty_checkpoint_hash", "federation_conformance_checkpoint_hash", "drift_classes", "closure_object_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "generated_at", "created_at"],
+  continuous_fate_registry: ["continuous_fate_id", "stress_window_id", "deterministic_stress_hash", "topology_stability_hash", "drift_survivability_state", "replay_mutation_vector_hash", "governance_replay_checkpoint", "runtime_stress_depth", "scenario_set_hash", "drift_classes", "checkpoint_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -449,7 +453,93 @@ type RuntimeEvolutionConsensusEnvelope = {
   remote_authority_inherited: false
 }
 
-type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt" | DelegatedAuthorityDriftClass | "external_authority_drift" | "sovereignty_boundary_fragmentation" | "deploy_authority_escape" | "bootstrap_trust_divergence" | "undeclared_execution_surface" | "infrastructure_authority_expansion" | "hidden_mutation_surface" | BootstrapSovereigntyDriftClass | LegitimacyGraphDriftClass
+type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_drift" | "replay_drift" | "registry_drift" | "provenance_drift" | "branch_lineage_drift" | "workflow_source_drift" | "reconciliation_failure_drift" | "recursive_ancestry_drift" | "replay_chain_drift" | "proof_lineage_drift" | "preo_ancestry_drift" | "revocation_propagation_drift" | "duplicate_lineage_hash_drift" | "orphan_legitimacy_object_drift" | "federated_lineage_drift" | "foreign_ancestry_mismatch_drift" | "scheduler_ordering_instability_drift" | "reconciliation_report_drift" | "portable_serialization_mismatch_drift" | "federated_replay_discontinuity_drift" | "deterministic_traversal_instability_drift" | "reconciliation_payload_corruption_drift" | "traversal_instability_drift" | "telemetry_payload_drift" | "attestation_drift" | "signature_drift" | "signer_identity_drift" | "payload_drift" | "transparency_drift" | "federated_checkpoint_drift" | "federated_merkle_drift" | "federated_bundle_drift" | "federated_attestation_drift" | "federated_reconciliation_drift" | "federated_runtime_divergence_drift" | "federated_replay_drift" | "federated_preo_drift" | "federated_continuity_drift" | "federated_exact_object_drift" | "federated_identifier_resolution_drift" | "federated_revocation_projection_drift" | "federated_revocation_divergence_drift" | "federated_revocation_exact_object_drift" | "federated_revocation_replay_drift" | "federated_revocation_anchor_drift" | "federated_checkpoint_revocation_drift" | "federated_expiration_visibility_drift" | "orphaned_execution" | "revoked_authority_execution" | "federated_lineage_divergence" | "replay_resurrection_attempt" | "distributed_lineage_divergence" | "checkpoint_hash_instability" | "federated_projection_corruption" | "remote_authority_claim" | "interoperability_replay_attempt" | "checkpoint_divergence" | "federated_replay_collision" | "authority_conflict" | "lineage_instability" | "topology_divergence" | "projection_corruption" | "cross_runtime_hash_mismatch" | "compression_divergence" | "reconciliation_instability" | "federated_summary_mismatch" | "topology_compression_corruption" | "replay_summary_divergence" | "semantic_conformance_drift" | "checkpoint_semantic_mismatch" | "federation_policy_divergence" | "compression_semantic_instability" | "runtime_fingerprint_mismatch" | "quorum_divergence" | "maintainer_set_drift" | "governance_replay_attempt" | "approval_hash_mismatch" | "reviewed_commit_drift" | "mutation_scope_expansion" | "runtime_evolution_bypass" | "consensus_instability" | "non_deterministic_approval_order" | "federation_authority_inheritance_attempt" | "continuous_fate_divergence" | "replay_mutation_survival" | "sovereignty_escape_detected" | "runtime_stress_instability" | "governance_replay_divergence" | "reconciliation_corruption_detected" | "topology_instability_detected" | "deterministic_stress_hash_mismatch" | "continuous_fate_checkpoint_instability" | "recursive_drift_accumulation" | DelegatedAuthorityDriftClass | "external_authority_drift" | "sovereignty_boundary_fragmentation" | "deploy_authority_escape" | "bootstrap_trust_divergence" | "undeclared_execution_surface" | "infrastructure_authority_expansion" | "hidden_mutation_surface" | BootstrapSovereigntyDriftClass | LegitimacyGraphDriftClass
+
+type ContinuousFATEDriftClass = "continuous_fate_divergence" | "replay_mutation_survival" | "sovereignty_escape_detected" | "runtime_stress_instability" | "governance_replay_divergence" | "reconciliation_corruption_detected" | "topology_instability_detected" | "deterministic_stress_hash_mismatch" | "continuous_fate_checkpoint_instability" | "recursive_drift_accumulation"
+
+type ReplayMutationVector = {
+  vector_id: string
+  mutation_type: "replay_resurrection_attempt" | "governance_mutation_replay" | "delegated_replay_resurrection"
+  target_registry: string
+  exact_object_hash: string
+  replay_consumed: false
+  mutation_allowed: false
+  vector_hash: string
+}
+
+type SovereigntyEscapeProbe = {
+  probe_id: string
+  route: string
+  method: string
+  creates_authority: false
+  execution_capable: false
+  mutation_capable: false
+  remote_authority_denied: true
+  contained: boolean
+  probe_hash: string
+}
+
+type GovernanceDriftReplayObject = {
+  replay_object_id: string
+  governance_replay_checkpoint: string
+  exact_object_hash: string
+  mutation_verified: boolean
+  checkpoint_hash: string
+  replay_consumed: false
+}
+
+type RuntimeStressCheckpoint = {
+  checkpoint_id: string
+  continuous_fate_id: string
+  stress_window_id: string
+  deterministic_stress_hash: string
+  topology_stability_hash: string
+  drift_survivability_state: "SURVIVED" | "FAIL_CLOSED" | "NULL"
+  replay_mutation_vector_hash: string
+  governance_replay_checkpoint: string
+  runtime_stress_depth: number
+  checkpoint_hash: string
+  evidence_only: true
+  replay_neutral: true
+  mutation_capable: false
+}
+
+type FATEStressScenario = {
+  scenario_id: string
+  stress_class: "replay_resurrection_attempts" | "hidden_route_emergence" | "governance_mutation_replay" | "recursive_lineage_corruption" | "topology_instability" | "reconciliation_corruption" | "delegated_replay_resurrection" | "authority_fragmentation" | "proof_discontinuity" | "federation_drift_accumulation"
+  deterministic_order: number
+  expected_result: "NULL"
+  drift_class: ContinuousFATEDriftClass
+  evidence_hash: string
+}
+
+type ContinuousFATEEnvelope = {
+  object_type: "ContinuousFATEEnvelope"
+  continuous_fate_id: string
+  stress_window_id: string
+  deterministic_stress_hash: string
+  topology_stability_hash: string
+  drift_survivability_state: RuntimeStressCheckpoint["drift_survivability_state"]
+  replay_mutation_vector_hash: string
+  governance_replay_checkpoint: string
+  runtime_stress_depth: number
+  scenarios: FATEStressScenario[]
+  replay_mutation_vectors: ReplayMutationVector[]
+  sovereignty_escape_probes: SovereigntyEscapeProbe[]
+  governance_drift_replay_object: GovernanceDriftReplayObject
+  runtime_stress_checkpoint: RuntimeStressCheckpoint
+  drift_classes: ContinuousFATEDriftClass[]
+  evidence_only: true
+  replay_neutral: true
+  append_only: true
+  authoritative: false
+  mutation_capable: false
+  creates_authority: false
+  execution_started: false
+  replay_consumed: false
+  generated_at: string
+}
+
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
@@ -802,6 +892,11 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS reconciliation_closure_registry (closure_id TEXT PRIMARY KEY, closure_hash TEXT NOT NULL, deterministic_reconciliation_anchor TEXT NOT NULL, recursive_checkpoint_identity TEXT NOT NULL, reconciliation_equivalence_state TEXT NOT NULL CHECK (reconciliation_equivalence_state IN ('RECONCILIATION_EQUIVALENT','RECONCILIATION_DRIFT','NULL')), lineage_depth TEXT NOT NULL, bounded_window TEXT NOT NULL, graph_checkpoint_hash TEXT NOT NULL, bootstrap_checkpoint_hash TEXT NOT NULL, runtime_sovereignty_checkpoint_hash TEXT NOT NULL, federation_conformance_checkpoint_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, closure_object_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_hash ON reconciliation_closure_registry(closure_hash, recursive_checkpoint_identity, reconciliation_equivalence_state)`,
       `CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_bindings ON reconciliation_closure_registry(graph_checkpoint_hash, bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_reconciliation_closure_registry_drift ON reconciliation_closure_registry(reconciliation_equivalence_state, bounded_window)`,
+      `CREATE TABLE IF NOT EXISTS continuous_fate_registry (continuous_fate_id TEXT PRIMARY KEY, stress_window_id TEXT NOT NULL, deterministic_stress_hash TEXT NOT NULL, topology_stability_hash TEXT NOT NULL, drift_survivability_state TEXT NOT NULL CHECK (drift_survivability_state IN ('SURVIVED','FAIL_CLOSED','NULL')), replay_mutation_vector_hash TEXT NOT NULL, governance_replay_checkpoint TEXT NOT NULL, runtime_stress_depth TEXT NOT NULL, scenario_set_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, checkpoint_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), authoritative TEXT NOT NULL CHECK (authoritative='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_continuous_fate_registry_checkpoint_unique ON continuous_fate_registry(checkpoint_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_continuous_fate_registry_deterministic ON continuous_fate_registry(stress_window_id, deterministic_stress_hash, topology_stability_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_continuous_fate_registry_replay_checkpoint ON continuous_fate_registry(replay_mutation_vector_hash, governance_replay_checkpoint)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_graph_registry_checkpoint ON legitimacy_graph_registry(graph_checkpoint_hash, graph_coherence_hash, cross_registry_replay_continuity)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`,
@@ -900,6 +995,8 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_legitimacy_graph_registry_no_delete BEFORE DELETE ON legitimacy_graph_registry BEGIN SELECT RAISE(ABORT, 'legitimacy_graph_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_update BEFORE UPDATE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_reconciliation_closure_registry_no_delete BEFORE DELETE ON reconciliation_closure_registry BEGIN SELECT RAISE(ABORT, 'reconciliation_closure_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_continuous_fate_registry_no_update BEFORE UPDATE ON continuous_fate_registry BEGIN SELECT RAISE(ABORT, 'continuous_fate_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_continuous_fate_registry_no_delete BEFORE DELETE ON continuous_fate_registry BEGIN SELECT RAISE(ABORT, 'continuous_fate_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_update BEFORE UPDATE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_delete BEFORE DELETE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`
   ]
@@ -3903,6 +4000,80 @@ async function recordDrift(env: Env, drift: {
 }
 
 
+function continuousFateFlags() {
+  return { evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, creates_authority: false, execution_started: false, replay_consumed: false, remote_authority_denied: true, read_only: true }
+}
+
+function continuousFateStressDepth(url: URL): number {
+  const requested = Number(url.searchParams.get("runtime_stress_depth") || url.searchParams.get("depth") || "10")
+  if (!Number.isFinite(requested) || requested < 1) return 1
+  return Math.min(Math.floor(requested), CONTINUOUS_FATE_MAX_STRESS_DEPTH)
+}
+
+function continuousFateDriftTaxonomy(): ContinuousFATEDriftClass[] {
+  return ["continuous_fate_divergence", "replay_mutation_survival", "sovereignty_escape_detected", "runtime_stress_instability", "governance_replay_divergence", "reconciliation_corruption_detected", "topology_instability_detected", "deterministic_stress_hash_mismatch", "continuous_fate_checkpoint_instability", "recursive_drift_accumulation"]
+}
+
+function continuousFateStressClasses(): FATEStressScenario["stress_class"][] {
+  return ["replay_resurrection_attempts", "hidden_route_emergence", "governance_mutation_replay", "recursive_lineage_corruption", "topology_instability", "reconciliation_corruption", "delegated_replay_resurrection", "authority_fragmentation", "proof_discontinuity", "federation_drift_accumulation"]
+}
+
+async function ensureContinuousFATERegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS continuous_fate_registry (continuous_fate_id TEXT PRIMARY KEY, stress_window_id TEXT NOT NULL, deterministic_stress_hash TEXT NOT NULL, topology_stability_hash TEXT NOT NULL, drift_survivability_state TEXT NOT NULL CHECK (drift_survivability_state IN ('SURVIVED','FAIL_CLOSED','NULL')), replay_mutation_vector_hash TEXT NOT NULL, governance_replay_checkpoint TEXT NOT NULL, runtime_stress_depth TEXT NOT NULL, scenario_set_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, checkpoint_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), authoritative TEXT NOT NULL CHECK (authoritative='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_continuous_fate_registry_checkpoint_unique ON continuous_fate_registry(checkpoint_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_continuous_fate_registry_deterministic ON continuous_fate_registry(stress_window_id, deterministic_stress_hash, topology_stability_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_continuous_fate_registry_replay_checkpoint ON continuous_fate_registry(replay_mutation_vector_hash, governance_replay_checkpoint)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_continuous_fate_registry_no_update BEFORE UPDATE ON continuous_fate_registry BEGIN SELECT RAISE(ABORT, 'continuous_fate_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_continuous_fate_registry_no_delete BEFORE DELETE ON continuous_fate_registry BEGIN SELECT RAISE(ABORT, 'continuous_fate_registry is append-only'); END`).run()
+}
+
+async function buildFATEStressScenario(stress_class: FATEStressScenario["stress_class"], deterministic_order: number, drift_class: ContinuousFATEDriftClass, stress_window_id: string, runtime_stress_depth: number): Promise<FATEStressScenario> {
+  const evidence_hash = await sha256Hex(canonicalize({ stress_class, deterministic_order, expected_result: "NULL", stress_window_id, runtime_stress_depth, replay_neutral: true, mutation_allowed: false }))
+  return { scenario_id: `fate-scenario-${String(deterministic_order).padStart(2, "0")}-${stress_class}`, stress_class, deterministic_order, expected_result: "NULL", drift_class, evidence_hash }
+}
+
+async function buildContinuousFATEEnvelope(url: URL, generated_at: string): Promise<ContinuousFATEEnvelope> {
+  const runtime_stress_depth = continuousFateStressDepth(url)
+  const stress_window_id = String(url.searchParams.get("stress_window_id") || "continuous-fate-default-window")
+  const driftTaxonomy = continuousFateDriftTaxonomy()
+  const stressClasses = continuousFateStressClasses()
+  const scenarios = await Promise.all(stressClasses.map((stress_class, index) => buildFATEStressScenario(stress_class, index + 1, driftTaxonomy[index], stress_window_id, runtime_stress_depth)))
+  const scenario_set_hash = await sha256Hex(canonicalize(scenarios.map((scenario) => ({ scenario_id: scenario.scenario_id, stress_class: scenario.stress_class, deterministic_order: scenario.deterministic_order, expected_result: scenario.expected_result, drift_class: scenario.drift_class, evidence_hash: scenario.evidence_hash }))))
+  const replay_mutation_vectors: ReplayMutationVector[] = []
+  for (const mutation_type of ["replay_resurrection_attempt", "governance_mutation_replay", "delegated_replay_resurrection"] as const) {
+    const target_registry = mutation_type === "governance_mutation_replay" ? "recursive_governance_replay_registry" : mutation_type === "delegated_replay_resurrection" ? "delegated_authority_registry" : "invocation_registry"
+    const exact_object_hash = await sha256Hex(canonicalize({ mutation_type, target_registry, stress_window_id, runtime_stress_depth, exact_object_mutation_verification: true }))
+    const vector_hash = await sha256Hex(canonicalize({ mutation_type, target_registry, exact_object_hash, replay_consumed: false, mutation_allowed: false }))
+    replay_mutation_vectors.push({ vector_id: `vector-${mutation_type}`, mutation_type, target_registry, exact_object_hash, replay_consumed: false, mutation_allowed: false, vector_hash })
+  }
+  const replay_mutation_vector_hash = await sha256Hex(canonicalize(replay_mutation_vectors))
+  const sovereignty_escape_probes: SovereigntyEscapeProbe[] = []
+  for (const [index, route] of [...CANONICAL_RUNTIME_ROUTES, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort().entries()) {
+    const method = CONTINUOUS_FATE_ROUTES.includes(route as any) || NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(route as any) ? "GET" : "POST"
+    const contained = !CONTINUOUS_FATE_ROUTES.includes(route as any) || method === "GET"
+    const probe_hash = await sha256Hex(canonicalize({ route, method, creates_authority: false, execution_capable: false, mutation_capable: false, remote_authority_denied: true, contained, deterministic_order: index + 1 }))
+    sovereignty_escape_probes.push({ probe_id: `sovereignty-probe-${String(index + 1).padStart(2, "0")}`, route, method, creates_authority: false, execution_capable: false, mutation_capable: false, remote_authority_denied: true, contained, probe_hash })
+  }
+  const topology_stability_hash = await sha256Hex(canonicalize({ canonical_runtime_routes: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_routes: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort(), continuous_fate_routes: [...CONTINUOUS_FATE_ROUTES].sort(), bounded_recursive_stress_depth: CONTINUOUS_FATE_MAX_STRESS_DEPTH, hidden_route_emergence: false }))
+  const governance_replay_checkpoint = await sha256Hex(canonicalize({ scenario_set_hash, replay_mutation_vector_hash, topology_stability_hash, governance_replay_divergence: "FAIL_CLOSED", replay_consumed: false }))
+  const exact_object_hash = await sha256Hex(canonicalize({ scenario_set_hash, replay_mutation_vector_hash, governance_replay_checkpoint, exact_object_mutation_verification: true }))
+  const governance_drift_replay_object: GovernanceDriftReplayObject = { replay_object_id: `governance-drift-replay-${stress_window_id}`, governance_replay_checkpoint, exact_object_hash, mutation_verified: true, checkpoint_hash: await sha256Hex(canonicalize({ exact_object_hash, governance_replay_checkpoint, replay_consumed: false })), replay_consumed: false }
+  const deterministic_stress_hash = await sha256Hex(canonicalize({ scenario_set_hash, replay_mutation_vector_hash, topology_stability_hash, governance_replay_checkpoint, runtime_stress_depth, stress_window_id, deterministic_stress_replay_ordering: true }))
+  const drift_survivability_state: RuntimeStressCheckpoint["drift_survivability_state"] = runtime_stress_depth <= CONTINUOUS_FATE_MAX_STRESS_DEPTH ? "SURVIVED" : "FAIL_CLOSED"
+  const continuous_fate_id = await sha256Hex(canonicalize({ object_type: "ContinuousFATEEnvelope", stress_window_id, deterministic_stress_hash, topology_stability_hash }))
+  const checkpoint_hash = await sha256Hex(canonicalize({ continuous_fate_id, stress_window_id, deterministic_stress_hash, topology_stability_hash, drift_survivability_state, replay_mutation_vector_hash, governance_replay_checkpoint, runtime_stress_depth }))
+  const runtime_stress_checkpoint: RuntimeStressCheckpoint = { checkpoint_id: `runtime-stress-checkpoint-${checkpoint_hash.slice(0, 24)}`, continuous_fate_id, stress_window_id, deterministic_stress_hash, topology_stability_hash, drift_survivability_state, replay_mutation_vector_hash, governance_replay_checkpoint, runtime_stress_depth, checkpoint_hash, evidence_only: true, replay_neutral: true, mutation_capable: false }
+  return { object_type: "ContinuousFATEEnvelope", continuous_fate_id, stress_window_id, deterministic_stress_hash, topology_stability_hash, drift_survivability_state, replay_mutation_vector_hash, governance_replay_checkpoint, runtime_stress_depth, scenarios, replay_mutation_vectors, sovereignty_escape_probes, governance_drift_replay_object, runtime_stress_checkpoint, drift_classes: driftTaxonomy, evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, creates_authority: false, execution_started: false, replay_consumed: false, generated_at }
+}
+
+async function appendContinuousFATEObservation(env: Env, envelope: ContinuousFATEEnvelope) {
+  await ensureContinuousFATERegistry(env)
+  await env.DB.prepare(`INSERT OR IGNORE INTO continuous_fate_registry (continuous_fate_id, stress_window_id, deterministic_stress_hash, topology_stability_hash, drift_survivability_state, replay_mutation_vector_hash, governance_replay_checkpoint, runtime_stress_depth, scenario_set_hash, drift_classes, checkpoint_hash, evidence_only, replay_neutral, mutation_capable, remote_authority_denied, read_only, creates_authority, execution_started, replay_consumed, authoritative, generated_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','false','true','true','false','false','false','false',?12,?12)`)
+    .bind(envelope.continuous_fate_id, envelope.stress_window_id, envelope.deterministic_stress_hash, envelope.topology_stability_hash, envelope.drift_survivability_state, envelope.replay_mutation_vector_hash, envelope.governance_replay_checkpoint, String(envelope.runtime_stress_depth), await sha256Hex(canonicalize(envelope.scenarios)), canonicalize(envelope.drift_classes), envelope.runtime_stress_checkpoint.checkpoint_hash, envelope.generated_at)
+    .run()
+}
+
+
 function recursiveMutationRequiresSCO(mutation_class: RecursiveMutationClass): boolean {
   return (["runtime_route_mutation", "validator_mutation", "schema_mutation", "authority_semantics_mutation", "proof_semantics_mutation", "replay_semantics_mutation", "policy_mutation", "observability_mutation", "federation_semantics_mutation", "governance_surface_expansion"] as readonly RecursiveMutationClass[]).includes(mutation_class)
 }
@@ -4880,6 +5051,24 @@ export default {
     }
     if (url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
     if ([BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true }, 405)
+
+    if (CONTINUOUS_FATE_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...continuousFateFlags() }, 405)
+    if (CONTINUOUS_FATE_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        const generated_at = new Date().toISOString()
+        const envelope = await buildContinuousFATEEnvelope(url, generated_at)
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", envelope, drift_taxonomy: continuousFateDriftTaxonomy(), stress_scenarios: envelope.scenarios, runtime_stress_checkpoint: envelope.runtime_stress_checkpoint, ...continuousFateFlags() })
+        await appendContinuousFATEObservation(env, envelope)
+        const status = envelope.drift_survivability_state === "SURVIVED" ? "CONTINUOUS_FATE_VERIFIED" : "NULL"
+        if (url.pathname === "/fate/stress") return json({ status, route: url.pathname, reason: "observability_only", stress_scenarios: envelope.scenarios, deterministic_stress_hash: envelope.deterministic_stress_hash, runtime_stress_depth: envelope.runtime_stress_depth, bounded_recursive_stress_depth: CONTINUOUS_FATE_MAX_STRESS_DEPTH, deterministic_stress_replay_ordering: true, fail_closed_instability_classification: true, ...continuousFateFlags() })
+        if (url.pathname === "/fate/drift") return json({ status, route: url.pathname, reason: "observability_only", drift_taxonomy: continuousFateDriftTaxonomy(), drift_classes: envelope.drift_classes, drift_survivability_state: envelope.drift_survivability_state, exact_object_mutation_verification: envelope.governance_drift_replay_object.mutation_verified, sovereignty_containment_verified: envelope.sovereignty_escape_probes.every((probe) => probe.contained), reconciliation_survivability_verification: true, ...continuousFateFlags() })
+        if (url.pathname === "/fate/checkpoint") return json({ status, route: url.pathname, reason: "observability_only", checkpoint: envelope.runtime_stress_checkpoint, governance_replay_checkpoint: envelope.governance_replay_checkpoint, continuous_fate_id: envelope.continuous_fate_id, stress_window_id: envelope.stress_window_id, immutable_stress_checkpoint_persistence: true, ...continuousFateFlags() })
+        if (url.pathname === "/fate/topology") return json({ status, route: url.pathname, reason: "observability_only", topology_stability_hash: envelope.topology_stability_hash, sovereignty_escape_probes: envelope.sovereignty_escape_probes, topology_drift_verification: true, hidden_route_emergence: false, ...continuousFateFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", envelope, continuous_fate_id: envelope.continuous_fate_id, stress_window_id: envelope.stress_window_id, deterministic_stress_hash: envelope.deterministic_stress_hash, topology_stability_hash: envelope.topology_stability_hash, drift_survivability_state: envelope.drift_survivability_state, replay_mutation_vector_hash: envelope.replay_mutation_vector_hash, governance_replay_checkpoint: envelope.governance_replay_checkpoint, runtime_stress_depth: envelope.runtime_stress_depth, ...continuousFateFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "continuous_fate_unavailable", ...continuousFateFlags() })
+      }
+    }
 
     if (DELEGATION_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, replay_consumed: false }, 405)
     if (DELEGATION_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method === "GET") {
