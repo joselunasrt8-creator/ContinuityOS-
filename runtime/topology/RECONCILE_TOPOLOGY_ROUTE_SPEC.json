@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "classification": "reconcile_topology_route_specification",
+  "status": "non_operative_specification",
+  "route": "/reconcile/topology",
+  "method": "GET",
+  "mode": "read_only",
+  "core_invariant": "Topology reconciliation observes governance drift; it does not grant authority or mutate runtime state.",
+  "inputs": [
+    "runtime_discovered_topology",
+    "canonical_governance_topology",
+    "topology_registry_latest_hashes"
+  ],
+  "outputs": [
+    "TOPOLOGY_MATCH",
+    "TOPOLOGY_DRIFT",
+    "UNKNOWN_SURFACE",
+    "MISSING_SURFACE",
+    "NULL"
+  ],
+  "drift_classes": [
+    "undeclared_mutation_surface",
+    "missing_declared_surface",
+    "authority_surface_mismatch",
+    "bypass_path_mismatch",
+    "trust_boundary_mismatch",
+    "federation_authority_inheritance",
+    "policy_graph_mismatch",
+    "runtime_graph_hash_mismatch"
+  ],
+  "forbidden_behavior": [
+    "runtime_state_mutation",
+    "authority_creation",
+    "proof_creation",
+    "execution_triggering",
+    "remote_authority_inheritance"
+  ],
+  "failure_mode": "NULL"
+}
