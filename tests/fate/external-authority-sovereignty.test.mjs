@@ -94,3 +94,45 @@ test('external authority route fails closed for undeclared surfaces, deploy esca
     assert.ok(observed.drift_classes.includes(drift), `${label} must include ${drift}`)
   }
 })
+
+
+test('GET /runtime/sovereignty/infrastructure-reconciliation deterministically reconciles classified dependencies without authority', async () => {
+  const runtime = await worker()
+  const db = new D1()
+  const response = await runtime.fetch(new Request('https://runtime.test/runtime/sovereignty/infrastructure-reconciliation'), { DB: db })
+  const observed = await response.json()
+
+  assert.equal(observed.status, 'INFRASTRUCTURE_DEPENDENCY_RECONCILED')
+  assert.equal(observed.evidence_only, true)
+  assert.equal(observed.read_only, true)
+  assert.equal(observed.mutation_capable, false)
+  assert.equal(observed.replay_neutral, true)
+  assert.equal(observed.authoritative, false)
+  assert.equal(observed.creates_authority, false)
+  assert.equal(observed.bypass_governance, false)
+  assert.equal(observed.append_only, true)
+  assert.equal(observed.fail_closed, false)
+  assert.equal(observed.reconciliation.closure_condition, 'classified->bounded->observable->replay-neutral->sovereignty-contained')
+  assert.equal(observed.reconciliation.local_validation_supremacy, true)
+  assert.equal(observed.reconciliation.exact_object_execution_legitimacy_preserved, true)
+  assert.equal(observed.reconciliation.replay_state_consumed, false)
+  assert.equal(observed.reconciliation.authority_created, false)
+  assert.ok(observed.reconciliation.dependencies.length >= 1)
+  assert.ok(observed.reconciliation.dependencies.every((dependency) => dependency.observability_only === true && dependency.replay_neutral === true))
+  assert.ok(db.statements.some((sql) => sql.includes('INSERT OR IGNORE INTO external_authority_registry')))
+})
+
+test('infrastructure dependency reconciliation fails closed for undeclared or escaping dependency probes', async () => {
+  const runtime = await worker()
+  const observed = await (await runtime.fetch(new Request('https://runtime.test/runtime/sovereignty/infrastructure-reconciliation?surface=shadow_runner&deploy_capable=true'), { DB: new D1() })).json()
+
+  assert.equal(observed.status, 'INFRASTRUCTURE_DEPENDENCY_DRIFT')
+  assert.equal(observed.fail_closed, true)
+  assert.equal(observed.evidence_only, true)
+  assert.equal(observed.read_only, true)
+  assert.equal(observed.mutation_capable, false)
+  assert.equal(observed.replay_neutral, true)
+  assert.equal(observed.authoritative, false)
+  assert.ok(observed.drift_classes.includes('undeclared_execution_surface'))
+  assert.ok(observed.drift_classes.includes('deploy_authority_escape'))
+})
