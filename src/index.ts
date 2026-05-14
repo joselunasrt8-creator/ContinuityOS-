@@ -59,6 +59,11 @@ const RUNTIME_CONTAINMENT_ROUTES_ROUTE = "/runtime/containment/routes" as const
 const RUNTIME_CONTAINMENT_DEPLOY_ROUTE = "/runtime/containment/deploy" as const
 const RUNTIME_CONTAINMENT_DRIFT_ROUTE = "/runtime/containment/drift" as const
 const RUNTIME_CONTAINMENT_CHECKPOINT_ROUTE = "/runtime/containment/checkpoint" as const
+const ROOT_AUTHORITY_ROUTE = "/sovereignty/root-authority" as const
+const ROOT_AUTHORITY_DRIFT_ROUTE = "/sovereignty/root-authority/drift" as const
+const ROOT_AUTHORITY_BOUNDARY_ROUTE = "/sovereignty/root-authority/boundary" as const
+const ROOT_AUTHORITY_TOPOLOGY_ROUTE = "/sovereignty/root-authority/topology" as const
+const ROOT_AUTHORITY_OBSERVABILITY_ROUTES = [ROOT_AUTHORITY_ROUTE, ROOT_AUTHORITY_DRIFT_ROUTE, ROOT_AUTHORITY_BOUNDARY_ROUTE, ROOT_AUTHORITY_TOPOLOGY_ROUTE] as const
 const RUNTIME_CONTAINMENT_ROUTES = [RUNTIME_CONTAINMENT_VERIFY_ROUTE, RUNTIME_CONTAINMENT_ROUTES_ROUTE, RUNTIME_CONTAINMENT_DEPLOY_ROUTE, RUNTIME_CONTAINMENT_DRIFT_ROUTE, RUNTIME_CONTAINMENT_CHECKPOINT_ROUTE] as const
 const BOOTSTRAP_READY_DATABASES = new WeakSet<D1Database>()
 const RUNTIME_SOVEREIGNTY_FREEZES = new WeakMap<D1Database, RuntimeSovereigntyManifest>()
@@ -72,7 +77,53 @@ const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as co
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, RECONCILIATION_IMPACT_ROUTE, RECONCILIATION_VERDICT_ROUTE, RECONCILIATION_PROPAGATION_ROUTE, RECONCILIATION_TOPOLOGY_DELTA_ROUTE, RECONCILIATION_QUARANTINE_ROUTE, RECONCILIATION_CONTAINMENT_ROUTE, RECONCILIATION_ISOLATION_ROUTE, RECONCILIATION_FEDERATION_BOUNDARY_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES, ...RUNTIME_CONTAINMENT_ROUTES] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
+  ...new Set([
+    RUNTIME_SOVEREIGNTY_ROUTE,
+    RUNTIME_EVOLUTION_CONSENSUS_ROUTE,
+    GRAPH_VERIFY_ROUTE,
+    GRAPH_TOPOLOGY_ROUTE,
+    GRAPH_CHECKPOINT_ROUTE,
+    GRAPH_ORPHANS_ROUTE,
+    RECONCILIATION_CLOSURE_ROUTE,
+    RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE,
+    RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE,
+    RECONCILIATION_CLOSURE_DRIFT_ROUTE,
+    RECONCILIATION_IMPACT_ROUTE,
+    RECONCILIATION_VERDICT_ROUTE,
+    RECONCILIATION_PROPAGATION_ROUTE,
+    RECONCILIATION_TOPOLOGY_DELTA_ROUTE,
+    RECONCILIATION_QUARANTINE_ROUTE,
+    RECONCILIATION_CONTAINMENT_ROUTE,
+    RECONCILIATION_ISOLATION_ROUTE,
+    RECONCILIATION_FEDERATION_BOUNDARY_ROUTE,
+    ...DELEGATION_OBSERVABILITY_ROUTES,
+    RECURSIVE_GOVERNANCE_ROUTE,
+    RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE,
+    "/reconcile",
+    "/reconcile/schedule",
+    "/reconcile/report",
+    "/reconcile/drift",
+    "/federation/reconcile",
+    "/federation/reconcile/report",
+    "/federation/reconcile/drift",
+    "/federation/reconcile/checkpoint",
+    "/federation/reconcile/revocation",
+    "/federation/reconcile/topology",
+    "/federation/reconcile/distributed",
+    "/federation/reconcile/compression",
+    "/federation/interoperability/checkpoint",
+    "/federation/conformance",
+    "/federation/sovereignty/checkpoint",
+    EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE,
+    BOOTSTRAP_VERIFY_ROUTE,
+    BOOTSTRAP_TOPOLOGY_ROUTE,
+    BOOTSTRAP_CHECKPOINT_ROUTE,
+    ...CONTINUOUS_FATE_ROUTES,
+    ...RUNTIME_CONTAINMENT_ROUTES,
+    ...ROOT_AUTHORITY_OBSERVABILITY_ROUTES,
+  ]),
+] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -106,6 +157,7 @@ const RUNTIME_SURFACE_CONTAINMENT_REGISTRY = "runtime_surface_containment_regist
 const TOPOLOGY_RECONCILIATION_REGISTRY = "topology_reconciliation_registry" as const
 const LEGITIMACY_DRIFT_PROPAGATION_REGISTRY = "legitimacy_drift_propagation_registry" as const
 const LEGITIMACY_QUARANTINE_REGISTRY = "legitimacy_quarantine_registry" as const
+const ROOT_AUTHORITY_OBSERVABILITY_REGISTRY = "root_authority_observability_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -487,6 +539,14 @@ type DeploymentSurfaceHash = { workflow_surface_hash: string, package_surface_ha
 type RouteContainmentCheckpoint = { checkpoint_hash: string, route_surface_hash: string, hidden_surface_count: number, drift_classes: RuntimeSurfaceContainmentDriftClass[] }
 type RuntimeSurfaceContainmentObject = { object_type: "RuntimeSurfaceContainmentObject", inventory: ExecutableSurfaceInventory, mutation_surface_classification: Record<string, MutationSurfaceClassification>, deployment_surface_hash: DeploymentSurfaceHash, route_surface_hash: string, package_surface_hash: string, hidden_surface_count: number, drift_classes: RuntimeSurfaceContainmentDriftClass[], runtime_sovereignty_hash: string, containment_hash: string, generated_at: string }
 type SovereigntyContainmentEnvelope = RuntimeSurfaceContainmentObject & { envelope_type: "SovereigntyContainmentEnvelope", checkpoint: RouteContainmentCheckpoint, evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false, authoritative: false }
+
+
+type RootAuthorityClassification = "ROOT_DEPLOY_AUTHORITY" | "ROOT_REPOSITORY_AUTHORITY" | "ROOT_ENVIRONMENT_AUTHORITY" | "ROOT_WORKFLOW_AUTHORITY" | "ROOT_BRANCH_POLICY_AUTHORITY" | "ROOT_RUNTIME_CONFIGURATION_AUTHORITY" | "ROOT_FEDERATION_AUTHORITY" | "ROOT_LOCAL_EXECUTION_AUTHORITY" | "ROOT_PACKAGE_EXECUTION_AUTHORITY" | "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY" | "UNDECLARED_ROOT_SURFACE" | "SOVEREIGNTY_DRIFT_DETECTED" | "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE" | "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"
+type RootAuthoritySurface = { surface_id: string, authority_origin: string, declared_boundary: string, classifications: readonly RootAuthorityClassification[], mutation_capability_observed: boolean, declared: boolean, secret_material: "REDACTED" | "NOT_INSPECTED", executable: false, deployment_capable: false, creates_authority: false }
+type RootAuthorityInventory = { inventory_type: "RootAuthorityInventory", surfaces: readonly RootAuthoritySurface[], evidence_only: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false }
+type RootAuthorityBoundary = { boundary_type: "RootAuthorityContainmentBoundary", allowed_canonical_path: readonly string[], contained_surfaces: readonly string[], overflow_surfaces: readonly string[], merge_legitimacy: "NULL" | "UNCHANGED", preo_validity: "NULL" | "UNCHANGED", classification_authorizes: false, evidence_authorizes_merge: false, boundary_hash: string, evidence_only: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false }
+type RootAuthorityDrift = { drift_type: "RootAuthorityDrift", drift_classes: RootAuthorityClassification[], undeclared_surfaces: readonly string[], topology_hash: string, drift_hash: string, merge_legitimacy: "NULL" | "UNCHANGED", fail_closed: boolean, evidence_only: true, replay_neutral: true, non_authoritative: true, secret_material_persisted: false }
+type RootAuthorityContainmentEnvelope = { envelope_type: "RootAuthorityContainmentEnvelope", inventory: RootAuthorityInventory, topology_hash: string, boundary: RootAuthorityBoundary, drift: RootAuthorityDrift, containment_identity: string, containment_hash: string, generated_at: string, evidence_only: true, append_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false, secret_material_persisted: false, fail_closed_on_ambiguity: true }
 
 type ReplayMutationVector = {
   vector_id: string
@@ -5186,6 +5246,114 @@ async function appendRuntimeSurfaceContainmentCheckpoint(env: Env, envelope: Sov
     .run()
 }
 
+
+function rootAuthorityFlags() {
+  return { evidence_only: true as const, append_only: true as const, replay_neutral: true as const, non_authoritative: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const, secret_values_inspected: false as const, secret_material_persisted: false as const, fail_closed_on_ambiguity: true as const }
+}
+
+const ROOT_AUTHORITY_BASELINE_SURFACES = Object.freeze([
+  Object.freeze({ surface_id: "cloudflare_account_authority", authority_origin: "cloudflare_account", declared_boundary: "/session→/continuity→/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "github_admin_authority", authority_origin: "github_repository", declared_boundary: "/session→/continuity→/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "github_actions_workflow_dispatch", authority_origin: "github_actions", declared_boundary: "/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_WORKFLOW_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "github_environment_and_secrets_configuration", authority_origin: "github_environment", declared_boundary: "declared-not-inspected", classifications: ["ROOT_ENVIRONMENT_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "wrangler_deploy_capability", authority_origin: "cloudflare_wrangler", declared_boundary: "governed-deploy-workflow-only", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "package_script_deploy_guard", authority_origin: "package_scripts", declared_boundary: "disabled-direct-deploy", classifications: ["ROOT_PACKAGE_EXECUTION_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "local_deploy_credentials_presence", authority_origin: "local_environment", declared_boundary: "not-inspected-observability-only", classifications: ["ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "ci_token_permissions", authority_origin: "github_actions_token", declared_boundary: "least-privilege-assumption", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "federated_runtime_authority", authority_origin: "remote_runtime", declared_boundary: "remote-authority-denied", classifications: ["ROOT_FEDERATION_AUTHORITY"] as const })
+].sort((a, b) => a.surface_id.localeCompare(b.surface_id)))
+
+function classifyRootAuthoritySurface(surface: Partial<RootAuthoritySurface> & Record<string, unknown>): RootAuthorityClassification[] {
+  const material = `${surface.surface_id || ""} ${surface.authority_origin || ""} ${surface.declared_boundary || ""}`.toLowerCase()
+  const classes = new Set<RootAuthorityClassification>()
+  for (const c of (Array.isArray(surface.classifications) ? surface.classifications : [])) classes.add(c as RootAuthorityClassification)
+  if (/deploy|wrangler|cloudflare/.test(material)) classes.add("ROOT_DEPLOY_AUTHORITY")
+  if (/repo|github_admin|settings|admin/.test(material)) classes.add("ROOT_REPOSITORY_AUTHORITY")
+  if (/env|secret|variable|credential|token/.test(material)) classes.add("ROOT_ENVIRONMENT_AUTHORITY")
+  if (/workflow|dispatch|actions/.test(material)) classes.add("ROOT_WORKFLOW_AUTHORITY")
+  if (/branch|protection/.test(material)) classes.add("ROOT_BRANCH_POLICY_AUTHORITY")
+  if (/runtime|configuration|config/.test(material)) classes.add("ROOT_RUNTIME_CONFIGURATION_AUTHORITY")
+  if (/federat|remote/.test(material)) classes.add("ROOT_FEDERATION_AUTHORITY")
+  if (/local/.test(material)) classes.add("ROOT_LOCAL_EXECUTION_AUTHORITY")
+  if (/package|npm|script/.test(material)) classes.add("ROOT_PACKAGE_EXECUTION_AUTHORITY")
+  if (/mutation|infrastructure|account|cloudflare/.test(material)) classes.add("ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY")
+  if (surface.declared === false || material.includes("undeclared")) classes.add("UNDECLARED_ROOT_SURFACE")
+  return [...classes].sort()
+}
+
+function canonicalizeRootAuthorityInventory(input: Partial<RootAuthorityInventory> = {}): RootAuthorityInventory {
+  const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length > 0 ? input.surfaces : ROOT_AUTHORITY_BASELINE_SURFACES).map((surface: any) => Object.freeze({
+    surface_id: String(surface.surface_id || "undeclared_root_surface"),
+    authority_origin: String(surface.authority_origin || "unknown"),
+    declared_boundary: String(surface.declared_boundary || "NULL"),
+    classifications: Object.freeze(classifyRootAuthoritySurface(surface)),
+    mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
+    declared: surface.declared === false ? false : true,
+    secret_material: "NOT_INSPECTED" as const,
+    executable: false as const,
+    deployment_capable: false as const,
+    creates_authority: false as const
+  })).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
+  return Object.freeze({ inventory_type: "RootAuthorityInventory" as const, surfaces: Object.freeze(surfaces), evidence_only: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const, secret_values_inspected: false as const })
+}
+
+async function hashRootAuthorityTopology(inventory: RootAuthorityInventory): Promise<string> {
+  return sha256Hex(canonicalize({ surfaces: inventory.surfaces.map((surface) => ({ surface_id: surface.surface_id, authority_origin: surface.authority_origin, declared_boundary: surface.declared_boundary, classifications: surface.classifications, declared: surface.declared })), evidence_only: true, executable: false, deployment_capable: false, creates_authority: false }))
+}
+
+async function computeAuthorityContainmentBoundary(inventory: RootAuthorityInventory): Promise<RootAuthorityBoundary> {
+  const overflow_surfaces = inventory.surfaces.filter((surface) => !surface.declared || surface.classifications.includes("UNDECLARED_ROOT_SURFACE")).map((surface) => surface.surface_id).sort()
+  const contained_surfaces = inventory.surfaces.map((surface) => surface.surface_id).sort()
+  const material = { allowed_canonical_path: CANONICAL_RUNTIME_ROUTES, contained_surfaces, overflow_surfaces, classification_authorizes: false, evidence_authorizes_merge: false }
+  const boundary_hash = await sha256Hex(canonicalize(material))
+  return Object.freeze({ boundary_type: "RootAuthorityContainmentBoundary" as const, allowed_canonical_path: CANONICAL_RUNTIME_ROUTES, contained_surfaces: Object.freeze(contained_surfaces), overflow_surfaces: Object.freeze(overflow_surfaces), merge_legitimacy: overflow_surfaces.length > 0 ? "NULL" as const : "UNCHANGED" as const, preo_validity: overflow_surfaces.length > 0 ? "NULL" as const : "UNCHANGED" as const, classification_authorizes: false as const, evidence_authorizes_merge: false as const, boundary_hash, evidence_only: true as const, non_authoritative: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const })
+}
+
+async function detectRootAuthorityDrift(inventory: RootAuthorityInventory, topology_hash: string, boundary?: RootAuthorityBoundary): Promise<RootAuthorityDrift> {
+  const b = boundary || await computeAuthorityContainmentBoundary(inventory)
+  const drift = new Set<RootAuthorityClassification>()
+  const undeclared_surfaces = b.overflow_surfaces
+  if (undeclared_surfaces.length > 0) drift.add("UNDECLARED_ROOT_SURFACE")
+  if (undeclared_surfaces.length > 0) drift.add("SOVEREIGNTY_DRIFT_DETECTED")
+  if (undeclared_surfaces.length > 0) drift.add("ROOT_AUTHORITY_BOUNDARY_OVERFLOW")
+  const topologyDivergence = inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== "NOT_INSPECTED" || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false)
+  if (topologyDivergence) drift.add("ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE")
+  const drift_classes = [...drift].sort()
+  const drift_hash = await sha256Hex(canonicalize({ topology_hash, drift_classes, undeclared_surfaces, merge_legitimacy: drift_classes.length > 0 ? "NULL" : "UNCHANGED" }))
+  return Object.freeze({ drift_type: "RootAuthorityDrift" as const, drift_classes, undeclared_surfaces, topology_hash, drift_hash, merge_legitimacy: drift_classes.length > 0 ? "NULL" as const : "UNCHANGED" as const, fail_closed: drift_classes.length > 0, evidence_only: true as const, replay_neutral: true as const, non_authoritative: true as const, secret_material_persisted: false as const })
+}
+
+async function buildRootAuthorityContainmentEnvelope(input: Partial<RootAuthorityInventory> = {}, generated_at = new Date().toISOString()): Promise<RootAuthorityContainmentEnvelope> {
+  const inventory = canonicalizeRootAuthorityInventory(input)
+  const topology_hash = await hashRootAuthorityTopology(inventory)
+  const boundary = await computeAuthorityContainmentBoundary(inventory)
+  const drift = await detectRootAuthorityDrift(inventory, topology_hash, boundary)
+  const containment_identity = await sha256Hex(canonicalize({ topology_hash, boundary_hash: boundary.boundary_hash, drift_hash: drift.drift_hash }))
+  const containment_hash = await sha256Hex(canonicalize({ containment_identity, topology_hash, boundary_hash: boundary.boundary_hash, drift_hash: drift.drift_hash, evidence_only: true, non_authoritative: true }))
+  return Object.freeze({ envelope_type: "RootAuthorityContainmentEnvelope" as const, inventory, topology_hash, boundary, drift, containment_identity, containment_hash, generated_at, ...rootAuthorityFlags() })
+}
+
+async function ensureRootAuthorityObservabilityRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS root_authority_observability_registry (observation_id TEXT PRIMARY KEY, observation_hash TEXT NOT NULL UNIQUE, topology_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, drift_hash TEXT NOT NULL, containment_identity TEXT NOT NULL, classification TEXT NOT NULL, inventory_object TEXT NOT NULL, boundary_object TEXT NOT NULL, drift_object TEXT NOT NULL, containment_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), secret_material_persisted TEXT NOT NULL CHECK (secret_material_persisted='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_topology ON root_authority_observability_registry(topology_hash, containment_identity)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_boundary ON root_authority_observability_registry(boundary_hash, classification)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_drift ON root_authority_observability_registry(drift_hash, classification)`).run()
+}
+
+async function appendRootAuthorityObservation(env: Env, envelope: RootAuthorityContainmentEnvelope) {
+  await ensureRootAuthorityObservabilityRegistry(env)
+  const classification = envelope.drift.drift_classes[0] || "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"
+  await env.DB.prepare(`INSERT OR IGNORE INTO root_authority_observability_registry (observation_id,observation_hash,topology_hash,boundary_hash,drift_hash,containment_identity,classification,inventory_object,boundary_object,drift_object,containment_envelope,evidence_only,append_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,secret_material_persisted,fail_closed_on_ambiguity,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','true','true','false','false','false','false','true',?12,?13)`)
+    .bind(envelope.containment_identity, envelope.containment_hash, envelope.topology_hash, envelope.boundary.boundary_hash, envelope.drift.drift_hash, envelope.containment_identity, classification, canonicalize(envelope.inventory), canonicalize(envelope.boundary), canonicalize(envelope.drift), canonicalize(envelope), envelope.generated_at, envelope.generated_at)
+    .run()
+}
+
+function rootAuthorityInventoryFromUrl(url: URL): Partial<RootAuthorityInventory> {
+  const undeclared = url.searchParams.get("surface") || url.searchParams.get("undeclared_surface")
+  if (!undeclared) return {}
+  return { surfaces: [...ROOT_AUTHORITY_BASELINE_SURFACES, { surface_id: undeclared, authority_origin: url.searchParams.get("authority_origin") || "undeclared", declared_boundary: "outside-canonical-boundary", classifications: ["UNDECLARED_ROOT_SURFACE", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"], mutation_capability_observed: true, declared: false }] as any }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -5586,6 +5754,23 @@ export default {
         return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_hash: envelope.containment_hash, runtime_sovereignty_hash: envelope.runtime_sovereignty_hash, append_only: true, ...containmentFlags() })
       } catch {
         return json({ status: "NULL", route: url.pathname, reason: "sovereignty_containment_unavailable", drift_classes: ["sovereignty_containment_failure"], ...containmentFlags() }, 500)
+      }
+    }
+
+    if (ROOT_AUTHORITY_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...rootAuthorityFlags() }, 405)
+    if (ROOT_AUTHORITY_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...rootAuthorityFlags() }, 500)
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        const envelope = await buildRootAuthorityContainmentEnvelope(rootAuthorityInventoryFromUrl(url))
+        await appendRootAuthorityObservation(env, envelope)
+        const status = envelope.drift.drift_classes.length > 0 ? "NULL" : "ROOT_AUTHORITY_CONTAINED"
+        if (url.pathname === ROOT_AUTHORITY_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift: envelope.drift, drift_taxonomy: ["ROOT_DEPLOY_AUTHORITY", "ROOT_REPOSITORY_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_FEDERATION_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_PACKAGE_EXECUTION_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY", "UNDECLARED_ROOT_SURFACE", "SOVEREIGNTY_DRIFT_DETECTED", "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE", "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"], merge_legitimacy: envelope.drift.merge_legitimacy, ...rootAuthorityFlags() })
+        if (url.pathname === ROOT_AUTHORITY_BOUNDARY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", boundary: envelope.boundary, containment_identity: envelope.containment_identity, merge_legitimacy: envelope.boundary.merge_legitimacy, ...rootAuthorityFlags() })
+        if (url.pathname === ROOT_AUTHORITY_TOPOLOGY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", topology_hash: envelope.topology_hash, containment_identity: envelope.containment_identity, inventory: envelope.inventory, ...rootAuthorityFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_identity: envelope.containment_identity, topology_hash: envelope.topology_hash, ...rootAuthorityFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "root_authority_observability_unavailable", drift_classes: ["ROOT_AUTHORITY_BOUNDARY_OVERFLOW"], ...rootAuthorityFlags() }, 500)
       }
     }
 

@@ -1,0 +1,12 @@
+{
+  "artifact_type": "root_authority_boundaries",
+  "version": "1.0",
+  "allowed_canonical_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+  "root_authority_evidence_is_execution_authority": false,
+  "observability_is_sovereignty": false,
+  "classification_is_authorization": false,
+  "undeclared_root_mutation_surface_result": "merge_legitimacy_NULL",
+  "evidence_only": true,
+  "non_authoritative": true,
+  "fail_closed_on_ambiguity": true
+}

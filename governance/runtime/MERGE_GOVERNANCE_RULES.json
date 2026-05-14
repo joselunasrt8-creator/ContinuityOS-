@@ -25,7 +25,12 @@
     "Recursive quarantine propagation -> PREO invalid",
     "Federated containment divergence -> governance trust isolated",
     "Downstream contamination spread -> merge authorization prohibited",
-    "Containment evidence may invalidate legitimacy but may NEVER authorize merge"
+    "Containment evidence may invalidate legitimacy but may NEVER authorize merge",
+    "Undeclared root authority -> merge legitimacy NULL",
+    "Sovereignty drift -> PREO invalid",
+    "Infrastructure mutation ambiguity -> containment required",
+    "Root authority topology divergence -> governance trust isolated",
+    "Root authority containment evidence may invalidate legitimacy but may NEVER authorize merge"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -98,6 +103,39 @@
       "PROOF_TRUST_CONTAINED",
       "GOVERNANCE_CONTAMINATION_EXPANDED",
       "CONTAINMENT_BOUNDARY_OVERFLOW"
+    ]
+  },
+  "root_authority_containment": {
+    "registry": "root_authority_observability_registry",
+    "artifacts": [
+      "runtime/sovereignty/root_authority_inventory.json",
+      "runtime/sovereignty/root_authority_boundaries.json",
+      "runtime/sovereignty/infrastructure_authority_map.json",
+      "runtime/sovereignty/sovereignty_assumption_registry.json",
+      "runtime/sovereignty/root_authority_drift_taxonomy.json",
+      "runtime/sovereignty/root_authority_containment_rules.json"
+    ],
+    "evidence_only": true,
+    "direct_merge_authority": false,
+    "may_invalidate_legitimacy": true,
+    "may_authorize_merge": false,
+    "fail_closed_on_ambiguity": true,
+    "secret_values_inspected": false,
+    "classifications": [
+      "ROOT_DEPLOY_AUTHORITY",
+      "ROOT_REPOSITORY_AUTHORITY",
+      "ROOT_ENVIRONMENT_AUTHORITY",
+      "ROOT_WORKFLOW_AUTHORITY",
+      "ROOT_BRANCH_POLICY_AUTHORITY",
+      "ROOT_RUNTIME_CONFIGURATION_AUTHORITY",
+      "ROOT_FEDERATION_AUTHORITY",
+      "ROOT_LOCAL_EXECUTION_AUTHORITY",
+      "ROOT_PACKAGE_EXECUTION_AUTHORITY",
+      "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY",
+      "UNDECLARED_ROOT_SURFACE",
+      "SOVEREIGNTY_DRIFT_DETECTED",
+      "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE",
+      "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"
     ]
   }
 }
