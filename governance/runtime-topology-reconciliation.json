@@ -1,0 +1,51 @@
+{
+  "artifact": "runtime_topology_reconciliation",
+  "version": "1.0.0",
+  "routes": [
+    "/topology/reconcile",
+    "/topology/drift",
+    "/topology/fingerprint",
+    "/topology/equivalence"
+  ],
+  "route_constraints": {
+    "method": "GET_ONLY",
+    "reject_methods": ["POST", "PUT", "PATCH", "DELETE"],
+    "deterministic_rejection_status": 405,
+    "evidence_only": true,
+    "non_authoritative": true,
+    "replay_neutral": true,
+    "executable": false,
+    "deployment_capable": false,
+    "creates_authority": false
+  },
+  "registry": {
+    "name": "runtime_topology_registry",
+    "append_only": true,
+    "immutable_topology_snapshots": true,
+    "deterministic_indexes": [
+      "idx_runtime_topology_registry_hashes",
+      "idx_runtime_topology_registry_boundary"
+    ],
+    "update_allowed": false,
+    "delete_allowed": false,
+    "persisted_fields": [
+      "topology_hash",
+      "topology_semantic_hash",
+      "topology_boundary_hash",
+      "topology_lineage_hash",
+      "topology_equivalence_hash",
+      "drift_classes",
+      "lineage_hash",
+      "boundary_hash",
+      "reconciliation_timestamp",
+      "containment_references"
+    ]
+  },
+  "policy_bindings": {
+    "merge_governance": "Topology evidence may invalidate or block merge but never authorize merge.",
+    "runtime_governance": "Topology evidence may invalidate runtime legitimacy but never authorize execution.",
+    "sovereignty_governance": "Topology evidence may classify sovereignty containment drift but never create sovereignty authority.",
+    "containment_governance": "Topology evidence may require containment and fail closed on ambiguity."
+  },
+  "core_invariant": "If no valid topology object exists, reconciliation legitimacy is NULL."
+}

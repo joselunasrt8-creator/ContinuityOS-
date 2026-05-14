@@ -1,0 +1,68 @@
+{
+  "artifact": "runtime_topology_drift_taxonomy",
+  "version": "1.0.0",
+  "core_invariant": "If no valid topology object exists, reconciliation legitimacy is NULL.",
+  "fail_closed_on_ambiguity": true,
+  "drift_classes": [
+    {
+      "class": "UNDECLARED_RUNTIME_SURFACE",
+      "meaning": "A runtime route, handler, or execution-capable surface exists outside declared canonical topology.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "TOPOLOGY_EQUIVALENCE_DRIFT",
+      "meaning": "Validated topology hash material differs from executed topology hash material.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "MUTATION_SURFACE_EXPANSION",
+      "meaning": "A workflow, deploy, registry, or route surface gained undeclared mutation capability.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "GOVERNANCE_SURFACE_DRIFT",
+      "meaning": "Governance artifacts or governance inventories diverge from runtime topology.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "OBSERVABILITY_BOUNDARY_DRIFT",
+      "meaning": "An observability-only route or surface becomes executable, deployment-capable, authority-creating, or mutation-capable.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "EXECUTION_BOUNDARY_DRIFT",
+      "meaning": "The canonical execution boundary differs from the declared route and execution inventory.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "REGISTRY_LINEAGE_DRIFT",
+      "meaning": "Append-only registry lineage, reconciliation persistence, or schema lineage diverges or becomes mutable.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "CONTAINMENT_DIVERGENCE",
+      "meaning": "Recursive governance containment or sovereignty containment inventory diverges from canonical containment.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "CANONICAL_ROUTE_DIVERGENCE",
+      "meaning": "Declared canonical runtime routes differ from runtime route inventory.",
+      "legitimacy_result": "NULL"
+    },
+    {
+      "class": "RECONCILIATION_AMBIGUITY",
+      "meaning": "A valid topology object cannot be identified or bounded traversal cannot establish exact topology evidence.",
+      "legitimacy_result": "NULL"
+    }
+  ],
+  "reconciliation_authority": {
+    "may_invalidate_legitimacy": true,
+    "may_classify_drift": true,
+    "may_produce_evidence": true,
+    "may_authorize_execution": false,
+    "may_authorize_merge": false,
+    "may_authorize_deployment": false,
+    "may_create_authority": false,
+    "may_mutate_canonical_execution_state": false
+  }
+}

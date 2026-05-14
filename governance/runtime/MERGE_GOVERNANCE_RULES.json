@@ -33,7 +33,10 @@
     "Root authority containment evidence may invalidate legitimacy but may NEVER authorize merge",
     "Recursive governance semantic drift -> merge legitimacy NULL",
     "Governance equivalence mismatch -> recursive containment required",
-    "Governance containment evidence may invalidate legitimacy but may NEVER authorize merge, proof, deployment, or execution"
+    "Governance containment evidence may invalidate legitimacy but may NEVER authorize merge, proof, deployment, or execution",
+    "Runtime topology reconciliation ambiguity -> merge legitimacy NULL",
+    "Runtime topology equivalence drift -> merge legitimacy NULL",
+    "Runtime topology evidence may block merge or deployment but may NEVER authorize merge, execution, deployment, or legitimacy"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -169,6 +172,28 @@
     "may_authorize_merge": false,
     "may_authorize_execution": false,
     "may_authorize_proof": false,
+    "fail_closed_on_ambiguity": true
+  },
+  "runtime_topology_reconciliation": {
+    "artifacts": [
+      "governance/runtime-topology-equivalence.json",
+      "governance/runtime-topology-drift-taxonomy.json",
+      "governance/runtime-topology-reconciliation.json"
+    ],
+    "registry": "runtime_topology_registry",
+    "routes": [
+      "/topology/reconcile",
+      "/topology/drift",
+      "/topology/fingerprint",
+      "/topology/equivalence"
+    ],
+    "may_invalidate_legitimacy": true,
+    "may_block_merge": true,
+    "may_block_deployment": true,
+    "may_authorize_legitimacy": false,
+    "may_authorize_execution": false,
+    "may_authorize_deployment": false,
+    "evidence_only": true,
     "fail_closed_on_ambiguity": true
   }
 }
