@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.dev/schemas/FEDERATION_ENVELOPE.schema.json",
+  "title": "FederationEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "version", "federation_id", "origin_runtime", "remote_runtime", "evidence_hash", "equivalence_hash", "verification_status", "trust_classification"],
+  "properties": {
+    "object_type": {"const": "FederationEnvelope"},
+    "version": {"type": "string"},
+    "federation_id": {"type": "string"},
+    "origin_runtime": {"type": "string"},
+    "remote_runtime": {"type": "string"},
+    "evidence_hash": {"type": "string"},
+    "equivalence_hash": {"type": "string"},
+    "verification_status": {"enum": ["FEDERATION_VERIFIED", "FEDERATION_DIVERGENT", "FEDERATION_UNVERIFIED", "NULL"]},
+    "trust_classification": {"enum": ["TIER_0", "TIER_1", "TIER_2", "TIER_3"]}
+  },
+  "x-mindshift": {
+    "failure_mode": "NULL",
+    "canonicalization": "required",
+    "federation_rule": "remote evidence does not imply local authority",
+    "hash_relevant_fields": ["object_type", "version", "federation_id", "origin_runtime", "remote_runtime", "evidence_hash", "equivalence_hash", "verification_status", "trust_classification"]
+  }
+}
