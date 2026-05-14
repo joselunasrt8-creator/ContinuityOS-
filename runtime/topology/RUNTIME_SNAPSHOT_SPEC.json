@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "classification": "runtime_snapshot_specification",
+  "status": "non_operative_specification",
+  "route": "/runtime/snapshot",
+  "method": "GET",
+  "mode": "read_only",
+  "core_invariant": "A runtime snapshot captures governance state for audit, reconciliation, and equivalence checks without mutating runtime state.",
+  "purpose": "Produce a deterministic governance snapshot containing runtime identity, topology state, policy state, replay state, reconciliation state, and federation mode.",
+  "required_sections": [
+    "runtime_identity",
+    "topology_hashes",
+    "surface_inventory_state",
+    "authority_surface_state",
+    "policy_set_state",
+    "continuity_state",
+    "replay_state",
+    "proof_semantics_state",
+    "federation_state",
+    "reconciliation_state",
+    "verification_summary"
+  ],
+  "verification_status_values": [
+    "SNAPSHOT_VALID",
+    "SNAPSHOT_DRIFT",
+    "SNAPSHOT_INCOMPLETE",
+    "NULL"
+  ],
+  "forbidden_behavior": [
+    "authority_creation",
+    "runtime_state_mutation",
+    "proof_creation",
+    "execution_triggering",
+    "registry_write",
+    "remote_authority_inheritance"
+  ],
+  "failure_mode": "NULL"
+}
