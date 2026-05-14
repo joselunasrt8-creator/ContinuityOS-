@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.dev/schemas/SCO.schema.json",
+  "title": "SCO",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["object_type", "version", "sco_id", "mutation_class", "target_surface", "mutation_scope", "governance_evidence", "validation_requirement"],
+  "properties": {
+    "object_type": {"const": "SCO"},
+    "version": {"type": "string"},
+    "sco_id": {"type": "string"},
+    "mutation_class": {"type": "string"},
+    "target_surface": {"type": "string"},
+    "mutation_scope": {"type": "string"},
+    "governance_evidence": {"type": "object"},
+    "validation_requirement": {"type": "string"}
+  },
+  "x-mindshift": {"failure_mode": "NULL", "canonicalization": "required", "hash_relevant_fields": ["object_type", "version", "sco_id", "mutation_class", "target_surface", "mutation_scope", "governance_evidence", "validation_requirement"]}
+}
