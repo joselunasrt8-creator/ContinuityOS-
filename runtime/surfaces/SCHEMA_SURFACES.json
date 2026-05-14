@@ -1,0 +1,45 @@
+{
+  "object_type": "RuntimeSurfaceInventory",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "surface_class": "schema_sources",
+  "surface_requirements": {
+    "declared": true,
+    "classified": true,
+    "schema_bound": true,
+    "route_bound": true,
+    "governance_bound": true,
+    "drift_observable": true,
+    "non_bypassable": true
+  },
+  "schema_sets": [
+    {
+      "id": "legacy_schema_set",
+      "root": "schemas",
+      "classification": "legacy_contract_schema",
+      "authoritative_for_runtime_validator": false,
+      "replacement_requires_future_sco": true,
+      "executable": false,
+      "creates_authority": false
+    },
+    {
+      "id": "runtime_legitimacy_schema_set",
+      "root": "runtime/legitimacy/schemas",
+      "classification": "canonical_runtime_legitimacy_schema",
+      "authoritative_for_runtime_validator": true,
+      "replacement_requires_future_sco": false,
+      "executable": false,
+      "creates_authority": false
+    }
+  ],
+  "inventory_hash": "3f209345ed76003a4761e2a68df3cc7cb6cc062a891441af43329b0bcd502837"
+}

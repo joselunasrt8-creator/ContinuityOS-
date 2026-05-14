@@ -1,0 +1,25 @@
+{
+  "object_type": "GovernancePolicyMap",
+  "policy_id": "SCO_POLICY",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "enforcement": "schema_change_order_required",
+  "statement": "Schema replacement or runtime topology mutation requires future SCO evidence before execution semantics change.",
+  "drift_classes": [
+    "silent_schema_replacement",
+    "runtime_mutation_without_sco"
+  ],
+  "ambiguity_result": "NULL",
+  "claims_authority": false,
+  "changes_execution_semantics": false,
+  "policy_hash": "49824d931504ffd64fd1d76ca25fbc0937c74ca40ab48007fa609bf13bd27567"
+}

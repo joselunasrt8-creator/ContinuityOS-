@@ -1,0 +1,66 @@
+{
+  "object_type": "SchemaSourceMap",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "ambiguous_source_result": "NULL",
+  "sources": [
+    {
+      "source_id": "legacy_proof_schema",
+      "path": "schemas/proof.schema.json",
+      "schema_role": "legacy_contract_schema",
+      "authoritative_for_runtime_validator": false,
+      "required_hash_fields": [
+        "aeo_hash"
+      ],
+      "conflict_with": "canonical_runtime_proof_object",
+      "replacement_required_by_future_SCO": true
+    },
+    {
+      "source_id": "canonical_runtime_proof_object",
+      "path": "runtime/legitimacy/schemas/PROOF_OBJECT.schema.json",
+      "schema_role": "canonical_runtime_legitimacy_schema",
+      "authoritative_for_runtime_validator": true,
+      "required_hash_fields": [
+        "validated_object_hash",
+        "execution_hash"
+      ],
+      "conflict_with": "legacy_proof_schema",
+      "replacement_required_by_future_SCO": false
+    },
+    {
+      "source_id": "runtime_legitimacy_aeo_schema",
+      "path": "runtime/legitimacy/schemas/AEO.schema.json",
+      "schema_role": "canonical_runtime_legitimacy_schema",
+      "authoritative_for_runtime_validator": true,
+      "exact_fields": [
+        "finality",
+        "intent",
+        "scope",
+        "target",
+        "validation"
+      ]
+    },
+    {
+      "source_id": "runtime_legitimacy_authority_schema",
+      "path": "runtime/legitimacy/schemas/AUTHORITY.schema.json",
+      "schema_role": "canonical_runtime_legitimacy_schema",
+      "authoritative_for_runtime_validator": true
+    },
+    {
+      "source_id": "runtime_legitimacy_continuity_schema",
+      "path": "runtime/legitimacy/schemas/CONTINUITY_OBJECT.schema.json",
+      "schema_role": "canonical_runtime_legitimacy_schema",
+      "authoritative_for_runtime_validator": true
+    }
+  ],
+  "schema_source_map_hash": "0fe964c67eaf7d364a6c222514374e69612542e22004129a18ef533ab3719e14"
+}

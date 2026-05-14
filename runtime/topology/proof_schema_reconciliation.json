@@ -1,0 +1,37 @@
+{
+  "object_type": "ProofSchemaReconciliationObject",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "legacy_schema_conflict": true,
+  "runtime_schema_authoritative_for_runtime_validator": true,
+  "legacy_schema_replacement_required_by_future_SCO": true,
+  "reconciliation_status": "CONFLICT_RECORDED_NO_REPLACEMENT",
+  "legacy_proof_schema": {
+    "source_id": "legacy_proof_schema",
+    "path": "schemas/proof.schema.json",
+    "required_hash_fields": [
+      "aeo_hash"
+    ],
+    "runtime_authoritative": false
+  },
+  "canonical_runtime_proof_object": {
+    "source_id": "canonical_runtime_proof_object",
+    "path": "runtime/legitimacy/schemas/PROOF_OBJECT.schema.json",
+    "required_hash_fields": [
+      "validated_object_hash",
+      "execution_hash"
+    ],
+    "runtime_authoritative": true
+  },
+  "replacement_boundary": "No legacy schema replacement without future SCO.",
+  "proof_schema_reconciliation_hash": "a374e518150d466a4d56571dd49dea127f9faed705323cb6d4851d23b4707b42"
+}

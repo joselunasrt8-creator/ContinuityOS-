@@ -1,0 +1,25 @@
+{
+  "object_type": "GovernancePolicyMap",
+  "policy_id": "SCHEMA_POLICY",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "enforcement": "declared_schema_source_required",
+  "statement": "Ambiguous or undeclared schema sources fail closed and are not authoritative.",
+  "drift_classes": [
+    "ambiguous_schema_source",
+    "legacy_runtime_confusion"
+  ],
+  "ambiguity_result": "NULL",
+  "claims_authority": false,
+  "changes_execution_semantics": false,
+  "policy_hash": "18bf736d5d93c3f744d448c121569149c2a5699e06ed4f8314cd75a8dd71eb90"
+}

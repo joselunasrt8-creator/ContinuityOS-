@@ -1,0 +1,121 @@
+{
+  "object_type": "TopologyManifest",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "topology_status": "CANONICAL_EVIDENCE_RECONCILED",
+  "canonical_lifecycle": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "topology_files": [
+    "runtime/surfaces/EXECUTION_SURFACES.json",
+    "runtime/surfaces/BYPASS_PATHS.json",
+    "runtime/surfaces/OBSERVABILITY_SURFACES.json",
+    "runtime/surfaces/SCHEMA_SURFACES.json",
+    "runtime/maps/CANONICAL_RUNTIME_MAP.md",
+    "runtime/maps/EXECUTION_FLOW.md",
+    "runtime/maps/CONTINUITY_LINEAGE_MAP.md",
+    "runtime/maps/RECONCILIATION_GRAPH.md",
+    "runtime/governance/PREO_POLICY.json",
+    "runtime/governance/SCO_POLICY.json",
+    "runtime/governance/REPLAY_POLICY.json",
+    "runtime/governance/DEPLOY_POLICY.json",
+    "runtime/governance/SCHEMA_POLICY.json",
+    "runtime/topology/runtime_graph.json",
+    "runtime/topology/schema_source_map.json",
+    "runtime/topology/proof_schema_reconciliation.json",
+    "runtime/topology/topology_manifest.json"
+  ],
+  "required_objects": [
+    "TopologyManifest",
+    "RuntimeSurfaceInventory",
+    "SchemaSourceMap",
+    "ProofSchemaReconciliationObject",
+    "GovernancePolicyMap",
+    "CanonicalRuntimeGraph"
+  ],
+  "hashes": {
+    "runtime_surface_inventory_hash": "6d4016b0421eb46c18f3857068921ab3b1c41f18ab2d38a4c7eafbdb6892f4b5",
+    "schema_source_map_hash": "0fe964c67eaf7d364a6c222514374e69612542e22004129a18ef533ab3719e14",
+    "topology_graph_hash": "fece0d5caa8f8395436ae47e1e97319ee75fdc571e42dd7a5cb5408ec766bbe0",
+    "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5",
+    "proof_schema_reconciliation_hash": "a374e518150d466a4d56571dd49dea127f9faed705323cb6d4851d23b4707b42"
+  },
+  "schema_reconciliation": {
+    "legacy_schema_conflict": true,
+    "runtime_schema_authoritative_for_runtime_validator": true,
+    "legacy_schema_replacement_required_by_future_SCO": true
+  },
+  "governance_policy_map": {
+    "object_type": "GovernancePolicyMap",
+    "version": "1.0.0",
+    "generated_at": "2026-05-14T00:00:00.000Z",
+    "invariant": "If no valid object exists -> nothing happens.",
+    "evidence_only": true,
+    "executable": false,
+    "creates_authority": false,
+    "mutation_capable": false,
+    "deployment_capable": false,
+    "proof_generating": false,
+    "additional_routes_created": false,
+    "fail_closed_on_ambiguity": true,
+    "policies": [
+      {
+        "policy_id": "PREO_POLICY",
+        "path": "runtime/governance/PREO_POLICY.json",
+        "policy_hash": "d74392b4d5a01b46aed52c2378c484b13d8173c1ad5b397cd98d969329ebaba5",
+        "enforcement": "proposal_review_required",
+        "creates_authority": false,
+        "executable": false
+      },
+      {
+        "policy_id": "SCO_POLICY",
+        "path": "runtime/governance/SCO_POLICY.json",
+        "policy_hash": "49824d931504ffd64fd1d76ca25fbc0937c74ca40ab48007fa609bf13bd27567",
+        "enforcement": "schema_change_order_required",
+        "creates_authority": false,
+        "executable": false
+      },
+      {
+        "policy_id": "REPLAY_POLICY",
+        "path": "runtime/governance/REPLAY_POLICY.json",
+        "policy_hash": "1d7a3a8227718b9084133903deb4e90fa3533f42b1f673f576d212e8669a284f",
+        "enforcement": "replay_neutral_topology",
+        "creates_authority": false,
+        "executable": false
+      },
+      {
+        "policy_id": "DEPLOY_POLICY",
+        "path": "runtime/governance/DEPLOY_POLICY.json",
+        "policy_hash": "c841acb3b928bfe9e035b63a71360fa5953efdc8ae2f33983cb253e3c1a4d228",
+        "enforcement": "governed_deploy_only",
+        "creates_authority": false,
+        "executable": false
+      },
+      {
+        "policy_id": "SCHEMA_POLICY",
+        "path": "runtime/governance/SCHEMA_POLICY.json",
+        "policy_hash": "18bf736d5d93c3f744d448c121569149c2a5699e06ed4f8314cd75a8dd71eb90",
+        "enforcement": "declared_schema_source_required",
+        "creates_authority": false,
+        "executable": false
+      }
+    ],
+    "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5"
+  },
+  "topology_manifest_hash": "ec1e5db8e99c38fbb9f077e238d58ec4f5a8be544c4abdd469d1c1a1a492e9f1"
+}

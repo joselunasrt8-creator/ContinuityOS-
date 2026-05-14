@@ -1,0 +1,189 @@
+{
+  "object_type": "CanonicalRuntimeGraph",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "canonical_lifecycle": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "canonical_execution_path": [
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "nodes": [
+    {
+      "id": "session",
+      "route": "/session",
+      "lifecycle_index": 0,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    },
+    {
+      "id": "continuity",
+      "route": "/continuity",
+      "lifecycle_index": 1,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    },
+    {
+      "id": "authority",
+      "route": "/authority",
+      "lifecycle_index": 2,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    },
+    {
+      "id": "compile",
+      "route": "/compile",
+      "lifecycle_index": 3,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    },
+    {
+      "id": "validate",
+      "route": "/validate",
+      "lifecycle_index": 4,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    },
+    {
+      "id": "execute",
+      "route": "/execute",
+      "lifecycle_index": 5,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    },
+    {
+      "id": "proof",
+      "route": "/proof",
+      "lifecycle_index": 6,
+      "declared": true,
+      "classified": true,
+      "schema_bound": true,
+      "route_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true,
+      "executable_by_topology": false,
+      "creates_authority_by_topology": false
+    }
+  ],
+  "edges": [
+    {
+      "from": "/session",
+      "to": "/continuity",
+      "boundary": "canonical_lifecycle_order",
+      "creates_route": false,
+      "bypass_allowed": false
+    },
+    {
+      "from": "/continuity",
+      "to": "/authority",
+      "boundary": "canonical_lifecycle_order",
+      "creates_route": false,
+      "bypass_allowed": false
+    },
+    {
+      "from": "/authority",
+      "to": "/compile",
+      "boundary": "canonical_lifecycle_order",
+      "creates_route": false,
+      "bypass_allowed": false
+    },
+    {
+      "from": "/compile",
+      "to": "/validate",
+      "boundary": "canonical_lifecycle_order",
+      "creates_route": false,
+      "bypass_allowed": false
+    },
+    {
+      "from": "/validate",
+      "to": "/execute",
+      "boundary": "canonical_lifecycle_order",
+      "creates_route": false,
+      "bypass_allowed": false
+    },
+    {
+      "from": "/execute",
+      "to": "/proof",
+      "boundary": "canonical_lifecycle_order",
+      "creates_route": false,
+      "bypass_allowed": false
+    }
+  ],
+  "null_edges": [
+    {
+      "from": "observability",
+      "to": "/execute",
+      "result": "NULL",
+      "reason": "observability_is_non_executable"
+    },
+    {
+      "from": "undeclared_surface",
+      "to": "canonical_runtime",
+      "result": "NULL",
+      "reason": "ambiguous_or_undeclared_topology_source"
+    }
+  ],
+  "topology_graph_hash": "fece0d5caa8f8395436ae47e1e97319ee75fdc571e42dd7a5cb5408ec766bbe0"
+}

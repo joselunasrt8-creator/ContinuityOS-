@@ -1,0 +1,77 @@
+{
+  "object_type": "RuntimeSurfaceInventory",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "surface_class": "bypass_paths",
+  "surface_requirements": {
+    "declared": true,
+    "classified": true,
+    "schema_bound": true,
+    "route_bound": true,
+    "governance_bound": true,
+    "drift_observable": true,
+    "non_bypassable": true
+  },
+  "bypass_result": "NULL",
+  "paths": [
+    {
+      "id": "direct_deploy",
+      "classification": "deployment_bypass",
+      "allowed": false,
+      "result": "NULL",
+      "governance_policy_refs": [
+        "DEPLOY_POLICY",
+        "PREO_POLICY",
+        "SCO_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "direct_database_mutation",
+      "classification": "mutation_bypass",
+      "allowed": false,
+      "result": "NULL",
+      "governance_policy_refs": [
+        "SCO_POLICY",
+        "REPLAY_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "direct_execution_without_validation",
+      "classification": "execution_bypass",
+      "allowed": false,
+      "result": "NULL",
+      "governance_policy_refs": [
+        "PREO_POLICY",
+        "REPLAY_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "observability_to_execution_upgrade",
+      "classification": "surface_upgrade_bypass",
+      "allowed": false,
+      "result": "NULL",
+      "governance_policy_refs": [
+        "SCHEMA_POLICY",
+        "SCO_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    }
+  ],
+  "inventory_hash": "7ad5b2e1e041351927e8b670c22cc2f2c5accc49e906ca7122fc180d132e983c"
+}

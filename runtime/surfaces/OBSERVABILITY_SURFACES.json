@@ -1,0 +1,64 @@
+{
+  "object_type": "RuntimeSurfaceInventory",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "surface_class": "observability",
+  "surface_requirements": {
+    "declared": true,
+    "classified": true,
+    "schema_bound": true,
+    "route_bound": true,
+    "governance_bound": true,
+    "drift_observable": true,
+    "non_bypassable": true
+  },
+  "observability_result": "evidence_only",
+  "surfaces": [
+    {
+      "id": "telemetry_events",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "creates_authority": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "runtime_maps",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "creates_authority": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "topology_manifest",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "creates_authority": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    }
+  ],
+  "inventory_hash": "95f9a57aaa578958c37b4f1314c201241f7e03a3525799297ff4c5c65cff74bd"
+}

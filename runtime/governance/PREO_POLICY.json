@@ -1,0 +1,25 @@
+{
+  "object_type": "GovernancePolicyMap",
+  "policy_id": "PREO_POLICY",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "enforcement": "proposal_review_required",
+  "statement": "Proposals can record review evidence only; they do not create runtime authority.",
+  "drift_classes": [
+    "proposal_to_execution_collapse",
+    "authority_invention"
+  ],
+  "ambiguity_result": "NULL",
+  "claims_authority": false,
+  "changes_execution_semantics": false,
+  "policy_hash": "d74392b4d5a01b46aed52c2378c484b13d8173c1ad5b397cd98d969329ebaba5"
+}

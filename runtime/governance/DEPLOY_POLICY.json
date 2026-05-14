@@ -1,0 +1,25 @@
+{
+  "object_type": "GovernancePolicyMap",
+  "policy_id": "DEPLOY_POLICY",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "enforcement": "governed_deploy_only",
+  "statement": "Deployment capability is not introduced here; direct deploy remains NULL.",
+  "drift_classes": [
+    "direct_deploy",
+    "workflow_bypass"
+  ],
+  "ambiguity_result": "NULL",
+  "claims_authority": false,
+  "changes_execution_semantics": false,
+  "policy_hash": "c841acb3b928bfe9e035b63a71360fa5953efdc8ae2f33983cb253e3c1a4d228"
+}

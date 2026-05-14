@@ -1,0 +1,26 @@
+{
+  "object_type": "GovernancePolicyMap",
+  "policy_id": "REPLAY_POLICY",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "enforcement": "replay_neutral_topology",
+  "statement": "Topology evidence cannot consume authority, generate proof, or reset replay state.",
+  "drift_classes": [
+    "authority_reuse",
+    "proof_replay",
+    "execution_replay"
+  ],
+  "ambiguity_result": "NULL",
+  "claims_authority": false,
+  "changes_execution_semantics": false,
+  "policy_hash": "1d7a3a8227718b9084133903deb4e90fa3533f42b1f673f576d212e8669a284f"
+}
