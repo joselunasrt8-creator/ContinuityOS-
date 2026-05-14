@@ -29,6 +29,7 @@ const RUNTIME_ID = "mindshift-worker-runtime" as const
 const RUNTIME_VERSION = "runtime-sovereignty-v1" as const
 const RUNTIME_SOVEREIGNTY_ROUTE = "/runtime/sovereignty" as const
 const EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE = "/runtime/sovereignty/external-authority" as const
+const INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE = "/runtime/sovereignty/infrastructure-reconciliation" as const
 const BOOTSTRAP_VERIFY_ROUTE = "/runtime/bootstrap/verify" as const
 const BOOTSTRAP_TOPOLOGY_ROUTE = "/runtime/bootstrap/topology" as const
 const BOOTSTRAP_CHECKPOINT_ROUTE = "/runtime/bootstrap/checkpoint" as const
@@ -78,6 +79,7 @@ const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-in
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, RECONCILIATION_IMPACT_ROUTE, RECONCILIATION_VERDICT_ROUTE, RECONCILIATION_PROPAGATION_ROUTE, RECONCILIATION_TOPOLOGY_DELTA_ROUTE, RECONCILIATION_QUARANTINE_ROUTE, RECONCILIATION_CONTAINMENT_ROUTE, RECONCILIATION_ISOLATION_ROUTE, RECONCILIATION_FEDERATION_BOUNDARY_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES, ...RUNTIME_CONTAINMENT_ROUTES, ...ROOT_AUTHORITY_OBSERVABILITY_ROUTES] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, RECONCILIATION_IMPACT_ROUTE, RECONCILIATION_VERDICT_ROUTE, RECONCILIATION_PROPAGATION_ROUTE, RECONCILIATION_TOPOLOGY_DELTA_ROUTE, RECONCILIATION_QUARANTINE_ROUTE, RECONCILIATION_CONTAINMENT_ROUTE, RECONCILIATION_ISOLATION_ROUTE, RECONCILIATION_FEDERATION_BOUNDARY_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES, ...RUNTIME_CONTAINMENT_ROUTES] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -4847,6 +4849,59 @@ async function appendExternalAuthorityObservation(env: Env, dependency: External
   return evidence_hash
 }
 
+async function buildInfrastructureDependencyReconciliation(url: URL) {
+  const dependencies = await canonicalExternalAuthorityRegistry()
+  const dependency_drifts = await Promise.all(dependencies.map(async (dependency) => ({
+    sovereignty_dependency_id: dependency.sovereignty_dependency_id,
+    external_authority_surface: dependency.external_authority_surface,
+    containment_state: dependency.containment_state,
+    sovereignty_classification: dependency.sovereignty_classification,
+    drift_classes: await classifyExternalAuthorityDrift(dependency, dependency)
+  })))
+  const probeDependency = url.searchParams.has("surface") ? await externalAuthorityObservationFromUrl(url) : null
+  const probeExpected = probeDependency ? dependencies.find((dependency) => dependency.external_authority_surface === probeDependency.external_authority_surface) : undefined
+  const probeDrift = probeDependency ? await classifyExternalAuthorityDrift({
+    ...probeDependency,
+    creates_authority: url.searchParams.get("creates_authority") === "true",
+    bypass_validation: url.searchParams.get("bypass_validation") === "true",
+    mutate_legitimacy: url.searchParams.get("mutate_legitimacy") === "true",
+    consume_replay_state: url.searchParams.get("consume_replay_state") === "true",
+    inherit_execution_legitimacy: url.searchParams.get("inherit_execution_legitimacy") === "true",
+    direct_deploy_allowed: url.searchParams.get("direct_deploy_allowed") === "true",
+    deploy_capable: url.searchParams.get("deploy_capable") === "true",
+    mutation_capable: url.searchParams.get("mutation_capable") === "true",
+    hidden_mutation: url.searchParams.get("hidden_mutation") === "true",
+    command: url.searchParams.get("command") || ""
+  }, probeExpected) : []
+  const drift_classes = Array.from(new Set([...dependency_drifts.flatMap((entry) => entry.drift_classes), ...probeDrift])).sort() as RuntimeSovereigntyDriftClass[]
+  const reconciliation_material = {
+    object_type: "InfrastructureDependencyReconciliation",
+    route: INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE,
+    dependency_count: dependencies.length,
+    dependencies: dependencies.map((dependency) => ({
+      sovereignty_dependency_id: dependency.sovereignty_dependency_id,
+      external_authority_surface: dependency.external_authority_surface,
+      authority_origin: dependency.authority_origin,
+      infrastructure_scope: dependency.infrastructure_scope,
+      bootstrap_trust_hash: dependency.bootstrap_trust_hash,
+      sovereignty_classification: dependency.sovereignty_classification,
+      containment_state: dependency.containment_state,
+      observability_only: dependency.observability_only,
+      replay_neutral: dependency.replay_neutral
+    })),
+    dependency_drifts,
+    probe: probeDependency ? { external_authority_surface: probeDependency.external_authority_surface, drift_classes: probeDrift } : null,
+    drift_classes,
+    closure_condition: "classified->bounded->observable->replay-neutral->sovereignty-contained",
+    local_validation_supremacy: true,
+    exact_object_execution_legitimacy_preserved: true,
+    replay_state_consumed: false,
+    authority_created: false
+  }
+  const reconciliation_hash = await sha256Hex(canonicalize(reconciliation_material))
+  return Object.freeze({ ...reconciliation_material, reconciliation_hash, status: drift_classes.length > 0 ? "INFRASTRUCTURE_DEPENDENCY_DRIFT" : "INFRASTRUCTURE_DEPENDENCY_RECONCILED" })
+}
+
 async function issueRuntimeGovernanceLock(env: Env, proof: RecursiveGovernanceProof, envelope: GovernanceMutationEnvelope, created_at: string): Promise<RuntimeGovernanceLock> {
   const canonical_hash = await deriveRecursiveGovernanceHash({ mutation_hash: envelope.mutation_hash, governance_id: proof.governance_id, target_surface: envelope.target_surface, canonical_path: envelope.canonical_execution_path })
   const lock_id = await deriveRecursiveGovernanceHash({ lock: "runtime_governance_lock", canonical_hash })
@@ -5657,6 +5712,7 @@ export default {
       }
     }
     if (url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
+    if (url.pathname === INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE && request.method !== "GET") return json({ status: "NULL", route: INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
     if ([BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true }, 405)
 
     if (CONTINUOUS_FATE_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...continuousFateFlags() }, 405)
@@ -5729,6 +5785,7 @@ export default {
     }
 
     if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE && url.pathname !== EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && ![BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
+    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE && url.pathname !== EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && url.pathname !== INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE && ![BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
@@ -5765,6 +5822,13 @@ export default {
       const evidence_hash = await appendExternalAuthorityObservation(env, dependency, drift_classes)
       const status = drift_classes.length > 0 ? "EXTERNAL_AUTHORITY_DRIFT" : "EXTERNAL_AUTHORITY_CONTAINED"
       return json({ status, route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, external_authority_registry: registry, dependency, drift_classes, evidence_hash, fail_closed: drift_classes.length > 0, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
+    }
+
+
+    if (url.pathname === INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE && request.method === "GET") {
+      const reconciliation = await buildInfrastructureDependencyReconciliation(url)
+      const evidence_hashes = await Promise.all((await canonicalExternalAuthorityRegistry()).map((dependency) => appendExternalAuthorityObservation(env, dependency, [])))
+      return json({ status: reconciliation.status, route: INFRASTRUCTURE_DEPENDENCY_RECONCILIATION_ROUTE, reason: "observability_only", reconciliation, external_authority_registry: reconciliation.dependencies, drift_classes: reconciliation.drift_classes, evidence_hashes, fail_closed: reconciliation.drift_classes.length > 0, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
     }
 
     if ([BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any) && request.method === "GET") {
