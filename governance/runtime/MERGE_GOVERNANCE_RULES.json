@@ -16,7 +16,11 @@
     "Topology reconciliation signal SAFE_TO_MERGE is evidence only and grants no direct merge authority",
     "Topology reconciliation signal TOPOLOGY_DRIFT -> merge legitimacy NULL",
     "Topology reconciliation signal GOVERNANCE_DIVERGENCE -> merge legitimacy NULL",
-    "Topology reconciliation signal UNDECLARED_EXECUTION_SURFACE -> merge legitimacy NULL"
+    "Topology reconciliation signal UNDECLARED_EXECUTION_SURFACE -> merge legitimacy NULL",
+    "Unresolved propagated drift -> merge legitimacy NULL",
+    "Topology impact divergence -> PREO invalid",
+    "Governance propagation mismatch -> reconciliation verdict invalid",
+    "Downstream legitimacy collapse -> governed merge denied"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -53,5 +57,23 @@
     "evidence_only": true,
     "replay_neutral": true,
     "mutation_capable": false
+  },
+  "legitimacy_drift_propagation": {
+    "registry": "legitimacy_drift_propagation_registry",
+    "evidence_only": true,
+    "direct_merge_authority": false,
+    "may_invalidate_legitimacy": true,
+    "may_authorize_merge": false,
+    "fail_closed_on_ambiguity": true,
+    "propagated_drift_classes": [
+      "TOPOLOGY_DRIFT_PROPAGATED",
+      "MERGE_LINEAGE_CONTAMINATED",
+      "GOVERNANCE_IMPACT_EXPANDED",
+      "SCHEMA_PROPAGATION_FAILURE",
+      "WORKFLOW_TRUST_COLLAPSE",
+      "PROOF_LINEAGE_CONTAMINATION",
+      "RECONCILIATION_EQUIVALENCE_INVALID",
+      "DOWNSTREAM_LEGITIMACY_NULL"
+    ]
   }
 }

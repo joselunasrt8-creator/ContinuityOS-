@@ -40,6 +40,10 @@ const RECONCILIATION_CLOSURE_ROUTE = "/reconcile/closure" as const
 const RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE = "/reconcile/closure/checkpoint" as const
 const RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE = "/reconcile/closure/equivalence" as const
 const RECONCILIATION_CLOSURE_DRIFT_ROUTE = "/reconcile/closure/drift" as const
+const RECONCILIATION_IMPACT_ROUTE = "/reconcile/impact" as const
+const RECONCILIATION_VERDICT_ROUTE = "/reconcile/verdict" as const
+const RECONCILIATION_PROPAGATION_ROUTE = "/reconcile/propagation" as const
+const RECONCILIATION_TOPOLOGY_DELTA_ROUTE = "/reconcile/topology-delta" as const
 const DELEGATION_LINEAGE_ROUTE = "/delegation/lineage" as const
 const DELEGATION_CHECKPOINT_ROUTE = "/delegation/checkpoint" as const
 const DELEGATION_DRIFT_ROUTE = "/delegation/drift" as const
@@ -64,7 +68,7 @@ const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as co
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
-const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES, ...RUNTIME_CONTAINMENT_ROUTES] as const
+const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [RUNTIME_SOVEREIGNTY_ROUTE, RUNTIME_EVOLUTION_CONSENSUS_ROUTE, GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE, RECONCILIATION_CLOSURE_ROUTE, RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, RECONCILIATION_CLOSURE_DRIFT_ROUTE, RECONCILIATION_IMPACT_ROUTE, RECONCILIATION_VERDICT_ROUTE, RECONCILIATION_PROPAGATION_ROUTE, RECONCILIATION_TOPOLOGY_DELTA_ROUTE, ...DELEGATION_OBSERVABILITY_ROUTES, "/governance/recursive/verify", "/governance/recursive/self-integrity", "/reconcile", "/reconcile/schedule", "/reconcile/report", "/reconcile/drift", "/federation/reconcile", "/federation/reconcile/report", "/federation/reconcile/drift", "/federation/reconcile/checkpoint", "/federation/reconcile/revocation", "/federation/reconcile/topology", "/federation/reconcile/distributed", "/federation/reconcile/compression", "/federation/interoperability/checkpoint", "/federation/conformance", "/federation/sovereignty/checkpoint", EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE, ...CONTINUOUS_FATE_ROUTES, ...RUNTIME_CONTAINMENT_ROUTES] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
 const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "session_registry",
@@ -96,6 +100,7 @@ const CONTINUOUS_FATE_MAX_STRESS_DEPTH = 32
 const DELEGATED_AUTHORITY_REGISTRY = "delegated_authority_registry" as const
 const RUNTIME_SURFACE_CONTAINMENT_REGISTRY = "runtime_surface_containment_registry" as const
 const TOPOLOGY_RECONCILIATION_REGISTRY = "topology_reconciliation_registry" as const
+const LEGITIMACY_DRIFT_PROPAGATION_REGISTRY = "legitimacy_drift_propagation_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -134,7 +139,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   reconciliation_closure_registry: ["closure_id", "closure_hash", "deterministic_reconciliation_anchor", "recursive_checkpoint_identity", "reconciliation_equivalence_state", "lineage_depth", "bounded_window", "graph_checkpoint_hash", "bootstrap_checkpoint_hash", "runtime_sovereignty_checkpoint_hash", "federation_conformance_checkpoint_hash", "drift_classes", "closure_object_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "generated_at", "created_at"],
   continuous_fate_registry: ["continuous_fate_id", "stress_window_id", "deterministic_stress_hash", "topology_stability_hash", "drift_survivability_state", "replay_mutation_vector_hash", "governance_replay_checkpoint", "runtime_stress_depth", "scenario_set_hash", "drift_classes", "checkpoint_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"],
   runtime_surface_containment_registry: ["containment_id", "containment_hash", "route_surface_hash", "deployment_surface_hash", "package_surface_hash", "runtime_sovereignty_hash", "hidden_surface_count", "drift_classes", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"],
-  topology_reconciliation_registry: ["reconciliation_id", "topology_hash", "governance_hash", "workflow_hash", "schema_hash", "reconciliation_hash", "traversal_hash", "classification", "drift_summary", "topology_ancestry", "merge_signal", "evidence_only", "remote_authority_denied", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"]
+  topology_reconciliation_registry: ["reconciliation_id", "topology_hash", "governance_hash", "workflow_hash", "schema_hash", "reconciliation_hash", "traversal_hash", "classification", "drift_summary", "topology_ancestry", "merge_signal", "evidence_only", "remote_authority_denied", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"],
+  legitimacy_drift_propagation_registry: ["propagation_id", "propagation_hash", "topology_hash", "impact_hash", "merge_legitimacy_hash", "verdict_hash", "classification", "propagation_object", "impact_graph", "merge_impact", "verdict_object", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "executable", "deployment_capable", "proof_generating", "fail_closed_on_ambiguity", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -924,6 +930,13 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_topology_reconciliation_registry_hash_unique ON topology_reconciliation_registry(reconciliation_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_topology_reconciliation_registry_classification ON topology_reconciliation_registry(classification, merge_signal)`,
       `CREATE INDEX IF NOT EXISTS idx_topology_reconciliation_registry_topology ON topology_reconciliation_registry(topology_hash, governance_hash, workflow_hash, schema_hash)`,
+      `CREATE TABLE IF NOT EXISTS legitimacy_drift_propagation_registry (propagation_id TEXT PRIMARY KEY, propagation_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, impact_hash TEXT NOT NULL, merge_legitimacy_hash TEXT NOT NULL, verdict_hash TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification IN ('TOPOLOGY_VALID','TOPOLOGY_DRIFT_PROPAGATED','MERGE_LINEAGE_CONTAMINATED','GOVERNANCE_IMPACT_EXPANDED','SCHEMA_PROPAGATION_FAILURE','WORKFLOW_TRUST_COLLAPSE','PROOF_LINEAGE_CONTAMINATION','RECONCILIATION_EQUIVALENCE_INVALID','DOWNSTREAM_LEGITIMACY_NULL','NULL')), propagation_object TEXT NOT NULL, impact_graph TEXT NOT NULL, merge_impact TEXT NOT NULL, verdict_object TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_hash_unique ON legitimacy_drift_propagation_registry(propagation_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_topology ON legitimacy_drift_propagation_registry(topology_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_impact ON legitimacy_drift_propagation_registry(impact_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_merge ON legitimacy_drift_propagation_registry(merge_legitimacy_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_verdict ON legitimacy_drift_propagation_registry(verdict_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_classification ON legitimacy_drift_propagation_registry(classification)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_graph_registry_checkpoint ON legitimacy_graph_registry(graph_checkpoint_hash, graph_coherence_hash, cross_registry_replay_continuity)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_mutation ON runtime_evolution_consensus_registry(mutation_hash, canonical_hash, governance_scope)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_evolution_consensus_registry_approval ON runtime_evolution_consensus_registry(approval_hash, consensus_status)`,
@@ -1682,6 +1695,153 @@ async function validateReconciliationClosureRegistry(env: Env) {
   for (const column of REQUIRED_SCHEMA_COLUMNS.reconciliation_closure_registry) {
     if (!columns.has(column)) throw new SchemaInitializationError("missing_required_column")
   }
+}
+
+
+const DRIFT_PROPAGATION_ROUTES = [RECONCILIATION_IMPACT_ROUTE, RECONCILIATION_VERDICT_ROUTE, RECONCILIATION_PROPAGATION_ROUTE, RECONCILIATION_TOPOLOGY_DELTA_ROUTE] as const
+const DRIFT_PROPAGATION_CLASSES = ["TOPOLOGY_DRIFT_PROPAGATED", "MERGE_LINEAGE_CONTAMINATED", "GOVERNANCE_IMPACT_EXPANDED", "SCHEMA_PROPAGATION_FAILURE", "WORKFLOW_TRUST_COLLAPSE", "PROOF_LINEAGE_CONTAMINATION", "RECONCILIATION_EQUIVALENCE_INVALID", "DOWNSTREAM_LEGITIMACY_NULL"] as const
+const DRIFT_PROPAGATION_FLAGS = { evidence_only: true, executable: false, creates_authority: false, mutation_capable: false, deployment_capable: false, proof_generating: false, fail_closed_on_ambiguity: true, read_only: true, replay_neutral: true, authoritative: false } as const
+const DRIFT_PROPAGATION_RULES: Record<string, string[]> = {
+  SCHEMA_DIVERGENCE: ["route_binding_invalid", "governance_binding_invalid", "reconciliation_equivalence_invalid", "preo_legitimacy_invalid", "merge_legitimacy_null"],
+  UNDECLARED_SURFACE: ["topology_legitimacy_null", "downstream_proof_lineage_contaminated", "merge_legitimacy_null"],
+  WORKFLOW_EXPANSION: ["preo_lineage_invalid", "governed_merge_invalid", "reconciliation_verdict_drift_propagated"],
+  GOVERNANCE_MISMATCH: ["governance_binding_invalid", "reconciliation_equivalence_invalid", "preo_legitimacy_invalid", "merge_legitimacy_null"],
+  TOPOLOGY_DRIFT: ["topology_legitimacy_null", "downstream_legitimacy_null", "merge_legitimacy_null"],
+  PROOF_LINEAGE_DISCONTINUITY: ["continuity_invalid", "execution_legitimacy_invalid", "downstream_proof_trust_invalid"],
+}
+const DRIFT_CONSEQUENCE_CLASSES: Record<string, string> = {
+  route_binding_invalid: "SCHEMA_PROPAGATION_FAILURE",
+  governance_binding_invalid: "GOVERNANCE_IMPACT_EXPANDED",
+  reconciliation_equivalence_invalid: "RECONCILIATION_EQUIVALENCE_INVALID",
+  preo_legitimacy_invalid: "DOWNSTREAM_LEGITIMACY_NULL",
+  merge_legitimacy_null: "MERGE_LINEAGE_CONTAMINATED",
+  topology_legitimacy_null: "TOPOLOGY_DRIFT_PROPAGATED",
+  downstream_proof_lineage_contaminated: "PROOF_LINEAGE_CONTAMINATION",
+  preo_lineage_invalid: "WORKFLOW_TRUST_COLLAPSE",
+  governed_merge_invalid: "MERGE_LINEAGE_CONTAMINATED",
+  reconciliation_verdict_drift_propagated: "TOPOLOGY_DRIFT_PROPAGATED",
+  continuity_invalid: "PROOF_LINEAGE_CONTAMINATION",
+  execution_legitimacy_invalid: "DOWNSTREAM_LEGITIMACY_NULL",
+  downstream_proof_trust_invalid: "PROOF_LINEAGE_CONTAMINATION",
+  downstream_legitimacy_null: "DOWNSTREAM_LEGITIMACY_NULL",
+}
+
+function propagationStableIdentity(value: any): string {
+  if (typeof value === "string") return value
+  if (!isPlainRecord(value)) return canonicalize(value)
+  return String(value.identity || value.id || value.route || value.path || value.surface_id || value.source_id || value.workflow || value.name || canonicalize(value))
+}
+
+function propagationSort(records: any[]): any[] {
+  return [...records].map(normalizeCanonicalValue).sort((left, right) => {
+    const byIdentity = propagationStableIdentity(left).localeCompare(propagationStableIdentity(right))
+    if (byIdentity !== 0) return byIdentity
+    return canonicalize(left).localeCompare(canonicalize(right))
+  })
+}
+
+function parseJsonArray(value: unknown): any[] {
+  if (Array.isArray(value)) return value
+  if (typeof value !== "string") return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function propagationClass(entry: any): string {
+  const classification = String(entry?.classification || entry?.drift_class || "").toUpperCase()
+  const reason = String(entry?.reason || "").toLowerCase()
+  if (classification === "PROOF_LINEAGE_DISCONTINUITY" || reason.includes("proof_lineage") || reason.includes("continuity")) return "PROOF_LINEAGE_DISCONTINUITY"
+  if (DRIFT_PROPAGATION_RULES[classification]) return classification
+  return classification ? "TOPOLOGY_DRIFT" : "NULL"
+}
+
+async function ensureLegitimacyDriftPropagationRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS legitimacy_drift_propagation_registry (propagation_id TEXT PRIMARY KEY, propagation_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, impact_hash TEXT NOT NULL, merge_legitimacy_hash TEXT NOT NULL, verdict_hash TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification IN ('TOPOLOGY_VALID','TOPOLOGY_DRIFT_PROPAGATED','MERGE_LINEAGE_CONTAMINATED','GOVERNANCE_IMPACT_EXPANDED','SCHEMA_PROPAGATION_FAILURE','WORKFLOW_TRUST_COLLAPSE','PROOF_LINEAGE_CONTAMINATION','RECONCILIATION_EQUIVALENCE_INVALID','DOWNSTREAM_LEGITIMACY_NULL','NULL')), propagation_object TEXT NOT NULL, impact_graph TEXT NOT NULL, merge_impact TEXT NOT NULL, verdict_object TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_hash_unique ON legitimacy_drift_propagation_registry(propagation_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_topology ON legitimacy_drift_propagation_registry(topology_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_impact ON legitimacy_drift_propagation_registry(impact_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_merge ON legitimacy_drift_propagation_registry(merge_legitimacy_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_verdict ON legitimacy_drift_propagation_registry(verdict_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_classification ON legitimacy_drift_propagation_registry(classification)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_legitimacy_drift_propagation_registry_no_update BEFORE UPDATE ON legitimacy_drift_propagation_registry BEGIN SELECT RAISE(ABORT, 'legitimacy_drift_propagation_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_legitimacy_drift_propagation_registry_no_delete BEFORE DELETE ON legitimacy_drift_propagation_registry BEGIN SELECT RAISE(ABORT, 'legitimacy_drift_propagation_registry is append-only'); END`).run()
+  const columns = await tableColumns(env, LEGITIMACY_DRIFT_PROPAGATION_REGISTRY)
+  for (const column of REQUIRED_SCHEMA_COLUMNS.legitimacy_drift_propagation_registry) {
+    if (!columns.has(column)) throw new SchemaInitializationError("missing_required_column")
+  }
+}
+
+async function latestTopologyReconciliationEvidence(env: Env): Promise<Record<string, unknown>> {
+  const selectedHash = ""
+  const result = await env.DB.prepare(`SELECT * FROM topology_reconciliation_registry ORDER BY reconciliation_hash ASC LIMIT 1`).all<any>()
+  const row = Array.isArray(result?.results) ? result.results[0] : null
+  if (!row) return { classification: "TOPOLOGY_VALID", topology_hash: await sha256Hex(canonicalize({ empty_topology_reconciliation_registry: true })), topology_ancestry: [], drift_summary: [], selected_reconciliation_hash: selectedHash }
+  return {
+    classification: String(row.classification || "NULL"),
+    topology_hash: String(row.topology_hash || ""),
+    governance_hash: String(row.governance_hash || ""),
+    workflow_hash: String(row.workflow_hash || ""),
+    schema_hash: String(row.schema_hash || ""),
+    reconciliation_hash: String(row.reconciliation_hash || ""),
+    traversal_hash: String(row.traversal_hash || ""),
+    drift_summary: parseJsonArray(row.drift_summary),
+    topology_ancestry: parseJsonArray(row.topology_ancestry),
+  }
+}
+
+async function buildDriftPropagationEnvelope(evidence: Record<string, unknown>) {
+  const entries = propagationSort(parseJsonArray(evidence.drift_summary))
+  const nodes: any[] = []
+  const edges: any[] = []
+  const propagated = new Set<string>()
+  let ambiguous = false
+  const max_depth = SYSTEM_MAX_CONTINUITY_DEPTH
+  const max_nodes = 256
+  for (const entry of entries) {
+    const sourceClass = propagationClass(entry)
+    if (sourceClass === "NULL") ambiguous = true
+    const sourceId = `drift:${sourceClass}:${propagationStableIdentity(entry)}`
+    if (nodes.length >= max_nodes) { ambiguous = true; break }
+    nodes.push({ node_id: sourceId, node_type: "drift_source", classification: sourceClass, identity: propagationStableIdentity(entry), reason: String(entry?.reason || "unspecified") })
+    let prior = sourceId
+    for (const [depth, consequence] of (DRIFT_PROPAGATION_RULES[sourceClass] || []).entries()) {
+      if (depth >= max_depth || nodes.length >= max_nodes) { ambiguous = true; break }
+      const classification = DRIFT_CONSEQUENCE_CLASSES[consequence] || "DOWNSTREAM_LEGITIMACY_NULL"
+      propagated.add(classification)
+      const nodeId = `impact:${consequence}:${propagationStableIdentity(entry)}`
+      nodes.push({ node_id: nodeId, node_type: "legitimacy_consequence", consequence, classification, depth: depth + 1, invalidates_legitimacy: true })
+      edges.push({ from: prior, to: nodeId, rule: `${sourceClass}->${consequence}`, depth: depth + 1 })
+      prior = nodeId
+    }
+  }
+  if (ambiguous) propagated.add("DOWNSTREAM_LEGITIMACY_NULL")
+  const drift_classes = [...propagated].sort()
+  const topology_hash = String(evidence.topology_hash || await sha256Hex(canonicalize({ topology_null: true })))
+  const impactMaterial = { topology_hash, nodes: propagationSort(nodes), edges: propagationSort(edges), drift_classes, bounded: true, max_depth, max_nodes, ambiguous }
+  const impact_hash = await sha256Hex(canonicalize(impactMaterial))
+  const impact_graph = { object_type: "GovernanceImpactGraph", ...impactMaterial, impact_hash, ...DRIFT_PROPAGATION_FLAGS }
+  const topology_delta = { object_type: "TopologyDeltaObject", topology_hash, topology_ancestry: propagationSort(parseJsonArray(evidence.topology_ancestry)), drift_sources: entries, topology_delta_hash: await sha256Hex(canonicalize({ topology_hash, drift_sources: entries })), ...DRIFT_PROPAGATION_FLAGS }
+  const propagationMaterial = { topology_delta, impact_hash, propagated_drift_classes: drift_classes, propagation_steps: impactMaterial.edges, fail_closed: ambiguous || drift_classes.length > 0 }
+  const propagation_hash = await sha256Hex(canonicalize(propagationMaterial))
+  const propagation_object = { object_type: "DriftPropagationObject", ...propagationMaterial, propagation_hash, ...DRIFT_PROPAGATION_FLAGS }
+  const collapse_hash = await sha256Hex(canonicalize({ propagation_hash, drift_classes, collapsed: propagation_object.fail_closed }))
+  const mergeMaterial = { merge_legitimacy: propagation_object.fail_closed || drift_classes.includes("MERGE_LINEAGE_CONTAMINATED") ? "NULL" : "UNCHANGED", governed_merge_allowed: false, merge_surfaces_fail_closed: propagation_object.fail_closed, collapse_hash, propagation_hash, invalidation_reasons: drift_classes }
+  const merge_legitimacy_hash = await sha256Hex(canonicalize(mergeMaterial))
+  const merge_impact = { object_type: "MergeLegitimacyImpactObject", ...mergeMaterial, merge_legitimacy_hash, ...DRIFT_PROPAGATION_FLAGS }
+  const verdictMaterial = { impact_hash, propagation_hash, merge_legitimacy_hash, verdict: merge_impact.merge_legitimacy === "NULL" ? "DRIFT_PROPAGATED" : "NO_PROPAGATED_DRIFT", classification: drift_classes[0] || "TOPOLOGY_VALID", deterministic: true, replay_neutral: true }
+  const verdict_hash = await sha256Hex(canonicalize(verdictMaterial))
+  const verdict_object = { object_type: "ReconciliationVerdictObject", ...verdictMaterial, verdict_hash, ...DRIFT_PROPAGATION_FLAGS }
+  return { status: merge_impact.merge_legitimacy === "NULL" ? "DRIFT_PROPAGATED" : "NO_PROPAGATED_DRIFT", impact_graph, topology_delta, propagation_object, merge_impact, verdict_object, propagation_hash, topology_hash, impact_hash, merge_legitimacy_hash, verdict_hash, classification: verdict_object.classification, drift_classes, ...DRIFT_PROPAGATION_FLAGS }
+}
+
+async function appendDriftPropagationObservation(env: Env, envelope: any) {
+  await env.DB.prepare(`INSERT OR IGNORE INTO legitimacy_drift_propagation_registry (propagation_id,propagation_hash,topology_hash,impact_hash,merge_legitimacy_hash,verdict_hash,classification,propagation_object,impact_graph,merge_impact,verdict_object,evidence_only,replay_neutral,mutation_capable,read_only,creates_authority,executable,deployment_capable,proof_generating,fail_closed_on_ambiguity,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','false','true','false','false','false','false','true',?12,?13)`)
+    .bind(envelope.propagation_hash, envelope.propagation_hash, envelope.topology_hash, envelope.impact_hash, envelope.merge_legitimacy_hash, envelope.verdict_hash, envelope.classification, canonicalize(envelope.propagation_object), canonicalize(envelope.impact_graph), canonicalize(envelope.merge_impact), canonicalize(envelope.verdict_object), new Date(0).toISOString(), new Date(0).toISOString())
+    .run()
 }
 
 async function ensureLegitimacyGraphRegistry(env: Env) {
@@ -5135,6 +5295,25 @@ export default {
         return json({ status: "NULL", route: "/federation/interoperability/checkpoint", reason: "reconciliation_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
       }
     }
+    if (DRIFT_PROPAGATION_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...DRIFT_PROPAGATION_FLAGS }, 405)
+
+    if (DRIFT_PROPAGATION_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...DRIFT_PROPAGATION_FLAGS }, 500)
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await ensureLegitimacyDriftPropagationRegistry(env)
+        const evidence = await latestTopologyReconciliationEvidence(env)
+        const envelope = await buildDriftPropagationEnvelope(evidence)
+        await appendDriftPropagationObservation(env, envelope)
+        if (url.pathname === RECONCILIATION_IMPACT_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_IMPACT_ROUTE, reason: "observability_only", impact_graph: envelope.impact_graph, impact_hash: envelope.impact_hash, drift_classes: envelope.drift_classes, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
+        if (url.pathname === RECONCILIATION_PROPAGATION_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_PROPAGATION_ROUTE, reason: "observability_only", propagation: envelope.propagation_object, propagation_hash: envelope.propagation_hash, drift_classes: envelope.drift_classes, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
+        if (url.pathname === RECONCILIATION_TOPOLOGY_DELTA_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_TOPOLOGY_DELTA_ROUTE, reason: "observability_only", topology_delta: envelope.topology_delta, topology_hash: envelope.topology_hash, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
+        return json({ status: envelope.status, route: RECONCILIATION_VERDICT_ROUTE, reason: "observability_only", verdict: envelope.verdict_object, merge_impact: envelope.merge_impact, verdict_hash: envelope.verdict_hash, propagation_hash: envelope.propagation_hash, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "drift_propagation_unavailable", drift_classes: ["DOWNSTREAM_LEGITIMACY_NULL"], ...DRIFT_PROPAGATION_FLAGS }, 500)
+      }
+    }
+
     if (RECONCILIATION_CLOSURE_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...reconciliationClosureFlags() }, 405)
 
     if (RECONCILIATION_CLOSURE_ROUTES.includes(url.pathname as any) && request.method === "GET") {
