@@ -38,7 +38,10 @@
     "runtime/topology/runtime_graph.json",
     "runtime/topology/schema_source_map.json",
     "runtime/topology/proof_schema_reconciliation.json",
-    "runtime/topology/topology_manifest.json"
+    "runtime/topology/topology_manifest.json",
+    "runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json",
+    "runtime/reconciliation/topology-reconciliation-engine.js",
+    "migrations/0033_topology_reconciliation_registry.sql"
   ],
   "required_objects": [
     "TopologyManifest",
@@ -53,7 +56,10 @@
     "schema_source_map_hash": "0fe964c67eaf7d364a6c222514374e69612542e22004129a18ef533ab3719e14",
     "topology_graph_hash": "fece0d5caa8f8395436ae47e1e97319ee75fdc571e42dd7a5cb5408ec766bbe0",
     "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5",
-    "proof_schema_reconciliation_hash": "a374e518150d466a4d56571dd49dea127f9faed705323cb6d4851d23b4707b42"
+    "proof_schema_reconciliation_hash": "a374e518150d466a4d56571dd49dea127f9faed705323cb6d4851d23b4707b42",
+    "topology_reconciliation_policy_hash": "e4736787f6121b0dd410473af83fc9d64cb3f271f3857160421f1daccf874946",
+    "topology_reconciliation_engine_hash": "9dbd1866b9532ee9920531959c7bca3bede2b3d996bb78b8eb799a7b60bcbc79",
+    "topology_reconciliation_registry_migration_hash": "a16ac2ecfcb17ce4241a7c46f24c3db6099811b2acfcb3179add21267da8192c"
   },
   "schema_reconciliation": {
     "legacy_schema_conflict": true,
@@ -117,5 +123,5 @@
     ],
     "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5"
   },
-  "topology_manifest_hash": "ec1e5db8e99c38fbb9f077e238d58ec4f5a8be544c4abdd469d1c1a1a492e9f1"
+  "topology_manifest_hash": "a47acc5f8c3e4c62914b3ae485a2aa013a788835d614907bbd1b79c12641d1a2"
 }

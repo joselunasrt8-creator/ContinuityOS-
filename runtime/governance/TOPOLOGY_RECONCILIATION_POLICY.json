@@ -1,0 +1,56 @@
+{
+  "object_type": "GovernancePolicyMap",
+  "version": "1.0.0",
+  "generated_at": "2026-05-14T00:00:00.000Z",
+  "invariant": "If no valid object exists -> nothing happens.",
+  "evidence_only": true,
+  "executable": false,
+  "creates_authority": false,
+  "mutation_capable": false,
+  "deployment_capable": false,
+  "proof_generating": false,
+  "additional_routes_created": false,
+  "fail_closed_on_ambiguity": true,
+  "policy_id": "TOPOLOGY_RECONCILIATION_POLICY",
+  "canonical_traversal_order": [
+    "runtime_routes",
+    "execution_surfaces",
+    "observability_surfaces",
+    "governance_inventories",
+    "schema_maps",
+    "workflow_topology",
+    "proof_lineage_bindings"
+  ],
+  "hashes": [
+    "topology_hash",
+    "governance_hash",
+    "workflow_hash",
+    "reconciliation_hash"
+  ],
+  "classifications": [
+    "TOPOLOGY_VALID",
+    "TOPOLOGY_DRIFT",
+    "UNDECLARED_SURFACE",
+    "SCHEMA_DIVERGENCE",
+    "WORKFLOW_EXPANSION",
+    "GOVERNANCE_MISMATCH"
+  ],
+  "merge_signals": [
+    "SAFE_TO_MERGE",
+    "TOPOLOGY_DRIFT",
+    "GOVERNANCE_DIVERGENCE",
+    "UNDECLARED_EXECUTION_SURFACE"
+  ],
+  "evidence_envelope_flags": {
+    "evidence_only": true,
+    "remote_authority_denied": true,
+    "replay_neutral": true,
+    "mutation_capable": false,
+    "read_only": true,
+    "creates_authority": false,
+    "execution_started": false
+  },
+  "registry": "topology_reconciliation_registry",
+  "runtime_authority": "observability_only",
+  "direct_merge_authority": false
+}

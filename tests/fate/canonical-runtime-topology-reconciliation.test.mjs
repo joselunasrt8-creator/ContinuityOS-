@@ -18,6 +18,7 @@ const requiredTopologyFiles = [
   'runtime/governance/REPLAY_POLICY.json',
   'runtime/governance/DEPLOY_POLICY.json',
   'runtime/governance/SCHEMA_POLICY.json',
+  'runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json',
   'runtime/topology/runtime_graph.json',
   'runtime/topology/schema_source_map.json',
   'runtime/topology/proof_schema_reconciliation.json',

@@ -12,7 +12,11 @@
     "Direct push to governed branches is a bypass path",
     "No PREO_VALID -> no merge legitimacy",
     "Required branch protection checks must resolve to emitted GitHub Actions job check-run names",
-    "Governance drift -> PREO invalid -> merge legitimacy NULL"
+    "Governance drift -> PREO invalid -> merge legitimacy NULL",
+    "Topology reconciliation signal SAFE_TO_MERGE is evidence only and grants no direct merge authority",
+    "Topology reconciliation signal TOPOLOGY_DRIFT -> merge legitimacy NULL",
+    "Topology reconciliation signal GOVERNANCE_DIVERGENCE -> merge legitimacy NULL",
+    "Topology reconciliation signal UNDECLARED_EXECUTION_SURFACE -> merge legitimacy NULL"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -35,5 +39,19 @@
     "merge-governance-check",
     "generate-preo-candidate",
     "generate-sco-candidate"
-  ]
+  ],
+  "topology_reconciliation": {
+    "policy": "runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json",
+    "registry": "topology_reconciliation_registry",
+    "signals": [
+      "SAFE_TO_MERGE",
+      "TOPOLOGY_DRIFT",
+      "GOVERNANCE_DIVERGENCE",
+      "UNDECLARED_EXECUTION_SURFACE"
+    ],
+    "direct_merge_authority": false,
+    "evidence_only": true,
+    "replay_neutral": true,
+    "mutation_capable": false
+  }
 }

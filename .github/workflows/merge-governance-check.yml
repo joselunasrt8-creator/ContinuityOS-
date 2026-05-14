@@ -191,7 +191,8 @@ jobs:
             governance/runtime/PREO_REQUIREMENTS.json \
             governance/runtime/SCO_REQUIREMENTS.json \
             governance/runtime/MERGE_GOVERNANCE_RULES.json \
-            governance/runtime/BRANCH_PROTECTION_POLICY.json
+            governance/runtime/BRANCH_PROTECTION_POLICY.json \
+            runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json
           do
             if [ ! -f "$file" ]; then
               echo "NULL — missing merge governance artifact: $file"
@@ -207,6 +208,7 @@ jobs:
 
           const merge = JSON.parse(readFileSync('governance/runtime/MERGE_GOVERNANCE_RULES.json', 'utf8'));
           const branch = JSON.parse(readFileSync('governance/runtime/BRANCH_PROTECTION_POLICY.json', 'utf8'));
+          const topologyPolicy = JSON.parse(readFileSync('runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json', 'utf8'));
           const rules = merge.rules.join('\n');
 
           function emittedCheckNames() {
@@ -226,11 +228,58 @@ jobs:
           assert.ok(rules.includes('Governance/runtime mutation -> requires SCO'), 'merge rules must require SCO');
           assert.ok(Array.isArray(merge.required_proof_fields), 'merge proof requirements must be declared');
           assert.ok(merge.required_proof_fields.includes('merge_commit_sha'), 'merge proof must require merge_commit_sha');
+          assert.equal(merge.topology_reconciliation.evidence_only, true, 'topology reconciliation must be evidence-only');
+          assert.equal(merge.topology_reconciliation.direct_merge_authority, false, 'topology reconciliation cannot grant direct merge authority');
+          assert.deepEqual(topologyPolicy.canonical_traversal_order, ['runtime_routes', 'execution_surfaces', 'observability_surfaces', 'governance_inventories', 'schema_maps', 'workflow_topology', 'proof_lineage_bindings']);
+          assert.ok(topologyPolicy.merge_signals.includes('SAFE_TO_MERGE'), 'topology reconciliation merge signal must be declared');
 
           const emitted = emittedCheckNames();
           const required = branch.required_controls.required_status_checks;
           const missing = required.filter((checkName) => !emitted.has(checkName));
           assert.deepEqual(missing, [], `required branch protection checks must be emitted workflow jobs: ${missing.join(', ')}`);
+          NODE
+
+      - name: Emit topology reconciliation merge signal
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { reconcileTopology } from './runtime/reconciliation/topology-reconciliation-engine.js';
+
+          const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+          const runtimeGraph = readJson('runtime/topology/runtime_graph.json');
+          const executionSurfaces = readJson('runtime/surfaces/EXECUTION_SURFACES.json');
+          const observabilitySurfaces = readJson('runtime/surfaces/OBSERVABILITY_SURFACES.json');
+          const schemaSourceMap = readJson('runtime/topology/schema_source_map.json');
+          const mergeGovernance = readJson('governance/runtime/MERGE_GOVERNANCE_RULES.json');
+
+          const topology = {
+            runtime_routes: runtimeGraph.nodes,
+            execution_surfaces: executionSurfaces.surfaces,
+            observability_surfaces: observabilitySurfaces.surfaces,
+            governance_inventories: [{ id: 'merge_governance_rules', current: true, required_routes: runtimeGraph.canonical_lifecycle }],
+            schema_maps: schemaSourceMap.sources,
+            workflow_topology: [{ id: 'governed_deploy_workflow', workflow: 'governed-deploy.yml', declared: true, expands_execution: false }],
+            proof_lineage_bindings: [{ id: 'merge_governance_rules', path: 'governance/runtime/MERGE_GOVERNANCE_RULES.json', hash_bound: true }],
+            topology_ancestry: [mergeGovernance.topology_reconciliation.policy],
+          };
+          const evidence = reconcileTopology(topology, { generated_at: new Date(0).toISOString(), maxNodes: 256 });
+          writeFileSync('TOPOLOGY_RECONCILIATION_SIGNAL.json', JSON.stringify({
+            reconciliation_id: evidence.reconciliation_id,
+            classification: evidence.classification,
+            merge_signal: evidence.merge_signal,
+            evidence_only: evidence.evidence_only,
+            remote_authority_denied: evidence.remote_authority_denied,
+            replay_neutral: evidence.replay_neutral,
+            mutation_capable: evidence.mutation_capable,
+            direct_merge_authority: false,
+          }, null, 2));
+
+          if (evidence.merge_signal !== 'SAFE_TO_MERGE') {
+            console.error(`NULL — topology reconciliation merge signal: ${evidence.merge_signal}`);
+            process.exit(1);
+          }
           NODE
 
       - name: Upload merge governance candidates
@@ -240,6 +289,7 @@ jobs:
           path: |
             PREO_CANDIDATE.json
             SCO_CANDIDATE.json
+            TOPOLOGY_RECONCILIATION_SIGNAL.json
             changed_files.txt
             governed_files.txt
 
@@ -260,5 +310,10 @@ jobs:
             echo "#### SCO_CANDIDATE.json"
             echo '```json'
             cat SCO_CANDIDATE.json
+            echo '```'
+            echo ""
+            echo "#### TOPOLOGY_RECONCILIATION_SIGNAL.json"
+            echo '```json'
+            cat TOPOLOGY_RECONCILIATION_SIGNAL.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
