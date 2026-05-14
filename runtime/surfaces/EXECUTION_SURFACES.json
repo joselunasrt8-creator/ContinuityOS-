@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "classification": "mutation_capable_surfaces",
+  "core_invariant": "No execution surface may bypass Authority → ATAO → AEO → Ω Validator → Execution Boundary → Proof",
+  "surfaces": [
+    {
+      "surface_id": "github_actions_governed_deploy",
+      "category": "deployment_runtime",
+      "mutation_class": "production_deploy",
+      "entrypoint": ".github/workflows/governed-deploy.yml",
+      "risk_class": "P3",
+      "canonical_status": "PARTIALLY_GOVERNED"
+    },
+    {
+      "surface_id": "workflow_dispatch",
+      "category": "manual_trigger_surface",
+      "mutation_class": "workflow_execution",
+      "entrypoint": "GitHub Actions workflow_dispatch",
+      "risk_class": "P2",
+      "canonical_status": "CONDITIONALLY_GOVERNED"
+    },
+    {
+      "surface_id": "wrangler_direct_deploy",
+      "category": "infrastructure_surface",
+      "mutation_class": "runtime_deploy",
+      "entrypoint": "wrangler deploy",
+      "risk_class": "P3",
+      "canonical_status": "UNGOVERNED_ROOT_SURFACE"
+    }
+  ]
+}
