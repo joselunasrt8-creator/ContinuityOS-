@@ -1,0 +1,63 @@
+{
+  "spec_id": "governance_consensus_infrastructure_v1",
+  "core_invariant": "If no valid object exists, nothing happens.",
+  "consensus_invariant": {
+    "may_classify_legitimacy": true,
+    "creates_authority": false,
+    "observer_agreement_authorizes_execution": false,
+    "federated_compatibility_inherits_authority": false,
+    "remote_legitimacy_equals_local_legitimacy": false,
+    "ambiguity_result": "NULL"
+  },
+  "routes": [
+    "/consensus/observer/checkpoint",
+    "/consensus/observer/equivalence",
+    "/consensus/observer/drift",
+    "/conformance/runtime",
+    "/conformance/equivalence",
+    "/conformance/checkpoint"
+  ],
+  "registries": [
+    "observer_attestation_registry",
+    "semantic_equivalence_registry",
+    "portable_governance_checkpoint_registry",
+    "external_conformance_verification_registry"
+  ],
+  "drift_classes": [
+    "OBSERVER_DIVERGENCE",
+    "QUORUM_AMBIGUITY",
+    "SEMANTIC_DIVERGENCE",
+    "FEDERATED_EQUIVALENCE_DRIFT",
+    "CHECKPOINT_CORRUPTION",
+    "PORTABILITY_LINEAGE_DRIFT",
+    "REMOTE_AUTHORITY_INHERITANCE_ATTEMPT",
+    "CONSENSUS_CONTAINMENT_OVERFLOW",
+    "OBSERVER_REPLAY_RESURRECTION",
+    "GOVERNANCE_CONSENSUS_FRAGMENTATION",
+    "SEMANTIC_AMBIGUITY",
+    "SEMANTIC_REPLAY",
+    "SEMANTIC_CONTAINMENT_OVERFLOW",
+    "SEMANTIC_GOVERNANCE_DRIFT"
+  ],
+  "required_flags": {
+    "evidence_only": true,
+    "replay_neutral": true,
+    "non_authoritative": true,
+    "read_only": true,
+    "mutation_capable": false,
+    "creates_authority": false,
+    "executable": false,
+    "deployment_capable": false,
+    "proof_generating": false,
+    "merge_authorizing": false,
+    "remote_authority_denied": true,
+    "fail_closed_on_ambiguity": true
+  },
+  "canonical_objects": [
+    "ObserverCheckpointObject",
+    "GovernanceConsensusCheckpoint",
+    "SemanticEquivalenceEnvelope",
+    "PortableGovernanceCheckpoint",
+    "ExternalConformanceVerification"
+  ]
+}
