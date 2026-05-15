@@ -687,7 +687,106 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
     })
     assert.equal(mismatch.status, 'NULL')
     assert.equal(mismatch.result, 'INVALID')
-    assert.equal(mismatch.reason, 'hash_mismatch')
+    assert.equal(mismatch.reason, 'lineage_mismatch')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('validate binds validation persistence to compiled canonical AEO origin', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-validate-compile-origin-'))
+  const dbPath = join(dir, 'runtime.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+
+  async function post(path, payload, expectedStatus = 200) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, expectedStatus)
+    return response.json()
+  }
+
+  async function createAuthority(decision_id, identity_id = `identity-${decision_id}`) {
+    const session = await post('/session', { identity_id })
+    assert.equal(session.status, 'SESSION_ACTIVE')
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    assert.equal(continuity.status, 'CONTINUITY_ACTIVE')
+    const authority = await post('/authority', {
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id,
+      owner: 'validate-compile-origin-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+    })
+    assert.equal(authority.status, 'ACTIVE')
+    return { session, continuity, authority }
+  }
+
+  async function createCompiled(decision_id) {
+    const lineage = await createAuthority(decision_id)
+    const compiled = await post('/compile', { decision_id })
+    assert.equal(compiled.status, 'COMPILED')
+    assert.ok(compiled.validated_object_hash)
+    return { ...lineage, compiled }
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const uncompiled = await createAuthority('decision-validate-uncompiled')
+    const uncompiledValidation = await post('/validate', {
+      decision_id: 'decision-validate-uncompiled',
+      validated_object_hash: 'uncompiled-hash',
+      invocation_nonce: 'nonce-uncompiled',
+      environment: 'production',
+      session_id: uncompiled.session.session_id
+    })
+    assert.equal(uncompiledValidation.status, 'NULL')
+    assert.equal(uncompiledValidation.result, 'INVALID')
+    assert.equal(uncompiledValidation.reason, 'hash_mismatch')
+    assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM validation_registry WHERE decision_id='decision-validate-uncompiled'"]).trim(), '0')
+
+    const otherCompiled = await createCompiled('decision-validate-other-context')
+    const crossContext = await createAuthority('decision-validate-cross-context')
+    const crossContextValidation = await post('/validate', {
+      decision_id: 'decision-validate-cross-context',
+      validated_object_hash: otherCompiled.compiled.validated_object_hash,
+      invocation_nonce: 'nonce-cross-context',
+      environment: 'production',
+      session_id: crossContext.session.session_id
+    })
+    assert.equal(crossContextValidation.status, 'NULL')
+    assert.equal(crossContextValidation.result, 'INVALID')
+    assert.equal(crossContextValidation.reason, 'lineage_mismatch')
+    assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM validation_registry WHERE decision_id='decision-validate-cross-context'"]).trim(), '0')
+
+    const exact = await createCompiled('decision-validate-exact')
+    const provenance = provenanceFor('decision-validate-exact')
+    await persistPreo(post, 'decision-validate-exact', exact.compiled.validated_object_hash, provenance)
+    const exactValidation = await post('/validate', {
+      decision_id: 'decision-validate-exact',
+      validated_object_hash: exact.compiled.validated_object_hash,
+      invocation_nonce: 'nonce-exact-compiled',
+      environment: 'production',
+      session_id: exact.session.session_id
+    })
+    assert.equal(exactValidation.status, 'VALID')
+    assert.equal(exactValidation.result, 'VALID')
+    assert.equal(exactValidation.validated_object_hash, exact.compiled.validated_object_hash)
+    assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM validation_registry WHERE decision_id='decision-validate-exact' AND validated_object_hash='" + exact.compiled.validated_object_hash + "'"]).trim(), '1')
+
+    const persistedHashes = runSqlite([dbPath, "SELECT validated_object_hash FROM validation_registry WHERE decision_id='decision-validate-exact'"]).trim().split('\n').filter(Boolean)
+    assert.deepEqual(persistedHashes, [exact.compiled.validated_object_hash])
+    assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM validation_registry WHERE status='VALID'"]).trim(), '1')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
