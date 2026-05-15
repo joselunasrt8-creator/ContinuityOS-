@@ -87,6 +87,12 @@ const TOPOLOGY_DRIFT_ROUTE = "/topology/drift" as const
 const TOPOLOGY_FINGERPRINT_ROUTE = "/topology/fingerprint" as const
 const TOPOLOGY_EQUIVALENCE_ROUTE = "/topology/equivalence" as const
 const TOPOLOGY_OBSERVABILITY_ROUTES = [TOPOLOGY_RECONCILE_ROUTE, TOPOLOGY_DRIFT_ROUTE, TOPOLOGY_FINGERPRINT_ROUTE, TOPOLOGY_EQUIVALENCE_ROUTE] as const
+const CROSS_REGISTRY_RECONCILE_ROUTE = "/registry/reconcile" as const
+const CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE = "/registry/reconcile/drift" as const
+const CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE = "/registry/reconcile/lineage" as const
+const CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE = "/registry/reconcile/equivalence" as const
+const CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE = "/registry/reconcile/orphans" as const
+const CROSS_REGISTRY_RECONCILIATION_ROUTES = [CROSS_REGISTRY_RECONCILE_ROUTE, CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE, CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE, CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE, CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
   ...new Set([
@@ -135,6 +141,7 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     ...RUNTIME_CONTAINMENT_ROUTES,
     ...ROOT_AUTHORITY_OBSERVABILITY_ROUTES,
     ...TOPOLOGY_OBSERVABILITY_ROUTES,
+    ...CROSS_REGISTRY_RECONCILIATION_ROUTES,
   ]),
 ] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
@@ -147,7 +154,11 @@ const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "execution_registry",
   "proof_registry",
   "invocation_registry",
-  "preo_registry"
+  "preo_registry",
+  "runtime_topology_registry",
+  "recursive_governance_containment_registry",
+  "root_authority_observability_registry",
+  "unauthorized_mutation_closure_registry"
 ] as const
 const RECONCILIATION_MAX_RECURSION_DEPTH = SYSTEM_MAX_CONTINUITY_DEPTH
 const RECONCILIATION_ROW_LIMIT = 2
@@ -173,6 +184,7 @@ const LEGITIMACY_QUARANTINE_REGISTRY = "legitimacy_quarantine_registry" as const
 const ROOT_AUTHORITY_OBSERVABILITY_REGISTRY = "root_authority_observability_registry" as const
 const RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY = "recursive_governance_containment_registry" as const
 const RUNTIME_TOPOLOGY_REGISTRY = "runtime_topology_registry" as const
+const CROSS_REGISTRY_RECONCILIATION_REGISTRY = "cross_registry_reconciliation_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -214,6 +226,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   runtime_surface_containment_registry: ["containment_id", "containment_hash", "route_surface_hash", "deployment_surface_hash", "package_surface_hash", "runtime_sovereignty_hash", "hidden_surface_count", "drift_classes", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"],
   topology_reconciliation_registry: ["reconciliation_id", "topology_hash", "governance_hash", "workflow_hash", "schema_hash", "reconciliation_hash", "traversal_hash", "classification", "drift_summary", "topology_ancestry", "merge_signal", "evidence_only", "remote_authority_denied", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"],
   runtime_topology_registry: ["snapshot_id", "topology_hash", "topology_semantic_hash", "topology_boundary_hash", "topology_lineage_hash", "topology_equivalence_hash", "drift_classes", "lineage_hash", "boundary_hash", "reconciliation_timestamp", "containment_references", "topology_snapshot", "evidence_only", "replay_neutral", "executable", "deployment_capable", "creates_authority", "append_only", "created_at"],
+  unauthorized_mutation_closure_registry: ["closure_id", "inventory_hash", "route_hash", "registry_hash", "evidence_only", "replay_neutral", "non_authoritative", "executable", "deployment_capable", "creates_authority", "proof_generating", "created_at"],
+  cross_registry_reconciliation_registry: ["reconciliation_id", "registry_set_hash", "lineage_graph_hash", "continuity_graph_hash", "proof_graph_hash", "replay_graph_hash", "topology_binding_hash", "governance_binding_hash", "reconciliation_equivalence_hash", "drift_classes", "unresolved_edges", "orphaned_records", "containment_status", "legitimacy_status", "evidence_only", "replay_neutral", "non_authoritative", "executable", "deployment_capable", "creates_authority", "proof_generating", "generated_at", "created_at"],
   legitimacy_drift_propagation_registry: ["propagation_id", "propagation_hash", "topology_hash", "impact_hash", "merge_legitimacy_hash", "verdict_hash", "classification", "propagation_object", "impact_graph", "merge_impact", "verdict_object", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "executable", "deployment_capable", "proof_generating", "fail_closed_on_ambiguity", "generated_at", "created_at"],
   legitimacy_quarantine_registry: ["quarantine_id", "quarantine_hash", "containment_hash", "lineage_hash", "federation_hash", "boundary_hash", "classification", "quarantine_object", "containment_boundary", "isolation_graph", "federated_containment", "propagation_envelope", "verdict_object", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "executable", "deployment_capable", "proof_generating", "fail_closed_on_ambiguity", "quarantine_authoritative", "generated_at", "created_at"]
 }
@@ -1166,6 +1180,10 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS runtime_topology_registry (snapshot_id TEXT PRIMARY KEY, topology_hash TEXT NOT NULL, topology_semantic_hash TEXT NOT NULL, topology_boundary_hash TEXT NOT NULL, topology_lineage_hash TEXT NOT NULL, topology_equivalence_hash TEXT NOT NULL UNIQUE, drift_classes TEXT NOT NULL, lineage_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, reconciliation_timestamp TEXT NOT NULL, containment_references TEXT NOT NULL, topology_snapshot TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), append_only TEXT NOT NULL CHECK (append_only='true'), created_at TEXT NOT NULL)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_topology_registry_hashes ON runtime_topology_registry(topology_hash, topology_semantic_hash, topology_boundary_hash, topology_lineage_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_topology_registry_boundary ON runtime_topology_registry(boundary_hash, lineage_hash)`,
+      `CREATE TABLE IF NOT EXISTS unauthorized_mutation_closure_registry (closure_id TEXT PRIMARY KEY, inventory_hash TEXT NOT NULL, route_hash TEXT NOT NULL, registry_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS cross_registry_reconciliation_registry (reconciliation_id TEXT PRIMARY KEY, registry_set_hash TEXT NOT NULL, lineage_graph_hash TEXT NOT NULL, continuity_graph_hash TEXT NOT NULL, proof_graph_hash TEXT NOT NULL, replay_graph_hash TEXT NOT NULL, topology_binding_hash TEXT NOT NULL, governance_binding_hash TEXT NOT NULL, reconciliation_equivalence_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, unresolved_edges TEXT NOT NULL, orphaned_records TEXT NOT NULL, containment_status TEXT NOT NULL CHECK (containment_status IN ('RECONCILED','RECONCILIATION_REQUIRED')), legitimacy_status TEXT CHECK (legitimacy_status IS NULL OR legitimacy_status='LEGITIMATE'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_cross_registry_reconciliation_registry_hash_unique ON cross_registry_reconciliation_registry(reconciliation_equivalence_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_cross_registry_reconciliation_registry_status ON cross_registry_reconciliation_registry(containment_status, legitimacy_status)`,
       `CREATE TABLE IF NOT EXISTS legitimacy_drift_propagation_registry (propagation_id TEXT PRIMARY KEY, propagation_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, impact_hash TEXT NOT NULL, merge_legitimacy_hash TEXT NOT NULL, verdict_hash TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification IN ('TOPOLOGY_VALID','TOPOLOGY_DRIFT_PROPAGATED','MERGE_LINEAGE_CONTAMINATED','GOVERNANCE_IMPACT_EXPANDED','SCHEMA_PROPAGATION_FAILURE','WORKFLOW_TRUST_COLLAPSE','PROOF_LINEAGE_CONTAMINATION','RECONCILIATION_EQUIVALENCE_INVALID','DOWNSTREAM_LEGITIMACY_NULL','NULL')), propagation_object TEXT NOT NULL, impact_graph TEXT NOT NULL, merge_impact TEXT NOT NULL, verdict_object TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_hash_unique ON legitimacy_drift_propagation_registry(propagation_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_topology ON legitimacy_drift_propagation_registry(topology_hash)`,
@@ -1290,6 +1308,8 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_topology_reconciliation_registry_no_delete BEFORE DELETE ON topology_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'topology_reconciliation_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_runtime_topology_registry_no_update BEFORE UPDATE ON runtime_topology_registry BEGIN SELECT RAISE(ABORT, 'runtime_topology_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_runtime_topology_registry_no_delete BEFORE DELETE ON runtime_topology_registry BEGIN SELECT RAISE(ABORT, 'runtime_topology_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_cross_registry_reconciliation_registry_no_update BEFORE UPDATE ON cross_registry_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'cross_registry_reconciliation_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_cross_registry_reconciliation_registry_no_delete BEFORE DELETE ON cross_registry_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'cross_registry_reconciliation_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_update BEFORE UPDATE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_delete BEFORE DELETE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`
   ]
@@ -2663,6 +2683,8 @@ function reconciliationLookup(anchor: ReconciliationAnchor, context: Record<stri
       return { sql: `SELECT * FROM invocation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 ORDER BY created_at ASC, invocation_nonce ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash, invocation_nonce], lookup_key: `${decision_id}:${validated_object_hash}:${invocation_nonce}` }
     case "preo_registry":
       return { sql: `SELECT * FROM preo_registry WHERE decision_id=?1 AND reviewed_hash=?2 ORDER BY created_at ASC, preo_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash], lookup_key: `${decision_id}:${validated_object_hash}` }
+    default:
+      return { sql: `SELECT * FROM ${registry} LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [], lookup_key: registry }
   }
 }
 
@@ -2787,6 +2809,8 @@ async function verifyReconciliationRegistryRow(env: Env, registry: Reconciliatio
       if (String(row.status || "") !== "PREO_VALID") return "preo_ancestry_drift"
       context.preo = row
       return "VALID"
+    default:
+      return "VALID"
   }
 }
 
@@ -2814,6 +2838,8 @@ function canonicalIdentifiersFromReconciliationRow(registry: ReconciliationRegis
       return populatedCanonicalIdentifiers({ continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), invocation_nonce: String(row?.invocation_nonce || ""), validated_object_hash: String(row?.validated_object_hash || "") })
     case "preo_registry":
       return populatedCanonicalIdentifiers({ preo_id: String(row?.preo_id || ""), authority_id: String(row?.authority_id || ""), continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), reviewed_hash: String(row?.reviewed_hash || "") })
+    default:
+      return populatedCanonicalIdentifiers({})
   }
 }
 
@@ -5626,6 +5652,156 @@ function rootAuthorityInventoryFromUrl(url: URL): Partial<RootAuthorityInventory
 }
 
 
+
+type CrossRegistryDriftClass = "REGISTRY_LINEAGE_MISMATCH" | "ORPHANED_AUTHORITY_RECORD" | "ORPHANED_AEO_RECORD" | "ORPHANED_VALIDATION_RECORD" | "ORPHANED_EXECUTION_RECORD" | "ORPHANED_PROOF_RECORD" | "ORPHANED_INVOCATION_RECORD" | "VALIDATED_HASH_DISCONTINUITY" | "EXECUTION_PROOF_HASH_MISMATCH" | "SESSION_CONTINUITY_DIVERGENCE" | "AUTHORITY_CONTINUITY_DIVERGENCE" | "REPLAY_GRAPH_FRAGMENTATION" | "TOPOLOGY_BINDING_DIVERGENCE" | "GOVERNANCE_BINDING_DIVERGENCE" | "ROOT_AUTHORITY_EVIDENCE_ESCALATION" | "OBSERVABILITY_RECORD_AUTHORITY_ESCALATION" | "CROSS_REGISTRY_RECONCILIATION_AMBIGUITY"
+type CrossRegistryLineageEdge = { object_type: "CrossRegistryLineageEdge", from_registry: string, from_id: string, to_registry: string, to_id: string, relation: string, status: "RESOLVED" | "UNRESOLVED", drift_class: CrossRegistryDriftClass }
+type CrossRegistryDrift = { object_type: "CrossRegistryDrift", drift_class: CrossRegistryDriftClass, registry: string, record_id: string, reason: string, legitimacy_status: "NULL" }
+type CrossRegistryReconciliationSnapshot = {
+  object_type: "CrossRegistryReconciliationSnapshot"
+  reconciliation_id: string
+  registry_set_hash: string
+  lineage_graph_hash: string
+  continuity_graph_hash: string
+  proof_graph_hash: string
+  replay_graph_hash: string
+  topology_binding_hash: string
+  governance_binding_hash: string
+  reconciliation_equivalence_hash: string
+  lineage_edges: CrossRegistryLineageEdge[]
+  drift: CrossRegistryDrift[]
+  equivalence: Record<string, unknown>
+  continuity_proof: Record<string, unknown>
+  drift_classes: CrossRegistryDriftClass[]
+  unresolved_edges: CrossRegistryLineageEdge[]
+  orphaned_records: Record<string, unknown>[]
+  containment_status: "RECONCILED" | "RECONCILIATION_REQUIRED"
+  legitimacy_status: "LEGITIMATE" | "NULL"
+  evidence_only: true
+  replay_neutral: true
+  non_authoritative: true
+  executable: false
+  deployment_capable: false
+  creates_authority: false
+  proof_generating: false
+}
+
+function crossRegistryRouteFlags(): { evidence_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, proof_generating: false } { return { evidence_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, proof_generating: false } }
+function crossRegistryRecordId(record: Record<string, unknown>): string {
+  return String(record.session_id || record.continuity_id || record.authority_id || record.aeo_id || record.validation_id || record.execution_id || record.proof_id || record.invocation_nonce || record.preo_id || record.snapshot_id || record.governance_observation_id || record.observation_id || record.closure_id || record.reconciliation_id || canonicalize(record))
+}
+function crossRegistryField(record: Record<string, unknown> | null | undefined, field: string): string { return String(record?.[field] || "") }
+function sortCrossRegistryRecords(records: Record<string, unknown>[]): Record<string, unknown>[] { return records.map((record) => canonicalRecord(record)).sort((a, b) => crossRegistryRecordId(a).localeCompare(crossRegistryRecordId(b)) || canonicalize(a).localeCompare(canonicalize(b))) }
+function oneCrossRegistry(records: Record<string, unknown>[], predicate: (record: Record<string, unknown>) => boolean): { match: Record<string, unknown> | null, ambiguous: boolean } {
+  const matches = records.filter(predicate)
+  return { match: matches[0] || null, ambiguous: matches.length > 1 }
+}
+function crossRegistryEdge(from_registry: string, from_id: string, to_registry: string, to_id: string, relation: string, resolved: boolean, drift_class: CrossRegistryDriftClass): CrossRegistryLineageEdge {
+  return { object_type: "CrossRegistryLineageEdge", from_registry, from_id, to_registry, to_id, relation, status: resolved ? "RESOLVED" : "UNRESOLVED", drift_class }
+}
+function truthyEvidenceEscalation(value: unknown): boolean { return value === true || value === "true" || value === 1 || value === "1" }
+async function buildCrossRegistryReconciliationSnapshot(state: Record<string, Record<string, unknown>[]>, generated_at = new Date().toISOString()): Promise<CrossRegistryReconciliationSnapshot> {
+  const canonicalState = Object.fromEntries((CANONICAL_RECONCILIATION_REGISTRY_ORDER as readonly string[]).map((registry) => [registry, sortCrossRegistryRecords(state[registry] || [])])) as Record<string, Record<string, unknown>[]>
+  const edges: CrossRegistryLineageEdge[] = []
+  const drift: CrossRegistryDrift[] = []
+  const orphaned_records: Record<string, unknown>[] = []
+  const addDrift = (drift_class: CrossRegistryDriftClass, registry: string, record: Record<string, unknown>, reason: string) => { drift.push({ object_type: "CrossRegistryDrift", drift_class, registry, record_id: crossRegistryRecordId(record), reason, legitimacy_status: "NULL" }); orphaned_records.push({ registry, record_id: crossRegistryRecordId(record), drift_class, reason }) }
+  const sessions = canonicalState.session_registry || [], continuities = canonicalState.continuity_registry || [], authorities = canonicalState.authority_registry || [], aeos = canonicalState.aeo_registry || [], validations = canonicalState.validation_registry || [], executions = canonicalState.execution_registry || [], proofs = canonicalState.proof_registry || [], invocations = canonicalState.invocation_registry || []
+  for (const authority of authorities) {
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(authority, "session_id"))
+    const continuity = oneCrossRegistry(continuities, (row) => crossRegistryField(row, "continuity_id") === crossRegistryField(authority, "continuity_id"))
+    edges.push(crossRegistryEdge("authority_registry", crossRegistryRecordId(authority), "session_registry", crossRegistryField(authority, "session_id"), "AUTHORITY_SESSION", Boolean(session.match) && !session.ambiguous, "ORPHANED_AUTHORITY_RECORD"))
+    edges.push(crossRegistryEdge("authority_registry", crossRegistryRecordId(authority), "continuity_registry", crossRegistryField(authority, "continuity_id"), "AUTHORITY_CONTINUITY", Boolean(continuity.match) && !continuity.ambiguous, "ORPHANED_AUTHORITY_RECORD"))
+    if (!session.match || !continuity.match) addDrift("ORPHANED_AUTHORITY_RECORD", "authority_registry", authority, "authority requires valid session and continuity")
+    if (session.ambiguous || continuity.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "authority_registry", authority, "authority lineage resolves ambiguously")
+    if (continuity.match && crossRegistryField(continuity.match, "session_id") !== crossRegistryField(authority, "session_id")) addDrift("SESSION_CONTINUITY_DIVERGENCE", "authority_registry", authority, "authority session differs from continuity session")
+  }
+  for (const aeo of aeos) {
+    const authority = oneCrossRegistry(authorities, (row) => crossRegistryField(row, "authority_id") === crossRegistryField(aeo, "authority_id"))
+    edges.push(crossRegistryEdge("aeo_registry", crossRegistryRecordId(aeo), "authority_registry", crossRegistryField(aeo, "authority_id"), "AEO_AUTHORITY", Boolean(authority.match) && !authority.ambiguous, "ORPHANED_AEO_RECORD"))
+    if (!authority.match) addDrift("ORPHANED_AEO_RECORD", "aeo_registry", aeo, "AEO requires valid authority")
+    if (authority.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "aeo_registry", aeo, "AEO authority resolves ambiguously")
+    if (authority.match && crossRegistryField(aeo, "continuity_id") && crossRegistryField(authority.match, "continuity_id") && crossRegistryField(aeo, "continuity_id") !== crossRegistryField(authority.match, "continuity_id")) addDrift("AUTHORITY_CONTINUITY_DIVERGENCE", "aeo_registry", aeo, "AEO continuity differs from authority continuity")
+  }
+  for (const validation of validations) {
+    const aeo = oneCrossRegistry(aeos, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(validation, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(validation, "validated_object_hash"))
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(validation, "session_id"))
+    const invocation = oneCrossRegistry(invocations, (row) => crossRegistryField(row, "invocation_nonce") === crossRegistryField(validation, "invocation_nonce") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(validation, "validated_object_hash"))
+    edges.push(crossRegistryEdge("validation_registry", crossRegistryRecordId(validation), "aeo_registry", aeo.match ? crossRegistryRecordId(aeo.match) : "", "VALIDATION_AEO", Boolean(aeo.match) && !aeo.ambiguous, "ORPHANED_VALIDATION_RECORD"))
+    edges.push(crossRegistryEdge("validation_registry", crossRegistryRecordId(validation), "session_registry", crossRegistryField(validation, "session_id"), "VALIDATION_SESSION", Boolean(session.match) && !session.ambiguous, "ORPHANED_VALIDATION_RECORD"))
+    edges.push(crossRegistryEdge("validation_registry", crossRegistryRecordId(validation), "invocation_registry", crossRegistryField(validation, "invocation_nonce"), "VALIDATION_NONCE", Boolean(invocation.match) && !invocation.ambiguous, "ORPHANED_INVOCATION_RECORD"))
+    if (!aeo.match || !session.match || !invocation.match || !crossRegistryField(validation, "invocation_nonce")) addDrift("ORPHANED_VALIDATION_RECORD", "validation_registry", validation, "validation requires AEO, session, and nonce")
+    if (aeo.ambiguous || session.ambiguous || invocation.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "validation_registry", validation, "validation lineage resolves ambiguously")
+  }
+  for (const execution of executions) {
+    const validation = oneCrossRegistry(validations, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(execution, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(execution, "validated_object_hash") && crossRegistryField(row, "invocation_nonce") === crossRegistryField(execution, "invocation_nonce"))
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(execution, "session_id"))
+    const continuity = oneCrossRegistry(continuities, (row) => crossRegistryField(row, "continuity_id") === crossRegistryField(execution, "continuity_id"))
+    edges.push(crossRegistryEdge("execution_registry", crossRegistryRecordId(execution), "validation_registry", validation.match ? crossRegistryRecordId(validation.match) : "", "EXECUTION_VALIDATION", Boolean(validation.match) && !validation.ambiguous, "ORPHANED_EXECUTION_RECORD"))
+    edges.push(crossRegistryEdge("execution_registry", crossRegistryRecordId(execution), "session_registry", crossRegistryField(execution, "session_id"), "EXECUTION_SESSION", Boolean(session.match) && !session.ambiguous, "ORPHANED_EXECUTION_RECORD"))
+    edges.push(crossRegistryEdge("execution_registry", crossRegistryRecordId(execution), "continuity_registry", crossRegistryField(execution, "continuity_id"), "EXECUTION_CONTINUITY", Boolean(continuity.match) && !continuity.ambiguous, "ORPHANED_EXECUTION_RECORD"))
+    if (!validation.match || !session.match || !continuity.match) addDrift("ORPHANED_EXECUTION_RECORD", "execution_registry", execution, "execution requires validation, session, and continuity")
+    if (validation.ambiguous || session.ambiguous || continuity.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "execution_registry", execution, "execution lineage resolves ambiguously")
+    if (validation.match && crossRegistryField(validation.match, "validated_object_hash") !== crossRegistryField(execution, "validated_object_hash")) addDrift("VALIDATED_HASH_DISCONTINUITY", "execution_registry", execution, "execution hash differs from validation hash")
+  }
+  for (const proof of proofs) {
+    const execution = oneCrossRegistry(executions, (row) => crossRegistryField(row, "execution_id") === crossRegistryField(proof, "execution_id"))
+    const authority = oneCrossRegistry(authorities, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(proof, "decision_id"))
+    edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "execution_registry", crossRegistryField(proof, "execution_id"), "PROOF_EXECUTION", Boolean(execution.match) && !execution.ambiguous, "ORPHANED_PROOF_RECORD"))
+    edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "authority_registry", authority.match ? crossRegistryRecordId(authority.match) : "", "PROOF_AUTHORITY", Boolean(authority.match) && !authority.ambiguous, "ORPHANED_PROOF_RECORD"))
+    if (!execution.match || !authority.match || !crossRegistryField(proof, "validated_object_hash")) addDrift("ORPHANED_PROOF_RECORD", "proof_registry", proof, "proof requires execution, authority, and validated object hash")
+    if (execution.ambiguous || authority.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "proof_registry", proof, "proof lineage resolves ambiguously")
+    if (execution.match && crossRegistryField(execution.match, "validated_object_hash") !== crossRegistryField(proof, "validated_object_hash")) addDrift("EXECUTION_PROOF_HASH_MISMATCH", "proof_registry", proof, "proof hash differs from execution hash")
+  }
+  const nonceToObjects = new Map<string, Set<string>>()
+  for (const record of [...validations, ...executions]) {
+    const nonce = crossRegistryField(record, "invocation_nonce")
+    if (!nonce) continue
+    const set = nonceToObjects.get(nonce) || new Set<string>()
+    set.add(`${crossRegistryField(record, "decision_id")}:${crossRegistryField(record, "validated_object_hash")}`)
+    nonceToObjects.set(nonce, set)
+  }
+  for (const invocation of invocations) {
+    const objects = nonceToObjects.get(crossRegistryField(invocation, "invocation_nonce")) || new Set<string>()
+    if (objects.size !== 1) addDrift(objects.size === 0 ? "ORPHANED_INVOCATION_RECORD" : "REPLAY_GRAPH_FRAGMENTATION", "invocation_registry", invocation, "invocation nonce must map to exactly one validated/executed object")
+  }
+  for (const topology of canonicalState.runtime_topology_registry || []) if (truthyEvidenceEscalation(topology.executable) || truthyEvidenceEscalation(topology.deployment_capable) || truthyEvidenceEscalation(topology.creates_authority) || topology.evidence_only === "false") addDrift("TOPOLOGY_BINDING_DIVERGENCE", "runtime_topology_registry", topology, "topology evidence became authoritative or executable")
+  for (const governance of canonicalState.recursive_governance_containment_registry || []) if (truthyEvidenceEscalation(governance.executable) || truthyEvidenceEscalation(governance.deployment_capable) || truthyEvidenceEscalation(governance.creates_authority) || governance.evidence_only === "false") addDrift("GOVERNANCE_BINDING_DIVERGENCE", "recursive_governance_containment_registry", governance, "recursive governance containment must remain evidence-only")
+  for (const root of canonicalState.root_authority_observability_registry || []) if (truthyEvidenceEscalation(root.executable) || truthyEvidenceEscalation(root.deployment_capable) || truthyEvidenceEscalation(root.creates_authority) || root.non_authoritative === "false") addDrift("ROOT_AUTHORITY_EVIDENCE_ESCALATION", "root_authority_observability_registry", root, "root authority evidence cannot grant authority")
+  for (const closure of canonicalState.unauthorized_mutation_closure_registry || []) if (truthyEvidenceEscalation(closure.executable) || truthyEvidenceEscalation(closure.creates_authority) || truthyEvidenceEscalation(closure.proof_generating)) addDrift("OBSERVABILITY_RECORD_AUTHORITY_ESCALATION", "unauthorized_mutation_closure_registry", closure, "observability evidence cannot become proof or authority")
+  const lineage_edges = edges.sort((a, b) => canonicalize(a).localeCompare(canonicalize(b)))
+  const unresolved_edges = lineage_edges.filter((edge) => edge.status === "UNRESOLVED")
+  const drift_classes = [...new Set(drift.map((item) => item.drift_class))].sort() as CrossRegistryDriftClass[]
+  const sorted_orphans = orphaned_records.sort((a, b) => canonicalize(a).localeCompare(canonicalize(b)))
+  const containment_status = drift_classes.length || unresolved_edges.length ? "RECONCILIATION_REQUIRED" : "RECONCILED"
+  const legitimacy_status = containment_status === "RECONCILED" ? "LEGITIMATE" : "NULL"
+  const registry_set_hash = await sha256Hex(canonicalize(canonicalState))
+  const lineage_graph_hash = await sha256Hex(canonicalize(lineage_edges))
+  const continuity_graph_hash = await sha256Hex(canonicalize(lineage_edges.filter((edge) => edge.relation.includes("CONTINUITY") || edge.relation.includes("SESSION"))))
+  const proof_graph_hash = await sha256Hex(canonicalize(lineage_edges.filter((edge) => edge.from_registry === "proof_registry" || edge.to_registry === "proof_registry")))
+  const replay_graph_hash = await sha256Hex(canonicalize({ invocations, nonce_to_objects: [...nonceToObjects.entries()].map(([nonce, objects]) => [nonce, [...objects].sort()]).sort() }))
+  const topology_binding_hash = await sha256Hex(canonicalize(canonicalState.runtime_topology_registry || []))
+  const governance_binding_hash = await sha256Hex(canonicalize({ recursive: canonicalState.recursive_governance_containment_registry || [], root: canonicalState.root_authority_observability_registry || [], closure: canonicalState.unauthorized_mutation_closure_registry || [], preo: canonicalState.preo_registry || [] }))
+  const equivalence = { object_type: "CrossRegistryEquivalence", equivalent: containment_status === "RECONCILED", drift_classes, legitimacy_status }
+  const continuity_proof = { object_type: "CrossRegistryContinuityProof", replay_neutral: true, replay_consumed: false, continuity_preserved: containment_status === "RECONCILED", legitimacy_status }
+  const reconciliation_equivalence_hash = await sha256Hex(canonicalize({ equivalence, continuity_proof, drift_classes, unresolved_edges, orphaned_records: sorted_orphans }))
+  const reconciliation_id = await sha256Hex(canonicalize({ registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash }))
+  return { object_type: "CrossRegistryReconciliationSnapshot", reconciliation_id, registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash, lineage_edges, drift: drift.sort((a, b) => canonicalize(a).localeCompare(canonicalize(b))), equivalence, continuity_proof, drift_classes, unresolved_edges, orphaned_records: sorted_orphans, containment_status, legitimacy_status, ...crossRegistryRouteFlags() }
+}
+async function fetchCrossRegistryState(env: Env): Promise<Record<string, Record<string, unknown>[]>> {
+  const state: Record<string, Record<string, unknown>[]> = {}
+  for (const registry of CANONICAL_RECONCILIATION_REGISTRY_ORDER) {
+    try {
+      const result = await env.DB.prepare(`SELECT * FROM ${registry} LIMIT 1000`).all<Record<string, unknown>>()
+      state[registry] = sortCrossRegistryRecords(result.results || [])
+    } catch { state[registry] = [] }
+  }
+  return state
+}
+async function appendCrossRegistryReconciliationSnapshot(env: Env, snapshot: CrossRegistryReconciliationSnapshot, generated_at: string) {
+  await env.DB.prepare(`INSERT OR IGNORE INTO cross_registry_reconciliation_registry (reconciliation_id,registry_set_hash,lineage_graph_hash,continuity_graph_hash,proof_graph_hash,replay_graph_hash,topology_binding_hash,governance_binding_hash,reconciliation_equivalence_hash,drift_classes,unresolved_edges,orphaned_records,containment_status,legitimacy_status,evidence_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,proof_generating,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,'true','true','true','false','false','false','false',?15,?16)`)
+    .bind(snapshot.reconciliation_id, snapshot.registry_set_hash, snapshot.lineage_graph_hash, snapshot.continuity_graph_hash, snapshot.proof_graph_hash, snapshot.replay_graph_hash, snapshot.topology_binding_hash, snapshot.governance_binding_hash, snapshot.reconciliation_equivalence_hash, canonicalize(snapshot.drift_classes), canonicalize(snapshot.unresolved_edges), canonicalize(snapshot.orphaned_records), snapshot.containment_status, snapshot.legitimacy_status === "NULL" ? null : snapshot.legitimacy_status, generated_at, generated_at).run()
+}
+
 type RuntimeTopologyDriftClass = "TOPOLOGY_VALID" | "UNDECLARED_RUNTIME_SURFACE" | "TOPOLOGY_EQUIVALENCE_DRIFT" | "MUTATION_SURFACE_EXPANSION" | "GOVERNANCE_SURFACE_DRIFT" | "OBSERVABILITY_BOUNDARY_DRIFT" | "EXECUTION_BOUNDARY_DRIFT" | "REGISTRY_LINEAGE_DRIFT" | "CONTAINMENT_DIVERGENCE" | "CANONICAL_ROUTE_DIVERGENCE" | "RECONCILIATION_AMBIGUITY"
 
 type RuntimeTopologySnapshot = {
@@ -6145,6 +6321,25 @@ export default {
         return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_status: envelope.containment_status, declared_root_surfaces: envelope.declared_root_surfaces, undeclared_root_surfaces: envelope.undeclared_root_surfaces, drift_classes: envelope.drift_classes, containment_identity: envelope.containment_identity, topology_hash: envelope.topology_hash, ...rootAuthorityFlags() })
       } catch {
         return json({ status: "NULL", route: url.pathname, reason: "root_authority_observability_unavailable", drift_classes: ["ROOT_AUTHORITY_BOUNDARY_OVERFLOW", "ROOT_AUTHORITY_BYPASS_RISK", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"], ...rootAuthorityFlags() }, 500)
+      }
+    }
+
+    if ((CROSS_REGISTRY_RECONCILIATION_ROUTES as readonly string[]).includes(url.pathname) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", allowed_methods: ["GET"], ...crossRegistryRouteFlags() }, 405)
+    if ((CROSS_REGISTRY_RECONCILIATION_ROUTES as readonly string[]).includes(url.pathname) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...crossRegistryRouteFlags() }, 500)
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        const generated_at = new Date().toISOString()
+        const snapshot = await buildCrossRegistryReconciliationSnapshot(await fetchCrossRegistryState(env), generated_at)
+        await appendCrossRegistryReconciliationSnapshot(env, snapshot, generated_at)
+        const status = snapshot.legitimacy_status === "NULL" ? "NULL" : "RECONCILED"
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: snapshot.drift_classes, drift: snapshot.drift, containment_status: snapshot.containment_status, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", lineage_edges: snapshot.lineage_edges, lineage_graph_hash: snapshot.lineage_graph_hash, continuity_graph_hash: snapshot.continuity_graph_hash, proof_graph_hash: snapshot.proof_graph_hash, unresolved_edges: snapshot.unresolved_edges, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence: snapshot.equivalence, continuity_proof: snapshot.continuity_proof, reconciliation_equivalence_hash: snapshot.reconciliation_equivalence_hash, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", orphaned_records: snapshot.orphaned_records, unresolved_edges: snapshot.unresolved_edges, containment_status: snapshot.containment_status, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", reconciliation: snapshot, append_only: true, ...crossRegistryRouteFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "cross_registry_reconciliation_unavailable", containment_status: "RECONCILIATION_REQUIRED", legitimacy_status: "NULL", ...crossRegistryRouteFlags() }, 500)
       }
     }
 

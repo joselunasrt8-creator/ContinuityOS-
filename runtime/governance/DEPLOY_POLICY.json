@@ -21,5 +21,14 @@
   "ambiguity_result": "NULL",
   "claims_authority": false,
   "changes_execution_semantics": false,
-  "policy_hash": "c841acb3b928bfe9e035b63a71360fa5953efdc8ae2f33983cb253e3c1a4d228"
+  "policy_hash": "c841acb3b928bfe9e035b63a71360fa5953efdc8ae2f33983cb253e3c1a4d228",
+  "cross_registry_reconciliation": {
+    "policy": "governance/cross-registry-reconciliation.json",
+    "registry": "cross_registry_reconciliation_registry",
+    "may_block_deployment_legitimacy": true,
+    "may_authorize_deployment": false,
+    "may_authorize_execution": false,
+    "may_repair_records_automatically": false,
+    "ambiguous_lineage_result": "NULL"
+  }
 }

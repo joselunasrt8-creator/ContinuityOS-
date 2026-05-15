@@ -1,0 +1,36 @@
+{
+  "object_type": "CrossRegistryDriftTaxonomy",
+  "artifact": "cross-registry-drift-taxonomy",
+  "evidence_only": true,
+  "replay_neutral": true,
+  "non_authoritative": true,
+  "executable": false,
+  "deployment_capable": false,
+  "creates_authority": false,
+  "proof_generating": false,
+  "fail_closed_on_ambiguity": true,
+  "canonical_invariant": "If registry lineage cannot be reconciled, legitimacy_status is NULL.",
+  "drift_classes": [
+    "REGISTRY_LINEAGE_MISMATCH",
+    "ORPHANED_AUTHORITY_RECORD",
+    "ORPHANED_AEO_RECORD",
+    "ORPHANED_VALIDATION_RECORD",
+    "ORPHANED_EXECUTION_RECORD",
+    "ORPHANED_PROOF_RECORD",
+    "ORPHANED_INVOCATION_RECORD",
+    "VALIDATED_HASH_DISCONTINUITY",
+    "EXECUTION_PROOF_HASH_MISMATCH",
+    "SESSION_CONTINUITY_DIVERGENCE",
+    "AUTHORITY_CONTINUITY_DIVERGENCE",
+    "REPLAY_GRAPH_FRAGMENTATION",
+    "TOPOLOGY_BINDING_DIVERGENCE",
+    "GOVERNANCE_BINDING_DIVERGENCE",
+    "ROOT_AUTHORITY_EVIDENCE_ESCALATION",
+    "OBSERVABILITY_RECORD_AUTHORITY_ESCALATION",
+    "CROSS_REGISTRY_RECONCILIATION_AMBIGUITY"
+  ],
+  "unresolved_or_ambiguous_response": {
+    "containment_status": "RECONCILIATION_REQUIRED",
+    "legitimacy_status": "NULL"
+  }
+}

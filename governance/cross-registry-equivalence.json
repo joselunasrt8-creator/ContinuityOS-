@@ -1,0 +1,23 @@
+{
+  "object_type": "CrossRegistryEquivalencePolicy",
+  "artifact": "cross-registry-equivalence",
+  "evidence_only": true,
+  "replay_neutral": true,
+  "non_authoritative": true,
+  "executable": false,
+  "deployment_capable": false,
+  "creates_authority": false,
+  "proof_generating": false,
+  "equivalence_inputs": [
+    "registry_set_hash",
+    "lineage_graph_hash",
+    "continuity_graph_hash",
+    "proof_graph_hash",
+    "replay_graph_hash",
+    "topology_binding_hash",
+    "governance_binding_hash"
+  ],
+  "equivalence_rule": "Equivalence is true only when all lineage edges are resolved and drift_classes is empty.",
+  "cannot_authorize": ["execution", "proof", "merge", "deployment", "authority_creation", "record_repair"],
+  "legitimacy_on_ambiguity": "NULL"
+}

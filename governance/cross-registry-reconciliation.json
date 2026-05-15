@@ -1,0 +1,67 @@
+{
+  "object_type": "CrossRegistryReconciliationPolicy",
+  "artifact": "cross-registry-reconciliation",
+  "evidence_only": true,
+  "replay_neutral": true,
+  "non_authoritative": true,
+  "executable": false,
+  "deployment_capable": false,
+  "creates_authority": false,
+  "proof_generating": false,
+  "canonical_registries": [
+    "session_registry",
+    "continuity_registry",
+    "authority_registry",
+    "aeo_registry",
+    "validation_registry",
+    "execution_registry",
+    "proof_registry",
+    "invocation_registry",
+    "preo_registry",
+    "runtime_topology_registry",
+    "recursive_governance_containment_registry",
+    "root_authority_observability_registry",
+    "unauthorized_mutation_closure_registry"
+  ],
+  "snapshot_object": "CrossRegistryReconciliationSnapshot",
+  "edge_object": "CrossRegistryLineageEdge",
+  "drift_object": "CrossRegistryDrift",
+  "equivalence_object": "CrossRegistryEquivalence",
+  "continuity_proof_object": "CrossRegistryContinuityProof",
+  "required_hash_fields": [
+    "reconciliation_id",
+    "registry_set_hash",
+    "lineage_graph_hash",
+    "continuity_graph_hash",
+    "proof_graph_hash",
+    "replay_graph_hash",
+    "topology_binding_hash",
+    "governance_binding_hash",
+    "reconciliation_equivalence_hash"
+  ],
+  "policy_integration": {
+    "may_invalidate_merge_legitimacy": true,
+    "may_block_deployment_legitimacy": true,
+    "may_classify_proof_lineage_drift": true,
+    "may_classify_replay_drift": true,
+    "may_authorize_execution": false,
+    "may_authorize_proof": false,
+    "may_authorize_merge": false,
+    "may_repair_records_automatically": false
+  },
+  "route_policy": {
+    "routes": [
+      "/registry/reconcile",
+      "/registry/reconcile/drift",
+      "/registry/reconcile/lineage",
+      "/registry/reconcile/equivalence",
+      "/registry/reconcile/orphans"
+    ],
+    "method": "GET",
+    "outside_canonical_runtime_routes": true,
+    "mutation_methods_response": "405 or canonical NULL"
+  },
+  "append_only_registry": "cross_registry_reconciliation_registry",
+  "fail_closed_on_ambiguity": true,
+  "legitimacy_on_unresolved_lineage": "NULL"
+}

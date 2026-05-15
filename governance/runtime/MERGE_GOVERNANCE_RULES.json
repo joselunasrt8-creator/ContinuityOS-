@@ -36,7 +36,12 @@
     "Governance containment evidence may invalidate legitimacy but may NEVER authorize merge, proof, deployment, or execution",
     "Runtime topology reconciliation ambiguity -> merge legitimacy NULL",
     "Runtime topology equivalence drift -> merge legitimacy NULL",
-    "Runtime topology evidence may block merge or deployment but may NEVER authorize merge, execution, deployment, or legitimacy"
+    "Runtime topology evidence may block merge or deployment but may NEVER authorize merge, execution, deployment, or legitimacy",
+    "Cross-registry reconciliation evidence may invalidate merge legitimacy but may NEVER authorize merge",
+    "Cross-registry proof lineage drift -> merge legitimacy NULL",
+    "Cross-registry replay drift -> deployment legitimacy NULL",
+    "Cross-registry ambiguity -> legitimacy NULL and reconciliation required",
+    "Cross-registry reconciliation may not authorize execution, proof, merge, deployment, authority creation, or automatic record repair"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -195,5 +200,18 @@
     "may_authorize_deployment": false,
     "evidence_only": true,
     "fail_closed_on_ambiguity": true
+  },
+  "cross_registry_reconciliation": {
+    "policy": "governance/cross-registry-reconciliation.json",
+    "registry": "cross_registry_reconciliation_registry",
+    "may_invalidate_merge_legitimacy": true,
+    "may_block_deployment_legitimacy": true,
+    "may_classify_proof_lineage_drift": true,
+    "may_classify_replay_drift": true,
+    "may_authorize_execution": false,
+    "may_authorize_proof": false,
+    "may_authorize_merge": false,
+    "may_repair_records_automatically": false,
+    "legitimacy_on_ambiguity": "NULL"
   }
 }
