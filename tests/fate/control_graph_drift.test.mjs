@@ -1,28 +1,124 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import test from "node:test"
+import assert from "node:assert"
+import fs from "node:fs"
 
-function propagateTopologyDrift(input) {
-  return {
-    mode: "OBSERVABILITY_ONLY",
-    observed_node: input.node,
-    drift_class: input.drift_class,
-    mutation_permitted: false,
-  };
-}
+test(
+  "control graph drift layer exists",
+  () => {
+    assert.ok(
+      fs.existsSync(
+        "runtime/control_graph_drift.ts",
+      ),
+    )
+  },
+)
 
-test("drift propagation remains observability-only", () => {
-  const drift = propagateTopologyDrift({
-    node: "validator",
-    drift_class: "topology_mismatch",
-  });
+test(
+  "drift layer remains observability only",
+  () => {
+    const source = fs.readFileSync(
+      "runtime/control_graph_drift.ts",
+      "utf8",
+    )
 
-  assert.equal(
-    drift.mode,
-    "OBSERVABILITY_ONLY",
-  );
+    assert.ok(
+      source.includes(
+        `"observability_only"`,
+      ),
+    )
 
-  assert.equal(
-    drift.mutation_permitted,
-    false,
-  );
-});
+    assert.ok(
+      source.includes(
+        `runtime_authority: false`,
+      ),
+    )
+  },
+)
+
+test(
+  "drift layer preserves replay neutrality",
+  () => {
+    const source = fs.readFileSync(
+      "runtime/control_graph_drift.ts",
+      "utf8",
+    )
+
+    assert.ok(
+      source.includes(
+        `replay_neutral: true`,
+      ),
+    )
+
+    assert.ok(
+      source.includes(
+        `verifyReplayNeutrality`,
+      ),
+    )
+  },
+)
+
+test(
+  "drift layer preserves append-only semantics",
+  () => {
+    const source = fs.readFileSync(
+      "runtime/control_graph_drift.ts",
+      "utf8",
+    )
+
+    assert.ok(
+      source.includes(
+        `append_only: true`,
+      ),
+    )
+
+    assert.ok(
+      source.includes(
+        `verifyAppendOnlyInvariant`,
+      ),
+    )
+  },
+)
+
+test(
+  "drift layer supports federated envelopes",
+  () => {
+    const source = fs.readFileSync(
+      "runtime/control_graph_drift.ts",
+      "utf8",
+    )
+
+    assert.ok(
+      source.includes(
+        `createDriftEnvelope`,
+      ),
+    )
+
+    assert.ok(
+      source.includes(
+        `drift_envelopes`,
+      ),
+    )
+  },
+)
+
+test(
+  "drift layer exports projection envelopes",
+  () => {
+    const source = fs.readFileSync(
+      "runtime/control_graph_drift.ts",
+      "utf8",
+    )
+
+    assert.ok(
+      source.includes(
+        `exportDriftProjection`,
+      ),
+    )
+
+    assert.ok(
+      source.includes(
+        `divergence_hash`,
+      ),
+    )
+  },
+)

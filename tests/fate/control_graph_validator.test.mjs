@@ -3,21 +3,21 @@ import assert from "node:assert"
 import fs from "node:fs"
 
 test(
-  "control graph boundary layer exists",
+  "control graph validator layer exists",
   () => {
     assert.ok(
       fs.existsSync(
-        "runtime/control_graph_boundary.ts",
+        "runtime/control_graph_validator.ts",
       ),
     )
   },
 )
 
 test(
-  "boundary layer remains observability only",
+  "validator layer remains observability only",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_validator.ts",
       "utf8",
     )
 
@@ -36,10 +36,10 @@ test(
 )
 
 test(
-  "boundary layer preserves replay neutrality",
+  "validator layer preserves replay neutrality",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_validator.ts",
       "utf8",
     )
 
@@ -58,10 +58,10 @@ test(
 )
 
 test(
-  "boundary layer preserves append-only semantics",
+  "validator layer preserves append-only semantics",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_validator.ts",
       "utf8",
     )
 
@@ -80,44 +80,44 @@ test(
 )
 
 test(
-  "boundary layer supports federated envelopes",
+  "validator layer supports federated envelopes",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_validator.ts",
       "utf8",
     )
 
     assert.ok(
       source.includes(
-        `createBoundaryEnvelope`,
+        `createValidatorEnvelope`,
       ),
     )
 
     assert.ok(
       source.includes(
-        `boundary_envelopes`,
+        `validator_envelopes`,
       ),
     )
   },
 )
 
 test(
-  "boundary layer exports projection envelopes",
+  "validator layer exports projection envelopes",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_validator.ts",
       "utf8",
     )
 
     assert.ok(
       source.includes(
-        `exportBoundaryProjection`,
+        `exportValidatorProjection`,
       ),
     )
 
     assert.ok(
       source.includes(
-        `boundary_hash`,
+        `validation_hash`,
       ),
     )
   },

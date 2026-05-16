@@ -3,21 +3,21 @@ import assert from "node:assert"
 import fs from "node:fs"
 
 test(
-  "control graph boundary layer exists",
+  "control graph sovereignty layer exists",
   () => {
     assert.ok(
       fs.existsSync(
-        "runtime/control_graph_boundary.ts",
+        "runtime/control_graph_sovereignty.ts",
       ),
     )
   },
 )
 
 test(
-  "boundary layer remains observability only",
+  "sovereignty layer remains observability only",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_sovereignty.ts",
       "utf8",
     )
 
@@ -36,10 +36,10 @@ test(
 )
 
 test(
-  "boundary layer preserves replay neutrality",
+  "sovereignty layer preserves replay neutrality",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_sovereignty.ts",
       "utf8",
     )
 
@@ -58,10 +58,10 @@ test(
 )
 
 test(
-  "boundary layer preserves append-only semantics",
+  "sovereignty layer preserves append-only semantics",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_sovereignty.ts",
       "utf8",
     )
 
@@ -80,44 +80,44 @@ test(
 )
 
 test(
-  "boundary layer supports federated envelopes",
+  "sovereignty layer supports federation envelopes",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_sovereignty.ts",
       "utf8",
     )
 
     assert.ok(
       source.includes(
-        `createBoundaryEnvelope`,
+        `createFederationEnvelope`,
       ),
     )
 
     assert.ok(
       source.includes(
-        `boundary_envelopes`,
+        `equivalence_hash`,
       ),
     )
   },
 )
 
 test(
-  "boundary layer exports projection envelopes",
+  "sovereignty layer exports projection envelopes",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_sovereignty.ts",
       "utf8",
     )
 
     assert.ok(
       source.includes(
-        `exportBoundaryProjection`,
+        `exportSovereigntyProjection`,
       ),
     )
 
     assert.ok(
       source.includes(
-        `boundary_hash`,
+        `federation_envelopes`,
       ),
     )
   },

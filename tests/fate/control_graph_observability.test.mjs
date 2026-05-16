@@ -3,21 +3,21 @@ import assert from "node:assert"
 import fs from "node:fs"
 
 test(
-  "control graph boundary layer exists",
+  "control graph observability layer exists",
   () => {
     assert.ok(
       fs.existsSync(
-        "runtime/control_graph_boundary.ts",
+        "runtime/control_graph_observability.ts",
       ),
     )
   },
 )
 
 test(
-  "boundary layer remains observability only",
+  "observability layer remains observability only",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_observability.ts",
       "utf8",
     )
 
@@ -36,10 +36,10 @@ test(
 )
 
 test(
-  "boundary layer preserves replay neutrality",
+  "observability layer preserves replay neutrality",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_observability.ts",
       "utf8",
     )
 
@@ -58,10 +58,10 @@ test(
 )
 
 test(
-  "boundary layer preserves append-only semantics",
+  "observability layer preserves append-only semantics",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_observability.ts",
       "utf8",
     )
 
@@ -80,44 +80,44 @@ test(
 )
 
 test(
-  "boundary layer supports federated envelopes",
+  "observability layer supports federated envelopes",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_observability.ts",
       "utf8",
     )
 
     assert.ok(
       source.includes(
-        `createBoundaryEnvelope`,
+        `createObservabilityEnvelope`,
       ),
     )
 
     assert.ok(
       source.includes(
-        `boundary_envelopes`,
+        `observability_envelopes`,
       ),
     )
   },
 )
 
 test(
-  "boundary layer exports projection envelopes",
+  "observability layer exports projection envelopes",
   () => {
     const source = fs.readFileSync(
-      "runtime/control_graph_boundary.ts",
+      "runtime/control_graph_observability.ts",
       "utf8",
     )
 
     assert.ok(
       source.includes(
-        `exportBoundaryProjection`,
+        `exportObservabilityProjection`,
       ),
     )
 
     assert.ok(
       source.includes(
-        `boundary_hash`,
+        `telemetry_hash`,
       ),
     )
   },
