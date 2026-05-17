@@ -56,6 +56,59 @@ jobs:
             echo "No constitutional drift detected."
           fi
 
+      - name: Classify governance impact
+        id: pr_classification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PR_CLASS="PR-0_NON_GOVERNED"
+
+          if grep -E "^governance/|^src/runtime/(validate|execute|canonicalize|authority|continuity)\.ts$" changed_files.txt; then
+            PR_CLASS="PR-2_CONSTITUTIONAL"
+          fi
+
+          if grep -E "workflow|deploy|wrangler|cloudflare|federation|sovereignty" changed_files.txt; then
+            PR_CLASS="PR-3_SOVEREIGNTY"
+          fi
+
+          if grep -E "^src/runtime/" changed_files.txt && [[ "$PR_CLASS" == "PR-0_NON_GOVERNED" ]]; then
+            PR_CLASS="PR-1_RUNTIME"
+          fi
+
+          if [[ -z "$PR_CLASS" ]]; then
+            echo "Unknown governance classification."
+            exit 1
+          fi
+
+          echo "pr_class=$PR_CLASS" >> "$GITHUB_OUTPUT"
+          echo "PR classified as: $PR_CLASS"
+
+      - name: Fail closed on unknown classification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VALID_CLASSES=(
+            "PR-0_NON_GOVERNED"
+            "PR-1_RUNTIME"
+            "PR-2_CONSTITUTIONAL"
+            "PR-3_SOVEREIGNTY"
+          )
+
+          MATCHED=false
+
+          for c in "${VALID_CLASSES[@]}"; do
+            if [[ "$c" == "${{ steps.pr_classification.outputs.pr_class }}" ]]; then
+              MATCHED=true
+            fi
+          done
+
+          if [[ "$MATCHED" != "true" ]]; then
+            echo "Unknown classification semantics -> NULL"
+            exit 1
+          fi
+
       - name: Validate governance JSON
         if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
         shell: bash
@@ -78,6 +131,7 @@ jobs:
           REQUIRED_FILES=(
             "governance/governance_mutation_control.json"
             "governance/execution_surfaces.json"
+            "governance/pr_classification_matrix.json"
           )
 
           for f in "${REQUIRED_FILES[@]}"; do
@@ -86,6 +140,14 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Require elevated review for constitutional or sovereignty drift
+        if: steps.pr_classification.outputs.pr_class == 'PR-2_CONSTITUTIONAL' || steps.pr_classification.outputs.pr_class == 'PR-3_SOVEREIGNTY'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Elevated governance review required for ${{ steps.pr_classification.outputs.pr_class }}"
 
       - name: Verify canonical runtime routes unchanged
         if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
@@ -123,6 +185,6 @@ jobs:
           done
 
       - name: Constitutional integrity pass
-        if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
         run: |
           echo "Constitutional integrity preserved."
+          echo "PR classification: ${{ steps.pr_classification.outputs.pr_class }}"
