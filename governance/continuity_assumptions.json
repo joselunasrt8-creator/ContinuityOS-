@@ -1,0 +1,84 @@
+{
+  "artifact": "CONTINUITY_ASSUMPTIONS",
+  "status": "NON_OPERATIVE",
+  "issue": 436,
+  "authority_creating": false,
+  "execution_authorizing": false,
+  "runtime_mutating": false,
+  "core_invariant": "no valid continuity chain -> no valid authority -> no valid execution",
+  "assumption_classes": [
+    "IDENTITY_CONTINUITY",
+    "SESSION_CONTINUITY",
+    "AUTHORITY_CONTINUITY",
+    "SCOPE_CONTINUITY",
+    "REVOCATION_CONTINUITY",
+    "EXPIRY_CONTINUITY",
+    "REPLAY_CONTINUITY",
+    "HASH_CONTINUITY",
+    "PROOF_CONTINUITY",
+    "REGISTRY_CONTINUITY",
+    "FEDERATION_CONTINUITY",
+    "OBSERVABILITY_CONTINUITY",
+    "SOVEREIGNTY_CONTINUITY",
+    "POLICY_CONTINUITY",
+    "SCHEMA_CONTINUITY"
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "CA-001",
+      "classes": ["IDENTITY_CONTINUITY", "AUTHORITY_CONTINUITY"],
+      "assumption": "identity/session origin remains authentic and bound to authority creation",
+      "failure_mode": "forged or orphaned authority lineage",
+      "required_closure": "authority creation must bind identity/session/continuity metadata",
+      "status": "OPEN"
+    },
+    {
+      "assumption_id": "CA-003",
+      "classes": ["SESSION_CONTINUITY", "REVOCATION_CONTINUITY"],
+      "assumption": "session revocation invalidates descendants",
+      "failure_mode": "revoked session still executes",
+      "required_closure": "cascade revocation to continuity, authority, validation, and execution",
+      "status": "OPEN"
+    },
+    {
+      "assumption_id": "CA-006",
+      "classes": ["SCOPE_CONTINUITY"],
+      "assumption": "scope cannot expand from authority to AEO to execution",
+      "failure_mode": "target escalation",
+      "required_closure": "deterministic scope matching across stages",
+      "status": "OPEN"
+    },
+    {
+      "assumption_id": "CA-010",
+      "classes": ["HASH_CONTINUITY"],
+      "assumption": "canonical object hash remains stable across runtime versions",
+      "failure_mode": "identity drift",
+      "required_closure": "canonicalization version governance",
+      "status": "OPEN"
+    },
+    {
+      "assumption_id": "CA-012",
+      "classes": ["PROOF_CONTINUITY"],
+      "assumption": "proof cannot exist without execution lineage",
+      "failure_mode": "orphan proof",
+      "required_closure": "proof requires execution_id and authority lineage",
+      "status": "OPEN"
+    },
+    {
+      "assumption_id": "CA-017",
+      "classes": ["FEDERATION_CONTINUITY"],
+      "assumption": "remote evidence cannot become local authority by default",
+      "failure_mode": "sovereignty collapse",
+      "required_closure": "federation evidence remains observability-only unless bound",
+      "status": "OPEN"
+    },
+    {
+      "assumption_id": "CA-021",
+      "classes": ["SOVEREIGNTY_CONTINUITY"],
+      "assumption": "root credentials remain external sovereignty assumptions until contained",
+      "failure_mode": "false non-bypassability claim",
+      "required_closure": "root authority registry and containment plan",
+      "status": "OPEN"
+    }
+  ]
+}
