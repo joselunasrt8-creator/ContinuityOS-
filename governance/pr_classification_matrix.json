@@ -1,0 +1,53 @@
+{
+  "artifact": "PR_CLASSIFICATION_MATRIX",
+  "status": "NON_OPERATIVE",
+  "authority_creating": false,
+  "execution_authorizing": false,
+  "runtime_mutating": false,
+  "core_invariant": "all repository mutation must be governance-classified before merge legitimacy",
+  "classification_levels": [
+    {
+      "class": "PR-0_NON_GOVERNED",
+      "description": "Documentation or non-runtime changes",
+      "review_requirement": "standard_review",
+      "merge_semantics": "normal"
+    },
+    {
+      "class": "PR-1_RUNTIME",
+      "description": "Runtime implementation changes without constitutional mutation",
+      "review_requirement": "runtime_review",
+      "merge_semantics": "governed"
+    },
+    {
+      "class": "PR-2_CONSTITUTIONAL",
+      "description": "Changes affecting governance or legitimacy semantics",
+      "review_requirement": "constitutional_review",
+      "merge_semantics": "fail_closed_until_reviewed"
+    },
+    {
+      "class": "PR-3_SOVEREIGNTY",
+      "description": "Changes affecting deploy authority, federation, or root trust boundaries",
+      "review_requirement": "sovereignty_review",
+      "merge_semantics": "fail_closed_until_explicit_approval"
+    }
+  ],
+  "constitutional_paths": [
+    "governance/**",
+    "src/runtime/validate.ts",
+    "src/runtime/execute.ts",
+    "src/runtime/canonicalize.ts",
+    "src/runtime/authority.ts",
+    "src/runtime/continuity.ts"
+  ],
+  "classification_rules": [
+    {
+      "class": "PR-2_CONSTITUTIONAL",
+      "trigger": "constitutional_path_mutation"
+    },
+    {
+      "class": "PR-3_SOVEREIGNTY",
+      "trigger": "deploy_or_root_authority_mutation"
+    }
+  ],
+  "unknown_classification_semantics": "NULL"
+}
