@@ -1,2 +1,21 @@
-# Require owned review for workflow changes.
-.github/workflows/** @joselunasrt8-creator
+# Constitutional governance ownership
+# NON-OPERATIVE
+# authority_creating: false
+# execution_authorizing: false
+# runtime_mutating: false
+
+# Constitutional governance layer
+/governance/ @joselunasrt8-creator
+
+# Constitutional CI enforcement
+/.github/workflows/constitutional-integrity.yml @joselunasrt8-creator
+
+# Runtime legitimacy boundaries
+/src/runtime/validate.ts @joselunasrt8-creator
+/src/runtime/execute.ts @joselunasrt8-creator
+/src/runtime/canonicalize.ts @joselunasrt8-creator
+/src/runtime/authority.ts @joselunasrt8-creator
+/src/runtime/continuity.ts @joselunasrt8-creator
+
+# Sovereignty-sensitive infrastructure
+/.github/workflows/** @joselunasrt8-creator
