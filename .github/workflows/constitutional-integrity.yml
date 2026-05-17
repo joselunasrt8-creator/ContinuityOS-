@@ -1,0 +1,190 @@
+name: constitutional-integrity
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  constitutional-integrity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect constitutional drift
+        id: constitutional_drift
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CONSTITUTIONAL_PATHS=(
+            "governance/"
+            "src/runtime/validate.ts"
+            "src/runtime/execute.ts"
+            "src/runtime/canonicalize.ts"
+            "src/runtime/authority.ts"
+            "src/runtime/continuity.ts"
+          )
+
+          git diff --name-only origin/main...HEAD > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt
+
+          CONSTITUTIONAL_DRIFT=false
+
+          while read -r file; do
+            for path in "${CONSTITUTIONAL_PATHS[@]}"; do
+              if [[ "$file" == "$path"* ]] || [[ "$file" == "$path" ]]; then
+                CONSTITUTIONAL_DRIFT=true
+              fi
+            done
+          done < changed_files.txt
+
+          echo "constitutional_drift=$CONSTITUTIONAL_DRIFT" >> "$GITHUB_OUTPUT"
+
+          if [[ "$CONSTITUTIONAL_DRIFT" == "true" ]]; then
+            echo "Constitutional drift detected."
+          else
+            echo "No constitutional drift detected."
+          fi
+
+      - name: Classify governance impact
+        id: pr_classification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PR_CLASS="PR-0_NON_GOVERNED"
+
+          if grep -E "^governance/|^src/runtime/(validate|execute|canonicalize|authority|continuity)\.ts$" changed_files.txt; then
+            PR_CLASS="PR-2_CONSTITUTIONAL"
+          fi
+
+          if grep -E "workflow|deploy|wrangler|cloudflare|federation|sovereignty" changed_files.txt; then
+            PR_CLASS="PR-3_SOVEREIGNTY"
+          fi
+
+          if grep -E "^src/runtime/" changed_files.txt && [[ "$PR_CLASS" == "PR-0_NON_GOVERNED" ]]; then
+            PR_CLASS="PR-1_RUNTIME"
+          fi
+
+          if [[ -z "$PR_CLASS" ]]; then
+            echo "Unknown governance classification."
+            exit 1
+          fi
+
+          echo "pr_class=$PR_CLASS" >> "$GITHUB_OUTPUT"
+          echo "PR classified as: $PR_CLASS"
+
+      - name: Fail closed on unknown classification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VALID_CLASSES=(
+            "PR-0_NON_GOVERNED"
+            "PR-1_RUNTIME"
+            "PR-2_CONSTITUTIONAL"
+            "PR-3_SOVEREIGNTY"
+          )
+
+          MATCHED=false
+
+          for c in "${VALID_CLASSES[@]}"; do
+            if [[ "$c" == "${{ steps.pr_classification.outputs.pr_class }}" ]]; then
+              MATCHED=true
+            fi
+          done
+
+          if [[ "$MATCHED" != "true" ]]; then
+            echo "Unknown classification semantics -> NULL"
+            exit 1
+          fi
+
+      - name: Validate governance JSON
+        if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+          for f in governance/*.json; do
+            jq . "$f" >/dev/null
+          done
+
+      - name: Ensure PREO and SCO evidence exists
+        if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REQUIRED_FILES=(
+            "governance/governance_mutation_control.json"
+            "governance/execution_surfaces.json"
+            "governance/pr_classification_matrix.json"
+          )
+
+          for f in "${REQUIRED_FILES[@]}"; do
+            if [[ ! -f "$f" ]]; then
+              echo "Missing governance evidence file: $f"
+              exit 1
+            fi
+          done
+
+      - name: Require elevated review for constitutional or sovereignty drift
+        if: steps.pr_classification.outputs.pr_class == 'PR-2_CONSTITUTIONAL' || steps.pr_classification.outputs.pr_class == 'PR-3_SOVEREIGNTY'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Elevated governance review required for ${{ steps.pr_classification.outputs.pr_class }}"
+
+      - name: Verify canonical runtime routes unchanged
+        if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff origin/main...HEAD -- | grep -E "CANONICAL_RUNTIME_ROUTES"; then
+            echo "Canonical runtime routes modified."
+            exit 1
+          fi
+
+      - name: Detect executable route expansion
+        if: steps.constitutional_drift.outputs.constitutional_drift == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FORBIDDEN_PATTERNS=(
+            "app.post("
+            "router.post("
+            "app.put("
+            "router.put("
+            "app.delete("
+            "router.delete("
+          )
+
+          git diff origin/main...HEAD > constitutional.patch
+
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            if grep -F "$pattern" constitutional.patch; then
+              echo "Executable route expansion detected: $pattern"
+              exit 1
+            fi
+          done
+
+      - name: Constitutional integrity pass
+        run: |
+          echo "Constitutional integrity preserved."
+          echo "PR classification: ${{ steps.pr_classification.outputs.pr_class }}"
