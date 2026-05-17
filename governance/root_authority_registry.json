@@ -1,0 +1,18 @@
+{
+  "artifact": "ROOT_AUTHORITY_REGISTRY",
+  "status": "NON_OPERATIVE",
+  "issue": 436,
+  "authority_creating": false,
+  "execution_authorizing": false,
+  "runtime_mutating": false,
+  "invariant": "runtime legitimacy != full infrastructure sovereignty",
+  "authority_classes": ["RA-0_ABSOLUTE_ROOT", "RA-1_INFRASTRUCTURE_ADMIN", "RA-2_DEPLOYMENT_ROOT", "RA-3_REPOSITORY_ROOT", "RA-4_SECRET_ROOT", "RA-5_DATABASE_ROOT", "RA-6_LOCAL_OPERATOR_ROOT", "RA-7_OBSERVABILITY_ROOT", "RA-8_GOVERNANCE_MUTATION_ROOT", "RA-9_UNKNOWN_ROOT"],
+  "roots": [
+    {"root_id":"RA-001","surface":"GitHub repository owner/admin","authority_class":"RA-0_ABSOLUTE_ROOT","can_bypass_runtime":true,"can_mutate_source":true,"can_mutate_deploy":true,"can_mutate_registry":false,"can_mutate_secrets":true,"current_containment":"external_trust","closure_requirement":"document sovereignty assumption and enforce branch protection where available","status":"OPEN"},
+    {"root_id":"RA-007","surface":"Cloudflare account owner/admin","authority_class":"RA-0_ABSOLUTE_ROOT","can_bypass_runtime":true,"can_mutate_source":false,"can_mutate_deploy":true,"can_mutate_registry":true,"can_mutate_secrets":true,"current_containment":"external_trust","closure_requirement":"document as absolute external sovereignty dependency","status":"OPEN"},
+    {"root_id":"RA-008","surface":"Cloudflare API token","authority_class":"RA-1_INFRASTRUCTURE_ADMIN","can_bypass_runtime":true,"can_mutate_source":false,"can_mutate_deploy":true,"can_mutate_registry":true,"can_mutate_secrets":false,"current_containment":"external_trust","closure_requirement":"scope token, rotate, classify, and restrict to governed workflow where possible","status":"OPEN"},
+    {"root_id":"RA-009","surface":"Wrangler authenticated local session","authority_class":"RA-6_LOCAL_OPERATOR_ROOT","can_bypass_runtime":true,"can_mutate_source":false,"can_mutate_deploy":true,"can_mutate_registry":true,"can_mutate_secrets":false,"current_containment":"ungoverned","closure_requirement":"treat local deploy authority as root bypass until contained","status":"OPEN"},
+    {"root_id":"RA-016","surface":"Canonical serialization code","authority_class":"RA-8_GOVERNANCE_MUTATION_ROOT","can_bypass_runtime":false,"can_mutate_source":true,"can_mutate_deploy":false,"can_mutate_registry":false,"can_mutate_secrets":false,"current_containment":"review_required","closure_requirement":"treat serialization mutation as root legitimacy identity mutation","status":"OPEN"},
+    {"root_id":"RA-021","surface":"Local terminal shell","authority_class":"RA-6_LOCAL_OPERATOR_ROOT","can_bypass_runtime":true,"can_mutate_source":true,"can_mutate_deploy":true,"can_mutate_registry":true,"can_mutate_secrets":true,"current_containment":"human_trust","closure_requirement":"document as irreducible operator root unless sandboxed","status":"OPEN"}
+  ]
+}
