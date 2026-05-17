@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from '../src/canonical.js'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -8,35 +8,6 @@ const NULL_STATUS = 'NULL'
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(join(root, relativePath), 'utf8'))
-}
-
-function isPlainRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function normalizeCanonicalValue(value) {
-  if (value === undefined) return null
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null
-  if (Array.isArray(value)) return value.map(normalizeCanonicalValue)
-  if (isPlainRecord(value)) {
-    return Object.freeze(Object.keys(value).sort().reduce((normalized, key) => {
-      normalized[key] = normalizeCanonicalValue(value[key])
-      return normalized
-    }, {}))
-  }
-  return null
-}
-
-function canonicalize(value) {
-  const normalized = normalizeCanonicalValue(value)
-  if (Array.isArray(normalized)) return `[${normalized.map(canonicalize).join(',')}]`
-  if (isPlainRecord(normalized)) return `{${Object.keys(normalized).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(normalized[key])}`).join(',')}}`
-  return JSON.stringify(normalized)
-}
-
-function sha256Hex(value) {
-  return createHash('sha256').update(value).digest('hex')
 }
 
 function getPath(source, path) {

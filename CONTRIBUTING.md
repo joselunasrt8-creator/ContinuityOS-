@@ -108,6 +108,28 @@ text validated_object == executed_object
 
 Mutation after validation is considered a boundary violation.
 
+
+---
+
+# Codex Execution Protocol
+
+Codex-assisted closure work must follow the repository execution protocol in `docs/codex-execution-protocol.md`.
+
+Required closure invariant:
+
+text one issue → one branch → one PR → one invariant → one FATE expansion
+
+Codex PRs must:
+
+- use exactly one issue-scoped branch
+- open exactly one issue-scoped PR
+- protect exactly one stated invariant
+- add or update deterministic FATE/static coverage for that invariant
+- avoid bundled refactors and unrelated cleanup
+- report changed files, tests added, invariant protected, and follow-up gaps as separate issue candidates
+
+Codex documentation-governance work must not modify runtime logic, canonical routes, authority behavior, proof behavior, replay behavior, validator behavior, reconciliation behavior, or schema behavior unless the scoped issue explicitly requires it.
+
 ---
 
 # Pull Request Expectations

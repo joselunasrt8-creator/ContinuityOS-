@@ -1,0 +1,45 @@
+{
+  "artifact": "recursive_governance_equivalence_model",
+  "version": "1.0",
+  "canonical_invariant": "If no valid object exists -> nothing happens.",
+  "governance_invariant": "If governance legitimacy cannot be recursively proven, governance evolution itself is invalid.",
+  "boundary_invariant": "Governance evidence may invalidate legitimacy, but may never authorize execution, proof, deployment, or merge.",
+  "hashes": [
+    "governance_equivalence_hash",
+    "governance_semantic_hash",
+    "governance_topology_hash",
+    "governance_lineage_hash"
+  ],
+  "semantic_domains": [
+    "validator_semantics",
+    "schema_semantics",
+    "proof_semantics",
+    "replay_semantics",
+    "authority_semantics",
+    "execution_boundary_topology",
+    "federation_semantics",
+    "observability_semantics"
+  ],
+  "no_semantically_divergent_governance_states_hash_equate": true,
+  "immutable_semantic_freeze": [
+    "exact_five_field_AEO_invariant",
+    "validated_object_equals_executed_object",
+    "authority_before_execution",
+    "replay_nonce_consumption",
+    "proof_lineage_binding",
+    "append_only_registry_guarantees",
+    "GET_only_observability_boundary",
+    "fail_closed_validation_semantics",
+    "remote_authority_denial",
+    "no_secret_inspection"
+  ],
+  "evidence_flags": {
+    "evidence_only": true,
+    "append_only": true,
+    "replay_neutral": true,
+    "non_authoritative": true,
+    "executable": false,
+    "deployment_capable": false,
+    "creates_authority": false
+  }
+}

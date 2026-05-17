@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { canonicalize, hashCanonical } from '../../src/canonical.js'
 import { readFileSync } from 'node:fs'
 
 export const OUTCOME = Object.freeze({
@@ -20,16 +20,9 @@ export const fixtures = Object.freeze({
   federationEnvelope: fixture('federation-envelope'),
 })
 
-export function canonicalize(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value)
-  if (Array.isArray(value)) return `[${value.map((item) => canonicalize(item)).join(',')}]`
-  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(value[key])}`).join(',')}}`
-}
-
 export function hashObject(value) {
-  return createHash('sha256').update(canonicalize(value)).digest('hex')
+  return hashCanonical(value)
 }
-
 export function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }

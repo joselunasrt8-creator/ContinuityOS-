@@ -1,16 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { canonicalize, hashCanonical } from '../../src/canonical.js'
 import { existsSync, readFileSync } from 'node:fs'
 
-function canonicalize(value) {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value)
-  if (typeof value === 'number') return Number.isFinite(value) ? JSON.stringify(value) : 'null'
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
-  if (typeof value === 'object') return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalize(value[k])}`).join(',')}}`
-  return 'null'
-}
-const hash = (v) => createHash('sha256').update(canonicalize(v)).digest('hex')
+const hash = (v) => hashCanonical(v)
 const standards = ['legitimacy-envelope-v1.md','legitimacy-state-machine-v1.md','replay-semantics-v1.md','revocation-semantics-v1.md','trace-lineage-v1.md']
 const predicates = ['aeo-predicate-v1.json','continuity-predicate-v1.json','proof-predicate-v1.json','preo-predicate-v1.json','sco-predicate-v1.json']
 

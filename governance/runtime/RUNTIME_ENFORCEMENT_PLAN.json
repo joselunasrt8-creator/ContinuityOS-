@@ -11,11 +11,26 @@
       "entrypoint": "/authority",
       "required_authority": "root_governance_authority",
       "required_AEO": "AUTHORITY_ISSUANCE_AEO",
-      "required_validation": ["identity_continuity", "authority_scope_validation", "replay_unused", "policy_validation"],
-      "required_proof": ["authority_hash", "authority_lineage", "issuance_timestamp"],
+      "required_validation": [
+        "identity_continuity",
+        "authority_scope_validation",
+        "replay_unused",
+        "policy_validation"
+      ],
+      "required_proof": [
+        "authority_hash",
+        "authority_lineage",
+        "issuance_timestamp"
+      ],
       "replay_semantics": "single_use_authority_consumption",
-      "drift_checks": ["authority_drift", "policy_drift"],
-      "observability": ["authority_registry", "issuance_logs"],
+      "drift_checks": [
+        "authority_drift",
+        "policy_drift"
+      ],
+      "observability": [
+        "authority_registry",
+        "issuance_logs"
+      ],
       "execution_boundary": "authority_boundary",
       "bypass_risk": "direct_authority_creation",
       "enforcement_status": "planned"
@@ -26,11 +41,24 @@
       "entrypoint": "/compile",
       "required_authority": "bound_authority",
       "required_AEO": "COMPILE_AEO",
-      "required_validation": ["schema_validation", "scope_validation", "constraint_validation"],
-      "required_proof": ["compiled_hash", "compiler_version"],
+      "required_validation": [
+        "schema_validation",
+        "scope_validation",
+        "constraint_validation"
+      ],
+      "required_proof": [
+        "compiled_hash",
+        "compiler_version"
+      ],
       "replay_semantics": "immutable_compilation_hash",
-      "drift_checks": ["schema_drift", "compiler_drift"],
-      "observability": ["compile_logs", "hash_registry"],
+      "drift_checks": [
+        "schema_drift",
+        "compiler_drift"
+      ],
+      "observability": [
+        "compile_logs",
+        "hash_registry"
+      ],
       "execution_boundary": "compilation_boundary",
       "bypass_risk": "direct_runtime_object_injection",
       "enforcement_status": "planned"
@@ -41,11 +69,24 @@
       "entrypoint": "/validate",
       "required_authority": "bound_authority",
       "required_AEO": "VALIDATION_AEO",
-      "required_validation": ["exact_object_validation", "policy_validation", "continuity_validation"],
-      "required_proof": ["validation_hash", "validator_result"],
+      "required_validation": [
+        "exact_object_validation",
+        "policy_validation",
+        "continuity_validation"
+      ],
+      "required_proof": [
+        "validation_hash",
+        "validator_result"
+      ],
       "replay_semantics": "validated_hash_locked",
-      "drift_checks": ["validator_drift", "policy_drift"],
-      "observability": ["validation_logs", "validator_registry"],
+      "drift_checks": [
+        "validator_drift",
+        "policy_drift"
+      ],
+      "observability": [
+        "validation_logs",
+        "validator_registry"
+      ],
       "execution_boundary": "validation_boundary",
       "bypass_risk": "execution_without_validation",
       "enforcement_status": "planned"
@@ -56,11 +97,25 @@
       "entrypoint": "/execute",
       "required_authority": "validated_authority",
       "required_AEO": "EXECUTION_AEO",
-      "required_validation": ["exact_hash_match", "unused_authority", "policy_valid"],
-      "required_proof": ["execution_receipt", "execution_hash", "execution_timestamp"],
+      "required_validation": [
+        "exact_hash_match",
+        "unused_authority",
+        "policy_valid"
+      ],
+      "required_proof": [
+        "execution_receipt",
+        "execution_hash",
+        "execution_timestamp"
+      ],
       "replay_semantics": "authority_consumed_after_execution",
-      "drift_checks": ["execution_drift", "runtime_drift"],
-      "observability": ["execution_logs", "runtime_registry"],
+      "drift_checks": [
+        "execution_drift",
+        "runtime_drift"
+      ],
+      "observability": [
+        "execution_logs",
+        "runtime_registry"
+      ],
       "execution_boundary": "non_bypassable_runtime_boundary",
       "bypass_risk": "direct_runtime_invocation",
       "enforcement_status": "planned"
@@ -71,11 +126,24 @@
       "entrypoint": "/proof",
       "required_authority": "validated_execution_authority",
       "required_AEO": "PROOF_AEO",
-      "required_validation": ["proof_integrity", "proof_lineage_validation"],
-      "required_proof": ["proof_hash", "registry_persistence", "proof_timestamp"],
+      "required_validation": [
+        "proof_integrity",
+        "proof_lineage_validation"
+      ],
+      "required_proof": [
+        "proof_hash",
+        "registry_persistence",
+        "proof_timestamp"
+      ],
       "replay_semantics": "duplicate_proof_hash_blocked",
-      "drift_checks": ["proof_drift", "registry_drift"],
-      "observability": ["proof_registry", "audit_logs"],
+      "drift_checks": [
+        "proof_drift",
+        "registry_drift"
+      ],
+      "observability": [
+        "proof_registry",
+        "audit_logs"
+      ],
       "execution_boundary": "proof_boundary",
       "bypass_risk": "execution_without_proof",
       "enforcement_status": "planned"
@@ -86,11 +154,30 @@
       "entrypoint": "workflow_dispatch",
       "required_authority": "branch_protected_merge_authority",
       "required_AEO": "WORKFLOW_DISPATCH_AEO",
-      "required_validation": ["dispatch_actor_authorized", "workflow_ref_matches_validated_object", "inputs_match_aeo", "branch_protection_satisfied"],
-      "required_proof": ["workflow_run_id", "workflow_name", "head_sha", "actor", "dispatch_timestamp"],
+      "required_validation": [
+        "dispatch_actor_authorized",
+        "workflow_ref_matches_validated_object",
+        "inputs_match_aeo",
+        "branch_protection_satisfied"
+      ],
+      "required_proof": [
+        "workflow_run_id",
+        "workflow_name",
+        "head_sha",
+        "actor",
+        "dispatch_timestamp"
+      ],
       "replay_semantics": "workflow_dispatch_input_hash_single_use_when_state_changing",
-      "drift_checks": ["workflow_file_drift", "dispatch_input_drift", "head_sha_drift"],
-      "observability": ["github_actions_run_log", "merge_governance_summary", "workflow_run_artifact"],
+      "drift_checks": [
+        "workflow_file_drift",
+        "dispatch_input_drift",
+        "head_sha_drift"
+      ],
+      "observability": [
+        "github_actions_run_log",
+        "merge_governance_summary",
+        "workflow_run_artifact"
+      ],
       "execution_boundary": "github_actions_dispatch_boundary",
       "bypass_risk": "manual_dispatch_without_bound_authority",
       "enforcement_status": "planned"
@@ -101,11 +188,33 @@
       "entrypoint": "governed-deploy.yml",
       "required_authority": "validated_deployment_authority",
       "required_AEO": "DEPLOYMENT_EXECUTION_AEO",
-      "required_validation": ["validated_object_hash_match", "environment_match", "worker_target_match", "wrangler_config_hash_match", "nonce_unused"],
-      "required_proof": ["deployment_id", "workflow_run_id", "commit_sha", "environment", "worker_name", "validated_object_hash"],
+      "required_validation": [
+        "validated_object_hash_match",
+        "environment_match",
+        "worker_target_match",
+        "wrangler_config_hash_match",
+        "nonce_unused"
+      ],
+      "required_proof": [
+        "deployment_id",
+        "workflow_run_id",
+        "commit_sha",
+        "environment",
+        "worker_name",
+        "validated_object_hash"
+      ],
       "replay_semantics": "deployment_nonce_consumed_once",
-      "drift_checks": ["wrangler_config_drift", "worker_target_drift", "environment_drift", "commit_sha_drift"],
-      "observability": ["deployment_logs", "github_actions_summary", "proof_registry"],
+      "drift_checks": [
+        "wrangler_config_drift",
+        "worker_target_drift",
+        "environment_drift",
+        "commit_sha_drift"
+      ],
+      "observability": [
+        "deployment_logs",
+        "github_actions_summary",
+        "proof_registry"
+      ],
       "execution_boundary": "production_deployment_boundary",
       "bypass_risk": "direct_wrangler_deploy_outside_governed_workflow",
       "enforcement_status": "planned"
@@ -116,11 +225,30 @@
       "entrypoint": "/execute + authority_registry",
       "required_authority": "active_unconsumed_authority",
       "required_AEO": "AUTHORITY_CONSUMPTION_AEO",
-      "required_validation": ["authority_status_active", "authority_not_expired", "nonce_unused", "decision_hash_not_consumed"],
-      "required_proof": ["authority_id", "decision_id", "consumed_at", "invocation_nonce", "validated_object_hash"],
+      "required_validation": [
+        "authority_status_active",
+        "authority_not_expired",
+        "nonce_unused",
+        "decision_hash_not_consumed"
+      ],
+      "required_proof": [
+        "authority_id",
+        "decision_id",
+        "consumed_at",
+        "invocation_nonce",
+        "validated_object_hash"
+      ],
       "replay_semantics": "ACTIVE -> CONSUMED; reused authority returns NULL",
-      "drift_checks": ["authority_status_drift", "nonce_registry_drift", "decision_hash_duplicate"],
-      "observability": ["authority_registry", "invocation_registry", "replay_blocked_event"],
+      "drift_checks": [
+        "authority_status_drift",
+        "nonce_registry_drift",
+        "decision_hash_duplicate"
+      ],
+      "observability": [
+        "authority_registry",
+        "invocation_registry",
+        "replay_blocked_event"
+      ],
       "execution_boundary": "replay_consumption_boundary",
       "bypass_risk": "authority_reuse_after_execution",
       "enforcement_status": "planned"
@@ -131,11 +259,33 @@
       "entrypoint": "/proof + proof_registry",
       "required_authority": "completed_execution_record",
       "required_AEO": "PROOF_LINEAGE_AEO",
-      "required_validation": ["execution_record_exists", "proof_binds_decision_id", "proof_binds_validated_object_hash", "proof_binds_execution_surface", "lineage_fields_present"],
-      "required_proof": ["proof_id", "decision_id", "execution_id", "continuity_id", "authority_id", "validated_object_hash", "registry_write_timestamp"],
+      "required_validation": [
+        "execution_record_exists",
+        "proof_binds_decision_id",
+        "proof_binds_validated_object_hash",
+        "proof_binds_execution_surface",
+        "lineage_fields_present"
+      ],
+      "required_proof": [
+        "proof_id",
+        "decision_id",
+        "execution_id",
+        "continuity_id",
+        "authority_id",
+        "validated_object_hash",
+        "registry_write_timestamp"
+      ],
       "replay_semantics": "one canonical proof per execution hash; duplicate proof blocked or archived",
-      "drift_checks": ["proof_hash_drift", "lineage_missing", "execution_surface_mismatch"],
-      "observability": ["proof_registry", "observability_registry", "lineage_audit_log"],
+      "drift_checks": [
+        "proof_hash_drift",
+        "lineage_missing",
+        "execution_surface_mismatch"
+      ],
+      "observability": [
+        "proof_registry",
+        "observability_registry",
+        "lineage_audit_log"
+      ],
       "execution_boundary": "proof_lineage_boundary",
       "bypass_risk": "proof_written_without_matching_execution",
       "enforcement_status": "planned"
@@ -146,11 +296,32 @@
       "entrypoint": "drift_registry + observability_registry",
       "required_authority": "observability_policy_authority",
       "required_AEO": "DRIFT_DETECTION_AEO",
-      "required_validation": ["expected_hash_present", "observed_hash_present", "drift_classification", "decision_or_execution_linkage"],
-      "required_proof": ["drift_id", "expected_value", "observed_value", "surface_id", "detected_at"],
+      "required_validation": [
+        "expected_hash_present",
+        "observed_hash_present",
+        "drift_classification",
+        "decision_or_execution_linkage"
+      ],
+      "required_proof": [
+        "drift_id",
+        "expected_value",
+        "observed_value",
+        "surface_id",
+        "detected_at"
+      ],
       "replay_semantics": "drift_event_append_only; drift record does not authorize execution",
-      "drift_checks": ["policy_drift", "authority_drift", "execution_drift", "model_drift", "economic_drift"],
-      "observability": ["drift_registry", "observability_registry", "alert_log"],
+      "drift_checks": [
+        "policy_drift",
+        "authority_drift",
+        "execution_drift",
+        "model_drift",
+        "economic_drift"
+      ],
+      "observability": [
+        "drift_registry",
+        "observability_registry",
+        "alert_log"
+      ],
       "execution_boundary": "observability_boundary",
       "bypass_risk": "silent_runtime_drift_without_detection",
       "enforcement_status": "planned"
@@ -161,11 +332,29 @@
       "entrypoint": "/validate + /execute",
       "required_authority": "bound_validation_authority",
       "required_AEO": "EXACT_OBJECT_VALIDATION_AEO",
-      "required_validation": ["canonical_json_hash_match", "validated_object_hash_present", "executed_object_hash_match", "post_validation_mutation_blocked"],
-      "required_proof": ["validated_object_hash", "executed_object_hash", "canonicalization_algorithm", "validator_version"],
+      "required_validation": [
+        "canonical_json_hash_match",
+        "validated_object_hash_present",
+        "executed_object_hash_match",
+        "post_validation_mutation_blocked"
+      ],
+      "required_proof": [
+        "validated_object_hash",
+        "executed_object_hash",
+        "canonicalization_algorithm",
+        "validator_version"
+      ],
       "replay_semantics": "validation applies only to exact object hash; mutated object returns NULL",
-      "drift_checks": ["canonicalization_drift", "validator_version_drift", "hash_mismatch"],
-      "observability": ["validation_registry", "hash_mismatch_event", "execution_rejection_log"],
+      "drift_checks": [
+        "canonicalization_drift",
+        "validator_version_drift",
+        "hash_mismatch"
+      ],
+      "observability": [
+        "validation_registry",
+        "hash_mismatch_event",
+        "execution_rejection_log"
+      ],
       "execution_boundary": "exact_object_boundary",
       "bypass_risk": "validated_object_mutated_before_execution",
       "enforcement_status": "planned"
@@ -176,11 +365,30 @@
       "entrypoint": "observability_registry",
       "required_authority": "observability_write_authority",
       "required_AEO": "OBSERVABILITY_EVENT_AEO",
-      "required_validation": ["event_type_present", "surface_id_present", "payload_schema_valid", "decision_or_execution_reference_when_available"],
-      "required_proof": ["event_id", "event_type", "surface_id", "payload_hash", "created_at"],
+      "required_validation": [
+        "event_type_present",
+        "surface_id_present",
+        "payload_schema_valid",
+        "decision_or_execution_reference_when_available"
+      ],
+      "required_proof": [
+        "event_id",
+        "event_type",
+        "surface_id",
+        "payload_hash",
+        "created_at"
+      ],
       "replay_semantics": "observability events append-only; duplicate event ids blocked",
-      "drift_checks": ["missing_observability_event", "payload_schema_drift", "unlinked_event"],
-      "observability": ["observability_registry", "audit_summary", "runtime_event_log"],
+      "drift_checks": [
+        "missing_observability_event",
+        "payload_schema_drift",
+        "unlinked_event"
+      ],
+      "observability": [
+        "observability_registry",
+        "audit_summary",
+        "runtime_event_log"
+      ],
       "execution_boundary": "observability_write_boundary",
       "bypass_risk": "state_change_without_observability_event",
       "enforcement_status": "planned"
@@ -191,11 +399,30 @@
       "entrypoint": "runtime_routes + workflows + scripts",
       "required_authority": "audit_authority",
       "required_AEO": "BYPASS_AUDIT_AEO",
-      "required_validation": ["all_state_changing_routes_classified", "all_deploy_paths_classified", "all_scripts_classified", "all_workflows_classified"],
-      "required_proof": ["audit_id", "surface_inventory_hash", "unclassified_surface_count", "audit_timestamp"],
+      "required_validation": [
+        "all_state_changing_routes_classified",
+        "all_deploy_paths_classified",
+        "all_scripts_classified",
+        "all_workflows_classified"
+      ],
+      "required_proof": [
+        "audit_id",
+        "surface_inventory_hash",
+        "unclassified_surface_count",
+        "audit_timestamp"
+      ],
       "replay_semantics": "audit snapshot immutable; new repo state requires new audit",
-      "drift_checks": ["new_unclassified_route", "new_unclassified_workflow", "new_unclassified_script", "new_unclassified_deploy_path"],
-      "observability": ["bypass_audit_report", "surface_inventory", "drift_registry"],
+      "drift_checks": [
+        "new_unclassified_route",
+        "new_unclassified_workflow",
+        "new_unclassified_script",
+        "new_unclassified_deploy_path"
+      ],
+      "observability": [
+        "bypass_audit_report",
+        "surface_inventory",
+        "drift_registry"
+      ],
       "execution_boundary": "audit_boundary",
       "bypass_risk": "alternate_execution_path_outside_authority_compile_validate_execute_proof",
       "enforcement_status": "planned"
@@ -229,6 +456,57 @@
     "no_execution_without_proof_persistence",
     "no_reused_authority",
     "no_validated_object_mutation",
-    "no_unclassified_state_changing_surface"
+    "no_unclassified_state_changing_surface",
+    "no_recursive_governance_evidence_authority",
+    "recursive_governance_drift_returns_NULL",
+    "containment_routes_excluded_from_CANONICAL_RUNTIME_ROUTES"
+  ],
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "canonical_invariant": "If no valid object exists -> nothing happens.",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+    "closure_condition": "No unauthorized reality mutation path exists.",
+    "undeclared_mutation_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "merge_legitimacy": "UNCHANGED",
+    "evidence_only": true,
+    "non_authoritative": true,
+    "replay_neutral": true
+  },
+  "surfaces": [
+    {
+      "surface_id": "recursive_governance_drift_containment",
+      "surface_type": "observability_validation_artifact",
+      "entrypoint": "/governance/recursive/containment (GET-only)",
+      "required_authority": "none_evidence_only",
+      "required_AEO": "not_applicable_observability_only",
+      "required_validation": [
+        "governance_equivalence_hash_present",
+        "semantic_divergence_classes_present",
+        "lineage_binding_present",
+        "non_authoritative_flags_present"
+      ],
+      "required_proof": [
+        "no_proof_generated_by_containment_evidence"
+      ],
+      "replay_semantics": "append-only evidence; replay-neutral; consumes no nonce or authority",
+      "drift_checks": [
+        "validator_semantics",
+        "schema_semantics",
+        "proof_semantics",
+        "replay_semantics",
+        "authority_semantics",
+        "execution_boundary_topology",
+        "federation_semantics",
+        "observability_semantics"
+      ],
+      "observability": [
+        "recursive_governance_containment_registry"
+      ],
+      "execution_boundary": "GET-only observability boundary",
+      "bypass_risk": "observability_to_authority_escalation",
+      "enforcement_status": "implemented_observability_only"
+    }
   ]
 }

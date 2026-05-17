@@ -16,3 +16,6 @@ deploy_aeo.json
 deploy_aeo.canonical.json
 .venv/
 graph/
+graph/repo_graph.json
+__pycache__/
+*.pyc

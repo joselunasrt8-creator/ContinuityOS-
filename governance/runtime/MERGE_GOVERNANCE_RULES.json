@@ -30,7 +30,18 @@
     "Sovereignty drift -> PREO invalid",
     "Infrastructure mutation ambiguity -> containment required",
     "Root authority topology divergence -> governance trust isolated",
-    "Root authority containment evidence may invalidate legitimacy but may NEVER authorize merge"
+    "Root authority containment evidence may invalidate legitimacy but may NEVER authorize merge",
+    "Recursive governance semantic drift -> merge legitimacy NULL",
+    "Governance equivalence mismatch -> recursive containment required",
+    "Governance containment evidence may invalidate legitimacy but may NEVER authorize merge, proof, deployment, or execution",
+    "Runtime topology reconciliation ambiguity -> merge legitimacy NULL",
+    "Runtime topology equivalence drift -> merge legitimacy NULL",
+    "Runtime topology evidence may block merge or deployment but may NEVER authorize merge, execution, deployment, or legitimacy",
+    "Cross-registry reconciliation evidence may invalidate merge legitimacy but may NEVER authorize merge",
+    "Cross-registry proof lineage drift -> merge legitimacy NULL",
+    "Cross-registry replay drift -> deployment legitimacy NULL",
+    "Cross-registry ambiguity -> legitimacy NULL and reconciliation required",
+    "Cross-registry reconciliation may not authorize execution, proof, merge, deployment, authority creation, or automatic record repair"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -135,7 +146,72 @@
       "UNDECLARED_ROOT_SURFACE",
       "SOVEREIGNTY_DRIFT_DETECTED",
       "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE",
-      "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"
+      "ROOT_AUTHORITY_BOUNDARY_OVERFLOW",
+      "ROOT_AUTHORITY_BYPASS_RISK",
+      "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
     ]
+  },
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "canonical_invariant": "If no valid object exists -> nothing happens.",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+    "closure_condition": "No unauthorized reality mutation path exists.",
+    "undeclared_mutation_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "merge_legitimacy": "UNCHANGED",
+    "evidence_only": true,
+    "non_authoritative": true,
+    "replay_neutral": true
+  },
+  "recursive_governance_containment": {
+    "registry": "recursive_governance_containment_registry",
+    "artifacts": [
+      "governance/recursive/RECURSIVE_GOVERNANCE_CONTAINMENT_MODEL.json",
+      "governance/recursive/GOVERNANCE_MUTATION_CAPABILITY_MATRIX.json",
+      "governance/recursive/RECURSIVE_GOVERNANCE_DRIFT_TAXONOMY.json"
+    ],
+    "evidence_only": true,
+    "direct_merge_authority": false,
+    "may_invalidate_legitimacy": true,
+    "may_authorize_merge": false,
+    "may_authorize_execution": false,
+    "may_authorize_proof": false,
+    "fail_closed_on_ambiguity": true
+  },
+  "runtime_topology_reconciliation": {
+    "artifacts": [
+      "governance/runtime-topology-equivalence.json",
+      "governance/runtime-topology-drift-taxonomy.json",
+      "governance/runtime-topology-reconciliation.json"
+    ],
+    "registry": "runtime_topology_registry",
+    "routes": [
+      "/topology/reconcile",
+      "/topology/drift",
+      "/topology/fingerprint",
+      "/topology/equivalence"
+    ],
+    "may_invalidate_legitimacy": true,
+    "may_block_merge": true,
+    "may_block_deployment": true,
+    "may_authorize_legitimacy": false,
+    "may_authorize_execution": false,
+    "may_authorize_deployment": false,
+    "evidence_only": true,
+    "fail_closed_on_ambiguity": true
+  },
+  "cross_registry_reconciliation": {
+    "policy": "governance/cross-registry-reconciliation.json",
+    "registry": "cross_registry_reconciliation_registry",
+    "may_invalidate_merge_legitimacy": true,
+    "may_block_deployment_legitimacy": true,
+    "may_classify_proof_lineage_drift": true,
+    "may_classify_replay_drift": true,
+    "may_authorize_execution": false,
+    "may_authorize_proof": false,
+    "may_authorize_merge": false,
+    "may_repair_records_automatically": false,
+    "legitimacy_on_ambiguity": "NULL"
   }
 }

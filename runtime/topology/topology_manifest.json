@@ -52,7 +52,7 @@
     "CanonicalRuntimeGraph"
   ],
   "hashes": {
-    "runtime_surface_inventory_hash": "6d4016b0421eb46c18f3857068921ab3b1c41f18ab2d38a4c7eafbdb6892f4b5",
+    "runtime_surface_inventory_hash": "f32f0641365da74dcda6647b6f267e3bf76d1b5f66865083542795643a6744a2",
     "schema_source_map_hash": "0fe964c67eaf7d364a6c222514374e69612542e22004129a18ef533ab3719e14",
     "topology_graph_hash": "fece0d5caa8f8395436ae47e1e97319ee75fdc571e42dd7a5cb5408ec766bbe0",
     "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5",
@@ -123,5 +123,5 @@
     ],
     "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5"
   },
-  "topology_manifest_hash": "a47acc5f8c3e4c62914b3ae485a2aa013a788835d614907bbd1b79c12641d1a2"
+  "topology_manifest_hash": "857f9034e85a7ca0a2bf53262ed46b4111daca0d0a785c6117d9a58f41a12c1e"
 }

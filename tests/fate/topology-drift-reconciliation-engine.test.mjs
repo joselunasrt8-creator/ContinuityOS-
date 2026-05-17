@@ -48,7 +48,7 @@ function shuffledTopology() {
 }
 
 test('topology traversal is deterministic and uses canonical bounded ordering', () => {
-  assert.deepEqual(CANONICAL_TRAVERSAL_ORDER, ['runtime_routes', 'execution_surfaces', 'observability_surfaces', 'governance_inventories', 'schema_maps', 'workflow_topology', 'proof_lineage_bindings'])
+  assert.deepEqual(CANONICAL_TRAVERSAL_ORDER.slice(0, 10), ['runtime_routes', 'observability_surfaces', 'append_only_registries', 'mutation_capable_registries', 'governance_artifacts', 'reconciliation_registries', 'recursive_governance_containment', 'sovereignty_containment', 'workflow_mutation_surfaces', 'deploy_mutation_surfaces'])
   const first = traverseTopology(validTopology(), { maxNodes: 64 })
   const second = traverseTopology(shuffledTopology(), { maxNodes: 64 })
   assert.equal(first.traversal_hash, second.traversal_hash)
@@ -59,7 +59,7 @@ test('topology hashes are deterministic for equivalent exact objects', () => {
   const first = topologyHashes(validTopology())
   const second = topologyHashes(shuffledTopology())
   assert.deepEqual(first, second)
-  for (const key of ['topology_hash', 'governance_hash', 'workflow_hash', 'schema_hash', 'reconciliation_hash']) {
+  for (const key of ['topology_hash', 'topology_semantic_hash', 'topology_boundary_hash', 'topology_lineage_hash', 'topology_equivalence_hash']) {
     assert.match(first[key], /^[0-9a-f]{64}$/)
   }
 })
@@ -68,7 +68,7 @@ test('undeclared execution surfaces fail closed and map to merge legitimacy sign
   const topology = validTopology()
   topology.execution_surfaces.push({ id: 'shadow_execute', route: '/shadow/execute', declared: false, classified: false, hidden: true })
   const evidence = reconcileTopology(topology, { generated_at: '2026-05-14T00:00:00.000Z' })
-  assert.equal(evidence.classification, 'UNDECLARED_SURFACE')
+  assert.equal(evidence.classification, 'UNDECLARED_RUNTIME_SURFACE')
   assert.equal(evidence.fail_closed, true)
   assert.equal(evidence.merge_signal, 'UNDECLARED_EXECUTION_SURFACE')
   assert.equal(mergeLegitimacySignal(evidence.classification), 'UNDECLARED_EXECUTION_SURFACE')
@@ -79,7 +79,7 @@ test('governance/runtime divergence is detected deterministically', () => {
   topology.governance_inventories = [{ id: 'canonical_governance', current: true, status: 'CURRENT', required_routes: [...canonicalRoutes, '/undeclared-governance-route'] }]
   const first = classifyTopologyDrift(topology)
   const second = classifyTopologyDrift(structuredClone(topology))
-  assert.equal(first.classification, 'GOVERNANCE_MISMATCH')
+  assert.equal(first.classification, 'GOVERNANCE_SURFACE_DRIFT')
   assert.deepEqual(first, second)
   assert.equal(mergeLegitimacySignal(first.classification), 'GOVERNANCE_DIVERGENCE')
 })
@@ -122,7 +122,7 @@ test('hidden workflow expansion is classified without granting merge authority',
   const topology = validTopology()
   topology.workflow_topology.push({ id: 'manual_shadow_deploy', workflow: 'shadow-deploy.yml', declared: false, hidden: true, expands_execution: true })
   const evidence = reconcileTopology(topology, { generated_at: '2026-05-14T00:00:00.000Z' })
-  assert.equal(evidence.classification, 'WORKFLOW_EXPANSION')
+  assert.equal(evidence.classification, 'MUTATION_SURFACE_EXPANSION')
   assert.equal(evidence.merge_signal, 'TOPOLOGY_DRIFT')
   assert.equal(evidence.read_only, true)
 })

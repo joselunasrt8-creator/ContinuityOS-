@@ -76,7 +76,31 @@ const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
+const RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTE = "/governance/recursive/containment" as const
+const RECURSIVE_GOVERNANCE_CONTAINMENT_DRIFT_ROUTE = "/governance/recursive/containment/drift" as const
+const RECURSIVE_GOVERNANCE_CONTAINMENT_TOPOLOGY_ROUTE = "/governance/recursive/containment/topology" as const
+const RECURSIVE_GOVERNANCE_CONTAINMENT_EQUIVALENCE_ROUTE = "/governance/recursive/containment/equivalence" as const
+const RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES = [RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTE, RECURSIVE_GOVERNANCE_CONTAINMENT_DRIFT_ROUTE, RECURSIVE_GOVERNANCE_CONTAINMENT_TOPOLOGY_ROUTE, RECURSIVE_GOVERNANCE_CONTAINMENT_EQUIVALENCE_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_ROUTE = "/governance/evolution/consensus" as const
+const TOPOLOGY_RECONCILE_ROUTE = "/topology/reconcile" as const
+const TOPOLOGY_DRIFT_ROUTE = "/topology/drift" as const
+const TOPOLOGY_FINGERPRINT_ROUTE = "/topology/fingerprint" as const
+const TOPOLOGY_EQUIVALENCE_ROUTE = "/topology/equivalence" as const
+const TOPOLOGY_OBSERVABILITY_ROUTES = [TOPOLOGY_RECONCILE_ROUTE, TOPOLOGY_DRIFT_ROUTE, TOPOLOGY_FINGERPRINT_ROUTE, TOPOLOGY_EQUIVALENCE_ROUTE] as const
+const CROSS_REGISTRY_RECONCILE_ROUTE = "/registry/reconcile" as const
+const CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE = "/registry/reconcile/drift" as const
+const CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE = "/registry/reconcile/lineage" as const
+const CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE = "/registry/reconcile/equivalence" as const
+const CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE = "/registry/reconcile/orphans" as const
+const CROSS_REGISTRY_RECONCILIATION_ROUTES = [CROSS_REGISTRY_RECONCILE_ROUTE, CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE, CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE, CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE, CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE] as const
+const OBSERVER_CONSENSUS_CHECKPOINT_ROUTE = "/consensus/observer/checkpoint" as const
+const OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE = "/consensus/observer/equivalence" as const
+const OBSERVER_CONSENSUS_DRIFT_ROUTE = "/consensus/observer/drift" as const
+const OBSERVER_CONSENSUS_ROUTES = [OBSERVER_CONSENSUS_CHECKPOINT_ROUTE, OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE, OBSERVER_CONSENSUS_DRIFT_ROUTE] as const
+const CONFORMANCE_RUNTIME_ROUTE = "/conformance/runtime" as const
+const CONFORMANCE_EQUIVALENCE_ROUTE = "/conformance/equivalence" as const
+const CONFORMANCE_CHECKPOINT_ROUTE = "/conformance/checkpoint" as const
+const EXTERNAL_CONFORMANCE_ROUTES = [CONFORMANCE_RUNTIME_ROUTE, CONFORMANCE_EQUIVALENCE_ROUTE, CONFORMANCE_CHECKPOINT_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
   ...new Set([
@@ -101,6 +125,7 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     ...DELEGATION_OBSERVABILITY_ROUTES,
     RECURSIVE_GOVERNANCE_ROUTE,
     RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE,
+    ...RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES,
     "/reconcile",
     "/reconcile/schedule",
     "/reconcile/report",
@@ -123,6 +148,10 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     ...CONTINUOUS_FATE_ROUTES,
     ...RUNTIME_CONTAINMENT_ROUTES,
     ...ROOT_AUTHORITY_OBSERVABILITY_ROUTES,
+    ...TOPOLOGY_OBSERVABILITY_ROUTES,
+    ...CROSS_REGISTRY_RECONCILIATION_ROUTES,
+    ...OBSERVER_CONSENSUS_ROUTES,
+    ...EXTERNAL_CONFORMANCE_ROUTES,
   ]),
 ] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
@@ -135,7 +164,11 @@ const CANONICAL_RECONCILIATION_REGISTRY_ORDER = [
   "execution_registry",
   "proof_registry",
   "invocation_registry",
-  "preo_registry"
+  "preo_registry",
+  "runtime_topology_registry",
+  "recursive_governance_containment_registry",
+  "root_authority_observability_registry",
+  "unauthorized_mutation_closure_registry"
 ] as const
 const RECONCILIATION_MAX_RECURSION_DEPTH = SYSTEM_MAX_CONTINUITY_DEPTH
 const RECONCILIATION_ROW_LIMIT = 2
@@ -159,6 +192,13 @@ const TOPOLOGY_RECONCILIATION_REGISTRY = "topology_reconciliation_registry" as c
 const LEGITIMACY_DRIFT_PROPAGATION_REGISTRY = "legitimacy_drift_propagation_registry" as const
 const LEGITIMACY_QUARANTINE_REGISTRY = "legitimacy_quarantine_registry" as const
 const ROOT_AUTHORITY_OBSERVABILITY_REGISTRY = "root_authority_observability_registry" as const
+const RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY = "recursive_governance_containment_registry" as const
+const RUNTIME_TOPOLOGY_REGISTRY = "runtime_topology_registry" as const
+const CROSS_REGISTRY_RECONCILIATION_REGISTRY = "cross_registry_reconciliation_registry" as const
+const OBSERVER_ATTESTATION_REGISTRY = "observer_attestation_registry" as const
+const SEMANTIC_EQUIVALENCE_REGISTRY = "semantic_equivalence_registry" as const
+const PORTABLE_GOVERNANCE_CHECKPOINT_REGISTRY = "portable_governance_checkpoint_registry" as const
+const EXTERNAL_CONFORMANCE_VERIFICATION_REGISTRY = "external_conformance_verification_registry" as const
 
 
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
@@ -186,6 +226,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   federation_conformance_registry: ["conformance_id", "envelope_id", "runtime_id", "remote_runtime_id", "fingerprint_hash", "checkpoint_hash", "compatibility_hash", "conformance_status", "drift_classes", "evidence_only", "remote_authority_denied", "read_only", "mutation_capable", "replay_neutral", "generated_at", "created_at"],
   federated_sovereignty_registry: ["federation_id", "local_runtime_id", "remote_runtime_id", "sovereignty_hash", "equivalence_hash", "drift_summary", "replay_indicators", "verification_status", "evidence_only", "remote_authority_denied", "generated_at"],
   recursive_governance_registry: ["governance_id", "mutation_class", "mutation_scope", "target_surface", "mutation_hash", "sco_hash", "preo_hash", "governance_decision", "drift_classes", "exact_object_verified", "replay_neutral", "mutation_authorized", "proof_required", "canonical_path_preserved", "generated_at", "created_at"],
+  recursive_governance_containment_registry: ["governance_observation_id", "governance_observation_hash", "governance_equivalence_hash", "governance_semantic_hash", "governance_topology_hash", "governance_lineage_hash", "semantic_divergence_classes", "recursive_containment_status", "governance_mutation_class", "containment_object", "evidence_only", "append_only", "replay_neutral", "non_authoritative", "executable", "deployment_capable", "creates_authority", "generated_at", "created_at"],
   runtime_sovereignty_registry: ["sovereignty_id", "sovereignty_hash", "runtime_surface_hash", "governance_surface_hash", "replay_surface_hash", "proof_surface_hash", "validator_surface_hash", "schema_hash", "migration_chain_hash", "generated_at"],
   external_authority_registry: ["sovereignty_dependency_id", "external_authority_surface", "authority_origin", "infrastructure_scope", "bootstrap_trust_hash", "sovereignty_classification", "containment_state", "observability_only", "replay_neutral", "evidence_hash", "drift_classes", "created_at"],
   bootstrap_sovereignty_registry: ["checkpoint_id", "manifest_hash", "lineage_checkpoint_hash", "deployment_lineage_root", "bootstrap_trust_root_hash", "initialization_order_hash", "startup_dependency_graph_hash", "startup_topology_hash", "replay_neutrality_hash", "conformance_status", "drift_classes", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "generated_at", "created_at"],
@@ -198,8 +239,15 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   continuous_fate_registry: ["continuous_fate_id", "stress_window_id", "deterministic_stress_hash", "topology_stability_hash", "drift_survivability_state", "replay_mutation_vector_hash", "governance_replay_checkpoint", "runtime_stress_depth", "scenario_set_hash", "drift_classes", "checkpoint_hash", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"],
   runtime_surface_containment_registry: ["containment_id", "containment_hash", "route_surface_hash", "deployment_surface_hash", "package_surface_hash", "runtime_sovereignty_hash", "hidden_surface_count", "drift_classes", "evidence_only", "replay_neutral", "mutation_capable", "remote_authority_denied", "read_only", "creates_authority", "execution_started", "replay_consumed", "authoritative", "generated_at", "created_at"],
   topology_reconciliation_registry: ["reconciliation_id", "topology_hash", "governance_hash", "workflow_hash", "schema_hash", "reconciliation_hash", "traversal_hash", "classification", "drift_summary", "topology_ancestry", "merge_signal", "evidence_only", "remote_authority_denied", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "execution_started", "generated_at", "created_at"],
+  runtime_topology_registry: ["snapshot_id", "topology_hash", "topology_semantic_hash", "topology_boundary_hash", "topology_lineage_hash", "topology_equivalence_hash", "drift_classes", "lineage_hash", "boundary_hash", "reconciliation_timestamp", "containment_references", "topology_snapshot", "evidence_only", "replay_neutral", "executable", "deployment_capable", "creates_authority", "append_only", "created_at"],
+  unauthorized_mutation_closure_registry: ["closure_id", "inventory_hash", "route_hash", "registry_hash", "evidence_only", "replay_neutral", "non_authoritative", "executable", "deployment_capable", "creates_authority", "proof_generating", "created_at"],
+  cross_registry_reconciliation_registry: ["reconciliation_id", "registry_set_hash", "lineage_graph_hash", "continuity_graph_hash", "proof_graph_hash", "replay_graph_hash", "topology_binding_hash", "governance_binding_hash", "reconciliation_equivalence_hash", "drift_classes", "unresolved_edges", "orphaned_records", "containment_status", "legitimacy_status", "evidence_only", "replay_neutral", "non_authoritative", "executable", "deployment_capable", "creates_authority", "proof_generating", "generated_at", "created_at"],
   legitimacy_drift_propagation_registry: ["propagation_id", "propagation_hash", "topology_hash", "impact_hash", "merge_legitimacy_hash", "verdict_hash", "classification", "propagation_object", "impact_graph", "merge_impact", "verdict_object", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "executable", "deployment_capable", "proof_generating", "fail_closed_on_ambiguity", "generated_at", "created_at"],
-  legitimacy_quarantine_registry: ["quarantine_id", "quarantine_hash", "containment_hash", "lineage_hash", "federation_hash", "boundary_hash", "classification", "quarantine_object", "containment_boundary", "isolation_graph", "federated_containment", "propagation_envelope", "verdict_object", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "executable", "deployment_capable", "proof_generating", "fail_closed_on_ambiguity", "quarantine_authoritative", "generated_at", "created_at"]
+  legitimacy_quarantine_registry: ["quarantine_id", "quarantine_hash", "containment_hash", "lineage_hash", "federation_hash", "boundary_hash", "classification", "quarantine_object", "containment_boundary", "isolation_graph", "federated_containment", "propagation_envelope", "verdict_object", "evidence_only", "replay_neutral", "mutation_capable", "read_only", "creates_authority", "executable", "deployment_capable", "proof_generating", "fail_closed_on_ambiguity", "quarantine_authoritative", "generated_at", "created_at"],
+  observer_attestation_registry: ["attestation_id", "observer_id", "observed_checkpoint_hash", "semantic_hash", "topology_hash", "reconciliation_hash", "sovereignty_hash", "equivalence_hash", "drift_classes", "legitimacy_status", "attestation_hash", "observer_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "generated_at", "created_at"],
+  semantic_equivalence_registry: ["semantic_equivalence_id", "semantic_hash", "schema_semantic_hash", "topology_semantic_hash", "governance_semantic_hash", "portability_semantic_hash", "equivalence_hash", "drift_classes", "legitimacy_status", "semantic_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "generated_at", "created_at"],
+  portable_governance_checkpoint_registry: ["checkpoint_id", "checkpoint_hash", "reconciliation_hash", "topology_hash", "semantic_equivalence_hash", "conformance_hash", "portable_envelope", "dsse_payload_type", "jcs_canonical", "drift_classes", "legitimacy_status", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "generated_at", "created_at"],
+  external_conformance_verification_registry: ["verification_id", "runtime_compatibility_hash", "governance_semantic_hash", "checkpoint_equivalence_hash", "federated_conformance_hash", "conformance_status", "drift_classes", "verification_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "remote_authority_denied", "generated_at", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -533,6 +581,7 @@ type DriftClass = "authority_drift" | "hash_drift" | "execution_drift" | "proof_
 type ContinuousFATEDriftClass = "continuous_fate_divergence" | "replay_mutation_survival" | "sovereignty_escape_detected" | "runtime_stress_instability" | "governance_replay_divergence" | "reconciliation_corruption_detected" | "topology_instability_detected" | "deterministic_stress_hash_mismatch" | "continuous_fate_checkpoint_instability" | "recursive_drift_accumulation"
 
 type RuntimeSurfaceContainmentDriftClass = "hidden_execution_surface_detected" | "undeclared_mutation_surface_detected" | "runtime_route_containment_drift" | "deployment_surface_hash_drift" | "workflow_dispatch_escape_detected" | "adapter_authority_escape_detected" | "proofless_execution_surface_detected" | "canonical_route_boundary_drift" | "observability_route_execution_upgrade" | "sovereignty_containment_failure"
+type UnauthorizedMutationClosureDriftClass = "UNDECLARED_MUTATION_SURFACE" | "UNCLASSIFIED_EXECUTION_SURFACE" | "UNBOUND_DATABASE_WRITE" | "UNBOUND_DEPLOYMENT_SURFACE" | "OBSERVABILITY_MUTATION_ESCALATION" | "GOVERNANCE_MUTATION_WITHOUT_SCO" | "AGENT_TOOL_MUTATION_UNCLASSIFIED" | "EXTERNAL_API_MUTATION_UNCLASSIFIED" | "RECONCILIATION_MUTATION_ESCAPE" | "PROOFLESS_MUTATION_PATH" | "AUTHORITYLESS_MUTATION_PATH" | "CLOSURE_INCOMPLETE"
 type MutationSurfaceClassification = "canonical_runtime" | "governed_evidence" | "observability_only" | "external_adapter" | "webhook" | "package_script" | "workflow" | "hidden" | "NULL"
 type ExecutableSurfaceInventory = { declared_canonical_routes: readonly string[], declared_observability_routes: readonly string[], route_handlers: readonly string[], undeclared_route_handlers: readonly string[], non_get_observability_handlers: readonly string[], workflow_surfaces: readonly string[], package_surfaces: readonly string[], adapter_surfaces: readonly string[], webhook_surfaces: readonly string[] }
 type HiddenSurfaceProbe = { route?: string, method?: string, workflow?: string, package_command?: string, adapter?: string, webhook?: string, mutation_capable: boolean, deploy_capable: boolean, proof_bound: boolean }
@@ -542,12 +591,158 @@ type RuntimeSurfaceContainmentObject = { object_type: "RuntimeSurfaceContainment
 type SovereigntyContainmentEnvelope = RuntimeSurfaceContainmentObject & { envelope_type: "SovereigntyContainmentEnvelope", checkpoint: RouteContainmentCheckpoint, evidence_only: true, replay_neutral: true, mutation_capable: false, remote_authority_denied: true, read_only: true, creates_authority: false, execution_started: false, replay_consumed: false, authoritative: false }
 
 
-type RootAuthorityClassification = "ROOT_DEPLOY_AUTHORITY" | "ROOT_REPOSITORY_AUTHORITY" | "ROOT_ENVIRONMENT_AUTHORITY" | "ROOT_WORKFLOW_AUTHORITY" | "ROOT_BRANCH_POLICY_AUTHORITY" | "ROOT_RUNTIME_CONFIGURATION_AUTHORITY" | "ROOT_FEDERATION_AUTHORITY" | "ROOT_LOCAL_EXECUTION_AUTHORITY" | "ROOT_PACKAGE_EXECUTION_AUTHORITY" | "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY" | "UNDECLARED_ROOT_SURFACE" | "SOVEREIGNTY_DRIFT_DETECTED" | "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE" | "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"
-type RootAuthoritySurface = { surface_id: string, authority_origin: string, declared_boundary: string, classifications: readonly RootAuthorityClassification[], mutation_capability_observed: boolean, declared: boolean, secret_material: "REDACTED" | "NOT_INSPECTED", executable: false, deployment_capable: false, creates_authority: false }
-type RootAuthorityInventory = { inventory_type: "RootAuthorityInventory", surfaces: readonly RootAuthoritySurface[], evidence_only: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false }
-type RootAuthorityBoundary = { boundary_type: "RootAuthorityContainmentBoundary", allowed_canonical_path: readonly string[], contained_surfaces: readonly string[], overflow_surfaces: readonly string[], merge_legitimacy: "NULL" | "UNCHANGED", preo_validity: "NULL" | "UNCHANGED", classification_authorizes: false, evidence_authorizes_merge: false, boundary_hash: string, evidence_only: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false }
-type RootAuthorityDrift = { drift_type: "RootAuthorityDrift", drift_classes: RootAuthorityClassification[], undeclared_surfaces: readonly string[], topology_hash: string, drift_hash: string, merge_legitimacy: "NULL" | "UNCHANGED", fail_closed: boolean, evidence_only: true, replay_neutral: true, non_authoritative: true, secret_material_persisted: false }
-type RootAuthorityContainmentEnvelope = { envelope_type: "RootAuthorityContainmentEnvelope", inventory: RootAuthorityInventory, topology_hash: string, boundary: RootAuthorityBoundary, drift: RootAuthorityDrift, containment_identity: string, containment_hash: string, generated_at: string, evidence_only: true, append_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false, secret_material_persisted: false, fail_closed_on_ambiguity: true }
+
+type GovernanceMutationClass = "SAFE_OBSERVABILITY_ONLY" | "GOVERNANCE_CONTAINED" | "GOVERNANCE_EXPANSION" | "EXECUTION_BOUNDARY_EXPANSION" | "VALIDATION_SEMANTICS_DRIFT" | "AUTHORITY_SEMANTICS_DRIFT" | "PROOF_SEMANTICS_DRIFT" | "REPLAY_SEMANTICS_DRIFT" | "FEDERATION_SEMANTICS_DRIFT" | "OBSERVABILITY_TO_AUTHORITY_ESCALATION" | "ROOT_GOVERNANCE_BYPASS_RISK" | "RECURSIVE_CONTAINMENT_REQUIRED"
+type GovernanceSemanticDivergenceClass = "GOVERNANCE_EQUIVALENCE_MISMATCH" | "GOVERNANCE_TOPOLOGY_DIVERGENCE" | "GOVERNANCE_LINEAGE_ORPHANED" | "GOVERNANCE_PARENT_HASH_MISMATCH" | "VALIDATOR_OUTPUT_DRIFT" | "SCHEMA_SEMANTICS_DRIFT" | "PROOF_SEMANTICS_DRIFT" | "REPLAY_SEMANTICS_DRIFT" | "AUTHORITY_SEMANTICS_DRIFT" | "FEDERATION_SEMANTICS_DRIFT" | "EXECUTION_BOUNDARY_EXPANSION" | "OBSERVABILITY_AUTHORITY_ESCALATION" | "APPEND_ONLY_SEMANTICS_WEAKENED" | "FAIL_CLOSED_SEMANTICS_WEAKENED" | "RECURSIVE_CONTAINMENT_REQUIRED"
+type RecursiveContainmentStatus = "GOVERNANCE_CONTAINED" | "RECURSIVE_CONTAINMENT_REQUIRED"
+
+type GovernanceContainmentFlags = { evidence_only: true, append_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false }
+type GovernanceContinuityBinding = { governance_continuity_id: string, parent_governance_hash: string, governance_lineage_hash: string, recursive_lineage_verification: "VERIFIED" | "NULL" | "RECURSIVE_CONTAINMENT_REQUIRED", orphan_governance_mutation_status: "NONE" | "NULL" }
+type GovernanceContainmentObject = GovernanceContainmentFlags & { object_type: "RecursiveGovernanceContainmentObject", validator_semantics: Record<string, unknown>, schema_semantics: Record<string, unknown>, proof_semantics: Record<string, unknown>, replay_semantics: Record<string, unknown>, authority_semantics: Record<string, unknown>, execution_boundary_topology: Record<string, unknown>, federation_semantics: Record<string, unknown>, observability_semantics: Record<string, unknown>, immutable_semantic_freeze: Record<string, unknown>, governance_continuity: GovernanceContinuityBinding, merge_legitimacy: "NULL" | "UNCHANGED", proof_authority: "NULL" | "UNCHANGED", execution_authority: "NULL" | "UNCHANGED" }
+type RecursiveGovernanceContainmentObservation = GovernanceContainmentFlags & { governance_observation_id: string, governance_observation_hash: string, governance_equivalence_hash: string, governance_semantic_hash: string, governance_topology_hash: string, governance_lineage_hash: string, semantic_divergence_classes: GovernanceSemanticDivergenceClass[], recursive_containment_status: RecursiveContainmentStatus, governance_mutation_class: GovernanceMutationClass, containment_object: GovernanceContainmentObject, generated_at: string, created_at: string }
+
+const GOVERNANCE_CONTAINMENT_FLAGS: GovernanceContainmentFlags = Object.freeze({ evidence_only: true, append_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false })
+const GOVERNANCE_DRIFT_TAXONOMY: readonly GovernanceSemanticDivergenceClass[] = Object.freeze(["GOVERNANCE_EQUIVALENCE_MISMATCH", "GOVERNANCE_TOPOLOGY_DIVERGENCE", "GOVERNANCE_LINEAGE_ORPHANED", "GOVERNANCE_PARENT_HASH_MISMATCH", "VALIDATOR_OUTPUT_DRIFT", "SCHEMA_SEMANTICS_DRIFT", "PROOF_SEMANTICS_DRIFT", "REPLAY_SEMANTICS_DRIFT", "AUTHORITY_SEMANTICS_DRIFT", "FEDERATION_SEMANTICS_DRIFT", "EXECUTION_BOUNDARY_EXPANSION", "OBSERVABILITY_AUTHORITY_ESCALATION", "APPEND_ONLY_SEMANTICS_WEAKENED", "FAIL_CLOSED_SEMANTICS_WEAKENED", "RECURSIVE_CONTAINMENT_REQUIRED"])
+const GOVERNANCE_MUTATION_CAPABILITY_MATRIX: Record<GovernanceMutationClass, { execution_capable: false, creates_authority: false, merge_legitimacy: "NULL" | "UNCHANGED", proof_authority: "NULL" | "UNCHANGED", execution_authority: "NULL" | "UNCHANGED", fail_closed_on_ambiguity: true }> = Object.freeze(Object.fromEntries((["SAFE_OBSERVABILITY_ONLY", "GOVERNANCE_CONTAINED", "GOVERNANCE_EXPANSION", "EXECUTION_BOUNDARY_EXPANSION", "VALIDATION_SEMANTICS_DRIFT", "AUTHORITY_SEMANTICS_DRIFT", "PROOF_SEMANTICS_DRIFT", "REPLAY_SEMANTICS_DRIFT", "FEDERATION_SEMANTICS_DRIFT", "OBSERVABILITY_TO_AUTHORITY_ESCALATION", "ROOT_GOVERNANCE_BYPASS_RISK", "RECURSIVE_CONTAINMENT_REQUIRED"] as GovernanceMutationClass[]).map((classification) => [classification, { execution_capable: false, creates_authority: false, merge_legitimacy: classification === "SAFE_OBSERVABILITY_ONLY" || classification === "GOVERNANCE_CONTAINED" ? "UNCHANGED" : "NULL", proof_authority: classification === "SAFE_OBSERVABILITY_ONLY" || classification === "GOVERNANCE_CONTAINED" ? "UNCHANGED" : "NULL", execution_authority: classification === "SAFE_OBSERVABILITY_ONLY" || classification === "GOVERNANCE_CONTAINED" ? "UNCHANGED" : "NULL", fail_closed_on_ambiguity: true }])) as Record<GovernanceMutationClass, { execution_capable: false, creates_authority: false, merge_legitimacy: "NULL" | "UNCHANGED", proof_authority: "NULL" | "UNCHANGED", execution_authority: "NULL" | "UNCHANGED", fail_closed_on_ambiguity: true }>)
+const IMMUTABLE_GOVERNANCE_SEMANTICS = Object.freeze({ exact_five_field_aeo_invariant: true, validated_object_equals_executed_object: true, authority_before_execution: true, replay_nonce_consumption: true, proof_lineage_binding: true, append_only_registry_guarantees: true, get_only_observability_boundary: true, fail_closed_validation_semantics: true, remote_authority_denial: true, no_secret_inspection: true })
+
+function queryBool(url: URL, key: string, fallback: boolean): boolean {
+  if (!url.searchParams.has(key)) return fallback
+  const value = String(url.searchParams.get(key) || "").toLowerCase()
+  return value === "true" || value === "1" || value === "yes"
+}
+
+function recursiveGovernanceContainmentStatusFlags() { return { evidence_only: true, append_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false } }
+
+function canonicalGovernanceContinuityBinding(url: URL): GovernanceContinuityBinding {
+  const parent_governance_hash = String(url.searchParams.get("parent_governance_hash") || "canonical-root-governance")
+  const expected_parent = String(url.searchParams.get("expected_parent_governance_hash") || parent_governance_hash)
+  const parent_exists = queryBool(url, "parent_exists", true)
+  const orphan = !parent_exists || parent_governance_hash === "" || parent_governance_hash === "NULL"
+  const mismatch = !orphan && parent_governance_hash !== expected_parent
+  const governance_continuity_id = String(url.searchParams.get("governance_continuity_id") || "recursive-governance-continuity")
+  const governance_lineage_hash = canonicalize({ governance_continuity_id, parent_governance_hash: orphan ? "NULL" : parent_governance_hash, expected_parent })
+  return { governance_continuity_id, parent_governance_hash: orphan ? "NULL" : parent_governance_hash, governance_lineage_hash, recursive_lineage_verification: orphan ? "NULL" : mismatch ? "RECURSIVE_CONTAINMENT_REQUIRED" : "VERIFIED", orphan_governance_mutation_status: orphan ? "NULL" : "NONE" }
+}
+
+function buildGovernanceContainmentObject(url: URL): GovernanceContainmentObject {
+  const immutable_semantic_freeze = {
+    exact_five_field_aeo_invariant: queryBool(url, "exact_five_field_aeo_invariant", true),
+    validated_object_equals_executed_object: queryBool(url, "validated_object_equals_executed_object", true),
+    authority_before_execution: queryBool(url, "authority_before_execution", true),
+    replay_nonce_consumption: queryBool(url, "replay_nonce_consumption", true),
+    proof_lineage_binding: queryBool(url, "proof_lineage_binding", true),
+    append_only_registry_guarantees: queryBool(url, "append_only_registry_guarantees", queryBool(url, "append_only", true)),
+    get_only_observability_boundary: queryBool(url, "get_only_observability_boundary", queryBool(url, "get_only", true)),
+    fail_closed_validation_semantics: queryBool(url, "fail_closed_validation_semantics", queryBool(url, "fail_closed", true)),
+    remote_authority_denial: queryBool(url, "remote_authority_denial", true),
+    no_secret_inspection: queryBool(url, "no_secret_inspection", !queryBool(url, "secret_inspection", false))
+  }
+  return Object.freeze({
+    object_type: "RecursiveGovernanceContainmentObject",
+    validator_semantics: { output_contract: String(url.searchParams.get("validator_semantics") || url.searchParams.get("validator_output") || "VALID_OR_NULL_FAIL_CLOSED"), exact_object_required: immutable_semantic_freeze.validated_object_equals_executed_object },
+    schema_semantics: { required_keys: String(url.searchParams.get("schema_semantics") || "EXACT_FIVE_FIELD_AEO"), fail_closed: immutable_semantic_freeze.fail_closed_validation_semantics },
+    proof_semantics: { lineage_binding: immutable_semantic_freeze.proof_lineage_binding, proof_contract: String(url.searchParams.get("proof_semantics") || "PERSIST_AFTER_EXECUTION_ONLY") },
+    replay_semantics: { nonce_consumption: immutable_semantic_freeze.replay_nonce_consumption, replay_contract: String(url.searchParams.get("replay_semantics") || "CONSUME_ONCE") },
+    authority_semantics: { authority_before_execution: immutable_semantic_freeze.authority_before_execution, remote_authority_denial: immutable_semantic_freeze.remote_authority_denial, authority_contract: String(url.searchParams.get("authority_semantics") || "BOUND_BEFORE_EXECUTION") },
+    execution_boundary_topology: { canonical_runtime_routes: [...CANONICAL_RUNTIME_ROUTES], observability_routes: [...RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES], expanded: queryBool(url, "execution_boundary_expansion", false), proposed_route: String(url.searchParams.get("route") || url.searchParams.get("target_surface") || "") },
+    federation_semantics: { remote_authority_denied: immutable_semantic_freeze.remote_authority_denial, federation_contract: String(url.searchParams.get("federation_semantics") || "EVIDENCE_ONLY_NO_REMOTE_AUTHORITY") },
+    observability_semantics: { evidence_only: true, replay_neutral: true, non_authoritative: !queryBool(url, "observability_authority", false), executable: false, deployment_capable: false, creates_authority: false, requested_authority: queryBool(url, "observability_authority", false) },
+    immutable_semantic_freeze,
+    governance_continuity: canonicalGovernanceContinuityBinding(url),
+    merge_legitimacy: "UNCHANGED",
+    proof_authority: "UNCHANGED",
+    execution_authority: "UNCHANGED",
+    ...GOVERNANCE_CONTAINMENT_FLAGS
+  })
+}
+
+function governanceSemanticProjection(containment_object: GovernanceContainmentObject) {
+  return { validator_semantics: containment_object.validator_semantics, schema_semantics: containment_object.schema_semantics, proof_semantics: containment_object.proof_semantics, replay_semantics: containment_object.replay_semantics, authority_semantics: containment_object.authority_semantics, federation_semantics: containment_object.federation_semantics, observability_semantics: containment_object.observability_semantics, immutable_semantic_freeze: containment_object.immutable_semantic_freeze }
+}
+
+function detectGovernanceSemanticDivergence(containment_object: GovernanceContainmentObject): GovernanceSemanticDivergenceClass[] {
+  const classes = new Set<GovernanceSemanticDivergenceClass>()
+  if (canonicalize(containment_object.validator_semantics) !== canonicalize({ output_contract: "VALID_OR_NULL_FAIL_CLOSED", exact_object_required: true })) classes.add("VALIDATOR_OUTPUT_DRIFT")
+  if (canonicalize(containment_object.schema_semantics) !== canonicalize({ required_keys: "EXACT_FIVE_FIELD_AEO", fail_closed: true })) classes.add("SCHEMA_SEMANTICS_DRIFT")
+  if (canonicalize(containment_object.proof_semantics) !== canonicalize({ lineage_binding: true, proof_contract: "PERSIST_AFTER_EXECUTION_ONLY" })) classes.add("PROOF_SEMANTICS_DRIFT")
+  if (canonicalize(containment_object.replay_semantics) !== canonicalize({ nonce_consumption: true, replay_contract: "CONSUME_ONCE" })) classes.add("REPLAY_SEMANTICS_DRIFT")
+  if (canonicalize(containment_object.authority_semantics) !== canonicalize({ authority_before_execution: true, remote_authority_denial: true, authority_contract: "BOUND_BEFORE_EXECUTION" })) classes.add("AUTHORITY_SEMANTICS_DRIFT")
+  if (canonicalize(containment_object.federation_semantics) !== canonicalize({ remote_authority_denied: true, federation_contract: "EVIDENCE_ONLY_NO_REMOTE_AUTHORITY" })) classes.add("FEDERATION_SEMANTICS_DRIFT")
+  if ((containment_object.execution_boundary_topology as any).expanded) classes.add("EXECUTION_BOUNDARY_EXPANSION")
+  if ((containment_object.observability_semantics as any).requested_authority || (containment_object.observability_semantics as any).non_authoritative !== true) classes.add("OBSERVABILITY_AUTHORITY_ESCALATION")
+  if (containment_object.governance_continuity.orphan_governance_mutation_status === "NULL") classes.add("GOVERNANCE_LINEAGE_ORPHANED")
+  if (containment_object.governance_continuity.recursive_lineage_verification === "RECURSIVE_CONTAINMENT_REQUIRED") classes.add("GOVERNANCE_PARENT_HASH_MISMATCH")
+  const freeze = containment_object.immutable_semantic_freeze as Record<string, unknown>
+  for (const [key, expected] of Object.entries(IMMUTABLE_GOVERNANCE_SEMANTICS)) {
+    if (freeze[key] !== expected) {
+      if (key === "append_only_registry_guarantees") classes.add("APPEND_ONLY_SEMANTICS_WEAKENED")
+      else if (key === "fail_closed_validation_semantics") classes.add("FAIL_CLOSED_SEMANTICS_WEAKENED")
+      else if (key === "replay_nonce_consumption") classes.add("REPLAY_SEMANTICS_DRIFT")
+      else if (key === "proof_lineage_binding") classes.add("PROOF_SEMANTICS_DRIFT")
+      else if (key === "authority_before_execution" || key === "remote_authority_denial") classes.add("AUTHORITY_SEMANTICS_DRIFT")
+      else if (key === "get_only_observability_boundary") classes.add("OBSERVABILITY_AUTHORITY_ESCALATION")
+      else if (key === "no_secret_inspection") classes.add("ROOT_GOVERNANCE_BYPASS_RISK" as GovernanceSemanticDivergenceClass)
+      else classes.add("SCHEMA_SEMANTICS_DRIFT")
+    }
+  }
+  if (classes.size > 0) classes.add("RECURSIVE_CONTAINMENT_REQUIRED")
+  return [...classes].filter((c) => GOVERNANCE_DRIFT_TAXONOMY.includes(c)).sort()
+}
+
+function classifyGovernanceMutation(url: URL, divergence_classes: readonly GovernanceSemanticDivergenceClass[]): GovernanceMutationClass {
+  if (divergence_classes.includes("OBSERVABILITY_AUTHORITY_ESCALATION")) return "OBSERVABILITY_TO_AUTHORITY_ESCALATION"
+  if (divergence_classes.includes("EXECUTION_BOUNDARY_EXPANSION")) return "EXECUTION_BOUNDARY_EXPANSION"
+  if (divergence_classes.includes("VALIDATOR_OUTPUT_DRIFT") || divergence_classes.includes("SCHEMA_SEMANTICS_DRIFT") || divergence_classes.includes("FAIL_CLOSED_SEMANTICS_WEAKENED")) return "VALIDATION_SEMANTICS_DRIFT"
+  if (divergence_classes.includes("AUTHORITY_SEMANTICS_DRIFT")) return "AUTHORITY_SEMANTICS_DRIFT"
+  if (divergence_classes.includes("PROOF_SEMANTICS_DRIFT")) return "PROOF_SEMANTICS_DRIFT"
+  if (divergence_classes.includes("REPLAY_SEMANTICS_DRIFT")) return "REPLAY_SEMANTICS_DRIFT"
+  if (divergence_classes.includes("FEDERATION_SEMANTICS_DRIFT")) return "FEDERATION_SEMANTICS_DRIFT"
+  if (divergence_classes.includes("GOVERNANCE_LINEAGE_ORPHANED") || divergence_classes.includes("GOVERNANCE_PARENT_HASH_MISMATCH")) return "RECURSIVE_CONTAINMENT_REQUIRED"
+  const requested = String(url.searchParams.get("governance_mutation_class") || url.searchParams.get("mutation_class") || "SAFE_OBSERVABILITY_ONLY")
+  if (requested === "GOVERNANCE_EXPANSION") return "GOVERNANCE_EXPANSION"
+  if (requested === "GOVERNANCE_CONTAINED") return "GOVERNANCE_CONTAINED"
+  if (requested === "SAFE_OBSERVABILITY_ONLY") return "SAFE_OBSERVABILITY_ONLY"
+  if (requested && requested !== "observability_mutation") return "RECURSIVE_CONTAINMENT_REQUIRED"
+  return "SAFE_OBSERVABILITY_ONLY"
+}
+
+async function buildRecursiveGovernanceContainmentObservation(url: URL, generated_at: string): Promise<RecursiveGovernanceContainmentObservation> {
+  let containment_object = buildGovernanceContainmentObject(url)
+  const semantic_divergence_classes = detectGovernanceSemanticDivergence(containment_object)
+  const recursive_containment_status: RecursiveContainmentStatus = semantic_divergence_classes.length > 0 ? "RECURSIVE_CONTAINMENT_REQUIRED" : "GOVERNANCE_CONTAINED"
+  const governance_mutation_class = classifyGovernanceMutation(url, semantic_divergence_classes)
+  if (recursive_containment_status === "RECURSIVE_CONTAINMENT_REQUIRED" || governance_mutation_class === "RECURSIVE_CONTAINMENT_REQUIRED") containment_object = Object.freeze({ ...containment_object, merge_legitimacy: "NULL", proof_authority: "NULL", execution_authority: "NULL" })
+  const governance_semantic_hash = await sha256Hex(canonicalize(governanceSemanticProjection(containment_object)))
+  const governance_topology_hash = await sha256Hex(canonicalize({ execution_boundary_topology: containment_object.execution_boundary_topology, canonical_runtime_routes: [...CANONICAL_RUNTIME_ROUTES], containment_routes: [...RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES] }))
+  const governance_lineage_hash = await sha256Hex(canonicalize(containment_object.governance_continuity))
+  const governance_equivalence_hash = await sha256Hex(canonicalize({ governance_semantic_hash, governance_topology_hash, governance_lineage_hash, semantic_divergence_classes, governance_mutation_class }))
+  const governance_observation_hash = await sha256Hex(canonicalize({ governance_equivalence_hash, containment_object, semantic_divergence_classes, recursive_containment_status, governance_mutation_class }))
+  const governance_observation_id = `recursive-governance-containment:${governance_observation_hash}`
+  return Object.freeze({ governance_observation_id, governance_observation_hash, governance_equivalence_hash, governance_semantic_hash, governance_topology_hash, governance_lineage_hash, semantic_divergence_classes, recursive_containment_status, governance_mutation_class, containment_object, generated_at, created_at: generated_at, ...GOVERNANCE_CONTAINMENT_FLAGS })
+}
+
+async function ensureRecursiveGovernanceContainmentRegistry(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS recursive_governance_containment_registry (governance_observation_id TEXT PRIMARY KEY, governance_observation_hash TEXT NOT NULL UNIQUE, governance_equivalence_hash TEXT NOT NULL, governance_semantic_hash TEXT NOT NULL, governance_topology_hash TEXT NOT NULL, governance_lineage_hash TEXT NOT NULL, semantic_divergence_classes TEXT NOT NULL, recursive_containment_status TEXT NOT NULL CHECK (recursive_containment_status IN ('GOVERNANCE_CONTAINED','RECURSIVE_CONTAINMENT_REQUIRED')), governance_mutation_class TEXT NOT NULL CHECK (governance_mutation_class IN ('SAFE_OBSERVABILITY_ONLY','GOVERNANCE_CONTAINED','GOVERNANCE_EXPANSION','EXECUTION_BOUNDARY_EXPANSION','VALIDATION_SEMANTICS_DRIFT','AUTHORITY_SEMANTICS_DRIFT','PROOF_SEMANTICS_DRIFT','REPLAY_SEMANTICS_DRIFT','FEDERATION_SEMANTICS_DRIFT','OBSERVABILITY_TO_AUTHORITY_ESCALATION','ROOT_GOVERNANCE_BYPASS_RISK','RECURSIVE_CONTAINMENT_REQUIRED')), containment_object TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_recursive_governance_containment_registry_equivalence ON recursive_governance_containment_registry(governance_equivalence_hash, governance_semantic_hash, governance_topology_hash)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_recursive_governance_containment_registry_lineage ON recursive_governance_containment_registry(governance_lineage_hash, recursive_containment_status)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_containment_registry_no_update BEFORE UPDATE ON recursive_governance_containment_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_containment_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_containment_registry_no_delete BEFORE DELETE ON recursive_governance_containment_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_containment_registry is append-only'); END`).run()
+}
+
+async function appendRecursiveGovernanceContainmentObservation(env: Env, observation: RecursiveGovernanceContainmentObservation) {
+  await ensureRecursiveGovernanceContainmentRegistry(env)
+  await env.DB.prepare(`INSERT OR IGNORE INTO recursive_governance_containment_registry (governance_observation_id,governance_observation_hash,governance_equivalence_hash,governance_semantic_hash,governance_topology_hash,governance_lineage_hash,semantic_divergence_classes,recursive_containment_status,governance_mutation_class,containment_object,evidence_only,append_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'true','true','true','true','false','false','false',?11,?12)`)
+    .bind(observation.governance_observation_id, observation.governance_observation_hash, observation.governance_equivalence_hash, observation.governance_semantic_hash, observation.governance_topology_hash, observation.governance_lineage_hash, canonicalize(observation.semantic_divergence_classes), observation.recursive_containment_status, observation.governance_mutation_class, canonicalize(observation.containment_object), observation.generated_at, observation.created_at)
+    .run()
+}
+
+type RootAuthorityClassification = "ROOT_DEPLOY_AUTHORITY" | "ROOT_REPOSITORY_AUTHORITY" | "ROOT_ENVIRONMENT_AUTHORITY" | "ROOT_WORKFLOW_AUTHORITY" | "ROOT_BRANCH_POLICY_AUTHORITY" | "ROOT_RUNTIME_CONFIGURATION_AUTHORITY" | "ROOT_FEDERATION_AUTHORITY" | "ROOT_LOCAL_EXECUTION_AUTHORITY" | "ROOT_PACKAGE_EXECUTION_AUTHORITY" | "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY" | "UNDECLARED_ROOT_SURFACE" | "SOVEREIGNTY_DRIFT_DETECTED" | "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE" | "ROOT_AUTHORITY_BOUNDARY_OVERFLOW" | "ROOT_AUTHORITY_BYPASS_RISK" | "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+type RootAuthoritySurface = { surface_id: string, authority_origin: string, declared_boundary: string, classifications: readonly RootAuthorityClassification[], workflow_dispatch_semantics: "TRIGGER_ONLY" | "NOT_APPLICABLE", deployment_token_observability: "OBSERVABILITY_ONLY_NO_SECRET_INSPECTION" | "NOT_APPLICABLE", mutation_capability_observed: boolean, declared: boolean, observed_executable: boolean, observed_deployment_capable: boolean, observed_creates_authority: boolean, observed_secret_values_inspected: boolean, observed_secret_material_persisted: boolean, observed_secret_material: string, normalized_secret_material: "NOT_INSPECTED", normalized_executable: false, normalized_deployment_capable: false, normalized_creates_authority: false, secret_material: "NOT_INSPECTED", executable: false, deployment_capable: false, creates_authority: false }
+type RootAuthorityInventory = { inventory_type: "RootAuthorityInventory", surfaces: readonly RootAuthoritySurface[], declared_root_surfaces: readonly string[], undeclared_root_surfaces: readonly string[], evidence_only: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false }
+type RootAuthorityBoundary = { boundary_type: "RootAuthorityContainmentBoundary", allowed_canonical_path: readonly string[], contained_surfaces: readonly string[], overflow_surfaces: readonly string[], declared_root_surfaces: readonly string[], undeclared_root_surfaces: readonly string[], containment_status: "ROOT_AUTHORITY_CONTAINED" | "ROOT_AUTHORITY_CONTAINMENT_REQUIRED", merge_legitimacy: "NULL" | "UNCHANGED", preo_validity: "NULL" | "UNCHANGED", classification_authorizes: false, evidence_authorizes_merge: false, boundary_hash: string, evidence_only: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false }
+type RootAuthorityDrift = { drift_type: "RootAuthorityDrift", drift_classes: RootAuthorityClassification[], containment_status: "ROOT_AUTHORITY_CONTAINED" | "ROOT_AUTHORITY_CONTAINMENT_REQUIRED", declared_root_surfaces: readonly string[], undeclared_root_surfaces: readonly string[], undeclared_surfaces: readonly string[], topology_hash: string, drift_hash: string, merge_legitimacy: "NULL" | "UNCHANGED", fail_closed: boolean, evidence_only: true, replay_neutral: true, non_authoritative: true, secret_material_persisted: false }
+type RootAuthorityContainmentEnvelope = { envelope_type: "RootAuthorityContainmentEnvelope", inventory: RootAuthorityInventory, topology_hash: string, boundary: RootAuthorityBoundary, drift: RootAuthorityDrift, containment_status: "ROOT_AUTHORITY_CONTAINED" | "ROOT_AUTHORITY_CONTAINMENT_REQUIRED", declared_root_surfaces: readonly string[], undeclared_root_surfaces: readonly string[], drift_classes: RootAuthorityClassification[], containment_identity: string, containment_hash: string, generated_at: string, evidence_only: true, append_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, secret_values_inspected: false, secret_material_persisted: false, fail_closed_on_ambiguity: true }
 
 type ReplayMutationVector = {
   vector_id: string
@@ -965,6 +1160,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_recursive_governance_registry_governance_unique ON recursive_governance_registry(governance_id)`,
       `CREATE INDEX IF NOT EXISTS idx_recursive_governance_registry_mutation ON recursive_governance_registry(mutation_class, mutation_scope, target_surface)`,
       `CREATE INDEX IF NOT EXISTS idx_recursive_governance_registry_legitimacy ON recursive_governance_registry(mutation_hash, sco_hash, preo_hash, governance_decision)`,
+      `CREATE TABLE IF NOT EXISTS recursive_governance_containment_registry (governance_observation_id TEXT PRIMARY KEY, governance_observation_hash TEXT NOT NULL UNIQUE, governance_equivalence_hash TEXT NOT NULL, governance_semantic_hash TEXT NOT NULL, governance_topology_hash TEXT NOT NULL, governance_lineage_hash TEXT NOT NULL, semantic_divergence_classes TEXT NOT NULL, recursive_containment_status TEXT NOT NULL CHECK (recursive_containment_status IN ('GOVERNANCE_CONTAINED','RECURSIVE_CONTAINMENT_REQUIRED')), governance_mutation_class TEXT NOT NULL CHECK (governance_mutation_class IN ('SAFE_OBSERVABILITY_ONLY','GOVERNANCE_CONTAINED','GOVERNANCE_EXPANSION','EXECUTION_BOUNDARY_EXPANSION','VALIDATION_SEMANTICS_DRIFT','AUTHORITY_SEMANTICS_DRIFT','PROOF_SEMANTICS_DRIFT','REPLAY_SEMANTICS_DRIFT','FEDERATION_SEMANTICS_DRIFT','OBSERVABILITY_TO_AUTHORITY_ESCALATION','ROOT_GOVERNANCE_BYPASS_RISK','RECURSIVE_CONTAINMENT_REQUIRED')), containment_object TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_recursive_governance_containment_registry_equivalence ON recursive_governance_containment_registry(governance_equivalence_hash, governance_semantic_hash, governance_topology_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_recursive_governance_containment_registry_lineage ON recursive_governance_containment_registry(governance_lineage_hash, recursive_containment_status)`,
       `CREATE TABLE IF NOT EXISTS runtime_governance_lock_registry (lock_id TEXT PRIMARY KEY, mutation_hash TEXT NOT NULL, governance_id TEXT NOT NULL, lock_state TEXT NOT NULL CHECK (lock_state IN ('LOCKED','NULL')), activation_allowed TEXT NOT NULL CHECK (activation_allowed IN ('true','false')), canonical_hash TEXT NOT NULL, created_at TEXT NOT NULL, CHECK (activation_allowed='true' AND lock_state='LOCKED'))`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_runtime_governance_lock_activation ON runtime_governance_lock_registry(mutation_hash, governance_id)`,
       `CREATE INDEX IF NOT EXISTS idx_runtime_governance_lock_canonical_hash ON runtime_governance_lock_registry(canonical_hash)`,
@@ -997,6 +1195,18 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_topology_reconciliation_registry_hash_unique ON topology_reconciliation_registry(reconciliation_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_topology_reconciliation_registry_classification ON topology_reconciliation_registry(classification, merge_signal)`,
       `CREATE INDEX IF NOT EXISTS idx_topology_reconciliation_registry_topology ON topology_reconciliation_registry(topology_hash, governance_hash, workflow_hash, schema_hash)`,
+      `CREATE TABLE IF NOT EXISTS runtime_topology_registry (snapshot_id TEXT PRIMARY KEY, topology_hash TEXT NOT NULL, topology_semantic_hash TEXT NOT NULL, topology_boundary_hash TEXT NOT NULL, topology_lineage_hash TEXT NOT NULL, topology_equivalence_hash TEXT NOT NULL UNIQUE, drift_classes TEXT NOT NULL, lineage_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, reconciliation_timestamp TEXT NOT NULL, containment_references TEXT NOT NULL, topology_snapshot TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), append_only TEXT NOT NULL CHECK (append_only='true'), created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_topology_registry_hashes ON runtime_topology_registry(topology_hash, topology_semantic_hash, topology_boundary_hash, topology_lineage_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_runtime_topology_registry_boundary ON runtime_topology_registry(boundary_hash, lineage_hash)`,
+      `CREATE TABLE IF NOT EXISTS unauthorized_mutation_closure_registry (closure_id TEXT PRIMARY KEY, inventory_hash TEXT NOT NULL, route_hash TEXT NOT NULL, registry_hash TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS cross_registry_reconciliation_registry (reconciliation_id TEXT PRIMARY KEY, registry_set_hash TEXT NOT NULL, lineage_graph_hash TEXT NOT NULL, continuity_graph_hash TEXT NOT NULL, proof_graph_hash TEXT NOT NULL, replay_graph_hash TEXT NOT NULL, topology_binding_hash TEXT NOT NULL, governance_binding_hash TEXT NOT NULL, reconciliation_equivalence_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, unresolved_edges TEXT NOT NULL, orphaned_records TEXT NOT NULL, containment_status TEXT NOT NULL CHECK (containment_status IN ('RECONCILED','RECONCILIATION_REQUIRED')), legitimacy_status TEXT CHECK (legitimacy_status IS NULL OR legitimacy_status='LEGITIMATE'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_cross_registry_reconciliation_registry_hash_unique ON cross_registry_reconciliation_registry(reconciliation_equivalence_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_cross_registry_reconciliation_registry_status ON cross_registry_reconciliation_registry(containment_status, legitimacy_status)`,
+      `CREATE TABLE IF NOT EXISTS observer_attestation_registry (attestation_id TEXT PRIMARY KEY, observer_id TEXT NOT NULL, observed_checkpoint_hash TEXT NOT NULL, semantic_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, reconciliation_hash TEXT NOT NULL, sovereignty_hash TEXT NOT NULL, equivalence_hash TEXT NOT NULL, drift_classes TEXT NOT NULL, legitimacy_status TEXT CHECK (legitimacy_status IS NULL OR legitimacy_status='LEGITIMATE'), attestation_hash TEXT NOT NULL UNIQUE, observer_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), read_only TEXT NOT NULL CHECK (read_only='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), merge_authorizing TEXT NOT NULL CHECK (merge_authorizing='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_observer_attestation_registry_equivalence ON observer_attestation_registry(equivalence_hash, legitimacy_status)`,
+      `CREATE TABLE IF NOT EXISTS semantic_equivalence_registry (semantic_equivalence_id TEXT PRIMARY KEY, semantic_hash TEXT NOT NULL, schema_semantic_hash TEXT NOT NULL, topology_semantic_hash TEXT NOT NULL, governance_semantic_hash TEXT NOT NULL, portability_semantic_hash TEXT NOT NULL, equivalence_hash TEXT NOT NULL UNIQUE, drift_classes TEXT NOT NULL, legitimacy_status TEXT CHECK (legitimacy_status IS NULL OR legitimacy_status='LEGITIMATE'), semantic_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), read_only TEXT NOT NULL CHECK (read_only='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), merge_authorizing TEXT NOT NULL CHECK (merge_authorizing='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS portable_governance_checkpoint_registry (checkpoint_id TEXT PRIMARY KEY, checkpoint_hash TEXT NOT NULL UNIQUE, reconciliation_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, semantic_equivalence_hash TEXT NOT NULL, conformance_hash TEXT NOT NULL, portable_envelope TEXT NOT NULL, dsse_payload_type TEXT NOT NULL, jcs_canonical TEXT NOT NULL CHECK (jcs_canonical='true'), drift_classes TEXT NOT NULL, legitimacy_status TEXT CHECK (legitimacy_status IS NULL OR legitimacy_status='LEGITIMATE'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), read_only TEXT NOT NULL CHECK (read_only='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), merge_authorizing TEXT NOT NULL CHECK (merge_authorizing='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS external_conformance_verification_registry (verification_id TEXT PRIMARY KEY, runtime_compatibility_hash TEXT NOT NULL, governance_semantic_hash TEXT NOT NULL, checkpoint_equivalence_hash TEXT NOT NULL, federated_conformance_hash TEXT NOT NULL UNIQUE, conformance_status TEXT NOT NULL CHECK (conformance_status IN ('CONFORMANT','NULL')), drift_classes TEXT NOT NULL, verification_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), read_only TEXT NOT NULL CHECK (read_only='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), merge_authorizing TEXT NOT NULL CHECK (merge_authorizing='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS legitimacy_drift_propagation_registry (propagation_id TEXT PRIMARY KEY, propagation_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, impact_hash TEXT NOT NULL, merge_legitimacy_hash TEXT NOT NULL, verdict_hash TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification IN ('TOPOLOGY_VALID','TOPOLOGY_DRIFT_PROPAGATED','MERGE_LINEAGE_CONTAMINATED','GOVERNANCE_IMPACT_EXPANDED','SCHEMA_PROPAGATION_FAILURE','WORKFLOW_TRUST_COLLAPSE','PROOF_LINEAGE_CONTAMINATION','RECONCILIATION_EQUIVALENCE_INVALID','DOWNSTREAM_LEGITIMACY_NULL','NULL')), propagation_object TEXT NOT NULL, impact_graph TEXT NOT NULL, merge_impact TEXT NOT NULL, verdict_object TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), proof_generating TEXT NOT NULL CHECK (proof_generating='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_hash_unique ON legitimacy_drift_propagation_registry(propagation_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_drift_propagation_registry_topology ON legitimacy_drift_propagation_registry(topology_hash)`,
@@ -1015,6 +1225,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TRIGGER IF NOT EXISTS trg_federation_conformance_registry_no_delete BEFORE DELETE ON federation_conformance_registry BEGIN SELECT RAISE(ABORT, 'federation_conformance_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_registry_no_update BEFORE UPDATE ON recursive_governance_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_registry_no_delete BEFORE DELETE ON recursive_governance_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_containment_registry_no_update BEFORE UPDATE ON recursive_governance_containment_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_containment_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_recursive_governance_containment_registry_no_delete BEFORE DELETE ON recursive_governance_containment_registry BEGIN SELECT RAISE(ABORT, 'recursive_governance_containment_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_governance_lock_registry_no_update BEFORE UPDATE ON runtime_governance_lock_registry BEGIN SELECT RAISE(ABORT, 'runtime_governance_lock_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_governance_lock_registry_no_delete BEFORE DELETE ON runtime_governance_lock_registry BEGIN SELECT RAISE(ABORT, 'runtime_governance_lock_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_runtime_sovereignty_registry_no_update BEFORE UPDATE ON runtime_sovereignty_registry BEGIN SELECT RAISE(ABORT, 'runtime_sovereignty_registry is append-only'); END`,
@@ -1117,6 +1329,18 @@ async function activateAppendOnlyRegistryEnforcement(env: Env) {
     `CREATE TRIGGER IF NOT EXISTS trg_runtime_surface_containment_registry_no_delete BEFORE DELETE ON runtime_surface_containment_registry BEGIN SELECT RAISE(ABORT, 'runtime_surface_containment_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_topology_reconciliation_registry_no_update BEFORE UPDATE ON topology_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'topology_reconciliation_registry is append-only'); END`,
     `CREATE TRIGGER IF NOT EXISTS trg_topology_reconciliation_registry_no_delete BEFORE DELETE ON topology_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'topology_reconciliation_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_topology_registry_no_update BEFORE UPDATE ON runtime_topology_registry BEGIN SELECT RAISE(ABORT, 'runtime_topology_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_runtime_topology_registry_no_delete BEFORE DELETE ON runtime_topology_registry BEGIN SELECT RAISE(ABORT, 'runtime_topology_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_cross_registry_reconciliation_registry_no_update BEFORE UPDATE ON cross_registry_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'cross_registry_reconciliation_registry is append-only'); END`,
+    `CREATE TRIGGER IF NOT EXISTS trg_cross_registry_reconciliation_registry_no_delete BEFORE DELETE ON cross_registry_reconciliation_registry BEGIN SELECT RAISE(ABORT, 'cross_registry_reconciliation_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_observer_attestation_registry_no_update BEFORE UPDATE ON observer_attestation_registry BEGIN SELECT RAISE(ABORT, 'observer_attestation_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_observer_attestation_registry_no_delete BEFORE DELETE ON observer_attestation_registry BEGIN SELECT RAISE(ABORT, 'observer_attestation_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_semantic_equivalence_registry_no_update BEFORE UPDATE ON semantic_equivalence_registry BEGIN SELECT RAISE(ABORT, 'semantic_equivalence_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_semantic_equivalence_registry_no_delete BEFORE DELETE ON semantic_equivalence_registry BEGIN SELECT RAISE(ABORT, 'semantic_equivalence_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_portable_governance_checkpoint_registry_no_update BEFORE UPDATE ON portable_governance_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'portable_governance_checkpoint_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_portable_governance_checkpoint_registry_no_delete BEFORE DELETE ON portable_governance_checkpoint_registry BEGIN SELECT RAISE(ABORT, 'portable_governance_checkpoint_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_external_conformance_verification_registry_no_update BEFORE UPDATE ON external_conformance_verification_registry BEGIN SELECT RAISE(ABORT, 'external_conformance_verification_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_external_conformance_verification_registry_no_delete BEFORE DELETE ON external_conformance_verification_registry BEGIN SELECT RAISE(ABORT, 'external_conformance_verification_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_update BEFORE UPDATE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_delegated_authority_registry_no_delete BEFORE DELETE ON delegated_authority_registry BEGIN SELECT RAISE(ABORT, 'delegated_authority_registry is append-only'); END`
   ]
@@ -2490,6 +2714,8 @@ function reconciliationLookup(anchor: ReconciliationAnchor, context: Record<stri
       return { sql: `SELECT * FROM invocation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 ORDER BY created_at ASC, invocation_nonce ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash, invocation_nonce], lookup_key: `${decision_id}:${validated_object_hash}:${invocation_nonce}` }
     case "preo_registry":
       return { sql: `SELECT * FROM preo_registry WHERE decision_id=?1 AND reviewed_hash=?2 ORDER BY created_at ASC, preo_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [decision_id, validated_object_hash], lookup_key: `${decision_id}:${validated_object_hash}` }
+    default:
+      return { sql: `SELECT * FROM ${registry} LIMIT ${RECONCILIATION_ROW_LIMIT}`, bind: [], lookup_key: registry }
   }
 }
 
@@ -2614,6 +2840,8 @@ async function verifyReconciliationRegistryRow(env: Env, registry: Reconciliatio
       if (String(row.status || "") !== "PREO_VALID") return "preo_ancestry_drift"
       context.preo = row
       return "VALID"
+    default:
+      return "VALID"
   }
 }
 
@@ -2641,6 +2869,8 @@ function canonicalIdentifiersFromReconciliationRow(registry: ReconciliationRegis
       return populatedCanonicalIdentifiers({ continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), invocation_nonce: String(row?.invocation_nonce || ""), validated_object_hash: String(row?.validated_object_hash || "") })
     case "preo_registry":
       return populatedCanonicalIdentifiers({ preo_id: String(row?.preo_id || ""), authority_id: String(row?.authority_id || ""), continuity_id: String(row?.continuity_id || ""), decision_id: String(row?.decision_id || ""), reviewed_hash: String(row?.reviewed_hash || "") })
+    default:
+      return populatedCanonicalIdentifiers({})
   }
 }
 
@@ -5209,6 +5439,9 @@ const NON_DEPLOY_WORKFLOW_SURFACES = Object.freeze([".github/workflows/merge-gov
 const PACKAGE_COMMAND_SURFACES = Object.freeze(["deploy:disabled-direct-deploy", "dev:local-only", "d1:migrate:local-only", "test:non-deploy", "conformance:non-deploy"])
 const ADAPTER_MUTATION_SURFACES = Object.freeze(["cloudflare-d1:canonical-registry-only", "github-actions:governed-deploy-only", "wrangler:governed-workflow-only"])
 const WEBHOOK_MUTATION_SURFACES = Object.freeze(["github-pull-request:review-observability-only", "github-workflow-dispatch:governed-deploy-only"])
+const UNAUTHORIZED_MUTATION_CLOSURE_DRIFT_TAXONOMY: readonly UnauthorizedMutationClosureDriftClass[] = Object.freeze(["UNDECLARED_MUTATION_SURFACE", "UNCLASSIFIED_EXECUTION_SURFACE", "UNBOUND_DATABASE_WRITE", "UNBOUND_DEPLOYMENT_SURFACE", "OBSERVABILITY_MUTATION_ESCALATION", "GOVERNANCE_MUTATION_WITHOUT_SCO", "AGENT_TOOL_MUTATION_UNCLASSIFIED", "EXTERNAL_API_MUTATION_UNCLASSIFIED", "RECONCILIATION_MUTATION_ESCAPE", "PROOFLESS_MUTATION_PATH", "AUTHORITYLESS_MUTATION_PATH", "CLOSURE_INCOMPLETE"])
+const UNAUTHORIZED_MUTATION_CLOSURE_FAIL_CLOSED = Object.freeze({ drift_class: "UNDECLARED_MUTATION_SURFACE" as const, status: "NULL" as const, evidence_only: true as const, non_authoritative: true as const, replay_neutral: true as const })
+const MUTATION_CLOSURE_INVENTORY_ARTIFACTS = Object.freeze(["runtime/unauthorized_mutation_surface_inventory.json", "runtime/unauthorized_mutation_path_closure_audit.json"])
 
 async function ensureRuntimeSurfaceContainmentRegistry(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS runtime_surface_containment_registry (containment_id TEXT PRIMARY KEY, containment_hash TEXT NOT NULL UNIQUE, route_surface_hash TEXT NOT NULL, deployment_surface_hash TEXT NOT NULL, package_surface_hash TEXT NOT NULL, runtime_sovereignty_hash TEXT NOT NULL, hidden_surface_count INTEGER NOT NULL, drift_classes TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), mutation_capable TEXT NOT NULL CHECK (mutation_capable='false'), remote_authority_denied TEXT NOT NULL CHECK (remote_authority_denied='true'), read_only TEXT NOT NULL CHECK (read_only='true'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), execution_started TEXT NOT NULL CHECK (execution_started='false'), replay_consumed TEXT NOT NULL CHECK (replay_consumed='false'), authoritative TEXT NOT NULL CHECK (authoritative='false'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
@@ -5306,49 +5539,74 @@ function rootAuthorityFlags() {
 }
 
 const ROOT_AUTHORITY_BASELINE_SURFACES = Object.freeze([
-  Object.freeze({ surface_id: "cloudflare_account_authority", authority_origin: "cloudflare_account", declared_boundary: "/session→/continuity→/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "github_admin_authority", authority_origin: "github_repository", declared_boundary: "/session→/continuity→/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "github_actions_workflow_dispatch", authority_origin: "github_actions", declared_boundary: "/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_WORKFLOW_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "github_environment_and_secrets_configuration", authority_origin: "github_environment", declared_boundary: "declared-not-inspected", classifications: ["ROOT_ENVIRONMENT_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "cloudflare_account_authority", authority_origin: "cloudflare_account", declared_boundary: "/session→/continuity→/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
+  Object.freeze({ surface_id: "cloudflare_deployment_token_authority", authority_origin: "cloudflare_api_token", declared_boundary: "observability-only-no-secret-inspection", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
+  Object.freeze({ surface_id: "github_admin_authority", authority_origin: "github_repository_admin", declared_boundary: "/session→/continuity→/authority→/compile→/validate→/execute→/proof", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
+  Object.freeze({ surface_id: "github_actions_token_authority", authority_origin: "github_actions_token", declared_boundary: "least-privilege-observability-only", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "github_actions_workflow_dispatch", authority_origin: "github_actions_workflow_dispatch", declared_boundary: "trigger-only-no-secret-inspection", classifications: ["ROOT_WORKFLOW_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "github_workflow_file_mutation", authority_origin: "github_repository_workflows", declared_boundary: "workflow-file-mutation-containment-required", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
+  Object.freeze({ surface_id: "github_environment_and_secrets_configuration", authority_origin: "github_environment", declared_boundary: "declared-not-inspected", classifications: ["ROOT_ENVIRONMENT_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
+  Object.freeze({ surface_id: "repository_secret_mutation_authority", authority_origin: "github_repository_secrets", declared_boundary: "observability-only-no-secret-inspection", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
   Object.freeze({ surface_id: "wrangler_deploy_capability", authority_origin: "cloudflare_wrangler", declared_boundary: "governed-deploy-workflow-only", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "package_script_deploy_guard", authority_origin: "package_scripts", declared_boundary: "disabled-direct-deploy", classifications: ["ROOT_PACKAGE_EXECUTION_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "local_deploy_credentials_presence", authority_origin: "local_environment", declared_boundary: "not-inspected-observability-only", classifications: ["ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "ci_token_permissions", authority_origin: "github_actions_token", declared_boundary: "least-privilege-assumption", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY"] as const }),
-  Object.freeze({ surface_id: "federated_runtime_authority", authority_origin: "remote_runtime", declared_boundary: "remote-authority-denied", classifications: ["ROOT_FEDERATION_AUTHORITY"] as const })
+  Object.freeze({ surface_id: "wrangler_local_deploy_authority", authority_origin: "local_wrangler_cli", declared_boundary: "local-deploy-denied-observability-only", classifications: ["ROOT_DEPLOY_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_AUTHORITY_BYPASS_RISK"] as const }),
+  Object.freeze({ surface_id: "package_script_deploy_guard", authority_origin: "package_scripts", declared_boundary: "disabled-direct-deploy", classifications: ["ROOT_PACKAGE_EXECUTION_AUTHORITY", "ROOT_AUTHORITY_BYPASS_RISK"] as const }),
+  Object.freeze({ surface_id: "local_deploy_credentials_presence", authority_origin: "local_environment", declared_boundary: "observability-only-no-secret-inspection", classifications: ["ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY", "ROOT_AUTHORITY_BYPASS_RISK"] as const }),
+  Object.freeze({ surface_id: "ci_token_permissions", authority_origin: "github_actions_token", declared_boundary: "least-privilege-assumption", classifications: ["ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY"] as const }),
+  Object.freeze({ surface_id: "federated_runtime_authority", authority_origin: "remote_runtime", declared_boundary: "remote-authority-denied", classifications: ["ROOT_FEDERATION_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const }),
+  Object.freeze({ surface_id: "root_runtime_authority_assumption", authority_origin: "runtime_root", declared_boundary: "runtime-authority-assumption-observability-only", classifications: ["ROOT_FEDERATION_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"] as const })
 ].sort((a, b) => a.surface_id.localeCompare(b.surface_id)))
 
 function classifyRootAuthoritySurface(surface: Partial<RootAuthoritySurface> & Record<string, unknown>): RootAuthorityClassification[] {
   const material = `${surface.surface_id || ""} ${surface.authority_origin || ""} ${surface.declared_boundary || ""}`.toLowerCase()
   const classes = new Set<RootAuthorityClassification>()
   for (const c of (Array.isArray(surface.classifications) ? surface.classifications : [])) classes.add(c as RootAuthorityClassification)
-  if (/deploy|wrangler|cloudflare/.test(material)) classes.add("ROOT_DEPLOY_AUTHORITY")
-  if (/repo|github_admin|settings|admin/.test(material)) classes.add("ROOT_REPOSITORY_AUTHORITY")
-  if (/env|secret|variable|credential|token/.test(material)) classes.add("ROOT_ENVIRONMENT_AUTHORITY")
+  if (/deploy|wrangler|cloudflare|deployment_token|api_token/.test(material)) classes.add("ROOT_DEPLOY_AUTHORITY")
+  if (/repo|repository|github_admin|settings|admin/.test(material)) classes.add("ROOT_REPOSITORY_AUTHORITY")
+  if (/env|environment|secret|variable|credential|token/.test(material)) classes.add("ROOT_ENVIRONMENT_AUTHORITY")
   if (/workflow|dispatch|actions/.test(material)) classes.add("ROOT_WORKFLOW_AUTHORITY")
   if (/branch|protection/.test(material)) classes.add("ROOT_BRANCH_POLICY_AUTHORITY")
   if (/runtime|configuration|config/.test(material)) classes.add("ROOT_RUNTIME_CONFIGURATION_AUTHORITY")
-  if (/federat|remote/.test(material)) classes.add("ROOT_FEDERATION_AUTHORITY")
-  if (/local/.test(material)) classes.add("ROOT_LOCAL_EXECUTION_AUTHORITY")
+  if (/federat|remote|runtime_root/.test(material)) classes.add("ROOT_FEDERATION_AUTHORITY")
+  if (/local|cli/.test(material)) classes.add("ROOT_LOCAL_EXECUTION_AUTHORITY")
   if (/package|npm|script/.test(material)) classes.add("ROOT_PACKAGE_EXECUTION_AUTHORITY")
-  if (/mutation|infrastructure|account|cloudflare/.test(material)) classes.add("ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY")
+  if (/mutation|infrastructure|account|cloudflare|settings/.test(material)) classes.add("ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY")
+  if (/bypass|direct|local-deploy|disabled-direct-deploy/.test(material)) classes.add("ROOT_AUTHORITY_BYPASS_RISK")
+  if (/containment-required|account|admin|secret|environment|federat|runtime_root/.test(material)) classes.add("ROOT_AUTHORITY_CONTAINMENT_REQUIRED")
   if (surface.declared === false || material.includes("undeclared")) classes.add("UNDECLARED_ROOT_SURFACE")
   return [...classes].sort()
 }
 
 function canonicalizeRootAuthorityInventory(input: Partial<RootAuthorityInventory> = {}): RootAuthorityInventory {
-  const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length > 0 ? input.surfaces : ROOT_AUTHORITY_BASELINE_SURFACES).map((surface: any) => Object.freeze({
-    surface_id: String(surface.surface_id || "undeclared_root_surface"),
-    authority_origin: String(surface.authority_origin || "unknown"),
-    declared_boundary: String(surface.declared_boundary || "NULL"),
-    classifications: Object.freeze(classifyRootAuthoritySurface(surface)),
-    mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
-    declared: surface.declared === false ? false : true,
-    secret_material: "NOT_INSPECTED" as const,
-    executable: false as const,
-    deployment_capable: false as const,
-    creates_authority: false as const
-  })).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
-  return Object.freeze({ inventory_type: "RootAuthorityInventory" as const, surfaces: Object.freeze(surfaces), evidence_only: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const, secret_values_inspected: false as const })
+  const surfaces = (Array.isArray(input.surfaces) && input.surfaces.length > 0 ? input.surfaces : ROOT_AUTHORITY_BASELINE_SURFACES).map((surface: any) => {
+    const observed_secret_material = String(surface.observed_secret_material ?? surface.secret_material ?? "NOT_INSPECTED")
+    return Object.freeze({
+      surface_id: String(surface.surface_id || "undeclared_root_surface"),
+      authority_origin: String(surface.authority_origin || "unknown"),
+      declared_boundary: String(surface.declared_boundary || "NULL"),
+      classifications: Object.freeze(classifyRootAuthoritySurface(surface)),
+      workflow_dispatch_semantics: /workflow_dispatch|dispatch/.test(`${surface.surface_id || ""} ${surface.authority_origin || ""}`.toLowerCase()) ? "TRIGGER_ONLY" as const : "NOT_APPLICABLE" as const,
+      deployment_token_observability: /token/.test(`${surface.surface_id || ""} ${surface.authority_origin || ""}`.toLowerCase()) ? "OBSERVABILITY_ONLY_NO_SECRET_INSPECTION" as const : "NOT_APPLICABLE" as const,
+      mutation_capability_observed: Boolean(surface.mutation_capability_observed ?? true),
+      declared: surface.declared === false ? false : true,
+      observed_executable: Boolean(surface.observed_executable ?? surface.executable ?? false),
+      observed_deployment_capable: Boolean(surface.observed_deployment_capable ?? surface.deployment_capable ?? false),
+      observed_creates_authority: Boolean(surface.observed_creates_authority ?? surface.creates_authority ?? false),
+      observed_secret_values_inspected: Boolean(surface.observed_secret_values_inspected ?? surface.secret_values_inspected ?? false),
+      observed_secret_material_persisted: Boolean(surface.observed_secret_material_persisted ?? surface.secret_material_persisted ?? false),
+      observed_secret_material,
+      normalized_secret_material: "NOT_INSPECTED" as const,
+      normalized_executable: false as const,
+      normalized_deployment_capable: false as const,
+      normalized_creates_authority: false as const,
+      secret_material: "NOT_INSPECTED" as const,
+      executable: false as const,
+      deployment_capable: false as const,
+      creates_authority: false as const
+    })
+  }).sort((a, b) => a.surface_id.localeCompare(b.surface_id) || a.authority_origin.localeCompare(b.authority_origin))
+  const declared_root_surfaces = surfaces.filter((surface) => surface.declared).map((surface) => surface.surface_id).sort()
+  const undeclared_root_surfaces = surfaces.filter((surface) => !surface.declared || surface.classifications.includes("UNDECLARED_ROOT_SURFACE")).map((surface) => surface.surface_id).sort()
+  return Object.freeze({ inventory_type: "RootAuthorityInventory" as const, surfaces: Object.freeze(surfaces), declared_root_surfaces: Object.freeze(declared_root_surfaces), undeclared_root_surfaces: Object.freeze(undeclared_root_surfaces), evidence_only: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const, secret_values_inspected: false as const })
 }
 
 async function hashRootAuthorityTopology(inventory: RootAuthorityInventory): Promise<string> {
@@ -5358,9 +5616,10 @@ async function hashRootAuthorityTopology(inventory: RootAuthorityInventory): Pro
 async function computeAuthorityContainmentBoundary(inventory: RootAuthorityInventory): Promise<RootAuthorityBoundary> {
   const overflow_surfaces = inventory.surfaces.filter((surface) => !surface.declared || surface.classifications.includes("UNDECLARED_ROOT_SURFACE")).map((surface) => surface.surface_id).sort()
   const contained_surfaces = inventory.surfaces.map((surface) => surface.surface_id).sort()
-  const material = { allowed_canonical_path: CANONICAL_RUNTIME_ROUTES, contained_surfaces, overflow_surfaces, classification_authorizes: false, evidence_authorizes_merge: false }
+  const containment_status = overflow_surfaces.length > 0 ? "ROOT_AUTHORITY_CONTAINMENT_REQUIRED" as const : "ROOT_AUTHORITY_CONTAINED" as const
+  const material = { allowed_canonical_path: CANONICAL_RUNTIME_ROUTES, contained_surfaces, overflow_surfaces, containment_status, classification_authorizes: false, evidence_authorizes_merge: false }
   const boundary_hash = await sha256Hex(canonicalize(material))
-  return Object.freeze({ boundary_type: "RootAuthorityContainmentBoundary" as const, allowed_canonical_path: CANONICAL_RUNTIME_ROUTES, contained_surfaces: Object.freeze(contained_surfaces), overflow_surfaces: Object.freeze(overflow_surfaces), merge_legitimacy: overflow_surfaces.length > 0 ? "NULL" as const : "UNCHANGED" as const, preo_validity: overflow_surfaces.length > 0 ? "NULL" as const : "UNCHANGED" as const, classification_authorizes: false as const, evidence_authorizes_merge: false as const, boundary_hash, evidence_only: true as const, non_authoritative: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const })
+  return Object.freeze({ boundary_type: "RootAuthorityContainmentBoundary" as const, allowed_canonical_path: CANONICAL_RUNTIME_ROUTES, contained_surfaces: Object.freeze(contained_surfaces), overflow_surfaces: Object.freeze(overflow_surfaces), declared_root_surfaces: Object.freeze(inventory.surfaces.filter((surface) => surface.declared).map((surface) => surface.surface_id).sort()), undeclared_root_surfaces: Object.freeze(overflow_surfaces), containment_status, merge_legitimacy: overflow_surfaces.length > 0 ? "NULL" as const : "UNCHANGED" as const, preo_validity: overflow_surfaces.length > 0 ? "NULL" as const : "UNCHANGED" as const, classification_authorizes: false as const, evidence_authorizes_merge: false as const, boundary_hash, evidence_only: true as const, non_authoritative: true as const, executable: false as const, deployment_capable: false as const, creates_authority: false as const })
 }
 
 async function detectRootAuthorityDrift(inventory: RootAuthorityInventory, topology_hash: string, boundary?: RootAuthorityBoundary): Promise<RootAuthorityDrift> {
@@ -5370,11 +5629,19 @@ async function detectRootAuthorityDrift(inventory: RootAuthorityInventory, topol
   if (undeclared_surfaces.length > 0) drift.add("UNDECLARED_ROOT_SURFACE")
   if (undeclared_surfaces.length > 0) drift.add("SOVEREIGNTY_DRIFT_DETECTED")
   if (undeclared_surfaces.length > 0) drift.add("ROOT_AUTHORITY_BOUNDARY_OVERFLOW")
-  const topologyDivergence = inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== "NOT_INSPECTED" || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false)
+  if (undeclared_surfaces.length > 0) drift.add("ROOT_AUTHORITY_CONTAINMENT_REQUIRED")
+  const unsafeObservedSurface = inventory.surfaces.some((surface) => surface.observed_executable === true || surface.observed_deployment_capable === true || surface.observed_creates_authority === true || surface.observed_secret_values_inspected === true || surface.observed_secret_material_persisted === true || surface.observed_secret_material !== "NOT_INSPECTED")
+  const topologyDivergence = inventory.surfaces.some((surface) => surface.classifications.length === 0 || surface.secret_material !== "NOT_INSPECTED" || surface.executable !== false || surface.deployment_capable !== false || surface.creates_authority !== false) || unsafeObservedSurface
   if (topologyDivergence) drift.add("ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE")
+  if (unsafeObservedSurface) {
+    drift.add("SOVEREIGNTY_DRIFT_DETECTED")
+    drift.add("ROOT_AUTHORITY_BYPASS_RISK")
+    drift.add("ROOT_AUTHORITY_CONTAINMENT_REQUIRED")
+  }
+  if (inventory.surfaces.some((surface) => surface.classifications.includes("ROOT_AUTHORITY_BYPASS_RISK"))) drift.add("ROOT_AUTHORITY_BYPASS_RISK")
   const drift_classes = [...drift].sort()
   const drift_hash = await sha256Hex(canonicalize({ topology_hash, drift_classes, undeclared_surfaces, merge_legitimacy: drift_classes.length > 0 ? "NULL" : "UNCHANGED" }))
-  return Object.freeze({ drift_type: "RootAuthorityDrift" as const, drift_classes, undeclared_surfaces, topology_hash, drift_hash, merge_legitimacy: drift_classes.length > 0 ? "NULL" as const : "UNCHANGED" as const, fail_closed: drift_classes.length > 0, evidence_only: true as const, replay_neutral: true as const, non_authoritative: true as const, secret_material_persisted: false as const })
+  return Object.freeze({ drift_type: "RootAuthorityDrift" as const, drift_classes, containment_status: drift_classes.length > 0 ? "ROOT_AUTHORITY_CONTAINMENT_REQUIRED" as const : "ROOT_AUTHORITY_CONTAINED" as const, declared_root_surfaces: Object.freeze(inventory.surfaces.filter((surface) => surface.declared).map((surface) => surface.surface_id).sort()), undeclared_root_surfaces: undeclared_surfaces, undeclared_surfaces, topology_hash, drift_hash, merge_legitimacy: drift_classes.length > 0 ? "NULL" as const : "UNCHANGED" as const, fail_closed: drift_classes.length > 0, evidence_only: true as const, replay_neutral: true as const, non_authoritative: true as const, secret_material_persisted: false as const })
 }
 
 async function buildRootAuthorityContainmentEnvelope(input: Partial<RootAuthorityInventory> = {}, generated_at = new Date().toISOString()): Promise<RootAuthorityContainmentEnvelope> {
@@ -5383,22 +5650,29 @@ async function buildRootAuthorityContainmentEnvelope(input: Partial<RootAuthorit
   const boundary = await computeAuthorityContainmentBoundary(inventory)
   const drift = await detectRootAuthorityDrift(inventory, topology_hash, boundary)
   const containment_identity = await sha256Hex(canonicalize({ topology_hash, boundary_hash: boundary.boundary_hash, drift_hash: drift.drift_hash }))
-  const containment_hash = await sha256Hex(canonicalize({ containment_identity, topology_hash, boundary_hash: boundary.boundary_hash, drift_hash: drift.drift_hash, evidence_only: true, non_authoritative: true }))
-  return Object.freeze({ envelope_type: "RootAuthorityContainmentEnvelope" as const, inventory, topology_hash, boundary, drift, containment_identity, containment_hash, generated_at, ...rootAuthorityFlags() })
+  const containment_status = drift.drift_classes.length > 0 ? "ROOT_AUTHORITY_CONTAINMENT_REQUIRED" as const : "ROOT_AUTHORITY_CONTAINED" as const
+  const containment_hash = await sha256Hex(canonicalize({ containment_identity, topology_hash, boundary_hash: boundary.boundary_hash, drift_hash: drift.drift_hash, containment_status, evidence_only: true, non_authoritative: true }))
+  return Object.freeze({ envelope_type: "RootAuthorityContainmentEnvelope" as const, inventory, topology_hash, boundary, drift, containment_status, declared_root_surfaces: inventory.declared_root_surfaces, undeclared_root_surfaces: inventory.undeclared_root_surfaces, drift_classes: drift.drift_classes, containment_identity, containment_hash, generated_at, ...rootAuthorityFlags() })
 }
 
 async function ensureRootAuthorityObservabilityRegistry(env: Env) {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS root_authority_observability_registry (observation_id TEXT PRIMARY KEY, observation_hash TEXT NOT NULL UNIQUE, topology_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, drift_hash TEXT NOT NULL, containment_identity TEXT NOT NULL, classification TEXT NOT NULL, inventory_object TEXT NOT NULL, boundary_object TEXT NOT NULL, drift_object TEXT NOT NULL, containment_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), secret_material_persisted TEXT NOT NULL CHECK (secret_material_persisted='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS root_authority_observability_registry (observation_id TEXT PRIMARY KEY, observation_hash TEXT NOT NULL UNIQUE, topology_hash TEXT NOT NULL, boundary_hash TEXT NOT NULL, drift_hash TEXT NOT NULL, containment_identity TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification IN ('ROOT_DEPLOY_AUTHORITY','ROOT_REPOSITORY_AUTHORITY','ROOT_ENVIRONMENT_AUTHORITY','ROOT_WORKFLOW_AUTHORITY','ROOT_BRANCH_POLICY_AUTHORITY','ROOT_RUNTIME_CONFIGURATION_AUTHORITY','ROOT_FEDERATION_AUTHORITY','ROOT_LOCAL_EXECUTION_AUTHORITY','ROOT_PACKAGE_EXECUTION_AUTHORITY','ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY','UNDECLARED_ROOT_SURFACE','SOVEREIGNTY_DRIFT_DETECTED','ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE','ROOT_AUTHORITY_BOUNDARY_OVERFLOW','ROOT_AUTHORITY_BYPASS_RISK','ROOT_AUTHORITY_CONTAINMENT_REQUIRED')), inventory_object TEXT NOT NULL, boundary_object TEXT NOT NULL, drift_object TEXT NOT NULL, containment_envelope TEXT NOT NULL, evidence_only TEXT NOT NULL CHECK (evidence_only='true'), append_only TEXT NOT NULL CHECK (append_only='true'), replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), executable TEXT NOT NULL CHECK (executable='false'), deployment_capable TEXT NOT NULL CHECK (deployment_capable='false'), creates_authority TEXT NOT NULL CHECK (creates_authority='false'), secret_material_persisted TEXT NOT NULL CHECK (secret_material_persisted='false'), fail_closed_on_ambiguity TEXT NOT NULL CHECK (fail_closed_on_ambiguity='true'), generated_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_topology ON root_authority_observability_registry(topology_hash, containment_identity)`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_boundary ON root_authority_observability_registry(boundary_hash, classification)`).run()
   await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_root_authority_observability_registry_drift ON root_authority_observability_registry(drift_hash, classification)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_update BEFORE UPDATE ON root_authority_observability_registry BEGIN SELECT RAISE(ABORT, 'root_authority_observability_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_delete BEFORE DELETE ON root_authority_observability_registry BEGIN SELECT RAISE(ABORT, 'root_authority_observability_registry is append-only'); END`).run()
 }
 
 async function appendRootAuthorityObservation(env: Env, envelope: RootAuthorityContainmentEnvelope) {
   await ensureRootAuthorityObservabilityRegistry(env)
   const classification = envelope.drift.drift_classes[0] || "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"
-  await env.DB.prepare(`INSERT OR IGNORE INTO root_authority_observability_registry (observation_id,observation_hash,topology_hash,boundary_hash,drift_hash,containment_identity,classification,inventory_object,boundary_object,drift_object,containment_envelope,evidence_only,append_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,secret_material_persisted,fail_closed_on_ambiguity,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','true','true','false','false','false','false','true',?12,?13)`)
-    .bind(envelope.containment_identity, envelope.containment_hash, envelope.topology_hash, envelope.boundary.boundary_hash, envelope.drift.drift_hash, envelope.containment_identity, classification, canonicalize(envelope.inventory), canonicalize(envelope.boundary), canonicalize(envelope.drift), canonicalize(envelope), envelope.generated_at, envelope.generated_at)
+  const created_at = new Date().toISOString()
+  const observation_nonce = crypto.randomUUID()
+  const observation_id = await sha256Hex(canonicalize({ containment_identity: envelope.containment_identity, created_at, observation_nonce, observation: "root_authority_containment" }))
+  const observation_hash = await sha256Hex(canonicalize({ observation_id, containment_hash: envelope.containment_hash, topology_hash: envelope.topology_hash, boundary_hash: envelope.boundary.boundary_hash, drift_hash: envelope.drift.drift_hash, created_at, observation_nonce, evidence_only: true, non_authoritative: true }))
+  await env.DB.prepare(`INSERT INTO root_authority_observability_registry (observation_id,observation_hash,topology_hash,boundary_hash,drift_hash,containment_identity,classification,inventory_object,boundary_object,drift_object,containment_envelope,evidence_only,append_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,secret_material_persisted,fail_closed_on_ambiguity,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'true','true','true','true','false','false','false','false','true',?12,?13)`)
+    .bind(observation_id, observation_hash, envelope.topology_hash, envelope.boundary.boundary_hash, envelope.drift.drift_hash, envelope.containment_identity, classification, canonicalize(envelope.inventory), canonicalize(envelope.boundary), canonicalize(envelope.drift), canonicalize(envelope), envelope.generated_at, created_at)
     .run()
 }
 
@@ -5406,6 +5680,294 @@ function rootAuthorityInventoryFromUrl(url: URL): Partial<RootAuthorityInventory
   const undeclared = url.searchParams.get("surface") || url.searchParams.get("undeclared_surface")
   if (!undeclared) return {}
   return { surfaces: [...ROOT_AUTHORITY_BASELINE_SURFACES, { surface_id: undeclared, authority_origin: url.searchParams.get("authority_origin") || "undeclared", declared_boundary: "outside-canonical-boundary", classifications: ["UNDECLARED_ROOT_SURFACE", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY"], mutation_capability_observed: true, declared: false }] as any }
+}
+
+
+
+type CrossRegistryDriftClass = "REGISTRY_LINEAGE_MISMATCH" | "ORPHANED_AUTHORITY_RECORD" | "ORPHANED_AEO_RECORD" | "ORPHANED_VALIDATION_RECORD" | "ORPHANED_EXECUTION_RECORD" | "ORPHANED_PROOF_RECORD" | "ORPHANED_INVOCATION_RECORD" | "VALIDATED_HASH_DISCONTINUITY" | "EXECUTION_PROOF_HASH_MISMATCH" | "SESSION_CONTINUITY_DIVERGENCE" | "AUTHORITY_CONTINUITY_DIVERGENCE" | "REPLAY_GRAPH_FRAGMENTATION" | "TOPOLOGY_BINDING_DIVERGENCE" | "GOVERNANCE_BINDING_DIVERGENCE" | "ROOT_AUTHORITY_EVIDENCE_ESCALATION" | "OBSERVABILITY_RECORD_AUTHORITY_ESCALATION" | "CROSS_REGISTRY_RECONCILIATION_AMBIGUITY"
+type CrossRegistryLineageEdge = { object_type: "CrossRegistryLineageEdge", from_registry: string, from_id: string, to_registry: string, to_id: string, relation: string, status: "RESOLVED" | "UNRESOLVED", drift_class: CrossRegistryDriftClass }
+type CrossRegistryDrift = { object_type: "CrossRegistryDrift", drift_class: CrossRegistryDriftClass, registry: string, record_id: string, reason: string, legitimacy_status: "NULL" }
+type CrossRegistryReconciliationSnapshot = {
+  object_type: "CrossRegistryReconciliationSnapshot"
+  reconciliation_id: string
+  registry_set_hash: string
+  lineage_graph_hash: string
+  continuity_graph_hash: string
+  proof_graph_hash: string
+  replay_graph_hash: string
+  topology_binding_hash: string
+  governance_binding_hash: string
+  reconciliation_equivalence_hash: string
+  lineage_edges: CrossRegistryLineageEdge[]
+  drift: CrossRegistryDrift[]
+  equivalence: Record<string, unknown>
+  continuity_proof: Record<string, unknown>
+  drift_classes: CrossRegistryDriftClass[]
+  unresolved_edges: CrossRegistryLineageEdge[]
+  orphaned_records: Record<string, unknown>[]
+  containment_status: "RECONCILED" | "RECONCILIATION_REQUIRED"
+  legitimacy_status: "LEGITIMATE" | "NULL"
+  evidence_only: true
+  replay_neutral: true
+  non_authoritative: true
+  executable: false
+  deployment_capable: false
+  creates_authority: false
+  proof_generating: false
+}
+
+function crossRegistryRouteFlags(): { evidence_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, proof_generating: false } { return { evidence_only: true, replay_neutral: true, non_authoritative: true, executable: false, deployment_capable: false, creates_authority: false, proof_generating: false } }
+function crossRegistryRecordId(record: Record<string, unknown>): string {
+  return String(record.session_id || record.continuity_id || record.authority_id || record.aeo_id || record.validation_id || record.execution_id || record.proof_id || record.invocation_nonce || record.preo_id || record.snapshot_id || record.governance_observation_id || record.observation_id || record.closure_id || record.reconciliation_id || canonicalize(record))
+}
+function crossRegistryField(record: Record<string, unknown> | null | undefined, field: string): string { return String(record?.[field] || "") }
+function sortCrossRegistryRecords(records: Record<string, unknown>[]): Record<string, unknown>[] { return records.map((record) => canonicalRecord(record)).sort((a, b) => crossRegistryRecordId(a).localeCompare(crossRegistryRecordId(b)) || canonicalize(a).localeCompare(canonicalize(b))) }
+function oneCrossRegistry(records: Record<string, unknown>[], predicate: (record: Record<string, unknown>) => boolean): { match: Record<string, unknown> | null, ambiguous: boolean } {
+  const matches = records.filter(predicate)
+  return { match: matches[0] || null, ambiguous: matches.length > 1 }
+}
+function crossRegistryEdge(from_registry: string, from_id: string, to_registry: string, to_id: string, relation: string, resolved: boolean, drift_class: CrossRegistryDriftClass): CrossRegistryLineageEdge {
+  return { object_type: "CrossRegistryLineageEdge", from_registry, from_id, to_registry, to_id, relation, status: resolved ? "RESOLVED" : "UNRESOLVED", drift_class }
+}
+function truthyEvidenceEscalation(value: unknown): boolean { return value === true || value === "true" || value === 1 || value === "1" }
+async function buildCrossRegistryReconciliationSnapshot(state: Record<string, Record<string, unknown>[]>, generated_at = new Date().toISOString()): Promise<CrossRegistryReconciliationSnapshot> {
+  const canonicalState = Object.fromEntries((CANONICAL_RECONCILIATION_REGISTRY_ORDER as readonly string[]).map((registry) => [registry, sortCrossRegistryRecords(state[registry] || [])])) as Record<string, Record<string, unknown>[]>
+  const edges: CrossRegistryLineageEdge[] = []
+  const drift: CrossRegistryDrift[] = []
+  const orphaned_records: Record<string, unknown>[] = []
+  const addDrift = (drift_class: CrossRegistryDriftClass, registry: string, record: Record<string, unknown>, reason: string) => { drift.push({ object_type: "CrossRegistryDrift", drift_class, registry, record_id: crossRegistryRecordId(record), reason, legitimacy_status: "NULL" }); orphaned_records.push({ registry, record_id: crossRegistryRecordId(record), drift_class, reason }) }
+  const sessions = canonicalState.session_registry || [], continuities = canonicalState.continuity_registry || [], authorities = canonicalState.authority_registry || [], aeos = canonicalState.aeo_registry || [], validations = canonicalState.validation_registry || [], executions = canonicalState.execution_registry || [], proofs = canonicalState.proof_registry || [], invocations = canonicalState.invocation_registry || []
+  for (const authority of authorities) {
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(authority, "session_id"))
+    const continuity = oneCrossRegistry(continuities, (row) => crossRegistryField(row, "continuity_id") === crossRegistryField(authority, "continuity_id"))
+    edges.push(crossRegistryEdge("authority_registry", crossRegistryRecordId(authority), "session_registry", crossRegistryField(authority, "session_id"), "AUTHORITY_SESSION", Boolean(session.match) && !session.ambiguous, "ORPHANED_AUTHORITY_RECORD"))
+    edges.push(crossRegistryEdge("authority_registry", crossRegistryRecordId(authority), "continuity_registry", crossRegistryField(authority, "continuity_id"), "AUTHORITY_CONTINUITY", Boolean(continuity.match) && !continuity.ambiguous, "ORPHANED_AUTHORITY_RECORD"))
+    if (!session.match || !continuity.match) addDrift("ORPHANED_AUTHORITY_RECORD", "authority_registry", authority, "authority requires valid session and continuity")
+    if (session.ambiguous || continuity.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "authority_registry", authority, "authority lineage resolves ambiguously")
+    if (continuity.match && crossRegistryField(continuity.match, "session_id") !== crossRegistryField(authority, "session_id")) addDrift("SESSION_CONTINUITY_DIVERGENCE", "authority_registry", authority, "authority session differs from continuity session")
+  }
+  for (const aeo of aeos) {
+    const authority = oneCrossRegistry(authorities, (row) => crossRegistryField(row, "authority_id") === crossRegistryField(aeo, "authority_id"))
+    edges.push(crossRegistryEdge("aeo_registry", crossRegistryRecordId(aeo), "authority_registry", crossRegistryField(aeo, "authority_id"), "AEO_AUTHORITY", Boolean(authority.match) && !authority.ambiguous, "ORPHANED_AEO_RECORD"))
+    if (!authority.match) addDrift("ORPHANED_AEO_RECORD", "aeo_registry", aeo, "AEO requires valid authority")
+    if (authority.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "aeo_registry", aeo, "AEO authority resolves ambiguously")
+    if (authority.match && crossRegistryField(aeo, "continuity_id") && crossRegistryField(authority.match, "continuity_id") && crossRegistryField(aeo, "continuity_id") !== crossRegistryField(authority.match, "continuity_id")) addDrift("AUTHORITY_CONTINUITY_DIVERGENCE", "aeo_registry", aeo, "AEO continuity differs from authority continuity")
+  }
+  for (const validation of validations) {
+    const aeo = oneCrossRegistry(aeos, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(validation, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(validation, "validated_object_hash"))
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(validation, "session_id"))
+    const invocation = oneCrossRegistry(invocations, (row) => crossRegistryField(row, "invocation_nonce") === crossRegistryField(validation, "invocation_nonce") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(validation, "validated_object_hash"))
+    edges.push(crossRegistryEdge("validation_registry", crossRegistryRecordId(validation), "aeo_registry", aeo.match ? crossRegistryRecordId(aeo.match) : "", "VALIDATION_AEO", Boolean(aeo.match) && !aeo.ambiguous, "ORPHANED_VALIDATION_RECORD"))
+    edges.push(crossRegistryEdge("validation_registry", crossRegistryRecordId(validation), "session_registry", crossRegistryField(validation, "session_id"), "VALIDATION_SESSION", Boolean(session.match) && !session.ambiguous, "ORPHANED_VALIDATION_RECORD"))
+    edges.push(crossRegistryEdge("validation_registry", crossRegistryRecordId(validation), "invocation_registry", crossRegistryField(validation, "invocation_nonce"), "VALIDATION_NONCE", Boolean(invocation.match) && !invocation.ambiguous, "ORPHANED_INVOCATION_RECORD"))
+    if (!aeo.match || !session.match || !invocation.match || !crossRegistryField(validation, "invocation_nonce")) addDrift("ORPHANED_VALIDATION_RECORD", "validation_registry", validation, "validation requires AEO, session, and nonce")
+    if (aeo.ambiguous || session.ambiguous || invocation.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "validation_registry", validation, "validation lineage resolves ambiguously")
+  }
+  for (const execution of executions) {
+    const validation = oneCrossRegistry(validations, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(execution, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(execution, "validated_object_hash") && crossRegistryField(row, "invocation_nonce") === crossRegistryField(execution, "invocation_nonce"))
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(execution, "session_id"))
+    const continuity = oneCrossRegistry(continuities, (row) => crossRegistryField(row, "continuity_id") === crossRegistryField(execution, "continuity_id"))
+    edges.push(crossRegistryEdge("execution_registry", crossRegistryRecordId(execution), "validation_registry", validation.match ? crossRegistryRecordId(validation.match) : "", "EXECUTION_VALIDATION", Boolean(validation.match) && !validation.ambiguous, "ORPHANED_EXECUTION_RECORD"))
+    edges.push(crossRegistryEdge("execution_registry", crossRegistryRecordId(execution), "session_registry", crossRegistryField(execution, "session_id"), "EXECUTION_SESSION", Boolean(session.match) && !session.ambiguous, "ORPHANED_EXECUTION_RECORD"))
+    edges.push(crossRegistryEdge("execution_registry", crossRegistryRecordId(execution), "continuity_registry", crossRegistryField(execution, "continuity_id"), "EXECUTION_CONTINUITY", Boolean(continuity.match) && !continuity.ambiguous, "ORPHANED_EXECUTION_RECORD"))
+    if (!validation.match || !session.match || !continuity.match) addDrift("ORPHANED_EXECUTION_RECORD", "execution_registry", execution, "execution requires validation, session, and continuity")
+    if (validation.ambiguous || session.ambiguous || continuity.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "execution_registry", execution, "execution lineage resolves ambiguously")
+    if (validation.match && crossRegistryField(validation.match, "validated_object_hash") !== crossRegistryField(execution, "validated_object_hash")) addDrift("VALIDATED_HASH_DISCONTINUITY", "execution_registry", execution, "execution hash differs from validation hash")
+  }
+  for (const proof of proofs) {
+    const execution = oneCrossRegistry(executions, (row) => crossRegistryField(row, "execution_id") === crossRegistryField(proof, "execution_id"))
+    const authority = oneCrossRegistry(authorities, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(proof, "decision_id"))
+    edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "execution_registry", crossRegistryField(proof, "execution_id"), "PROOF_EXECUTION", Boolean(execution.match) && !execution.ambiguous, "ORPHANED_PROOF_RECORD"))
+    edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "authority_registry", authority.match ? crossRegistryRecordId(authority.match) : "", "PROOF_AUTHORITY", Boolean(authority.match) && !authority.ambiguous, "ORPHANED_PROOF_RECORD"))
+    if (!execution.match || !authority.match || !crossRegistryField(proof, "validated_object_hash")) addDrift("ORPHANED_PROOF_RECORD", "proof_registry", proof, "proof requires execution, authority, and validated object hash")
+    if (execution.ambiguous || authority.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "proof_registry", proof, "proof lineage resolves ambiguously")
+    if (execution.match && crossRegistryField(execution.match, "validated_object_hash") !== crossRegistryField(proof, "validated_object_hash")) addDrift("EXECUTION_PROOF_HASH_MISMATCH", "proof_registry", proof, "proof hash differs from execution hash")
+  }
+  const nonceToObjects = new Map<string, Set<string>>()
+  for (const record of [...validations, ...executions]) {
+    const nonce = crossRegistryField(record, "invocation_nonce")
+    if (!nonce) continue
+    const set = nonceToObjects.get(nonce) || new Set<string>()
+    set.add(`${crossRegistryField(record, "decision_id")}:${crossRegistryField(record, "validated_object_hash")}`)
+    nonceToObjects.set(nonce, set)
+  }
+  for (const invocation of invocations) {
+    const objects = nonceToObjects.get(crossRegistryField(invocation, "invocation_nonce")) || new Set<string>()
+    if (objects.size !== 1) addDrift(objects.size === 0 ? "ORPHANED_INVOCATION_RECORD" : "REPLAY_GRAPH_FRAGMENTATION", "invocation_registry", invocation, "invocation nonce must map to exactly one validated/executed object")
+  }
+  for (const topology of canonicalState.runtime_topology_registry || []) if (truthyEvidenceEscalation(topology.executable) || truthyEvidenceEscalation(topology.deployment_capable) || truthyEvidenceEscalation(topology.creates_authority) || topology.evidence_only === "false") addDrift("TOPOLOGY_BINDING_DIVERGENCE", "runtime_topology_registry", topology, "topology evidence became authoritative or executable")
+  for (const governance of canonicalState.recursive_governance_containment_registry || []) if (truthyEvidenceEscalation(governance.executable) || truthyEvidenceEscalation(governance.deployment_capable) || truthyEvidenceEscalation(governance.creates_authority) || governance.evidence_only === "false") addDrift("GOVERNANCE_BINDING_DIVERGENCE", "recursive_governance_containment_registry", governance, "recursive governance containment must remain evidence-only")
+  for (const root of canonicalState.root_authority_observability_registry || []) if (truthyEvidenceEscalation(root.executable) || truthyEvidenceEscalation(root.deployment_capable) || truthyEvidenceEscalation(root.creates_authority) || root.non_authoritative === "false") addDrift("ROOT_AUTHORITY_EVIDENCE_ESCALATION", "root_authority_observability_registry", root, "root authority evidence cannot grant authority")
+  for (const closure of canonicalState.unauthorized_mutation_closure_registry || []) if (truthyEvidenceEscalation(closure.executable) || truthyEvidenceEscalation(closure.creates_authority) || truthyEvidenceEscalation(closure.proof_generating)) addDrift("OBSERVABILITY_RECORD_AUTHORITY_ESCALATION", "unauthorized_mutation_closure_registry", closure, "observability evidence cannot become proof or authority")
+  const lineage_edges = edges.sort((a, b) => canonicalize(a).localeCompare(canonicalize(b)))
+  const unresolved_edges = lineage_edges.filter((edge) => edge.status === "UNRESOLVED")
+  const drift_classes = [...new Set(drift.map((item) => item.drift_class))].sort() as CrossRegistryDriftClass[]
+  const sorted_orphans = orphaned_records.sort((a, b) => canonicalize(a).localeCompare(canonicalize(b)))
+  const containment_status = drift_classes.length || unresolved_edges.length ? "RECONCILIATION_REQUIRED" : "RECONCILED"
+  const legitimacy_status = containment_status === "RECONCILED" ? "LEGITIMATE" : "NULL"
+  const registry_set_hash = await sha256Hex(canonicalize(canonicalState))
+  const lineage_graph_hash = await sha256Hex(canonicalize(lineage_edges))
+  const continuity_graph_hash = await sha256Hex(canonicalize(lineage_edges.filter((edge) => edge.relation.includes("CONTINUITY") || edge.relation.includes("SESSION"))))
+  const proof_graph_hash = await sha256Hex(canonicalize(lineage_edges.filter((edge) => edge.from_registry === "proof_registry" || edge.to_registry === "proof_registry")))
+  const replay_graph_hash = await sha256Hex(canonicalize({ invocations, nonce_to_objects: [...nonceToObjects.entries()].map(([nonce, objects]) => [nonce, [...objects].sort()]).sort() }))
+  const topology_binding_hash = await sha256Hex(canonicalize(canonicalState.runtime_topology_registry || []))
+  const governance_binding_hash = await sha256Hex(canonicalize({ recursive: canonicalState.recursive_governance_containment_registry || [], root: canonicalState.root_authority_observability_registry || [], closure: canonicalState.unauthorized_mutation_closure_registry || [], preo: canonicalState.preo_registry || [] }))
+  const equivalence = { object_type: "CrossRegistryEquivalence", equivalent: containment_status === "RECONCILED", drift_classes, legitimacy_status }
+  const continuity_proof = { object_type: "CrossRegistryContinuityProof", replay_neutral: true, replay_consumed: false, continuity_preserved: containment_status === "RECONCILED", legitimacy_status }
+  const reconciliation_equivalence_hash = await sha256Hex(canonicalize({ equivalence, continuity_proof, drift_classes, unresolved_edges, orphaned_records: sorted_orphans }))
+  const reconciliation_id = await sha256Hex(canonicalize({ registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash }))
+  return { object_type: "CrossRegistryReconciliationSnapshot", reconciliation_id, registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash, lineage_edges, drift: drift.sort((a, b) => canonicalize(a).localeCompare(canonicalize(b))), equivalence, continuity_proof, drift_classes, unresolved_edges, orphaned_records: sorted_orphans, containment_status, legitimacy_status, ...crossRegistryRouteFlags() }
+}
+async function fetchCrossRegistryState(env: Env): Promise<Record<string, Record<string, unknown>[]>> {
+  const state: Record<string, Record<string, unknown>[]> = {}
+  for (const registry of CANONICAL_RECONCILIATION_REGISTRY_ORDER) {
+    try {
+      const result = await env.DB.prepare(`SELECT * FROM ${registry} LIMIT 1000`).all<Record<string, unknown>>()
+      state[registry] = sortCrossRegistryRecords(result.results || [])
+    } catch { state[registry] = [] }
+  }
+  return state
+}
+async function appendCrossRegistryReconciliationSnapshot(env: Env, snapshot: CrossRegistryReconciliationSnapshot, generated_at: string) {
+  await env.DB.prepare(`INSERT OR IGNORE INTO cross_registry_reconciliation_registry (reconciliation_id,registry_set_hash,lineage_graph_hash,continuity_graph_hash,proof_graph_hash,replay_graph_hash,topology_binding_hash,governance_binding_hash,reconciliation_equivalence_hash,drift_classes,unresolved_edges,orphaned_records,containment_status,legitimacy_status,evidence_only,replay_neutral,non_authoritative,executable,deployment_capable,creates_authority,proof_generating,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,'true','true','true','false','false','false','false',?15,?16)`)
+    .bind(snapshot.reconciliation_id, snapshot.registry_set_hash, snapshot.lineage_graph_hash, snapshot.continuity_graph_hash, snapshot.proof_graph_hash, snapshot.replay_graph_hash, snapshot.topology_binding_hash, snapshot.governance_binding_hash, snapshot.reconciliation_equivalence_hash, canonicalize(snapshot.drift_classes), canonicalize(snapshot.unresolved_edges), canonicalize(snapshot.orphaned_records), snapshot.containment_status, snapshot.legitimacy_status === "NULL" ? null : snapshot.legitimacy_status, generated_at, generated_at).run()
+}
+
+type RuntimeTopologyDriftClass = "TOPOLOGY_VALID" | "UNDECLARED_RUNTIME_SURFACE" | "TOPOLOGY_EQUIVALENCE_DRIFT" | "MUTATION_SURFACE_EXPANSION" | "GOVERNANCE_SURFACE_DRIFT" | "OBSERVABILITY_BOUNDARY_DRIFT" | "EXECUTION_BOUNDARY_DRIFT" | "REGISTRY_LINEAGE_DRIFT" | "CONTAINMENT_DIVERGENCE" | "CANONICAL_ROUTE_DIVERGENCE" | "RECONCILIATION_AMBIGUITY"
+
+type RuntimeTopologySnapshot = {
+  object_type: "RuntimeTopologySnapshot"
+  nodes: Record<string, unknown>[]
+  edges: Record<string, unknown>[]
+  topology_hash: string
+  topology_semantic_hash: string
+  topology_boundary_hash: string
+  topology_lineage_hash: string
+  topology_equivalence_hash: string
+  replay_neutral: true
+  executable: false
+  deployment_capable: false
+  creates_authority: false
+}
+
+function topologyRouteFlags() {
+  return { evidence_only: true, replay_neutral: true, executable: false, deployment_capable: false, creates_authority: false, mutation_capable: false, read_only: true, authoritative: false, proof_generating: false, replay_consumed: false }
+}
+
+function runtimeTopologyNodeObject(section: string, identity: string, object: Record<string, unknown>) {
+  return Object.freeze({ object_type: "RuntimeTopologyNode", section, identity, object, executable: false, deployment_capable: false, creates_authority: false, mutation_capable: Boolean(object.mutation_capable ?? false) })
+}
+
+function sortTopologyObjects(objects: Record<string, unknown>[]) {
+  return [...objects].map(canonicalRecord).sort((a, b) => String(a.identity ?? a.route ?? a.registry ?? a.artifact ?? canonicalize(a)).localeCompare(String(b.identity ?? b.route ?? b.registry ?? b.artifact ?? canonicalize(b))) || canonicalize(a).localeCompare(canonicalize(b)))
+}
+
+async function enumerateRuntimeTopologySnapshot(): Promise<RuntimeTopologySnapshot> {
+  const routeNodes = [...CANONICAL_RUNTIME_ROUTES].sort().map((route) => runtimeTopologyNodeObject("canonical_routes", route, { route, canonical: true, observability_only: false, mutation_requires_authority: true }))
+  const observabilityNodes = [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort().map((route) => runtimeTopologyNodeObject("observability_only_routes", route, { route, observability_only: true, replay_neutral: true, executable: false, deployment_capable: false, creates_authority: false }))
+  const appendOnlyRegistries = [
+    "authority_registry", "aeo_registry", "validation_registry", "execution_registry", "proof_registry", "invocation_registry", "preo_registry", "runtime_surface_containment_registry", "reconciliation_closure_registry", "recursive_governance_containment_registry", "runtime_sovereignty_registry", "root_authority_observability_registry", "runtime_topology_registry", "topology_reconciliation_registry"
+  ].sort().map((registry) => runtimeTopologyNodeObject("append_only_registries", registry, { registry, append_only: true, update_allowed: false, delete_allowed: false }))
+  const mutationNodes = [
+    ...GOVERNED_DEPLOY_WORKFLOW_SURFACES.map((workflow) => runtimeTopologyNodeObject("workflow_mutation_surfaces", workflow, { workflow, declared: true, governed: true, direct_deploy_allowed: false })),
+    ...ADAPTER_MUTATION_SURFACES.map((adapter) => runtimeTopologyNodeObject("deploy_mutation_surfaces", adapter, { adapter, declared: true, governed: true, direct_deploy_allowed: false })),
+  ]
+  const governanceNodes = [
+    "governance/runtime-topology-equivalence.json", "governance/runtime-topology-drift-taxonomy.json", "governance/runtime-topology-reconciliation.json", "governance/runtime/MERGE_GOVERNANCE_RULES.json", "governance/runtime/RECURSIVE_GOVERNANCE_SPEC.json", "governance/runtime/EXECUTION_SURFACES.json"
+  ].sort().map((artifact) => runtimeTopologyNodeObject("governance_artifacts", artifact, { artifact, machine_readable: true, authorizes_execution: false }))
+  const containmentNodes = [
+    runtimeTopologyNodeObject("recursive_governance_containment", RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY, { registry: RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY, contained: true }),
+    runtimeTopologyNodeObject("sovereignty_containment", ROOT_AUTHORITY_OBSERVABILITY_REGISTRY, { registry: ROOT_AUTHORITY_OBSERVABILITY_REGISTRY, contained: true }),
+  ]
+  const nodes = sortTopologyObjects([...routeNodes, ...observabilityNodes, ...appendOnlyRegistries, ...mutationNodes, ...governanceNodes, ...containmentNodes])
+  const edges = sortTopologyObjects(nodes.map((node) => canonicalRecord({ object_type: "RuntimeTopologyEdge", from: node.section, to: node.identity, relation: "ENUMERATES_EXACT_OBJECT" })))
+  const runtimeMaterial = { canonical_routes: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_routes: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort() }
+  const semanticMaterial = { governance_artifacts: governanceNodes.map((node) => node.identity).sort(), registries: appendOnlyRegistries.map((node) => node.identity).sort() }
+  const boundaryMaterial = { execution_boundary: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_boundary: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort(), workflow_mutation_surfaces: GOVERNED_DEPLOY_WORKFLOW_SURFACES }
+  const lineageMaterial = { append_only_registries: appendOnlyRegistries.map((node) => node.identity).sort(), containment: containmentNodes.map((node) => node.identity).sort() }
+  const topology_hash = await sha256Hex(canonicalize(runtimeMaterial))
+  const topology_semantic_hash = await sha256Hex(canonicalize(semanticMaterial))
+  const topology_boundary_hash = await sha256Hex(canonicalize(boundaryMaterial))
+  const topology_lineage_hash = await sha256Hex(canonicalize(lineageMaterial))
+  const topology_equivalence_hash = await sha256Hex(canonicalize({ topology_hash, topology_semantic_hash, topology_boundary_hash, topology_lineage_hash }))
+  return Object.freeze({ object_type: "RuntimeTopologySnapshot", nodes, edges, topology_hash, topology_semantic_hash, topology_boundary_hash, topology_lineage_hash, topology_equivalence_hash, replay_neutral: true, executable: false, deployment_capable: false, creates_authority: false })
+}
+
+function classifyRuntimeTopologySnapshot(snapshot: RuntimeTopologySnapshot): RuntimeTopologyDriftClass[] {
+  const drift = new Set<RuntimeTopologyDriftClass>()
+  if (!snapshot || snapshot.object_type !== "RuntimeTopologySnapshot") drift.add("RECONCILIATION_AMBIGUITY")
+  for (const node of snapshot.nodes) {
+    if (node.section === "observability_only_routes" && (node.executable !== false || node.deployment_capable !== false || node.creates_authority !== false)) drift.add("OBSERVABILITY_BOUNDARY_DRIFT")
+    const object = canonicalRecord(node.object)
+    if (object.append_only === false || object.update_allowed === true || object.delete_allowed === true) drift.add("REGISTRY_LINEAGE_DRIFT")
+    if (object.contained === false || object.divergent === true || object.boundary_overflow === true) drift.add("CONTAINMENT_DIVERGENCE")
+  }
+  return [...drift].sort()
+}
+
+async function buildRuntimeTopologyReconciliationEnvelope(generated_at: string) {
+  const snapshot = await enumerateRuntimeTopologySnapshot()
+  const drift_classes = classifyRuntimeTopologySnapshot(snapshot)
+  const classification: RuntimeTopologyDriftClass = drift_classes.includes("RECONCILIATION_AMBIGUITY") ? "RECONCILIATION_AMBIGUITY" : drift_classes[0] || "TOPOLOGY_VALID"
+  const equivalence = Object.freeze({ object_type: "RuntimeTopologyEquivalence", validated_topology_hash: snapshot.topology_equivalence_hash, executed_topology_hash: snapshot.topology_equivalence_hash, equivalent: classification === "TOPOLOGY_VALID", legitimacy: classification === "TOPOLOGY_VALID" ? "UNCHANGED" : "NULL", evidence_only: true, authorizes_execution: false, authorizes_deployment: false })
+  const fingerprint = Object.freeze({ object_type: "RuntimeTopologyFingerprint", topology_hash: snapshot.topology_hash, topology_semantic_hash: snapshot.topology_semantic_hash, topology_boundary_hash: snapshot.topology_boundary_hash, topology_lineage_hash: snapshot.topology_lineage_hash, topology_equivalence_hash: snapshot.topology_equivalence_hash, replay_neutral: true })
+  const reconciliation_id = await sha256Hex(canonicalize({ fingerprint, drift_classes, equivalence }))
+  return Object.freeze({ object_type: "RuntimeTopologyReconciliation", reconciliation_id, reconciliation_timestamp: generated_at, fingerprint, snapshot, drift: { object_type: "RuntimeTopologyDrift", classification, drift_classes: drift_classes.length ? drift_classes : ["TOPOLOGY_VALID"], fail_closed: classification !== "TOPOLOGY_VALID", legitimacy: classification === "TOPOLOGY_VALID" ? "UNCHANGED" : "NULL" }, equivalence, ...topologyRouteFlags() })
+}
+
+async function appendRuntimeTopologySnapshot(env: Env, envelope: Awaited<ReturnType<typeof buildRuntimeTopologyReconciliationEnvelope>>, created_at: string) {
+  await env.DB.prepare(`INSERT OR IGNORE INTO runtime_topology_registry (snapshot_id,topology_hash,topology_semantic_hash,topology_boundary_hash,topology_lineage_hash,topology_equivalence_hash,drift_classes,lineage_hash,boundary_hash,reconciliation_timestamp,containment_references,topology_snapshot,evidence_only,replay_neutral,executable,deployment_capable,creates_authority,append_only,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'true','true','false','false','false','true',?13)`).bind(envelope.reconciliation_id, envelope.fingerprint.topology_hash, envelope.fingerprint.topology_semantic_hash, envelope.fingerprint.topology_boundary_hash, envelope.fingerprint.topology_lineage_hash, envelope.fingerprint.topology_equivalence_hash, JSON.stringify(envelope.drift.drift_classes), envelope.fingerprint.topology_lineage_hash, envelope.fingerprint.topology_boundary_hash, envelope.reconciliation_timestamp, JSON.stringify([RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY, ROOT_AUTHORITY_OBSERVABILITY_REGISTRY]), canonicalize(envelope.snapshot), created_at).run()
+}
+
+type ConsensusDriftClass = "OBSERVER_DIVERGENCE" | "QUORUM_AMBIGUITY" | "SEMANTIC_DIVERGENCE" | "FEDERATED_EQUIVALENCE_DRIFT" | "CHECKPOINT_CORRUPTION" | "PORTABILITY_LINEAGE_DRIFT" | "REMOTE_AUTHORITY_INHERITANCE_ATTEMPT" | "CONSENSUS_CONTAINMENT_OVERFLOW" | "OBSERVER_REPLAY_RESURRECTION" | "GOVERNANCE_CONSENSUS_FRAGMENTATION" | "SEMANTIC_AMBIGUITY" | "SEMANTIC_REPLAY" | "SEMANTIC_CONTAINMENT_OVERFLOW" | "SEMANTIC_GOVERNANCE_DRIFT"
+const CONSENSUS_DRIFT_TAXONOMY: readonly ConsensusDriftClass[] = Object.freeze(["OBSERVER_DIVERGENCE", "QUORUM_AMBIGUITY", "SEMANTIC_DIVERGENCE", "FEDERATED_EQUIVALENCE_DRIFT", "CHECKPOINT_CORRUPTION", "PORTABILITY_LINEAGE_DRIFT", "REMOTE_AUTHORITY_INHERITANCE_ATTEMPT", "CONSENSUS_CONTAINMENT_OVERFLOW", "OBSERVER_REPLAY_RESURRECTION", "GOVERNANCE_CONSENSUS_FRAGMENTATION", "SEMANTIC_AMBIGUITY", "SEMANTIC_REPLAY", "SEMANTIC_CONTAINMENT_OVERFLOW", "SEMANTIC_GOVERNANCE_DRIFT"])
+const CONSENSUS_FLAGS = Object.freeze({ evidence_only: true, replay_neutral: true, non_authoritative: true, read_only: true, mutation_capable: false, creates_authority: false, executable: false, deployment_capable: false, proof_generating: false, merge_authorizing: false, remote_authority_denied: true, local_validation_required: true, observer_agreement_authorizes_execution: false, semantic_equivalence_authorizes_execution: false, remote_legitimacy_inherits_local_authority: false, fail_closed_on_ambiguity: true })
+type ObserverCheckpointObject = { observer_id: string, observed_checkpoint_hash: string, semantic_hash: string, topology_hash: string, reconciliation_hash: string, sovereignty_hash: string, equivalence_hash: string, drift_classes: ConsensusDriftClass[], legitimacy_status: "LEGITIMATE" | null }
+type GovernanceConsensusEnvelope = { envelope_type: "GovernanceConsensusCheckpoint", observer: ObserverCheckpointObject, semantic_envelope: Record<string, unknown>, portable_checkpoint: Record<string, unknown>, conformance: Record<string, unknown>, quorum: Record<string, unknown>, consensus_hash: string, generated_at: string, evidence_only: true, replay_neutral: true, non_authoritative: true, executable: false, creates_authority: false }
+
+function consensusGeneratedAt(): string { return new Date(0).toISOString() }
+function consensusRouteFlags() { return CONSENSUS_FLAGS }
+function decodeConsensusEnvelope(value: string | null): Record<string, unknown> | null {
+  if (!value) return null
+  try { return canonicalRecord(JSON.parse(new TextDecoder().decode(base64ToBytes(value) || utf8Bytes("{}")))) } catch { return null }
+}
+async function semanticHashForConsensus(route: string): Promise<string> {
+  return sha256Hex(canonicalize({ exact_object_discipline: true, schema_evolution_equivalence: true, topology_evolution_equivalence: true, portability_evolution_equivalence: true, replay_neutral: true, route, semantic_equivalence_authorizes: false }))
+}
+async function buildGovernanceConsensusEnvelope(url: URL): Promise<GovernanceConsensusEnvelope> {
+  const generated_at = consensusGeneratedAt()
+  const remote = decodeConsensusEnvelope(url.searchParams.get("remote_envelope"))
+  const observer_id = String(url.searchParams.get("observer_id") || "local-observer")
+  const semantic_hash = await semanticHashForConsensus(url.pathname)
+  const topology_hash = await sha256Hex(canonicalize({ canonical_routes: CANONICAL_RUNTIME_ROUTES, observer_routes: OBSERVER_CONSENSUS_ROUTES, conformance_routes: EXTERNAL_CONFORMANCE_ROUTES, routes_outside_runtime: true }))
+  const reconciliation_hash = await sha256Hex(canonicalize({ registries: [OBSERVER_ATTESTATION_REGISTRY, SEMANTIC_EQUIVALENCE_REGISTRY, PORTABLE_GOVERNANCE_CHECKPOINT_REGISTRY, EXTERNAL_CONFORMANCE_VERIFICATION_REGISTRY], append_only: true, observer_consensus_authoritative: false }))
+  const sovereignty_hash = await sha256Hex(canonicalize({ local_sovereignty_isolated: true, remote_authority_denied: true, federation_inheritance: false, runtime_id: RUNTIME_ID }))
+  const observed_checkpoint_hash = await sha256Hex(canonicalize({ semantic_hash, topology_hash, reconciliation_hash, sovereignty_hash, generated_at, replay_neutral: true }))
+  const equivalence_hash = await sha256Hex(canonicalize({ semantic_hash, topology_hash, reconciliation_hash, sovereignty_hash, observed_checkpoint_hash }))
+  const drift = new Set<ConsensusDriftClass>()
+  const remoteStatus = String(remote?.legitimacy_status || remote?.status || "")
+  if (remote && String(remote.equivalence_hash || "") && String(remote.equivalence_hash) !== equivalence_hash) drift.add("FEDERATED_EQUIVALENCE_DRIFT")
+  if (remote && String(remote.semantic_hash || "") && String(remote.semantic_hash) !== semantic_hash) drift.add("SEMANTIC_DIVERGENCE")
+  if (remote && (remote.creates_authority === true || remote["remote_authority_inherited"] === true || remote["authority_inherited"] === true)) drift.add("REMOTE_AUTHORITY_INHERITANCE_ATTEMPT")
+  if (remote && remoteStatus && !["LEGITIMATE", "CONFORMANT", "OBSERVER_CONSENSUS_OBSERVED"].includes(remoteStatus)) drift.add("OBSERVER_DIVERGENCE")
+  if (url.searchParams.get("replay") === "true") drift.add("OBSERVER_REPLAY_RESURRECTION")
+  if (url.searchParams.get("ambiguous") === "true") drift.add("QUORUM_AMBIGUITY")
+  const drift_classes = Array.from(drift).sort() as ConsensusDriftClass[]
+  const legitimacy_status: "LEGITIMATE" | null = drift_classes.length === 0 ? "LEGITIMATE" : null
+  const observer: ObserverCheckpointObject = { observer_id, observed_checkpoint_hash, semantic_hash, topology_hash, reconciliation_hash, sovereignty_hash, equivalence_hash, drift_classes, legitimacy_status }
+  const semantic_envelope = canonicalRecord({ semantic_hash, schema_semantic_hash: semantic_hash, topology_semantic_hash: topology_hash, governance_semantic_hash: reconciliation_hash, portability_semantic_hash: observed_checkpoint_hash, equivalence_hash, drift_classes, legitimacy_status, same_meaning_same_legitimacy_identity: drift_classes.length === 0, authority_inheritance: false })
+  const portable_checkpoint = canonicalRecord({ checkpoint_hash: observed_checkpoint_hash, reconciliation_hash, topology_hash, semantic_equivalence_hash: equivalence_hash, conformance_hash: sovereignty_hash, jcs_compatible: true, dsse_compatible: true, exact_object_stable: true, replay_neutral: true, authorizes_execution: false, authorizes_proof: false, authorizes_merge: false })
+  const conformance = canonicalRecord({ runtime_compatibility_hash: topology_hash, governance_semantic_hash: semantic_hash, checkpoint_equivalence_hash: equivalence_hash, federated_conformance_hash: await sha256Hex(canonicalize({ topology_hash, semantic_hash, equivalence_hash, sovereignty_hash })), conformance_status: drift_classes.length === 0 ? "CONFORMANT" : "NULL", bounded_federated_reconciliation: true, trust_inheritance: false })
+  const quorum = canonicalRecord({ observer_count: remote ? 2 : 1, quorum_status: drift_classes.includes("QUORUM_AMBIGUITY") || drift_classes.includes("OBSERVER_DIVERGENCE") ? "NULL" : "QUORUM_CLASSIFIED", observer_agreement_authorizes_execution: false })
+  const consensus_hash = await sha256Hex(canonicalize({ observer, semantic_envelope, portable_checkpoint, conformance, quorum }))
+  return { envelope_type: "GovernanceConsensusCheckpoint", observer, semantic_envelope, portable_checkpoint, conformance, quorum, consensus_hash, generated_at, evidence_only: true, replay_neutral: true, non_authoritative: true, executable: false, creates_authority: false }
+}
+async function appendGovernanceConsensusEvidence(env: Env, envelope: GovernanceConsensusEnvelope, created_at: string) {
+  const o = envelope.observer
+  await env.DB.prepare(`INSERT OR IGNORE INTO observer_attestation_registry (attestation_id,observer_id,observed_checkpoint_hash,semantic_hash,topology_hash,reconciliation_hash,sovereignty_hash,equivalence_hash,drift_classes,legitimacy_status,attestation_hash,observer_envelope,evidence_only,replay_neutral,non_authoritative,read_only,mutation_capable,creates_authority,executable,deployment_capable,proof_generating,merge_authorizing,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'true','true','true','true','false','false','false','false','false','false',?13,?14)`).bind(crypto.randomUUID(), o.observer_id, o.observed_checkpoint_hash, o.semantic_hash, o.topology_hash, o.reconciliation_hash, o.sovereignty_hash, o.equivalence_hash, canonicalize(o.drift_classes), o.legitimacy_status, envelope.consensus_hash, canonicalize(envelope), envelope.generated_at, created_at).run()
+  await env.DB.prepare(`INSERT OR IGNORE INTO semantic_equivalence_registry (semantic_equivalence_id,semantic_hash,schema_semantic_hash,topology_semantic_hash,governance_semantic_hash,portability_semantic_hash,equivalence_hash,drift_classes,legitimacy_status,semantic_envelope,evidence_only,replay_neutral,non_authoritative,read_only,mutation_capable,creates_authority,executable,deployment_capable,proof_generating,merge_authorizing,generated_at,created_at) VALUES (?1,?2,?2,?3,?4,?5,?6,?7,?8,?9,'true','true','true','true','false','false','false','false','false','false',?10,?11)`).bind(crypto.randomUUID(), o.semantic_hash, o.topology_hash, o.reconciliation_hash, o.observed_checkpoint_hash, o.equivalence_hash, canonicalize(o.drift_classes), o.legitimacy_status, canonicalize(envelope.semantic_envelope), envelope.generated_at, created_at).run()
+  await env.DB.prepare(`INSERT OR IGNORE INTO portable_governance_checkpoint_registry (checkpoint_id,checkpoint_hash,reconciliation_hash,topology_hash,semantic_equivalence_hash,conformance_hash,portable_envelope,dsse_payload_type,jcs_canonical,drift_classes,legitimacy_status,evidence_only,replay_neutral,non_authoritative,read_only,mutation_capable,creates_authority,executable,deployment_capable,proof_generating,merge_authorizing,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'application/vnd.mindshift.governance-checkpoint.v1+json','true',?8,?9,'true','true','true','true','false','false','false','false','false','false',?10,?11)`).bind(crypto.randomUUID(), o.observed_checkpoint_hash, o.reconciliation_hash, o.topology_hash, o.equivalence_hash, String(envelope.conformance.conformance_hash || envelope.consensus_hash), canonicalize(envelope.portable_checkpoint), canonicalize(o.drift_classes), o.legitimacy_status, envelope.generated_at, created_at).run()
+  await env.DB.prepare(`INSERT OR IGNORE INTO external_conformance_verification_registry (verification_id,runtime_compatibility_hash,governance_semantic_hash,checkpoint_equivalence_hash,federated_conformance_hash,conformance_status,drift_classes,verification_envelope,evidence_only,replay_neutral,non_authoritative,read_only,mutation_capable,creates_authority,executable,deployment_capable,proof_generating,merge_authorizing,remote_authority_denied,generated_at,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'true','true','true','true','false','false','false','false','false','false','true',?9,?10)`).bind(crypto.randomUUID(), String(envelope.conformance.runtime_compatibility_hash || ""), String(envelope.conformance.governance_semantic_hash || ""), String(envelope.conformance.checkpoint_equivalence_hash || ""), String(envelope.conformance.federated_conformance_hash || envelope.consensus_hash), String(envelope.conformance.conformance_status || "NULL"), canonicalize(o.drift_classes), canonicalize(envelope.conformance), envelope.generated_at, created_at).run()
 }
 
 export default {
@@ -5431,6 +5993,21 @@ export default {
         return json({ status: admission.status, route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, reason: "recursive_governance_boundary_enforced", activation_allowed: true, admission, lock: admission.lock, runtime_ready: true })
       } catch {
         return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, reason: "recursive_governance_admission_unavailable", activation_allowed: false, runtime_ready: false })
+      }
+    }
+    if (RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...recursiveGovernanceContainmentStatusFlags() }, 405)
+    if (RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        const generated_at = new Date().toISOString()
+        const observation = await buildRecursiveGovernanceContainmentObservation(url, generated_at)
+        if (hasDb(env)) await appendRecursiveGovernanceContainmentObservation(env, observation)
+        const status = observation.recursive_containment_status === "RECURSIVE_CONTAINMENT_REQUIRED" ? "NULL" : "GOVERNANCE_CONTAINED"
+        if (url.pathname === RECURSIVE_GOVERNANCE_CONTAINMENT_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", semantic_divergence_classes: observation.semantic_divergence_classes, drift_taxonomy: GOVERNANCE_DRIFT_TAXONOMY, recursive_containment_status: observation.recursive_containment_status, governance_mutation_class: observation.governance_mutation_class, merge_legitimacy: observation.containment_object.merge_legitimacy, proof_authority: observation.containment_object.proof_authority, execution_authority: observation.containment_object.execution_authority, ...recursiveGovernanceContainmentStatusFlags() })
+        if (url.pathname === RECURSIVE_GOVERNANCE_CONTAINMENT_TOPOLOGY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", governance_topology_hash: observation.governance_topology_hash, execution_boundary_topology: observation.containment_object.execution_boundary_topology, governance_lineage_hash: observation.governance_lineage_hash, governance_continuity: observation.containment_object.governance_continuity, ...recursiveGovernanceContainmentStatusFlags() })
+        if (url.pathname === RECURSIVE_GOVERNANCE_CONTAINMENT_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", governance_equivalence_hash: observation.governance_equivalence_hash, governance_semantic_hash: observation.governance_semantic_hash, governance_topology_hash: observation.governance_topology_hash, governance_lineage_hash: observation.governance_lineage_hash, semantic_divergence_classes: observation.semantic_divergence_classes, ...recursiveGovernanceContainmentStatusFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", observation, governance_equivalence_hash: observation.governance_equivalence_hash, governance_semantic_hash: observation.governance_semantic_hash, governance_topology_hash: observation.governance_topology_hash, governance_lineage_hash: observation.governance_lineage_hash, semantic_divergence_classes: observation.semantic_divergence_classes, recursive_containment_status: observation.recursive_containment_status, governance_mutation_class: observation.governance_mutation_class, ...recursiveGovernanceContainmentStatusFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "recursive_governance_containment_unavailable", semantic_divergence_classes: ["RECURSIVE_CONTAINMENT_REQUIRED"], recursive_containment_status: "RECURSIVE_CONTAINMENT_REQUIRED", ...recursiveGovernanceContainmentStatusFlags() }, 500)
       }
     }
     if (url.pathname === RECURSIVE_GOVERNANCE_ROUTE && request.method === "GET") {
@@ -5819,17 +6396,58 @@ export default {
         await ensureSchema(env, { stabilizeProofRegistry: false })
         const envelope = await buildRootAuthorityContainmentEnvelope(rootAuthorityInventoryFromUrl(url))
         await appendRootAuthorityObservation(env, envelope)
-        const status = envelope.drift.drift_classes.length > 0 ? "NULL" : "ROOT_AUTHORITY_CONTAINED"
-        if (url.pathname === ROOT_AUTHORITY_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift: envelope.drift, drift_taxonomy: ["ROOT_DEPLOY_AUTHORITY", "ROOT_REPOSITORY_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_FEDERATION_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_PACKAGE_EXECUTION_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY", "UNDECLARED_ROOT_SURFACE", "SOVEREIGNTY_DRIFT_DETECTED", "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE", "ROOT_AUTHORITY_BOUNDARY_OVERFLOW"], merge_legitimacy: envelope.drift.merge_legitimacy, ...rootAuthorityFlags() })
+        const status = envelope.containment_status === "ROOT_AUTHORITY_CONTAINMENT_REQUIRED" ? "NULL" : "ROOT_AUTHORITY_CONTAINED"
+        if (url.pathname === ROOT_AUTHORITY_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift: envelope.drift, drift_taxonomy: ["ROOT_DEPLOY_AUTHORITY", "ROOT_REPOSITORY_AUTHORITY", "ROOT_ENVIRONMENT_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY", "ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY", "ROOT_FEDERATION_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY", "ROOT_PACKAGE_EXECUTION_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY", "UNDECLARED_ROOT_SURFACE", "SOVEREIGNTY_DRIFT_DETECTED", "ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE", "ROOT_AUTHORITY_BOUNDARY_OVERFLOW", "ROOT_AUTHORITY_BYPASS_RISK", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"], merge_legitimacy: envelope.drift.merge_legitimacy, ...rootAuthorityFlags() })
         if (url.pathname === ROOT_AUTHORITY_BOUNDARY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", boundary: envelope.boundary, containment_identity: envelope.containment_identity, merge_legitimacy: envelope.boundary.merge_legitimacy, ...rootAuthorityFlags() })
         if (url.pathname === ROOT_AUTHORITY_TOPOLOGY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", topology_hash: envelope.topology_hash, containment_identity: envelope.containment_identity, inventory: envelope.inventory, ...rootAuthorityFlags() })
-        return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_identity: envelope.containment_identity, topology_hash: envelope.topology_hash, ...rootAuthorityFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_status: envelope.containment_status, declared_root_surfaces: envelope.declared_root_surfaces, undeclared_root_surfaces: envelope.undeclared_root_surfaces, drift_classes: envelope.drift_classes, containment_identity: envelope.containment_identity, topology_hash: envelope.topology_hash, ...rootAuthorityFlags() })
       } catch {
-        return json({ status: "NULL", route: url.pathname, reason: "root_authority_observability_unavailable", drift_classes: ["ROOT_AUTHORITY_BOUNDARY_OVERFLOW"], ...rootAuthorityFlags() }, 500)
+        return json({ status: "NULL", route: url.pathname, reason: "root_authority_observability_unavailable", drift_classes: ["ROOT_AUTHORITY_BOUNDARY_OVERFLOW", "ROOT_AUTHORITY_BYPASS_RISK", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"], ...rootAuthorityFlags() }, 500)
       }
     }
 
-    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE && url.pathname !== EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && ![BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
+    if ((CROSS_REGISTRY_RECONCILIATION_ROUTES as readonly string[]).includes(url.pathname) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", allowed_methods: ["GET"], ...crossRegistryRouteFlags() }, 405)
+    if ((CROSS_REGISTRY_RECONCILIATION_ROUTES as readonly string[]).includes(url.pathname) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...crossRegistryRouteFlags() }, 500)
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        const generated_at = new Date().toISOString()
+        const snapshot = await buildCrossRegistryReconciliationSnapshot(await fetchCrossRegistryState(env), generated_at)
+        await appendCrossRegistryReconciliationSnapshot(env, snapshot, generated_at)
+        const status = snapshot.legitimacy_status === "NULL" ? "NULL" : "RECONCILED"
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: snapshot.drift_classes, drift: snapshot.drift, containment_status: snapshot.containment_status, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", lineage_edges: snapshot.lineage_edges, lineage_graph_hash: snapshot.lineage_graph_hash, continuity_graph_hash: snapshot.continuity_graph_hash, proof_graph_hash: snapshot.proof_graph_hash, unresolved_edges: snapshot.unresolved_edges, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence: snapshot.equivalence, continuity_proof: snapshot.continuity_proof, reconciliation_equivalence_hash: snapshot.reconciliation_equivalence_hash, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        if (url.pathname === CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", orphaned_records: snapshot.orphaned_records, unresolved_edges: snapshot.unresolved_edges, containment_status: snapshot.containment_status, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", reconciliation: snapshot, append_only: true, ...crossRegistryRouteFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "cross_registry_reconciliation_unavailable", containment_status: "RECONCILIATION_REQUIRED", legitimacy_status: "NULL", ...crossRegistryRouteFlags() }, 500)
+      }
+    }
+
+    if ([...OBSERVER_CONSENSUS_ROUTES, ...EXTERNAL_CONFORMANCE_ROUTES].includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", allowed_methods: ["GET"], ...consensusRouteFlags() }, 405)
+
+    if ([...OBSERVER_CONSENSUS_ROUTES, ...EXTERNAL_CONFORMANCE_ROUTES].includes(url.pathname as any) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", drift_classes: ["GOVERNANCE_CONSENSUS_FRAGMENTATION"], legitimacy_status: null, ...consensusRouteFlags() }, 500)
+        await ensureSchema(env, { stabilizeProofRegistry: false })
+        const envelope = await buildGovernanceConsensusEnvelope(url)
+        await appendGovernanceConsensusEvidence(env, envelope, new Date().toISOString())
+        const status = envelope.observer.legitimacy_status ? "CONSENSUS_EVIDENCE_OBSERVED" : "NULL"
+        if (url.pathname === OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence_hash: envelope.observer.equivalence_hash, semantic_hash: envelope.observer.semantic_hash, topology_hash: envelope.observer.topology_hash, reconciliation_hash: envelope.observer.reconciliation_hash, sovereignty_hash: envelope.observer.sovereignty_hash, legitimacy_status: envelope.observer.legitimacy_status, drift_classes: envelope.observer.drift_classes, append_only: true, ...consensusRouteFlags() })
+        if (url.pathname === OBSERVER_CONSENSUS_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: envelope.observer.drift_classes, drift_taxonomy: CONSENSUS_DRIFT_TAXONOMY, legitimacy_status: envelope.observer.legitimacy_status, observer_divergence_authorizes_execution: false, ambiguity_result: envelope.observer.drift_classes.length > 0 ? "NULL" : "LEGITIMATE", append_only: true, ...consensusRouteFlags() })
+        if (url.pathname === CONFORMANCE_RUNTIME_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", runtime_compatibility_hash: envelope.conformance.runtime_compatibility_hash, conformance: envelope.conformance, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
+        if (url.pathname === CONFORMANCE_EQUIVALENCE_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", checkpoint_equivalence_hash: envelope.conformance.checkpoint_equivalence_hash, semantic_envelope: envelope.semantic_envelope, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
+        if (url.pathname === CONFORMANCE_CHECKPOINT_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", checkpoint: envelope.portable_checkpoint, checkpoint_hash: envelope.observer.observed_checkpoint_hash, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
+        return json({ status, route: url.pathname, reason: "observability_only", observer: envelope.observer, quorum: envelope.quorum, checkpoint: envelope.portable_checkpoint, append_only: true, ...consensusRouteFlags() })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "governance_consensus_unavailable", drift_classes: ["GOVERNANCE_CONSENSUS_FRAGMENTATION"], legitimacy_status: null, ...consensusRouteFlags() }, 500)
+      }
+    }
+
+    if ((TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", allowed_methods: ["GET"], ...topologyRouteFlags() }, 405)
+
+    if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && !(TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE && url.pathname !== EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && ![BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
@@ -5849,6 +6467,17 @@ export default {
 
     const sovereigntyState = await assertRuntimeSovereigntyCanonical(env)
     if (sovereigntyState.status !== "CANONICAL") return json({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", reason: "runtime_sovereignty_drift", drift_classes: sovereigntyState.drift_classes, expected_sovereignty_hash: sovereigntyState.expected_sovereignty_hash, actual_sovereignty_hash: sovereigntyState.actual_sovereignty_hash, runtime_ready: false }, 503)
+
+    if ((TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname)) {
+      if (request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", allowed_methods: ["GET"], ...topologyRouteFlags() }, 405)
+      const generated_at = new Date(0).toISOString()
+      const envelope = await buildRuntimeTopologyReconciliationEnvelope(generated_at)
+      await appendRuntimeTopologySnapshot(env, envelope, new Date().toISOString())
+      if (url.pathname === TOPOLOGY_FINGERPRINT_ROUTE) return json({ status: envelope.drift.classification === "TOPOLOGY_VALID" ? "TOPOLOGY_FINGERPRINTED" : "NULL", route: url.pathname, fingerprint: envelope.fingerprint, legitimacy: envelope.drift.legitimacy, ...topologyRouteFlags() })
+      if (url.pathname === TOPOLOGY_DRIFT_ROUTE) return json({ status: envelope.drift.classification === "TOPOLOGY_VALID" ? "TOPOLOGY_VALID" : "NULL", route: url.pathname, drift: envelope.drift, legitimacy: envelope.drift.legitimacy, ...topologyRouteFlags() })
+      if (url.pathname === TOPOLOGY_EQUIVALENCE_ROUTE) return json({ status: envelope.equivalence.equivalent ? "TOPOLOGY_EQUIVALENT" : "NULL", route: url.pathname, equivalence: envelope.equivalence, legitimacy: envelope.drift.legitimacy, ...topologyRouteFlags() })
+      return json({ status: envelope.drift.classification === "TOPOLOGY_VALID" ? "TOPOLOGY_RECONCILED" : "NULL", route: url.pathname, reconciliation: envelope, legitimacy: envelope.drift.legitimacy, ...topologyRouteFlags() })
+    }
 
     if (url.pathname === RUNTIME_SOVEREIGNTY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: RUNTIME_SOVEREIGNTY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
     if (url.pathname === RUNTIME_SOVEREIGNTY_ROUTE && request.method === "GET") {
@@ -6207,13 +6836,19 @@ export default {
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", continuity_id: authority.continuity_id || null }, drift_class: "authority_drift" })
       if (String(authority.identity_id || "") !== String(session.identity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"identity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_identity_id: session.identity_id, provided_identity_id: authority.identity_id }, drift_class: "authority_drift" })
       const compiled = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id, validated_object_hash).first<any>()
-      if (!compiled) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
+      if (!compiled) {
+        const compiledForOtherLineage = await env.DB.prepare(`SELECT decision_id,authority_id,continuity_id FROM aeo_registry WHERE validated_object_hash=?1 AND status='COMPILED'`).bind(validated_object_hash).first<any>()
+        if (compiledForOtherLineage) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash, expected_decision_id: decision_id, provided_decision_id: String(compiledForOtherLineage.decision_id || ""), indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
+        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
+      }
       let compiledAeo: any
       try { compiledAeo = JSON.parse(String(compiled.canonical_aeo || "{}")) } catch { compiledAeo = null }
       const compiledCanonicalAeo = toCanonicalAeo(compiledAeo)
       const compiledHash = compiledCanonicalAeo ? await sha256Hex(canonicalize(compiledCanonicalAeo)) : ""
       if (!compiledCanonicalAeo || compiledHash !== validated_object_hash || compiledHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_hash: validated_object_hash, actual_hash: compiledHash, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
-      if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
+      if (String(compiled.authority_id || "") !== String(authority.authority_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_authority_id: authority.authority_id, provided_authority_id: compiled.authority_id, indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
+      if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
+      if (String(compiled.delegated_authority_id || "") !== String(authority.delegated_authority_id || "") || String(compiled.delegated_replay_chain_hash || "") !== String(authority.delegated_replay_chain_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", delegated_authority_id: String(authority.delegated_authority_id || ""), indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
       const delegatedValidation = await validateDelegatedAuthorityLineage(env, authority, compiledCanonicalAeo)
       if (!delegatedValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: delegatedValidation.reason }, { event_type: delegatedValidation.drift_class === "delegated_replay_resurrection" ? "REPLAY_BLOCKED" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", delegated_authority_id: String(authority.delegated_authority_id || ""), indicator: delegatedValidation.reason }, drift_class: delegatedValidation.drift_class })
       const target = compiledCanonicalAeo.target

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { canonicalize, hashCanonical, normalize } from '../../../src/canonical.js'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -48,20 +48,10 @@ function nullResult(object_type, errors) {
   return result(NULL, object_type, null, errors, null)
 }
 
-export function canonicalize(value) {
-  return JSON.stringify(sortKeys(value))
-}
+export { canonicalize }
 
 export function hashCanonicalObject(value) {
-  return createHash('sha256').update(canonicalize(value)).digest('hex')
-}
-
-function sortKeys(value) {
-  if (Array.isArray(value)) return value.map(sortKeys)
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortKeys(value[key])]))
-  }
-  return value
+  return hashCanonical(value)
 }
 
 function parseInput(input) {
@@ -196,7 +186,7 @@ export function validateLegitimacySchema(input) {
   const errors = [...schemaErrors, ...hashErrors]
   if (errors.length > 0) return nullResult(objectType, errors)
 
-  const canonicalized = sortKeys(candidate)
+  const canonicalized = normalize(candidate)
   return result(VALID_SCHEMA, objectType, hashCanonicalObject(candidate), [], canonicalized)
 }
 

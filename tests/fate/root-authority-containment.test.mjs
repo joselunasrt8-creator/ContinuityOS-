@@ -23,15 +23,33 @@ const taxonomyArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereig
 const rulesArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/root_authority_containment_rules.json', import.meta.url), 'utf8'))
 
 class D1 {
-  constructor() { this.statements = [] }
+  constructor() {
+    this.statements = []
+    this.rootAuthorityRows = []
+    this.rootAuthorityAppendOnly = { update: false, delete: false }
+  }
+
   prepare(sql) {
     this.statements.push(sql)
-    return {
-      bind() { return this },
+    const db = this
+    const statement = {
+      bindings: [],
+      bind(...args) { this.bindings = args; return this },
       all() { return Promise.resolve({ results: [] }) },
       first() { return Promise.resolve(null) },
-      run() { return Promise.resolve({ meta: { changes: 1 } }) },
+      run() {
+        if (/trg_root_authority_observability_registry_no_update/.test(sql)) db.rootAuthorityAppendOnly.update = true
+        if (/trg_root_authority_observability_registry_no_delete/.test(sql)) db.rootAuthorityAppendOnly.delete = true
+        if (/^UPDATE root_authority_observability_registry/i.test(sql) && db.rootAuthorityAppendOnly.update) return Promise.reject(new Error('root_authority_observability_registry is append-only'))
+        if (/^DELETE FROM root_authority_observability_registry/i.test(sql) && db.rootAuthorityAppendOnly.delete) return Promise.reject(new Error('root_authority_observability_registry is append-only'))
+        if (/^INSERT INTO root_authority_observability_registry/i.test(sql)) {
+          const [observation_id, observation_hash, topology_hash, boundary_hash, drift_hash, containment_identity] = this.bindings
+          db.rootAuthorityRows.push({ observation_id, observation_hash, topology_hash, boundary_hash, drift_hash, containment_identity })
+        }
+        return Promise.resolve({ meta: { changes: 1 } })
+      },
     }
+    return statement
   }
 }
 
@@ -92,9 +110,37 @@ test('GET-only sovereignty routes are non-executable and do not expand route exe
   assert.equal(body.deployment_capable, false)
   assert.equal(body.creates_authority, false)
   assert.equal(body.secret_values_inspected, false)
-  assert.ok(db.statements.some((sql) => sql.includes('INSERT OR IGNORE INTO root_authority_observability_registry')))
+  assert.ok(db.statements.some((sql) => /^INSERT INTO root_authority_observability_registry/.test(sql)))
+  assert.ok(!db.statements.some((sql) => sql.includes('INSERT OR IGNORE INTO root_authority_observability_registry')))
   const post = await runtime.fetch(new Request('https://runtime.test/sovereignty/root-authority', { method: 'POST' }), { DB: db })
   assert.equal(post.status, 405)
+})
+
+test('runtime-created root authority registry is append-only for updates and deletes', async () => {
+  const runtime = await worker()
+  const db = new D1()
+  const res = await runtime.fetch(new Request('https://runtime.test/sovereignty/root-authority'), { DB: db })
+  assert.equal(res.status, 200)
+  assert.equal(db.rootAuthorityAppendOnly.update, true)
+  assert.equal(db.rootAuthorityAppendOnly.delete, true)
+  assert.ok(db.statements.some((sql) => sql.includes('CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_update')))
+  assert.ok(db.statements.some((sql) => sql.includes('CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_delete')))
+  await assert.rejects(() => db.prepare('UPDATE root_authority_observability_registry SET classification=classification').run(), /append-only/)
+  await assert.rejects(() => db.prepare('DELETE FROM root_authority_observability_registry').run(), /append-only/)
+})
+
+test('same-topology root authority GET observations append distinct records with stable containment identity', async () => {
+  const runtime = await worker()
+  const db = new D1()
+  await runtime.fetch(new Request('https://runtime.test/sovereignty/root-authority'), { DB: db })
+  await runtime.fetch(new Request('https://runtime.test/sovereignty/root-authority'), { DB: db })
+  assert.equal(db.rootAuthorityRows.length, 2)
+  assert.equal(db.rootAuthorityRows[0].containment_identity, db.rootAuthorityRows[1].containment_identity)
+  assert.equal(db.rootAuthorityRows[0].topology_hash, db.rootAuthorityRows[1].topology_hash)
+  assert.equal(db.rootAuthorityRows[0].boundary_hash, db.rootAuthorityRows[1].boundary_hash)
+  assert.equal(db.rootAuthorityRows[0].drift_hash, db.rootAuthorityRows[1].drift_hash)
+  assert.notEqual(db.rootAuthorityRows[0].observation_id, db.rootAuthorityRows[1].observation_id)
+  assert.notEqual(db.rootAuthorityRows[0].observation_hash, db.rootAuthorityRows[1].observation_hash)
 })
 
 test('deterministic boundary equivalence and authority topology drift detection', () => {
@@ -104,6 +150,36 @@ test('deterministic boundary equivalence and authority topology drift detection'
   assert.equal(boundaryA.boundary_hash, boundaryB.boundary_hash)
   const drift = detectRootAuthorityDrift(canonicalizeRootAuthorityInventory({ surfaces: [{ surface_id: 'ambiguous', authority_origin: 'unknown', declared_boundary: 'declared', classifications: [] }] }))
   assert.ok(drift.drift_classes.includes('ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE'))
+})
+
+test('unsafe observed root authority flags are preserved for fail-closed drift', () => {
+  const envelope = buildRootAuthorityContainmentEnvelope({ surfaces: [{
+    surface_id: 'unsafe_observed_surface',
+    authority_origin: 'github_actions',
+    declared_boundary: 'declared',
+    classifications: ['ROOT_WORKFLOW_AUTHORITY'],
+    executable: true,
+    deployment_capable: true,
+    creates_authority: true,
+    secret_values_inspected: true,
+    secret_material_persisted: true,
+    secret_material: 'OBSERVED_SECRET_VALUE',
+  }] })
+  const [surface] = envelope.inventory.surfaces
+  assert.equal(surface.observed_executable, true)
+  assert.equal(surface.observed_deployment_capable, true)
+  assert.equal(surface.observed_creates_authority, true)
+  assert.equal(surface.observed_secret_values_inspected, true)
+  assert.equal(surface.observed_secret_material_persisted, true)
+  assert.equal(surface.observed_secret_material, 'OBSERVED_SECRET_VALUE')
+  assert.equal(surface.executable, false)
+  assert.equal(surface.deployment_capable, false)
+  assert.equal(surface.creates_authority, false)
+  assert.equal(surface.secret_material, 'NOT_INSPECTED')
+  assert.ok(envelope.drift.drift_classes.includes('ROOT_AUTHORITY_TOPOLOGY_DIVERGENCE'))
+  assert.ok(envelope.drift.drift_classes.includes('SOVEREIGNTY_DRIFT_DETECTED'))
+  assert.equal(envelope.drift.fail_closed, true)
+  assert.equal(envelope.drift.merge_legitimacy, 'NULL')
 })
 
 test('no secret material persistence and no deployment capability introduction', () => {
@@ -145,4 +221,31 @@ test('merge governance root authority rules invalidate legitimacy but never auth
   ]) assert.ok(governance.rules.includes(rule))
   assert.equal(governance.root_authority_containment.may_authorize_merge, false)
   assert.equal(governance.root_authority_containment.secret_values_inspected, false)
+})
+
+test('expanded root authority closure preserves containment semantics without secret inspection', () => {
+  const envelope = buildRootAuthorityContainmentEnvelope()
+  const byId = new Map(envelope.inventory.surfaces.map((surface) => [surface.surface_id, surface]))
+  for (const surfaceId of [
+    'cloudflare_deployment_token_authority',
+    'wrangler_local_deploy_authority',
+    'github_actions_token_authority',
+    'github_workflow_file_mutation',
+    'repository_secret_mutation_authority',
+    'root_runtime_authority_assumption',
+  ]) assert.ok(byId.has(surfaceId), `missing expanded root authority surface ${surfaceId}`)
+
+  assert.ok(byId.get('cloudflare_deployment_token_authority').classifications.includes('ROOT_DEPLOY_AUTHORITY'))
+  assert.equal(byId.get('cloudflare_deployment_token_authority').deployment_token_observability, 'OBSERVABILITY_ONLY_NO_SECRET_INSPECTION')
+  assert.equal(byId.get('cloudflare_deployment_token_authority').observed_secret_material, 'NOT_INSPECTED')
+  assert.equal(byId.get('github_actions_workflow_dispatch').workflow_dispatch_semantics, 'TRIGGER_ONLY')
+  assert.ok(byId.get('repository_secret_mutation_authority').classifications.includes('ROOT_ENVIRONMENT_AUTHORITY'))
+  assert.ok(byId.get('wrangler_local_deploy_authority').classifications.includes('ROOT_AUTHORITY_BYPASS_RISK'))
+  assert.ok(byId.get('root_runtime_authority_assumption').classifications.includes('ROOT_FEDERATION_AUTHORITY'))
+  assert.equal(envelope.containment_status, 'ROOT_AUTHORITY_CONTAINMENT_REQUIRED')
+  assert.ok(envelope.declared_root_surfaces.includes('cloudflare_deployment_token_authority'))
+  assert.deepEqual(envelope.undeclared_root_surfaces, [])
+  assert.ok(envelope.drift_classes.includes('ROOT_AUTHORITY_BYPASS_RISK'))
+  assert.equal(envelope.secret_values_inspected, false)
+  assert.equal(envelope.secret_material_persisted, false)
 })

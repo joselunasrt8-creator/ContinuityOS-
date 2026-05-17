@@ -1,22 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from '../../src/canonical.js'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
-
-function canonicalize(value) {
-  if (value === undefined) return 'null'
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value)
-  if (typeof value === 'number') return JSON.stringify(Number.isFinite(value) ? value : null)
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
-  if (typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(value[key])}`).join(',')}}`
-  return 'null'
-}
-
-function sha256Hex(value) {
-  return createHash('sha256').update(value).digest('hex')
-}
 
 test('remote evidence cannot authorize execution and federated trust envelopes always deny remote authority', () => {
   assert.match(source, /type FederatedTrustEnvelope/)

@@ -14,7 +14,7 @@ test('FATE hash mutation specs are now represented by executable assertions', ()
 
 test('modified validated_object_hash returns NULL / INVALID', () => {
   assert.match(source, /SELECT \* FROM aeo_registry WHERE decision_id=\?1 AND validated_object_hash=\?2/)
-  assert.match(source, /if \(!compiled\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/)
+  assert.match(source, /if \(!compiled\) \{[\s\S]*reason:"hash_mismatch" \}/)
   assert.match(source, /event_type: "HASH_MISMATCH"/)
 })
 

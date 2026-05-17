@@ -58,7 +58,77 @@
       "governance_bound": true,
       "drift_observable": true,
       "non_bypassable": true
+    },
+    {
+      "id": "registry_reconcile",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "proof_generating": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "registry_reconcile_drift",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "proof_generating": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "registry_reconcile_lineage",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "proof_generating": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "registry_reconcile_equivalence",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "proof_generating": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "registry_reconcile_orphans",
+      "classification": "non_executable_observability",
+      "executable": false,
+      "mutation_capable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "proof_generating": false,
+      "route_bound": true,
+      "schema_bound": true,
+      "governance_bound": true,
+      "drift_observable": true,
+      "non_bypassable": true
     }
   ],
-  "inventory_hash": "95f9a57aaa578958c37b4f1314c201241f7e03a3525799297ff4c5c65cff74bd"
+  "inventory_hash": "2632e4c4003c038a7601b9715d2ac774bac1cb6d524e59dc97ba0c876e29f76f"
 }

@@ -2,17 +2,98 @@
   "artifact_type": "infrastructure_authority_map",
   "version": "1.0",
   "map": [
-    { "surface": "Cloudflare account authority", "classification": "ROOT_DEPLOY_AUTHORITY", "boundary": "declared-observable-non-authoritative" },
-    { "surface": "GitHub admin authority", "classification": "ROOT_REPOSITORY_AUTHORITY", "boundary": "declared-observable-non-authoritative" },
-    { "surface": "Wrangler deploy capability", "classification": "ROOT_DEPLOY_AUTHORITY", "boundary": "governed-workflow-only" },
-    { "surface": "repository settings mutation", "classification": "ROOT_REPOSITORY_AUTHORITY", "boundary": "containment-required-on-drift" },
-    { "surface": "environment variables / secrets mutation", "classification": "ROOT_ENVIRONMENT_AUTHORITY", "boundary": "names-only-no-values" },
-    { "surface": "workflow dispatch authority", "classification": "ROOT_WORKFLOW_AUTHORITY", "boundary": "canonical-execute-proof-required" },
-    { "surface": "branch protection mutation", "classification": "ROOT_BRANCH_POLICY_AUTHORITY", "boundary": "governance-trust-isolated-on-drift" },
-    { "surface": "local deploy credentials", "classification": "ROOT_LOCAL_EXECUTION_AUTHORITY", "boundary": "not-inspected" },
-    { "surface": "package script deploy capability", "classification": "ROOT_PACKAGE_EXECUTION_AUTHORITY", "boundary": "disabled-direct-deploy" },
-    { "surface": "CI token permissions", "classification": "ROOT_WORKFLOW_AUTHORITY", "boundary": "least-privilege-assumption" }
+    {
+      "surface": "Cloudflare account authority",
+      "classification": "ROOT_DEPLOY_AUTHORITY",
+      "boundary": "declared-observable-non-authoritative"
+    },
+    {
+      "surface": "GitHub admin authority",
+      "classification": "ROOT_REPOSITORY_AUTHORITY",
+      "boundary": "declared-observable-non-authoritative"
+    },
+    {
+      "surface": "Wrangler deploy capability",
+      "classification": "ROOT_DEPLOY_AUTHORITY",
+      "boundary": "governed-workflow-only"
+    },
+    {
+      "surface": "repository settings mutation",
+      "classification": "ROOT_REPOSITORY_AUTHORITY",
+      "boundary": "containment-required-on-drift"
+    },
+    {
+      "surface": "environment variables / secrets mutation",
+      "classification": "ROOT_ENVIRONMENT_AUTHORITY",
+      "boundary": "names-only-no-values"
+    },
+    {
+      "surface": "workflow dispatch authority",
+      "classification": "ROOT_WORKFLOW_AUTHORITY",
+      "boundary": "canonical-execute-proof-required"
+    },
+    {
+      "surface": "branch protection mutation",
+      "classification": "ROOT_BRANCH_POLICY_AUTHORITY",
+      "boundary": "governance-trust-isolated-on-drift"
+    },
+    {
+      "surface": "local deploy credentials",
+      "classification": "ROOT_LOCAL_EXECUTION_AUTHORITY",
+      "boundary": "not-inspected"
+    },
+    {
+      "surface": "package script deploy capability",
+      "classification": "ROOT_PACKAGE_EXECUTION_AUTHORITY",
+      "boundary": "disabled-direct-deploy"
+    },
+    {
+      "surface": "CI token permissions",
+      "classification": "ROOT_WORKFLOW_AUTHORITY",
+      "boundary": "least-privilege-assumption"
+    },
+    {
+      "surface": "Cloudflare deployment token authority",
+      "classification": "ROOT_DEPLOY_AUTHORITY",
+      "boundary": "observability-only-no-secret-inspection"
+    },
+    {
+      "surface": "GitHub Actions token authority",
+      "classification": "ROOT_REPOSITORY_AUTHORITY",
+      "boundary": "least-privilege-observability-only"
+    },
+    {
+      "surface": "GitHub workflow file mutation",
+      "classification": "ROOT_WORKFLOW_AUTHORITY",
+      "boundary": "containment-required"
+    },
+    {
+      "surface": "repository secret mutation authority",
+      "classification": "ROOT_ENVIRONMENT_AUTHORITY",
+      "boundary": "observability-only-no-secret-inspection"
+    },
+    {
+      "surface": "Wrangler local deploy authority",
+      "classification": "ROOT_AUTHORITY_BYPASS_RISK",
+      "boundary": "local-deploy-denied"
+    },
+    {
+      "surface": "root runtime authority assumption",
+      "classification": "ROOT_FEDERATION_AUTHORITY",
+      "boundary": "containment-required"
+    }
   ],
   "secret_values_inspected": false,
-  "evidence_only": true
+  "evidence_only": true,
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "classification_authorizes_execution": false,
+    "classification_authorizes_merge": false,
+    "secret_values_inspected": false,
+    "evidence_only": true,
+    "non_authoritative": true,
+    "missing_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+  }
 }

@@ -1,19 +1,287 @@
 {
   "artifact_type": "root_authority_inventory",
   "version": "1.0",
-  "canonical_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+  "canonical_path": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
   "secret_values_inspected": false,
   "surfaces": [
-    { "surface_id": "ci_token_permissions", "authority_origin": "github_actions_token", "declared_boundary": "least-privilege-assumption", "classifications": ["ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "cloudflare_account_authority", "authority_origin": "cloudflare_account", "declared_boundary": "/session→/continuity→/authority→/compile→/validate→/execute→/proof", "classifications": ["ROOT_DEPLOY_AUTHORITY", "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY", "ROOT_RUNTIME_CONFIGURATION_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "federated_runtime_authority", "authority_origin": "remote_runtime", "declared_boundary": "remote-authority-denied", "classifications": ["ROOT_FEDERATION_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "github_actions_workflow_dispatch", "authority_origin": "github_actions", "declared_boundary": "/authority→/compile→/validate→/execute→/proof", "classifications": ["ROOT_WORKFLOW_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "github_admin_authority", "authority_origin": "github_repository", "declared_boundary": "/session→/continuity→/authority→/compile→/validate→/execute→/proof", "classifications": ["ROOT_BRANCH_POLICY_AUTHORITY", "ROOT_REPOSITORY_AUTHORITY", "ROOT_WORKFLOW_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "github_environment_and_secrets_configuration", "authority_origin": "github_environment", "declared_boundary": "declared-not-inspected", "classifications": ["ROOT_ENVIRONMENT_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "local_deploy_credentials_presence", "authority_origin": "local_environment", "declared_boundary": "not-inspected-observability-only", "classifications": ["ROOT_ENVIRONMENT_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "package_script_deploy_guard", "authority_origin": "package_scripts", "declared_boundary": "disabled-direct-deploy", "classifications": ["ROOT_PACKAGE_EXECUTION_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false },
-    { "surface_id": "wrangler_deploy_capability", "authority_origin": "cloudflare_wrangler", "declared_boundary": "governed-deploy-workflow-only", "classifications": ["ROOT_DEPLOY_AUTHORITY", "ROOT_LOCAL_EXECUTION_AUTHORITY"], "secret_material": "NOT_INSPECTED", "executable": false, "deployment_capable": false, "creates_authority": false }
+    {
+      "surface_id": "ci_token_permissions",
+      "authority_origin": "github_actions_token",
+      "declared_boundary": "least-privilege-assumption",
+      "classifications": [
+        "ROOT_ENVIRONMENT_AUTHORITY",
+        "ROOT_REPOSITORY_AUTHORITY",
+        "ROOT_WORKFLOW_AUTHORITY"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "OBSERVABILITY_ONLY_NO_SECRET_INSPECTION"
+    },
+    {
+      "surface_id": "cloudflare_account_authority",
+      "authority_origin": "cloudflare_account",
+      "declared_boundary": "/session\u2192/continuity\u2192/authority\u2192/compile\u2192/validate\u2192/execute\u2192/proof",
+      "classifications": [
+        "ROOT_DEPLOY_AUTHORITY",
+        "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY",
+        "ROOT_RUNTIME_CONFIGURATION_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "cloudflare_deployment_token_authority",
+      "authority_origin": "cloudflare_api_token",
+      "declared_boundary": "observability-only-no-secret-inspection",
+      "classifications": [
+        "ROOT_DEPLOY_AUTHORITY",
+        "ROOT_ENVIRONMENT_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "OBSERVABILITY_ONLY_NO_SECRET_INSPECTION"
+    },
+    {
+      "surface_id": "federated_runtime_authority",
+      "authority_origin": "remote_runtime",
+      "declared_boundary": "remote-authority-denied",
+      "classifications": [
+        "ROOT_FEDERATION_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "github_actions_token_authority",
+      "authority_origin": "github_actions_token",
+      "declared_boundary": "least-privilege-observability-only",
+      "classifications": [
+        "ROOT_REPOSITORY_AUTHORITY",
+        "ROOT_WORKFLOW_AUTHORITY",
+        "ROOT_ENVIRONMENT_AUTHORITY"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "OBSERVABILITY_ONLY_NO_SECRET_INSPECTION"
+    },
+    {
+      "surface_id": "github_actions_workflow_dispatch",
+      "authority_origin": "github_actions",
+      "declared_boundary": "/authority\u2192/compile\u2192/validate\u2192/execute\u2192/proof",
+      "classifications": [
+        "ROOT_WORKFLOW_AUTHORITY"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "TRIGGER_ONLY",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "github_admin_authority",
+      "authority_origin": "github_repository",
+      "declared_boundary": "/session\u2192/continuity\u2192/authority\u2192/compile\u2192/validate\u2192/execute\u2192/proof",
+      "classifications": [
+        "ROOT_BRANCH_POLICY_AUTHORITY",
+        "ROOT_REPOSITORY_AUTHORITY",
+        "ROOT_WORKFLOW_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "github_environment_and_secrets_configuration",
+      "authority_origin": "github_environment",
+      "declared_boundary": "declared-not-inspected",
+      "classifications": [
+        "ROOT_ENVIRONMENT_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "github_workflow_file_mutation",
+      "authority_origin": "github_repository_workflows",
+      "declared_boundary": "workflow-file-mutation-containment-required",
+      "classifications": [
+        "ROOT_REPOSITORY_AUTHORITY",
+        "ROOT_WORKFLOW_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "local_deploy_credentials_presence",
+      "authority_origin": "local_environment",
+      "declared_boundary": "not-inspected-observability-only",
+      "classifications": [
+        "ROOT_ENVIRONMENT_AUTHORITY",
+        "ROOT_LOCAL_EXECUTION_AUTHORITY",
+        "ROOT_AUTHORITY_BYPASS_RISK"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "package_script_deploy_guard",
+      "authority_origin": "package_scripts",
+      "declared_boundary": "disabled-direct-deploy",
+      "classifications": [
+        "ROOT_PACKAGE_EXECUTION_AUTHORITY",
+        "ROOT_AUTHORITY_BYPASS_RISK"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "repository_secret_mutation_authority",
+      "authority_origin": "github_repository_secrets",
+      "declared_boundary": "observability-only-no-secret-inspection",
+      "classifications": [
+        "ROOT_REPOSITORY_AUTHORITY",
+        "ROOT_ENVIRONMENT_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "root_runtime_authority_assumption",
+      "authority_origin": "runtime_root",
+      "declared_boundary": "runtime-authority-assumption-observability-only",
+      "classifications": [
+        "ROOT_FEDERATION_AUTHORITY",
+        "ROOT_RUNTIME_CONFIGURATION_AUTHORITY",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "wrangler_deploy_capability",
+      "authority_origin": "cloudflare_wrangler",
+      "declared_boundary": "governed-deploy-workflow-only",
+      "classifications": [
+        "ROOT_DEPLOY_AUTHORITY",
+        "ROOT_LOCAL_EXECUTION_AUTHORITY"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "wrangler_local_deploy_authority",
+      "authority_origin": "local_wrangler_cli",
+      "declared_boundary": "local-deploy-denied-observability-only",
+      "classifications": [
+        "ROOT_DEPLOY_AUTHORITY",
+        "ROOT_LOCAL_EXECUTION_AUTHORITY",
+        "ROOT_AUTHORITY_BYPASS_RISK"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE"
+    }
   ],
   "evidence_only": true,
-  "non_authoritative": true
+  "non_authoritative": true,
+  "declared_root_surfaces": [
+    "ci_token_permissions",
+    "cloudflare_account_authority",
+    "cloudflare_deployment_token_authority",
+    "federated_runtime_authority",
+    "github_actions_token_authority",
+    "github_actions_workflow_dispatch",
+    "github_admin_authority",
+    "github_environment_and_secrets_configuration",
+    "github_workflow_file_mutation",
+    "local_deploy_credentials_presence",
+    "package_script_deploy_guard",
+    "repository_secret_mutation_authority",
+    "root_runtime_authority_assumption",
+    "wrangler_deploy_capability",
+    "wrangler_local_deploy_authority"
+  ],
+  "undeclared_root_surfaces": [],
+  "containment_status": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
+  "drift_classes": [
+    "ROOT_AUTHORITY_BYPASS_RISK"
+  ],
+  "unauthorized_mutation_path_closure": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "classification_authorizes_execution": false,
+    "classification_authorizes_merge": false,
+    "secret_values_inspected": false,
+    "evidence_only": true,
+    "non_authoritative": true,
+    "missing_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+  }
 }

@@ -1,0 +1,22 @@
+{
+  "artifact": "governance_mutation_capability_matrix",
+  "fail_closed_on_ambiguity": true,
+  "classes": [
+    "SAFE_OBSERVABILITY_ONLY",
+    "GOVERNANCE_CONTAINED",
+    "GOVERNANCE_EXPANSION",
+    "EXECUTION_BOUNDARY_EXPANSION",
+    "VALIDATION_SEMANTICS_DRIFT",
+    "AUTHORITY_SEMANTICS_DRIFT",
+    "PROOF_SEMANTICS_DRIFT",
+    "REPLAY_SEMANTICS_DRIFT",
+    "FEDERATION_SEMANTICS_DRIFT",
+    "OBSERVABILITY_TO_AUTHORITY_ESCALATION",
+    "ROOT_GOVERNANCE_BYPASS_RISK",
+    "RECURSIVE_CONTAINMENT_REQUIRED"
+  ],
+  "authorizes_execution": false,
+  "authorizes_proof": false,
+  "authorizes_deployment": false,
+  "authorizes_merge": false
+}

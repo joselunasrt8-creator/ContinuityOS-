@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { canonicalize, hashCanonical, normalize } from '../../src/canonical.js'
 import { readFileSync } from 'node:fs'
 import { validateLegitimacySchema } from '../../runtime/legitimacy/validators/schema-validator.js'
 
@@ -40,19 +40,11 @@ function readJson(file) {
 }
 
 function sortKeys(value) {
-  if (Array.isArray(value)) return value.map(sortKeys)
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortKeys(value[key])]))
-  }
-  return value
-}
-
-function canonicalize(value) {
-  return JSON.stringify(sortKeys(value))
+  return normalize(value)
 }
 
 function hashObject(value) {
-  return createHash('sha256').update(canonicalize(value)).digest('hex')
+  return hashCanonical(value)
 }
 
 function withoutKey(object, key) {

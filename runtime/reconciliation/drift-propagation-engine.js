@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto'
+import { canonicalize, hashCanonical, normalize } from '../../src/canonical.js'
+export { canonicalize, hashCanonical }
 
 export const EVIDENCE_ONLY_FLAGS = Object.freeze({
   evidence_only: true,
@@ -46,25 +47,6 @@ const CONSEQUENCE_CLASSES = Object.freeze({
   downstream_proof_trust_invalid: 'PROOF_LINEAGE_CONTAMINATION',
   downstream_legitimacy_null: 'DOWNSTREAM_LEGITIMACY_NULL',
 })
-
-function isPlainObject(value) {
-  return value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
-}
-
-function normalize(value) {
-  if (Array.isArray(value)) return value.map(normalize)
-  if (isPlainObject(value)) return Object.fromEntries(Object.keys(value).sort().map((key) => [key, normalize(value[key])]))
-  if (value === undefined) return null
-  return value
-}
-
-export function canonicalize(value) {
-  return JSON.stringify(normalize(value))
-}
-
-export function hashCanonical(value) {
-  return createHash('sha256').update(canonicalize(value)).digest('hex')
-}
 
 function asArray(value) {
   return Array.isArray(value) ? value : []
