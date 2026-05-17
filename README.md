@@ -90,3 +90,4 @@ MindShift does not replace intelligence.
 
 MindShift governs legitimacy before execution.
 
+
