@@ -1,0 +1,118 @@
+{
+  "artifact": "EXECUTION_SURFACES",
+  "status": "NON_OPERATIVE",
+  "issue": 436,
+  "authority_creating": false,
+  "execution_authorizing": false,
+  "runtime_mutating": false,
+  "classification_states": [
+    "GOVERNED",
+    "PARTIALLY_GOVERNED",
+    "OBSERVABILITY_ONLY",
+    "UNGOVERNED",
+    "ROOT_AUTHORITY",
+    "UNKNOWN",
+    "PROPOSAL_ONLY",
+    "NON_OPERATIVE"
+  ],
+  "canonical_lifecycle": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "invariant": "unmapped mutation capability = hidden legitimacy risk",
+  "surfaces": [
+    {
+      "surface_id": "ES-001",
+      "name": "/execute runtime route",
+      "mutation_capability": true,
+      "classification": "GOVERNED",
+      "canonical_path_required": true,
+      "root_authority_required": false,
+      "proof_required": true,
+      "known_gap": "requires verification that executed object hash equals validated object hash",
+      "closure_requirement": "validated object hash must equal executed object hash"
+    },
+    {
+      "surface_id": "ES-002",
+      "name": "/proof runtime route",
+      "mutation_capability": true,
+      "classification": "GOVERNED",
+      "canonical_path_required": true,
+      "root_authority_required": false,
+      "proof_required": true,
+      "known_gap": "proof must not exist without valid execution lineage",
+      "closure_requirement": "proof requires execution lineage, authority lineage, and object hash binding"
+    },
+    {
+      "surface_id": "ES-019",
+      "name": "GitHub Actions governed deploy workflow",
+      "mutation_capability": true,
+      "classification": "PARTIALLY_GOVERNED",
+      "canonical_path_required": true,
+      "root_authority_required": false,
+      "proof_required": true,
+      "known_gap": "workflow must require canonical runtime validation",
+      "closure_requirement": "verify workflow cannot deploy without canonical validation and proof path"
+    },
+    {
+      "surface_id": "ES-022",
+      "name": "Direct push to main",
+      "mutation_capability": true,
+      "classification": "ROOT_AUTHORITY",
+      "canonical_path_required": false,
+      "root_authority_required": true,
+      "proof_required": false,
+      "known_gap": "repository admin or branch override may bypass governed merge path",
+      "closure_requirement": "branch protection and root authority containment"
+    },
+    {
+      "surface_id": "ES-027",
+      "name": "Direct Wrangler deploy",
+      "mutation_capability": true,
+      "classification": "ROOT_AUTHORITY",
+      "canonical_path_required": false,
+      "root_authority_required": true,
+      "proof_required": false,
+      "known_gap": "local authenticated deploy can bypass runtime legitimacy",
+      "closure_requirement": "contain local deploy authority or classify as explicit sovereignty assumption"
+    },
+    {
+      "surface_id": "ES-029",
+      "name": "Cloudflare D1 console writes",
+      "mutation_capability": true,
+      "classification": "ROOT_AUTHORITY",
+      "canonical_path_required": false,
+      "root_authority_required": true,
+      "proof_required": false,
+      "known_gap": "raw registry mutation can bypass route-level lineage checks",
+      "closure_requirement": "classify as root database authority and prevent silent registry mutation"
+    },
+    {
+      "surface_id": "ES-032",
+      "name": "Local terminal commands",
+      "mutation_capability": true,
+      "classification": "UNGOVERNED",
+      "canonical_path_required": false,
+      "root_authority_required": true,
+      "proof_required": false,
+      "known_gap": "human/operator shell can mutate repo, runtime, or deploy state",
+      "closure_requirement": "document as local operator root unless sandboxed or governed"
+    },
+    {
+      "surface_id": "ES-036",
+      "name": "Neo4j graph ingestion",
+      "mutation_capability": true,
+      "classification": "OBSERVABILITY_ONLY",
+      "canonical_path_required": false,
+      "root_authority_required": false,
+      "proof_required": false,
+      "known_gap": "graph writes must not create authority or runtime legitimacy",
+      "closure_requirement": "ensure graph remains descriptive and non-authoritative"
+    }
+  ]
+}
