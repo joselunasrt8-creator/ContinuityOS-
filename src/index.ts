@@ -7018,8 +7018,27 @@ export default {
       if (proofCandidates.length > 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_lineage_ambiguity" }, drift_class: "proof_drift" })
       const canonicalExistingProof = proofCandidates[0] || null
       if (canonicalExistingProof) {
-        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, indicator: "deterministic_existing_proof_returned" } })
-        return json({ status:"PROVEN", result:"OK", proof_id: String(canonicalExistingProof.proof_id || ""), proof: canonicalExistingProof })
+        const canonicalEvidenceReplay = {
+          classification: "PROOF_CANONICAL_EVIDENCE_REPLAY_CONTAINED",
+          replay_detected: true,
+          duplicate_proof_replay: true,
+          evidence_only: true,
+          read_only: true,
+          non_authoritative: true,
+          replay_neutral: true,
+          lifecycle_advanced: false,
+          proof_registry_appended: false,
+          authority_registry_mutated: false,
+          execution_registry_mutated: false,
+          invocation_registry_mutated: false,
+          merge_authorized: false,
+          deployment_authorized: false,
+          validator_mutation_authorized: false,
+          runtime_authority_granted: false,
+          proof_issue_authority_granted: false
+        } as const
+        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, indicator: "deterministic_existing_proof_returned", classification: canonicalEvidenceReplay.classification } })
+        return json({ status:"PROVEN", result:"OK", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay, proof: canonicalExistingProof })
       }
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
