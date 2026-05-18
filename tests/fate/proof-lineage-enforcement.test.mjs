@@ -91,3 +91,59 @@ test('proof persistence emits proof telemetry', () => {
     'proof telemetry must include proof lineage identifiers',
   )
 })
+
+test('proof_requires_matching_execution_lineage', () => {
+  assert.match(
+    source,
+    /SELECT \* FROM execution_registry WHERE execution_id=\?1 AND decision_id=\?2 AND validated_object_hash=\?3 AND status='EXECUTED'/,
+    'proof must resolve execution by exact execution_id + decision_id + validated_object_hash lineage',
+  )
+})
+
+test('proof_rejects_cross_decision_execution_id', () => {
+  assert.match(
+    source,
+    /reason:"execution_decision_mismatch"[\s\S]*indicator: "proof_execution_decision_mismatch"/,
+    'proof must reject execution_id that resolves to a different decision_id',
+  )
+})
+
+test('proof_rejects_missing_execution_id', () => {
+  assert.match(
+    source,
+    /if \(!execution_id\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_execution_id" \}/,
+    'proof must fail closed when execution_id is missing',
+  )
+})
+
+test('proof_rejects_hash_mismatch', () => {
+  assert.match(
+    source,
+    /reason:"execution_hash_mismatch"[\s\S]*indicator: "proof_hash_mismatch"/,
+    'proof must reject execution_id lineage with mismatched validated_object_hash',
+  )
+})
+
+test('proof_rejection_does_not_write_proof_registry', () => {
+  const proofStart = source.indexOf('if (url.pathname === "/proof" && request.method === "POST") {')
+  const proofInsert = source.indexOf('INSERT INTO proof_registry', proofStart)
+  const missingExecReject = source.indexOf('reason:"execution_missing"', proofStart)
+  assert.ok(proofStart >= 0 && missingExecReject > proofStart && proofInsert > missingExecReject, 'expected proof lineage rejection before proof_registry insert')
+  const failClosedBlock = source.slice(proofStart, proofInsert)
+  assert.doesNotMatch(failClosedBlock, /INSERT INTO proof_registry/, 'proof rejection paths must not write proof_registry')
+  assert.doesNotMatch(failClosedBlock, /UPDATE authority_registry SET status='CONSUMED'/, 'proof rejection paths must not consume authority')
+})
+
+test('valid_execute_proof_path_preserved', () => {
+  assert.match(
+    source,
+    /return json\(\{ status:"EXECUTED", session_id, execution_id \}\)/,
+    'execute success path must remain intact',
+  )
+
+  assert.match(
+    source,
+    /return json\(\{ status:"PROVEN", result:"OK", proof_id, proof:/,
+    'proof success path must remain intact',
+  )
+})
