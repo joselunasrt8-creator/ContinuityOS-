@@ -155,7 +155,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git diff origin/main...HEAD -- | grep -E "CANONICAL_RUNTIME_ROUTES"; then
+          EXPECTED_CANONICAL_RUNTIME_ROUTES='const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const'
+          ACTUAL_CANONICAL_RUNTIME_ROUTE_DECLARATIONS=$(grep -E '^const CANONICAL_RUNTIME_ROUTES = ' src/index.ts || true)
+          DECLARATION_COUNT=$(printf '%s\n' "$ACTUAL_CANONICAL_RUNTIME_ROUTE_DECLARATIONS" | grep -Ec '^const CANONICAL_RUNTIME_ROUTES = ' || true)
+
+          if [[ "$DECLARATION_COUNT" -ne 1 ]]; then
+            echo "Canonical runtime route declaration missing or duplicated."
+            exit 1
+          fi
+
+          if [[ "$ACTUAL_CANONICAL_RUNTIME_ROUTE_DECLARATIONS" != "$EXPECTED_CANONICAL_RUNTIME_ROUTES" ]]; then
             echo "Canonical runtime routes modified."
             exit 1
           fi
