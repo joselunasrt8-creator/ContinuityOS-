@@ -5258,6 +5258,45 @@ async function appendGovernanceCompressionObservation(env: Env, envelope: Govern
     .run()
 }
 
+
+function proofExecutionLineageMatches(proof: any, execution: any): boolean {
+  let executionLineage: any
+  try { executionLineage = JSON.parse(String(proof?.execution_lineage || "{}")) } catch { return false }
+  return String(proof?.execution_id || "") === String(execution?.execution_id || "")
+    && String(proof?.decision_id || "") === String(execution?.decision_id || "")
+    && String(proof?.validated_object_hash || "") === String(execution?.validated_object_hash || "")
+    && String(executionLineage?.execution_id || "") === String(execution?.execution_id || "")
+    && String(executionLineage?.decision_id || "") === String(execution?.decision_id || "")
+    && String(executionLineage?.validated_object_hash || "") === String(execution?.validated_object_hash || "")
+    && String(executionLineage?.invocation_nonce || "") === String(execution?.invocation_nonce || "")
+}
+
+function proofAmbiguityReplayEvidence(candidate_count: number, canonical_candidate_count: number) {
+  return {
+    classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED",
+    replay_detected: true,
+    proof_drift_detected: true,
+    duplicate_proof_replay: candidate_count > 1,
+    ambiguous_proof_lineage: true,
+    candidate_count,
+    canonical_candidate_count,
+    evidence_only: true,
+    read_only: true,
+    non_authoritative: true,
+    replay_neutral: true,
+    lifecycle_advanced: false,
+    proof_registry_appended: false,
+    authority_registry_mutated: false,
+    execution_registry_mutated: false,
+    invocation_registry_mutated: false,
+    merge_authorized: false,
+    deployment_authorized: false,
+    validator_mutation_authorized: false,
+    runtime_authority_granted: false,
+    proof_issue_authority_granted: false
+  } as const
+}
+
 async function rejectWithTelemetry(env: Env, response: Record<string, unknown>, telemetry: {
   event_type?: TelemetryEventType
   decision_id?: string
@@ -7009,14 +7048,18 @@ export default {
       if (String(execution.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", expected_session_id: execution.session_id, provided_session_id: session_id }, drift_class: "proof_drift" })
       if (Object.hasOwn(b, "continuity_id") && String(b.continuity_id || "") && String(b.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: b.continuity_id, indicator: "proof_execution_continuity_mismatch" }, drift_class: "proof_drift" })
       if (Object.hasOwn(b, "invocation_nonce") && String(b.invocation_nonce || "") && String(b.invocation_nonce || "") !== String(execution.invocation_nonce || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invocation_lineage_mismatch" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", expected_invocation_nonce: execution.invocation_nonce, provided_invocation_nonce: b.invocation_nonce, indicator: "proof_execution_invocation_mismatch" }, drift_class: "replay_drift" })
-      if (!authority || String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority?.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority?.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+      if (!authority) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: "", severity: "HIGH", payload: { route: "/proof", authority_status: null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       if (String(authority.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_session_id: authority.session_id, provided_session_id: session_id }, drift_class: "authority_drift" })
       if (String(authority.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: authority.continuity_id, provided_continuity_id: execution.continuity_id }, drift_class: "proof_drift" })
       if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
-      const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 2`).bind(execution_id,decision_id,validated_object_hash).all<any>()
+      const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(execution_id,decision_id,validated_object_hash).all<any>()
       const proofCandidates = existingProofs.results || []
-      if (proofCandidates.length > 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_lineage_ambiguity" }, drift_class: "proof_drift" })
-      const canonicalExistingProof = proofCandidates[0] || null
+      const canonicalProofCandidates = proofCandidates.filter((proof: any) => proofExecutionLineageMatches(proof, execution))
+      if (proofCandidates.length > 1 || (proofCandidates.length === 1 && canonicalProofCandidates.length !== 1)) {
+        const ambiguityReplay = proofAmbiguityReplayEvidence(proofCandidates.length, canonicalProofCandidates.length)
+        return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous", replay: ambiguityReplay }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "duplicate_or_ambiguous_proof_lineage", classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED", drift_classes: ["replay_drift", "proof_lineage_drift"], candidate_count: proofCandidates.length, canonical_candidate_count: canonicalProofCandidates.length }, drift_class: "proof_lineage_drift" })
+      }
+      const canonicalExistingProof = canonicalProofCandidates[0] || null
       if (canonicalExistingProof) {
         const canonicalEvidenceReplay = {
           classification: "PROOF_CANONICAL_EVIDENCE_REPLAY_CONTAINED",
@@ -7037,9 +7080,10 @@ export default {
           runtime_authority_granted: false,
           proof_issue_authority_granted: false
         } as const
-        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, indicator: "deterministic_existing_proof_returned", classification: canonicalEvidenceReplay.classification } })
+        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "deterministic_existing_proof_returned", classification: canonicalEvidenceReplay.classification } })
         return json({ status:"PROVEN", result:"OK", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay, proof: canonicalExistingProof })
       }
+      if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
       const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()

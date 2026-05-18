@@ -152,26 +152,67 @@ test('valid_execute_proof_path_preserved', () => {
 test('duplicate proof replay returns deterministic existing proof evidence without state mutation', () => {
   assert.match(
     source,
-    /SELECT \* FROM proof_registry WHERE execution_id=\?1 AND decision_id=\?2 AND validated_object_hash=\?3 ORDER BY created_at ASC, proof_id ASC LIMIT 2/,
+    /SELECT \* FROM proof_registry WHERE execution_id=\?1 AND decision_id=\?2 AND validated_object_hash=\?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3/,
     'proof must preflight canonical lineage duplicates before writes',
   )
 
   assert.match(
     source,
-    /if \(proofCandidates\.length > 1\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous" \}/,
+    /if \(proofCandidates\.length > 1 \|\| \(proofCandidates\.length === 1 && canonicalProofCandidates\.length !== 1\)\) \{[\s\S]*reason:"proof_lineage_ambiguous"/,
     'ambiguous duplicate proof lineage must fail closed',
   )
 
   assert.match(
     source,
-    /if \(canonicalExistingProof\) \{[\s\S]*return json\(\{ status:"PROVEN", result:"OK", proof_id: String\(canonicalExistingProof\.proof_id \|\| ""\), proof: canonicalExistingProof \}\)/,
+    /if \(canonicalExistingProof\) \{[\s\S]*return json\(\{ status:"PROVEN", result:"OK", proof_id: String\(canonicalExistingProof\.proof_id \|\| ""\), replay: canonicalEvidenceReplay, proof: canonicalExistingProof \}\)/,
     'duplicate replay must return deterministic canonical existing proof evidence',
   )
 })
 
 test('duplicate proof preflight occurs before authority consumption mutation path', () => {
   const proofStart = source.indexOf('if (url.pathname === "/proof" && request.method === "POST") {')
-  const duplicatePreflight = source.indexOf('SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 2', proofStart)
+  const duplicatePreflight = source.indexOf('SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3', proofStart)
   const authorityConsume = source.indexOf("UPDATE authority_registry SET status='CONSUMED'", proofStart)
   assert.ok(proofStart >= 0 && duplicatePreflight > proofStart && authorityConsume > duplicatePreflight, 'expected duplicate proof preflight before authority consumption')
+})
+
+
+test('proof ambiguity fail-closed binds existing proof evidence to invocation nonce', () => {
+  assert.match(
+    source,
+    /function proofExecutionLineageMatches\(proof: any, execution: any\): boolean \{[\s\S]*executionLineage\?\.invocation_nonce[\s\S]*execution\?\.invocation_nonce/,
+    'canonical existing proof evidence must match execution_id + decision_id + validated_object_hash + invocation_nonce',
+  )
+
+  assert.match(
+    source,
+    /const canonicalProofCandidates = proofCandidates\.filter\(\(proof: any\) => proofExecutionLineageMatches\(proof, execution\)\)/,
+    'proof replay must derive canonical candidates from exact execution lineage including invocation_nonce',
+  )
+
+  assert.match(
+    source,
+    /classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED"/,
+    'ambiguous proof lineage telemetry must carry the requested fail-closed classification',
+  )
+
+  assert.match(
+    source,
+    /drift_classes: \["replay_drift", "proof_lineage_drift"\]/,
+    'ambiguity telemetry must classify both replay and proof lineage drift without granting authority',
+  )
+})
+
+test('proof ambiguity fail-closed returns NULL before governed mutations', () => {
+  const proofStart = source.indexOf('if (url.pathname === "/proof" && request.method === "POST") {')
+  const ambiguityReject = source.indexOf('PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED', proofStart)
+  const proofInsert = source.indexOf('INSERT INTO proof_registry', proofStart)
+  const authorityConsume = source.indexOf("UPDATE authority_registry SET status='CONSUMED'", proofStart)
+  const invocationMutation = source.indexOf('UPDATE invocation_registry', proofStart)
+  const executionMutation = source.indexOf('UPDATE execution_registry', proofStart)
+  assert.ok(proofStart >= 0 && ambiguityReject > proofStart, 'expected ambiguity classification inside /proof')
+  assert.ok(proofInsert > ambiguityReject, 'ambiguous lineage must be rejected before proof_registry append')
+  assert.ok(authorityConsume > ambiguityReject, 'ambiguous lineage must be rejected before authority consumption')
+  assert.equal(invocationMutation, -1, 'proof route ambiguity handling must not mutate invocation_registry')
+  assert.equal(executionMutation, -1, 'proof route ambiguity handling must not mutate execution_registry')
 })
