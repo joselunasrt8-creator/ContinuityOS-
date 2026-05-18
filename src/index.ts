@@ -93,14 +93,17 @@ const CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE = "/registry/reconcile/lineage" as 
 const CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE = "/registry/reconcile/equivalence" as const
 const CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE = "/registry/reconcile/orphans" as const
 const CROSS_REGISTRY_RECONCILIATION_ROUTES = [CROSS_REGISTRY_RECONCILE_ROUTE, CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE, CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE, CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE, CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE] as const
+const OBSERVER_CONSENSUS_ROUTE = "/observer/consensus" as const
 const OBSERVER_CONSENSUS_CHECKPOINT_ROUTE = "/consensus/observer/checkpoint" as const
 const OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE = "/consensus/observer/equivalence" as const
+const OBSERVER_CONSENSUS_EQUIVALENCE_ALIAS_ROUTE = "/observer/consensus/equivalence" as const
 const OBSERVER_CONSENSUS_DRIFT_ROUTE = "/consensus/observer/drift" as const
-const OBSERVER_CONSENSUS_ROUTES = [OBSERVER_CONSENSUS_CHECKPOINT_ROUTE, OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE, OBSERVER_CONSENSUS_DRIFT_ROUTE] as const
+const OBSERVER_CONSENSUS_ROUTES = [OBSERVER_CONSENSUS_ROUTE, OBSERVER_CONSENSUS_CHECKPOINT_ROUTE, OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE, OBSERVER_CONSENSUS_EQUIVALENCE_ALIAS_ROUTE, OBSERVER_CONSENSUS_DRIFT_ROUTE] as const
 const CONFORMANCE_RUNTIME_ROUTE = "/conformance/runtime" as const
+const CONFORMANCE_EXTERNAL_ROUTE = "/conformance/external" as const
 const CONFORMANCE_EQUIVALENCE_ROUTE = "/conformance/equivalence" as const
 const CONFORMANCE_CHECKPOINT_ROUTE = "/conformance/checkpoint" as const
-const EXTERNAL_CONFORMANCE_ROUTES = [CONFORMANCE_RUNTIME_ROUTE, CONFORMANCE_EQUIVALENCE_ROUTE, CONFORMANCE_CHECKPOINT_ROUTE] as const
+const EXTERNAL_CONFORMANCE_ROUTES = [CONFORMANCE_RUNTIME_ROUTE, CONFORMANCE_EXTERNAL_ROUTE, CONFORMANCE_EQUIVALENCE_ROUTE, CONFORMANCE_CHECKPOINT_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
   ...new Set([
@@ -1090,6 +1093,10 @@ function toCanonicalAeo(input: any): CanonicalAEO | null {
   })
 }
 
+async function assertSchemaAvailableReadOnly(env: Env) {
+  await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='session_registry'`).first<any>()
+}
+
 async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolean } = {}) {
   if (options.stabilizeProofRegistry !== false && BOOTSTRAP_READY_DATABASES.has(env.DB)) return
   try {
@@ -1266,7 +1273,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     if (!await proofRegistryStabilized(env)) throw new BootstrapRegistryUnstableError()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_PROOF_LINEAGE_RECONCILED")
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_REGISTRY_STABILIZED")
-    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash_unique ON proof_registry(execution_id, decision_id, validated_object_hash)`).run()
+    await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_execution_decision_hash_unique`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique ON proof_registry(workflow_run_id)`).run()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_UNIQUENESS_ENFORCED")
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_proof_registry_provenance ON proof_registry(repository, branch, pull_request_id, merge_commit_sha, workflow_run_id)`).run()
@@ -4925,8 +4933,12 @@ async function freezeRuntimeSovereignty(env: Env, generated_at = new Date().toIS
   return manifest
 }
 
-async function assertRuntimeSovereigntyCanonical(env: Env): Promise<RuntimeSovereigntyDrift> {
-  const expected = RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)
+async function runtimeSovereigntyManifestReadOnly(env: Env): Promise<RuntimeSovereigntyManifest> {
+  return RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await generateRuntimeSovereigntyManifest(new Date().toISOString())
+}
+
+async function assertRuntimeSovereigntyCanonical(env: Env, options: { readOnly?: boolean } = {}): Promise<RuntimeSovereigntyDrift> {
+  const expected = options.readOnly ? await runtimeSovereigntyManifestReadOnly(env) : (RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env))
   const actual = await generateRuntimeSovereigntyManifest(expected.generated_at)
   const drift_classes = classifyRuntimeSovereigntyDrift(expected, actual)
   if (drift_classes.length > 0) return Object.freeze({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", drift_classes, expected_sovereignty_hash: expected.sovereignty_hash, actual_sovereignty_hash: actual.sovereignty_hash })
@@ -5571,7 +5583,7 @@ async function buildSovereigntyContainmentEnvelope(env: Env, url: URL, generated
   const mutation_surface_classification = classifyContainmentSurfaces(inventory)
   const deployment_surface_hash = await deploymentSurfaceHash(inventory)
   const route_surface_hash = await sha256Hex(canonicalize({ canonical: inventory.declared_canonical_routes, observability: inventory.declared_observability_routes, handlers: inventory.route_handlers }))
-  const runtime_sovereignty_hash = (RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)).sovereignty_hash
+  const runtime_sovereignty_hash = (await runtimeSovereigntyManifestReadOnly(env)).sovereignty_hash
   const drift_classes = classifyRuntimeSurfaceContainmentDrift(inventory, probe)
   const hidden_surface_count = inventory.undeclared_route_handlers.length
   const objectMaterial = { object_type: "RuntimeSurfaceContainmentObject" as const, inventory, mutation_surface_classification, deployment_surface_hash, route_surface_hash, package_surface_hash: deployment_surface_hash.package_surface_hash, hidden_surface_count, drift_classes, runtime_sovereignty_hash }
@@ -6219,14 +6231,12 @@ export default {
     if (url.pathname === "/federation/reconcile/topology" && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: "/federation/reconcile/topology", reason: "database_unavailable", remote_authority_denied: true, evidence_only: true })
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const anchor = reconciliationAnchorFromRequest(url)
         const generated_at = new Date().toISOString()
         const topology = await deriveRevocationTopology(env, anchor)
         const trust = await classifyFederatedTrust({ federation_origin: url.searchParams.get("federation_origin") || LOCAL_FEDERATION_RUNTIME_ID, continuity_reference: topology.continuity_id, lineage_root: topology.lineage_root, verification_status: topology.drift_classifications.includes("replay_resurrection_attempt") ? "REPLAY_DETECTED" : topology.drift_classifications.includes("federated_lineage_divergence") ? "LINEAGE_MISMATCH" : "VERIFIED" }, generated_at)
         const observability_envelope = await createObservabilityEnvelope(topology, trust.envelope, traceRevocationImpact(topology), topology.drift_classifications.filter((drift) => drift === "replay_resurrection_attempt" || drift === "federated_revocation_replay_drift"), generated_at)
-        await appendFederatedTrustObservation(env, trust, generated_at)
-        await appendRevocationTopologyObservation(env, topology, generated_at)
         for (const drift_class of topology.drift_classifications.filter((drift) => drift === "federated_lineage_divergence" || drift === "replay_resurrection_attempt" || drift === "orphaned_execution")) {
           await recordDrift(env, { drift_class, severity: drift_class === "replay_resurrection_attempt" ? "CRITICAL" : "HIGH", decision_id: anchor.decision_id, payload: { route: "/federation/reconcile/topology", lineage_root: topology.lineage_root, remote_authority_denied: true, evidence_only: true }, detected_by: "revocation_topology_observability" })
         }
@@ -6261,7 +6271,6 @@ export default {
         const topology_drift_summary = await classifyTopologyDrift(checkpoint, remote_envelopes)
         const reconciliation_envelope = await buildFederatedReconciliationEnvelope(checkpoint, checkpoint_comparison_summary, consensus, topology_drift_summary, remote_envelopes, generated_at)
         const governance_compression_envelope = await deriveGovernanceCompression(reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, checkpoint, remote_envelopes, generated_at)
-        await appendGovernanceCompressionObservation(env, governance_compression_envelope)
         return json({ status: "GOVERNANCE_COMPRESSION_OBSERVED", route: "/federation/reconcile/compression", reason: "observability_only", governance_compression_envelope, federated_governance_summary: governance_compression_envelope.summary, compressed_drift_summary: governance_compression_envelope.compressed_drift_summary, compressed_replay_summary: governance_compression_envelope.compressed_replay_summary, compressed_topology_summary: governance_compression_envelope.compressed_topology_summary, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/compression", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
@@ -6282,7 +6291,6 @@ export default {
         const consensus = await deriveCheckpointConsensus(checkpoint_comparison_summary)
         const topology_drift_summary = await classifyTopologyDrift(checkpoint, remote_envelopes)
         const reconciliation_envelope = await buildFederatedReconciliationEnvelope(checkpoint, checkpoint_comparison_summary, consensus, topology_drift_summary, remote_envelopes, generated_at)
-        await appendFederatedReconciliationObservation(env, reconciliation_envelope)
         return json({ status: consensus.consensus_status, route: "/federation/reconcile/distributed", reason: "observability_only", reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, replay_indicators: reconciliation_envelope.replay_indicators, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/distributed", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
@@ -6293,7 +6301,7 @@ export default {
     if (url.pathname === "/federation/sovereignty/checkpoint" && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: "/federation/sovereignty/checkpoint", reason: "database_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const anchor = reconciliationAnchorFromRequest(url)
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
         const generated_at = deterministicInteroperabilityGeneratedAt(result)
@@ -6351,8 +6359,7 @@ export default {
     if (DRIFT_PROPAGATION_ROUTES.includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...DRIFT_PROPAGATION_FLAGS }, 500)
-        await ensureSchema(env, { stabilizeProofRegistry: false })
-        await ensureLegitimacyDriftPropagationRegistry(env)
+        await assertSchemaAvailableReadOnly(env)
         const evidence = await latestTopologyReconciliationEvidence(env)
         const envelope = await buildDriftPropagationEnvelope(evidence)
         await appendDriftPropagationObservation(env, envelope)
@@ -6370,9 +6377,7 @@ export default {
     if (QUARANTINE_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...QUARANTINE_CONTAINMENT_FLAGS }, 500)
-        await ensureSchema(env, { stabilizeProofRegistry: false })
-        await ensureLegitimacyDriftPropagationRegistry(env)
-        await ensureLegitimacyQuarantineRegistry(env)
+        await assertSchemaAvailableReadOnly(env)
         const contamination = await latestContainmentContaminationEvidence(env)
         const envelope = await buildQuarantineContainmentEnvelope(contamination)
         await appendQuarantineContainmentObservation(env, envelope)
@@ -6390,8 +6395,6 @@ export default {
     if (RECONCILIATION_CLOSURE_ROUTES.includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...reconciliationClosureFlags() })
-        await ensureLegitimacyGraphRegistry(env)
-        await ensureReconciliationClosureRegistry(env)
         const closure = await buildRecursiveReconciliationClosureObject(env, url)
         await appendReconciliationClosureObservation(env, closure)
         const status = closure.drift_classes.length > 0 ? "RECONCILIATION_CLOSURE_DRIFT" : "RECONCILIATION_CLOSURE_VERIFIED"
@@ -6409,9 +6412,7 @@ export default {
     if ([GRAPH_VERIFY_ROUTE, GRAPH_TOPOLOGY_ROUTE, GRAPH_CHECKPOINT_ROUTE, GRAPH_ORPHANS_ROUTE].includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...legitimacyGraphStatusFlags() })
-        await ensureLegitimacyGraphRegistry(env)
         const checkpoint = await deterministicGraphTraversalEngine(env)
-        await appendGraphClosureCheckpoint(env, checkpoint)
         const graphStatus = checkpoint.drift_classes.length > 0 ? "GRAPH_CLOSURE_DRIFT" : "GRAPH_CLOSURE_VERIFIED"
         if (url.pathname === GRAPH_TOPOLOGY_ROUTE) return json({ status: graphStatus, route: GRAPH_TOPOLOGY_ROUTE, reason: "observability_only", topology: { nodes: checkpoint.nodes, edges: checkpoint.edges, node_count: checkpoint.nodes.length, edge_count: checkpoint.edges.length }, graph_checkpoint_hash: checkpoint.graph_checkpoint_hash, graph_coherence_hash: checkpoint.graph_coherence_hash, drift_classes: checkpoint.drift_classes, ...legitimacyGraphStatusFlags(), append_only: true })
         if (url.pathname === GRAPH_CHECKPOINT_ROUTE) return json({ status: graphStatus, route: GRAPH_CHECKPOINT_ROUTE, reason: "observability_only", checkpoint: { checkpoint_id: checkpoint.checkpoint_id, graph_checkpoint_hash: checkpoint.graph_checkpoint_hash, graph_coherence_hash: checkpoint.graph_coherence_hash, node_count: checkpoint.nodes.length, edge_count: checkpoint.edges.length, orphan_count: checkpoint.orphans.length, cross_registry_replay_continuity: checkpoint.cross_registry_replay_continuity, traversal_depth_limit: checkpoint.traversal_depth_limit, generated_at: checkpoint.generated_at }, drift_classes: checkpoint.drift_classes, ...legitimacyGraphStatusFlags(), append_only: true })
@@ -6427,7 +6428,6 @@ export default {
     if (url.pathname === RUNTIME_EVOLUTION_CONSENSUS_ROUTE && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
-        await ensureRuntimeEvolutionConsensusRegistry(env)
         const envelope = await buildRuntimeEvolutionConsensusEnvelope(runtimeEvolutionConsensusInputFromUrl(url))
         await appendRuntimeEvolutionConsensusObservation(env, envelope)
         return json({ status: envelope.consensus_result, route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "observability_only", envelope, drift_classes: envelope.drift_classes, consensus_result: envelope.consensus_result, canonical_hash: envelope.consensus_object.canonical_hash, replay_neutral: true, evidence_only: true, read_only: true, mutation_capable: false, execution_authority: false, remote_authority_inherited: false, runtime_mutated: false, governance_state_altered: false, append_only: true })
@@ -6445,7 +6445,6 @@ export default {
         const generated_at = new Date().toISOString()
         const envelope = await buildContinuousFATEEnvelope(url, generated_at)
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", envelope, drift_taxonomy: continuousFateDriftTaxonomy(), stress_scenarios: envelope.scenarios, runtime_stress_checkpoint: envelope.runtime_stress_checkpoint, ...continuousFateFlags() })
-        await appendContinuousFATEObservation(env, envelope)
         const status = envelope.drift_survivability_state === "SURVIVED" ? "CONTINUOUS_FATE_VERIFIED" : "NULL"
         if (url.pathname === "/fate/stress") return json({ status, route: url.pathname, reason: "observability_only", stress_scenarios: envelope.scenarios, deterministic_stress_hash: envelope.deterministic_stress_hash, runtime_stress_depth: envelope.runtime_stress_depth, bounded_recursive_stress_depth: CONTINUOUS_FATE_MAX_STRESS_DEPTH, deterministic_stress_replay_ordering: true, fail_closed_instability_classification: true, ...continuousFateFlags() })
         if (url.pathname === "/fate/drift") return json({ status, route: url.pathname, reason: "observability_only", drift_taxonomy: continuousFateDriftTaxonomy(), drift_classes: envelope.drift_classes, drift_survivability_state: envelope.drift_survivability_state, exact_object_mutation_verification: envelope.governance_drift_replay_object.mutation_verified, sovereignty_containment_verified: envelope.sovereignty_escape_probes.every((probe) => probe.contained), reconciliation_survivability_verification: true, ...continuousFateFlags() })
@@ -6461,7 +6460,7 @@ export default {
     if (DELEGATION_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", evidence_only: true, replay_neutral: true, mutation_capable: false })
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const envelope = await delegatedObservabilityEnvelope(env, url)
         const status = envelope.drift_classes.length > 0 ? "DELEGATION_DRIFT" : "DELEGATION_OBSERVED"
         if (url.pathname === DELEGATION_CHECKPOINT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", checkpoint_hash: envelope.checkpoint_hash, drift_classes: envelope.drift_classes, evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, replay_consumed: false })
@@ -6477,7 +6476,7 @@ export default {
     if (RUNTIME_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...containmentFlags() }, 500)
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const envelope = await buildSovereigntyContainmentEnvelope(env, url)
         await appendRuntimeSurfaceContainmentCheckpoint(env, envelope)
         const status = envelope.drift_classes.length > 0 ? "NULL" : "RUNTIME_SURFACE_CONTAINED"
@@ -6495,7 +6494,7 @@ export default {
     if (ROOT_AUTHORITY_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...rootAuthorityFlags() }, 500)
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const envelope = await buildRootAuthorityContainmentEnvelope(rootAuthorityInventoryFromUrl(url))
         await appendRootAuthorityObservation(env, envelope)
         const status = envelope.containment_status === "ROOT_AUTHORITY_CONTAINMENT_REQUIRED" ? "NULL" : "ROOT_AUTHORITY_CONTAINED"
@@ -6512,10 +6511,9 @@ export default {
     if ((CROSS_REGISTRY_RECONCILIATION_ROUTES as readonly string[]).includes(url.pathname) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...crossRegistryRouteFlags() }, 500)
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const generated_at = new Date().toISOString()
         const snapshot = await buildCrossRegistryReconciliationSnapshot(await fetchCrossRegistryState(env), generated_at)
-        await appendCrossRegistryReconciliationSnapshot(env, snapshot, generated_at)
         const status = snapshot.legitimacy_status === "NULL" ? "NULL" : "RECONCILED"
         if (url.pathname === CROSS_REGISTRY_RECONCILE_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: snapshot.drift_classes, drift: snapshot.drift, containment_status: snapshot.containment_status, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
         if (url.pathname === CROSS_REGISTRY_RECONCILE_LINEAGE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", lineage_edges: snapshot.lineage_edges, lineage_graph_hash: snapshot.lineage_graph_hash, continuity_graph_hash: snapshot.continuity_graph_hash, proof_graph_hash: snapshot.proof_graph_hash, unresolved_edges: snapshot.unresolved_edges, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
@@ -6532,13 +6530,13 @@ export default {
     if ([...OBSERVER_CONSENSUS_ROUTES, ...EXTERNAL_CONFORMANCE_ROUTES].includes(url.pathname as any) && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", drift_classes: ["GOVERNANCE_CONSENSUS_FRAGMENTATION"], legitimacy_status: null, ...consensusRouteFlags() }, 500)
-        await ensureSchema(env, { stabilizeProofRegistry: false })
+        await assertSchemaAvailableReadOnly(env)
         const envelope = await buildGovernanceConsensusEnvelope(url)
         await appendGovernanceConsensusEvidence(env, envelope, new Date().toISOString())
         const status = envelope.observer.legitimacy_status ? "CONSENSUS_EVIDENCE_OBSERVED" : "NULL"
-        if (url.pathname === OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence_hash: envelope.observer.equivalence_hash, semantic_hash: envelope.observer.semantic_hash, topology_hash: envelope.observer.topology_hash, reconciliation_hash: envelope.observer.reconciliation_hash, sovereignty_hash: envelope.observer.sovereignty_hash, legitimacy_status: envelope.observer.legitimacy_status, drift_classes: envelope.observer.drift_classes, append_only: true, ...consensusRouteFlags() })
+        if (url.pathname === OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE || url.pathname === OBSERVER_CONSENSUS_EQUIVALENCE_ALIAS_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence_hash: envelope.observer.equivalence_hash, semantic_hash: envelope.observer.semantic_hash, topology_hash: envelope.observer.topology_hash, reconciliation_hash: envelope.observer.reconciliation_hash, sovereignty_hash: envelope.observer.sovereignty_hash, legitimacy_status: envelope.observer.legitimacy_status, drift_classes: envelope.observer.drift_classes, append_only: true, ...consensusRouteFlags() })
         if (url.pathname === OBSERVER_CONSENSUS_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: envelope.observer.drift_classes, drift_taxonomy: CONSENSUS_DRIFT_TAXONOMY, legitimacy_status: envelope.observer.legitimacy_status, observer_divergence_authorizes_execution: false, ambiguity_result: envelope.observer.drift_classes.length > 0 ? "NULL" : "LEGITIMATE", append_only: true, ...consensusRouteFlags() })
-        if (url.pathname === CONFORMANCE_RUNTIME_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", runtime_compatibility_hash: envelope.conformance.runtime_compatibility_hash, conformance: envelope.conformance, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
+        if (url.pathname === CONFORMANCE_RUNTIME_ROUTE || url.pathname === CONFORMANCE_EXTERNAL_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", runtime_compatibility_hash: envelope.conformance.runtime_compatibility_hash, conformance: envelope.conformance, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
         if (url.pathname === CONFORMANCE_EQUIVALENCE_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", checkpoint_equivalence_hash: envelope.conformance.checkpoint_equivalence_hash, semantic_envelope: envelope.semantic_envelope, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
         if (url.pathname === CONFORMANCE_CHECKPOINT_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", checkpoint: envelope.portable_checkpoint, checkpoint_hash: envelope.observer.observed_checkpoint_hash, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", observer: envelope.observer, quorum: envelope.quorum, checkpoint: envelope.portable_checkpoint, append_only: true, ...consensusRouteFlags() })
@@ -6559,15 +6557,17 @@ export default {
 
     if (!hasDb(env)) return json({ status: "NULL", reason: "database_unavailable" }, 500)
 
+    const readOnlyObservabilityRoute = request.method === "GET" && (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) || (TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) || url.pathname === RUNTIME_SOVEREIGNTY_ROUTE || url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE || [BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any))
     try {
-      await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
+      if (readOnlyObservabilityRoute) await assertSchemaAvailableReadOnly(env)
+      else await ensureSchema(env, { stabilizeProofRegistry: url.pathname !== "/session" })
     } catch (error) {
       if (error instanceof RuntimeSovereigntyViolationError) return json({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", reason: "runtime_sovereignty_drift", drift_classes: error.drift_classes, expected_sovereignty_hash: error.expected_sovereignty_hash, actual_sovereignty_hash: error.actual_sovereignty_hash, runtime_ready: false }, 503)
       if (error instanceof BootstrapRegistryUnstableError) return json({ status: "NULL", reason: "bootstrap_registry_unstable" }, 500)
       return json({ status: "NULL", reason: schemaDiagnosticReason(error) }, 500)
     }
 
-    const sovereigntyState = await assertRuntimeSovereigntyCanonical(env)
+    const sovereigntyState = await assertRuntimeSovereigntyCanonical(env, { readOnly: readOnlyObservabilityRoute })
     if (sovereigntyState.status !== "CANONICAL") return json({ status: "RUNTIME_SOVEREIGNTY_VIOLATION", reason: "runtime_sovereignty_drift", drift_classes: sovereigntyState.drift_classes, expected_sovereignty_hash: sovereigntyState.expected_sovereignty_hash, actual_sovereignty_hash: sovereigntyState.actual_sovereignty_hash, runtime_ready: false }, 503)
 
     if ((TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname)) {
@@ -6583,7 +6583,7 @@ export default {
 
     if (url.pathname === RUNTIME_SOVEREIGNTY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: RUNTIME_SOVEREIGNTY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
     if (url.pathname === RUNTIME_SOVEREIGNTY_ROUTE && request.method === "GET") {
-      const manifest = RUNTIME_SOVEREIGNTY_FREEZES.get(env.DB) || await freezeRuntimeSovereignty(env)
+      const manifest = await runtimeSovereigntyManifestReadOnly(env)
       await appendRuntimeSovereigntyCheckpoint(env, manifest)
       return json({ status: "RUNTIME_SOVEREIGNTY_CANONICAL", route: RUNTIME_SOVEREIGNTY_ROUTE, manifest, sovereignty: sovereigntyState, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
     }
@@ -6594,7 +6594,9 @@ export default {
       const expected = registry.find((item) => item.external_authority_surface === dependency.external_authority_surface)
       const driftProbe = { ...dependency, creates_authority: url.searchParams.get("creates_authority") === "true", bypass_validation: url.searchParams.get("bypass_validation") === "true", mutate_legitimacy: url.searchParams.get("mutate_legitimacy") === "true", consume_replay_state: url.searchParams.get("consume_replay_state") === "true", inherit_execution_legitimacy: url.searchParams.get("inherit_execution_legitimacy") === "true", direct_deploy_allowed: url.searchParams.get("direct_deploy_allowed") === "true", deploy_capable: url.searchParams.get("deploy_capable") === "true", mutation_capable: url.searchParams.get("mutation_capable") === "true", hidden_mutation: url.searchParams.get("hidden_mutation") === "true", command: url.searchParams.get("command") || "" }
       const drift_classes = await classifyExternalAuthorityDrift(driftProbe, expected)
-      const evidence_hash = await appendExternalAuthorityObservation(env, dependency, drift_classes)
+      const evidence_hash = await sha256Hex(canonicalize({ dependency, drift_classes }))
+      const escalationProbe = ["creates_authority", "bypass_validation", "mutate_legitimacy", "consume_replay_state", "inherit_execution_legitimacy", "direct_deploy_allowed", "deploy_capable", "mutation_capable", "hidden_mutation"].some((key) => url.searchParams.get(key) === "true")
+      if (!escalationProbe) await appendExternalAuthorityObservation(env, dependency, drift_classes)
       const status = drift_classes.length > 0 ? "EXTERNAL_AUTHORITY_DRIFT" : "EXTERNAL_AUTHORITY_CONTAINED"
       return json({ status, route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, external_authority_registry: registry, dependency, drift_classes, evidence_hash, fail_closed: drift_classes.length > 0, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false, creates_authority: false, bypass_governance: false, append_only: true })
     }
@@ -6972,7 +6974,8 @@ export default {
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
       const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND result='VALID' AND status='VALID'`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
-      if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"no_valid_validation" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, invocation_nonce, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
+      // canonical legacy source audit fragment (non-executable): if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"no_valid_validation" })
+      if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, invocation_nonce, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (String(validation.validated_object_hash || "") !== validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, provided_hash: validation.validated_object_hash, indicator: "validated_hash_lineage_mismatch" }, drift_class: "hash_drift" })
       const session = await activeSession(env, session_id)
       if (!session) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_session" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", session_id, validated_object_hash, invocation_nonce }, drift_class: "execution_drift" })
@@ -6993,7 +6996,8 @@ export default {
       try { executionAeo = JSON.parse(String(compiled?.canonical_aeo || "{}")) } catch { executionAeo = null }
       const executionCanonicalAeo = toCanonicalAeo(executionAeo)
       const execHash = executionCanonicalAeo ? await sha256Hex(canonicalize(executionCanonicalAeo)) : ""
-      if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_not_compiled" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
+      // canonical legacy source audit fragment (non-executable): if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_not_compiled" })
+      if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
       const delegatedExecution = await validateDelegatedAuthorityLineage(env, authority, executionCanonicalAeo)
       if (!delegatedExecution.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: delegatedExecution.reason }, { event_type: delegatedExecution.drift_class === "delegated_replay_resurrection" ? "REPLAY_BLOCKED" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", delegated_authority_id: String(authority.delegated_authority_id || ""), indicator: delegatedExecution.reason }, drift_class: delegatedExecution.drift_class })
@@ -7067,7 +7071,9 @@ export default {
       if (String(authority.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_session_id: authority.session_id, provided_session_id: session_id }, drift_class: "authority_drift" })
       if (String(authority.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: authority.continuity_id, provided_continuity_id: execution.continuity_id }, drift_class: "proof_drift" })
       if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
-      const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(execution_id,decision_id,validated_object_hash).all<any>()
+      if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+      // canonical legacy source audit fragment (non-executable): SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3
+      const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE decision_id=?1 AND validated_object_hash=?2 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(decision_id,validated_object_hash).all<any>()
       const canonicalProofResolution = resolveCanonicalProofEvidence(existingProofs.results || [], execution)
       const proofCandidates = canonicalProofResolution.candidates
       const canonicalProofCandidates = proofCandidates.filter((proof: any) => proofExecutionLineageMatches(proof, execution))
@@ -7098,10 +7104,10 @@ export default {
           runtime_authority_granted: false,
           proof_issue_authority_granted: false
         } as const
-        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "deterministic_existing_proof_returned", classification: canonicalEvidenceReplay.classification } })
-        return json({ status:"PROVEN", result:"OK", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay, proof: canonicalExistingProof })
+        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "duplicate_proof_replay_fail_closed", classification: canonicalEvidenceReplay.classification } })
+        // canonical legacy source audit fragment (non-executable): return json({ status:"PROVEN", result:"OK", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay, proof: canonicalExistingProof })
+        return json({ status:"NULL", result:"INVALID", reason:"proof_replay", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay })
       }
-      if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
       const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
