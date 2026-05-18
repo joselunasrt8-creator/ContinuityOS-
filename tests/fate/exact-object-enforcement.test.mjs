@@ -45,8 +45,8 @@ test('execution requires decision_id, validated_object_hash, and a VALID validat
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"hash_mismatch\" \}/,
-    'missing validation hash match must return NULL / INVALID with hash_mismatch',
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"no_valid_validation\" \}/,
+    'missing validation hash match must return NULL / INVALID with no_valid_validation',
   )
 
   assert.match(
@@ -177,4 +177,91 @@ test('validation rejection does not consume invocation_registry', () => {
   const noCompiledBlock = source.slice(noCompiledStart, invocationInsert)
   assert.match(noCompiledBlock, /return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"(?:lineage_mismatch|hash_mismatch)" \}/)
   assert.doesNotMatch(noCompiledBlock, /invocation_registry/, 'fail-closed validation rejection path must not consume invocation nonce')
+})
+
+test('execute_rejects_uncompiled_hash', () => {
+  assert.match(
+    source,
+    /const compiled = await env\.DB\.prepare\(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=\?1 AND validated_object_hash=\?2 AND status='COMPILED'`\)\.bind\(decision_id,validated_object_hash\)\.first<any>\(\)/,
+    'execute must re-bind decision_id + validated_object_hash to a COMPILED AEO row before execution',
+  )
+
+  assert.match(
+    source,
+    /if \(!compiled \|\| !executionCanonicalAeo \|\| execHash !== validated_object_hash \|\| execHash !== String\(compiled\.validated_object_hash \|\| ""\)\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_not_compiled" \}/,
+    'execute must fail closed with hash_not_compiled when hash is not a canonical compiled object',
+  )
+})
+
+test('execute_rejects_unvalidated_hash', () => {
+  assert.match(
+    source,
+    /SELECT \* FROM validation_registry WHERE decision_id=\?1 AND validated_object_hash=\?2 AND invocation_nonce=\?3 AND result='VALID' AND status='VALID'/,
+    'execute must require a VALID validation_registry row for decision_id + validated_object_hash + invocation_nonce',
+  )
+
+  assert.match(
+    source,
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"no_valid_validation" \}/,
+    'execute must reject unvalidated hashes with no_valid_validation',
+  )
+})
+
+test('execute_rejects_cross_context_hash', () => {
+  assert.match(
+    source,
+    /if \(String\(validation\.continuity_id \|\| ""\) !== String\(authority\.continuity_id \|\| ""\)\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"lineage_mismatch" \}/,
+    'execute must reject validation rows that do not match authority continuity lineage',
+  )
+
+  assert.match(
+    source,
+    /if \(String\(compiled\.continuity_id \|\| ""\) !== String\(authority\.continuity_id \|\| ""\)\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"lineage_mismatch" \}/,
+    'execute must reject compiled rows that do not match authority continuity lineage',
+  )
+})
+
+test('execute_preserves_validated_compiled_hash_path', () => {
+  assert.match(
+    source,
+    /INSERT INTO execution_registry[\s\S]*decision_id,validated_object_hash,invocation_nonce[\s\S]*\.bind\(execution_id, authority\.session_id, decision_id, validated_object_hash, invocation_nonce/,
+    'execute must persist the same validated_object_hash that passed compiled + validation binding checks',
+  )
+
+  assert.match(
+    source,
+    /return json\(\{ status:"EXECUTED", session_id, execution_id \}\)/,
+    'execute canonical path must still return EXECUTED without alternate response authority fields',
+  )
+})
+
+test('execution rejection does not write execution_registry', () => {
+  const executeStart = source.indexOf('if (url.pathname === "/execute" && request.method === "POST") {')
+  const executionInsert = source.indexOf('INSERT INTO execution_registry', executeStart)
+  const unvalidatedStart = source.indexOf('if (!validation) return rejectWithTelemetry', executeStart)
+  assert.ok(executeStart >= 0 && unvalidatedStart > executeStart && executionInsert > unvalidatedStart, 'expected execute fail-closed branch before execution insert')
+
+  const failClosedBlock = source.slice(unvalidatedStart, executionInsert)
+  assert.match(failClosedBlock, /reason:"(?:no_valid_validation|hash_not_compiled|lineage_mismatch)"/)
+  assert.doesNotMatch(failClosedBlock, /INSERT INTO execution_registry/, 'execute fail-closed rejection path must not write execution_registry')
+})
+
+test('execution rejection does not consume invocation_registry', () => {
+  const executeStart = source.indexOf('if (url.pathname === "/execute" && request.method === "POST") {')
+  const invocationConsume = source.indexOf("UPDATE invocation_registry SET status='EXECUTED'", executeStart)
+  const uncompiledStart = source.indexOf('if (!compiled || !executionCanonicalAeo', executeStart)
+  assert.ok(executeStart >= 0 && uncompiledStart > executeStart && invocationConsume > uncompiledStart, 'expected execute fail-closed compiled guard before nonce consumption')
+
+  const failClosedBlock = source.slice(uncompiledStart, invocationConsume)
+  assert.match(failClosedBlock, /reason:"(?:hash_not_compiled|lineage_mismatch)"/)
+  assert.doesNotMatch(failClosedBlock, /UPDATE invocation_registry SET status='EXECUTED'/, 'execute fail-closed rejection path must not consume invocation nonce')
+})
+
+test('execution rejection does not create proof_registry entry', () => {
+  const executeStart = source.indexOf('if (url.pathname === "/execute" && request.method === "POST") {')
+  const proofRouteStart = source.indexOf('if (url.pathname === "/proof" && request.method === "POST") {')
+  const executeBlock = source.slice(executeStart, proofRouteStart)
+
+  assert.doesNotMatch(executeBlock, /INSERT INTO proof_registry/, 'execute rejection paths must not create proof_registry entries')
+  assert.doesNotMatch(executeBlock, /UPDATE authority_registry SET status='CONSUMED'/, 'execute rejection paths must not mutate authority to proof-consumed state')
 })
