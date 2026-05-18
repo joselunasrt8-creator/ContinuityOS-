@@ -24,10 +24,10 @@
   "bypass_result": "NULL",
   "paths": [
     {
-      "id": "direct_deploy",
-      "classification": "deployment_bypass",
+      "id": "cloudflare_account_or_token_direct_deploy",
+      "classification": "root_authority_escape_hatch",
       "allowed": false,
-      "result": "NULL",
+      "result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
       "governance_policy_refs": [
         "DEPLOY_POLICY",
         "PREO_POLICY",
@@ -49,6 +49,19 @@
       "non_bypassable": true
     },
     {
+      "id": "direct_deploy",
+      "classification": "deployment_bypass",
+      "allowed": false,
+      "result": "NULL",
+      "governance_policy_refs": [
+        "DEPLOY_POLICY",
+        "PREO_POLICY",
+        "SCO_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
       "id": "direct_execution_without_validation",
       "classification": "execution_bypass",
       "allowed": false,
@@ -56,6 +69,45 @@
       "governance_policy_refs": [
         "PREO_POLICY",
         "REPLAY_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "github_admin_branch_protection_root_override",
+      "classification": "root_authority_escape_hatch",
+      "allowed": false,
+      "result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "governance_policy_refs": [
+        "DEPLOY_POLICY",
+        "PREO_POLICY",
+        "SCO_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "github_repository_environment_secret_root_override",
+      "classification": "root_authority_escape_hatch",
+      "allowed": false,
+      "result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "governance_policy_refs": [
+        "DEPLOY_POLICY",
+        "PREO_POLICY",
+        "SCO_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "local_authenticated_wrangler_direct_deploy",
+      "classification": "root_authority_escape_hatch",
+      "allowed": false,
+      "result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "governance_policy_refs": [
+        "DEPLOY_POLICY",
+        "PREO_POLICY",
+        "SCO_POLICY"
       ],
       "drift_observable": true,
       "non_bypassable": true
@@ -73,5 +125,5 @@
       "non_bypassable": true
     }
   ],
-  "inventory_hash": "7ad5b2e1e041351927e8b670c22cc2f2c5accc49e906ca7122fc180d132e983c"
+  "inventory_hash": "3d8e5072abb3fcbd9b1d38b9299503f3f7def68911ffec4235bd6d81040d0200"
 }

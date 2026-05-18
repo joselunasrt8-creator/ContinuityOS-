@@ -60,6 +60,10 @@ test('bypass paths identify direct deploy, raw DB write, webhook, hidden, exact-
     'legacy_runtime_entrypoint_invocation',
     'mutation_after_validation',
     'proof_without_execution_lineage',
+    'github_admin_branch_protection_root_override',
+    'github_repository_environment_secret_root_override',
+    'cloudflare_account_or_token_direct_deploy',
+    'local_authenticated_wrangler_direct_deploy',
   ]) {
     requireBypass(id);
   }

@@ -31,7 +31,7 @@
     {
       "surface_id": "cloudflare_account_authority",
       "authority_origin": "cloudflare_account",
-      "declared_boundary": "/session\u2192/continuity\u2192/authority\u2192/compile\u2192/validate\u2192/execute\u2192/proof",
+      "declared_boundary": "external-root-cloudflare-account-containment-required",
       "classifications": [
         "ROOT_DEPLOY_AUTHORITY",
         "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY",
@@ -95,7 +95,7 @@
     {
       "surface_id": "github_actions_workflow_dispatch",
       "authority_origin": "github_actions",
-      "declared_boundary": "/authority\u2192/compile\u2192/validate\u2192/execute\u2192/proof",
+      "declared_boundary": "trigger-only-no-secret-inspection",
       "classifications": [
         "ROOT_WORKFLOW_AUTHORITY"
       ],
@@ -109,7 +109,7 @@
     {
       "surface_id": "github_admin_authority",
       "authority_origin": "github_repository",
-      "declared_boundary": "/session\u2192/continuity\u2192/authority\u2192/compile\u2192/validate\u2192/execute\u2192/proof",
+      "declared_boundary": "external-root-github-admin-and-branch-policy-containment-required",
       "classifications": [
         "ROOT_BRANCH_POLICY_AUTHORITY",
         "ROOT_REPOSITORY_AUTHORITY",

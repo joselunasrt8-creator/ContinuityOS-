@@ -8,74 +8,189 @@
     {
       "bypass_id": "direct_wrangler_deploy",
       "category": "direct_deploy_path",
-      "observed_paths": ["wrangler.toml", "package.json", ".github/workflows/*.yml"],
+      "observed_paths": [
+        "wrangler.toml",
+        "package.json",
+        ".github/workflows/*.yml"
+      ],
       "current_evidence": "No wrangler deploy command observed in workflow scan; package deploy script is disabled.",
       "risk": "A future workflow/script could call wrangler deploy without /authority -> /compile -> /validate -> /execute -> /proof.",
       "required_response": "block_or_NULL",
-      "required_tests": ["workflow_deploy_exclusivity", "package_deploy_disabled"]
+      "required_tests": [
+        "workflow_deploy_exclusivity",
+        "package_deploy_disabled"
+      ]
     },
     {
       "bypass_id": "raw_d1_migration_apply",
       "category": "raw_db_write_path",
-      "observed_paths": ["package.json", "migrations/*.sql", "schema.sql"],
+      "observed_paths": [
+        "package.json",
+        "migrations/*.sql",
+        "schema.sql"
+      ],
       "current_evidence": "Local D1 migration script exists; migrations include INSERT/DELETE/schema mutations.",
       "risk": "Production D1 migration apply can mutate registry state outside exact-object validation unless separately governed.",
       "required_response": "governed_migration_only_or_NULL",
-      "required_tests": ["raw_db_write_surface_declared", "migration_replay_constraints_preserved"]
+      "required_tests": [
+        "raw_db_write_surface_declared",
+        "migration_replay_constraints_preserved"
+      ]
     },
     {
       "bypass_id": "runtime_raw_registry_write",
       "category": "raw_db_write_path",
-      "observed_paths": ["src/index.ts"],
+      "observed_paths": [
+        "src/index.ts"
+      ],
       "current_evidence": "D1 INSERT/UPDATE/DELETE statements exist in canonical runtime lifecycle handlers.",
       "risk": "Any new DB write outside canonical route/lineage helpers could create implicit authority or proof bypass.",
       "required_response": "route_through_canonical_runtime_or_NULL",
-      "required_tests": ["runtime_db_writes_have_surface_mapping", "exact_object_execution_required"]
+      "required_tests": [
+        "runtime_db_writes_have_surface_mapping",
+        "exact_object_execution_required"
+      ]
     },
     {
       "bypass_id": "manual_governed_workflow_dispatch_without_valid_object",
       "category": "direct_deploy_path",
-      "observed_paths": [".github/workflows/governed-deploy.yml", ".github/workflows/prepare-governed-deploy.yml"],
+      "observed_paths": [
+        ".github/workflows/governed-deploy.yml",
+        ".github/workflows/prepare-governed-deploy.yml"
+      ],
       "current_evidence": "Dispatch inputs exist and workflow asserts required decision_id, validated_object_hash, and invocation_nonce.",
       "risk": "Manual dispatch could attempt execution with fabricated object material.",
       "required_response": "NULL_before_execution",
-      "required_tests": ["missing_or_mismatched_inputs_fail_closed", "replay_execute_probe_blocks"]
+      "required_tests": [
+        "missing_or_mismatched_inputs_fail_closed",
+        "replay_execute_probe_blocks"
+      ]
     },
     {
       "bypass_id": "webhook_mutation_demo_object",
       "category": "webhook_mutation_path",
-      "observed_paths": ["decision.json", "aeo.json"],
+      "observed_paths": [
+        "decision.json",
+        "aeo.json"
+      ],
       "current_evidence": "Static demo object uses transfer_webhook/webhook metadata but no production webhook caller was observed.",
       "risk": "Static webhook intent could be mistaken for live authority if accepted outside canonical compile/validate.",
       "required_response": "demo_only_or_NULL",
-      "required_tests": ["static_demo_objects_non_authoritative"]
+      "required_tests": [
+        "static_demo_objects_non_authoritative"
+      ]
     },
     {
       "bypass_id": "legacy_runtime_entrypoint_invocation",
       "category": "hidden_execution_path",
-      "observed_paths": ["server.js", "gateway.js", "worker.js", "registry.js", "compile-decision.js", "Dockerfile", "mindshift_bundle_generator.sh"],
+      "observed_paths": [
+        "server.js",
+        "gateway.js",
+        "worker.js",
+        "registry.js",
+        "compile-decision.js",
+        "Dockerfile",
+        "mindshift_bundle_generator.sh"
+      ],
       "current_evidence": "server.js/gateway.js/worker.js throw, but registry.js and compile-decision.js remain manually invocable demo paths; Dockerfile points to disabled server.js.",
       "risk": "Legacy/demo path could be wired into deployment or treated as authority without runtime validation.",
       "required_response": "quarantine_or_NULL",
-      "required_tests": ["legacy_entrypoints_quarantined", "demo_compile_not_production_authority"]
+      "required_tests": [
+        "legacy_entrypoints_quarantined",
+        "demo_compile_not_production_authority"
+      ]
     },
     {
       "bypass_id": "mutation_after_validation",
       "category": "exact_object_bypass",
-      "observed_paths": ["src/index.ts", ".github/workflows/governed-deploy.yml"],
+      "observed_paths": [
+        "src/index.ts",
+        ".github/workflows/governed-deploy.yml"
+      ],
       "current_evidence": "Workflow and runtime bind validated_object_hash through validate/execute/proof.",
       "risk": "Changing target/scope after VALID but before execute would violate validated_object == executed_object.",
       "required_response": "NULL_hash_mismatch",
-      "required_tests": ["post_validation_mutation_rejected", "execute_rerequires_validated_hash"]
+      "required_tests": [
+        "post_validation_mutation_rejected",
+        "execute_rerequires_validated_hash"
+      ]
     },
     {
       "bypass_id": "proof_without_execution_lineage",
       "category": "proof_bypass",
-      "observed_paths": ["src/index.ts", ".github/workflows/governed-deploy.yml"],
+      "observed_paths": [
+        "src/index.ts",
+        ".github/workflows/governed-deploy.yml"
+      ],
       "current_evidence": "Proof request includes execution_id, decision_id, validated_object_hash, workflow, run_id, and commit_sha.",
       "risk": "Proof accepted without exact execution lineage could legitimize unvalidated execution.",
       "required_response": "NULL_lineage_mismatch",
-      "required_tests": ["proof_lineage_required", "proof_replay_unique"]
+      "required_tests": [
+        "proof_lineage_required",
+        "proof_replay_unique"
+      ]
+    },
+    {
+      "bypass_id": "github_admin_branch_protection_root_override",
+      "category": "root_authority_escape_hatch",
+      "observed_paths": [
+        "GitHub repository settings",
+        "branch protection rules"
+      ],
+      "current_evidence": "Repository admin and branch protection authority are external root surfaces in runtime/sovereignty/root_authority_inventory.json; no secret values are inspected.",
+      "risk": "An admin/settings change could weaken workflow or branch protections outside the governed deploy lifecycle.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED_or_NULL",
+      "required_tests": [
+        "root_authority_escape_hatches_in_bypass_artifacts",
+        "workflow_dispatch_full_lifecycle_required"
+      ]
+    },
+    {
+      "bypass_id": "github_repository_environment_secret_root_override",
+      "category": "root_authority_escape_hatch",
+      "observed_paths": [
+        "GitHub repository secrets",
+        "GitHub environment secrets"
+      ],
+      "current_evidence": "Repository/environment secrets are inventoried as external root dependencies and secret material remains NOT_INSPECTED.",
+      "risk": "Secret or environment mutation could redirect runtime/deploy authority without becoming MindShift authority.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED_or_NULL",
+      "required_tests": [
+        "root_authority_escape_hatches_in_bypass_artifacts",
+        "secret_values_not_inspected"
+      ]
+    },
+    {
+      "bypass_id": "cloudflare_account_or_token_direct_deploy",
+      "category": "root_authority_escape_hatch",
+      "observed_paths": [
+        "Cloudflare account",
+        "Cloudflare API token",
+        "wrangler.toml"
+      ],
+      "current_evidence": "Cloudflare account/token authority is classified as root/external authority; workflow deploy scan does not inspect token values.",
+      "risk": "A Cloudflare account or token holder could deploy directly outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED_or_NULL",
+      "required_tests": [
+        "root_authority_escape_hatches_in_bypass_artifacts",
+        "workflow_deploy_exclusivity"
+      ]
+    },
+    {
+      "bypass_id": "local_authenticated_wrangler_direct_deploy",
+      "category": "root_authority_escape_hatch",
+      "observed_paths": [
+        "local wrangler CLI",
+        "local environment credentials",
+        "package.json"
+      ],
+      "current_evidence": "Local Wrangler authority is classified as root/local bypass risk; package deploy guard is disabled and deploy:dry-run uses --dry-run.",
+      "risk": "A local authenticated wrangler deploy command remains a root authority escape hatch if executed outside governed workflow.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED_or_NULL",
+      "required_tests": [
+        "root_authority_escape_hatches_in_bypass_artifacts",
+        "package_deploy_disabled"
+      ]
     }
   ]
 }

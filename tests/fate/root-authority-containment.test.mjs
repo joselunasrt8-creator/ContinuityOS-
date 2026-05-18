@@ -21,6 +21,9 @@ const mapArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/i
 const assumptionArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/sovereignty_assumption_registry.json', import.meta.url), 'utf8'))
 const taxonomyArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/root_authority_drift_taxonomy.json', import.meta.url), 'utf8'))
 const rulesArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/root_authority_containment_rules.json', import.meta.url), 'utf8'))
+const sovereigntyGaps = JSON.parse(readFileSync(new URL('../../runtime/sovereignty_gaps.json', import.meta.url), 'utf8'))
+const rootBypassArtifact = JSON.parse(readFileSync(new URL('../../BYPASS_PATHS.json', import.meta.url), 'utf8'))
+const runtimeBypassArtifact = JSON.parse(readFileSync(new URL('../../runtime/bypass_paths.json', import.meta.url), 'utf8'))
 
 class D1 {
   constructor() {
@@ -248,4 +251,45 @@ test('expanded root authority closure preserves containment semantics without se
   assert.ok(envelope.drift_classes.includes('ROOT_AUTHORITY_BYPASS_RISK'))
   assert.equal(envelope.secret_values_inspected, false)
   assert.equal(envelope.secret_material_persisted, false)
+})
+
+
+test('root authority escape hatches are evidence-only bypass paths and sovereignty gaps', () => {
+  const inventoryById = new Map(inventoryArtifact.surfaces.map((surface) => [surface.surface_id, surface]))
+  assert.equal(inventoryById.get('github_admin_authority').declared_boundary, 'external-root-github-admin-and-branch-policy-containment-required')
+  assert.equal(inventoryById.get('cloudflare_account_authority').declared_boundary, 'external-root-cloudflare-account-containment-required')
+  assert.equal(inventoryById.get('github_actions_workflow_dispatch').declared_boundary, 'trigger-only-no-secret-inspection')
+  assert.equal(inventoryById.get('github_actions_workflow_dispatch').workflow_dispatch_semantics, 'TRIGGER_ONLY')
+  for (const surface of inventoryArtifact.surfaces) {
+    assert.equal(surface.secret_material, 'NOT_INSPECTED')
+    assert.equal(surface.executable, false)
+    assert.equal(surface.deployment_capable, false)
+    assert.equal(surface.creates_authority, false)
+  }
+
+  for (const assumptionId of [
+    'root_admin_branch_policy_external_dependency',
+    'repository_environment_secrets_external_dependency',
+    'workflow_dispatch_full_lifecycle_required',
+  ]) assert.ok(assumptionArtifact.assumptions.some((entry) => entry.assumption_id === assumptionId), `missing ${assumptionId}`)
+
+  const rootBypassIds = new Set(rootBypassArtifact.bypass_paths.map((entry) => entry.bypass_id))
+  const runtimeBypassIds = new Set(runtimeBypassArtifact.bypass_paths.map((entry) => entry.bypass_id))
+  for (const bypassId of [
+    'github_admin_branch_protection_root_override',
+    'github_repository_environment_secret_root_override',
+    'cloudflare_account_or_token_direct_deploy',
+    'local_authenticated_wrangler_direct_deploy',
+  ]) {
+    assert.ok(rootBypassIds.has(bypassId), `root bypass artifact missing ${bypassId}`)
+    assert.ok(runtimeBypassIds.has(bypassId), `runtime bypass artifact missing ${bypassId}`)
+  }
+
+  const gapIds = new Set(sovereigntyGaps.gaps.map((entry) => entry.surface_id))
+  for (const gapId of [
+    'github_admin_branch_protection_mutation',
+    'github_repository_environment_secret_mutation',
+    'cloudflare_account_or_token_direct_deploy',
+    'local_wrangler_authenticated_deploy',
+  ]) assert.ok(gapIds.has(gapId), `sovereignty gap missing ${gapId}`)
 })

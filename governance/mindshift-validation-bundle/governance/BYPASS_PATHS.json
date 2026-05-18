@@ -29,6 +29,34 @@
       "risk": "proof_without_execution_boundary",
       "observed_control": "proof route binds proof to execution_id and validated object hash",
       "bundle_change": "none"
+    },
+    {
+      "id": "github_admin_branch_protection_root_override",
+      "path": "GitHub repository settings, branch protection rules",
+      "risk": "An admin/settings change could weaken workflow or branch protections outside the governed deploy lifecycle.",
+      "observed_control": "Repository admin and branch protection authority are external root surfaces in runtime/sovereignty/root_authority_inventory.json; no secret values are inspected.",
+      "bundle_change": "root_authority_escape_hatch_evidence_only"
+    },
+    {
+      "id": "github_repository_environment_secret_root_override",
+      "path": "GitHub repository secrets, GitHub environment secrets",
+      "risk": "Secret or environment mutation could redirect runtime/deploy authority without becoming MindShift authority.",
+      "observed_control": "Repository/environment secrets are inventoried as external root dependencies and secret material remains NOT_INSPECTED.",
+      "bundle_change": "root_authority_escape_hatch_evidence_only"
+    },
+    {
+      "id": "cloudflare_account_or_token_direct_deploy",
+      "path": "Cloudflare account, Cloudflare API token, wrangler.toml",
+      "risk": "A Cloudflare account or token holder could deploy directly outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof.",
+      "observed_control": "Cloudflare account/token authority is classified as root/external authority; workflow deploy scan does not inspect token values.",
+      "bundle_change": "root_authority_escape_hatch_evidence_only"
+    },
+    {
+      "id": "local_authenticated_wrangler_direct_deploy",
+      "path": "local wrangler CLI, local environment credentials, package.json",
+      "risk": "A local authenticated wrangler deploy command remains a root authority escape hatch if executed outside governed workflow.",
+      "observed_control": "Local Wrangler authority is classified as root/local bypass risk; package deploy guard is disabled and deploy:dry-run uses --dry-run.",
+      "bundle_change": "root_authority_escape_hatch_evidence_only"
     }
   ],
   "artifact_assertions": {
@@ -72,6 +100,30 @@
       "bypass_id": "observability_mutation_escalation",
       "risk": "GET-only observability route becomes executable or authoritative",
       "required_response": "OBSERVABILITY_MUTATION_ESCALATION -> NULL"
+    },
+    {
+      "path": "github_admin_branch_protection_root_override",
+      "bypass_id": "github_admin_branch_protection_root_override",
+      "risk": "An admin/settings change could weaken workflow or branch protections outside the governed deploy lifecycle.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "github_repository_environment_secret_root_override",
+      "bypass_id": "github_repository_environment_secret_root_override",
+      "risk": "Secret or environment mutation could redirect runtime/deploy authority without becoming MindShift authority.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "cloudflare_account_or_token_direct_deploy",
+      "bypass_id": "cloudflare_account_or_token_direct_deploy",
+      "risk": "A Cloudflare account or token holder could deploy directly outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "local_authenticated_wrangler_direct_deploy",
+      "bypass_id": "local_authenticated_wrangler_direct_deploy",
+      "risk": "A local authenticated wrangler deploy command remains a root authority escape hatch if executed outside governed workflow.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
     }
   ]
 }

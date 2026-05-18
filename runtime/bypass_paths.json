@@ -47,6 +47,30 @@
       "bypass_id": "observability_mutation_escalation",
       "risk": "GET-only observability route becomes executable or authoritative",
       "required_response": "OBSERVABILITY_MUTATION_ESCALATION -> NULL"
+    },
+    {
+      "path": "github_admin_branch_protection_root_override",
+      "bypass_id": "github_admin_branch_protection_root_override",
+      "risk": "An admin/settings change could weaken workflow or branch protections outside the governed deploy lifecycle.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "github_repository_environment_secret_root_override",
+      "bypass_id": "github_repository_environment_secret_root_override",
+      "risk": "Secret or environment mutation could redirect runtime/deploy authority without becoming MindShift authority.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "cloudflare_account_or_token_direct_deploy",
+      "bypass_id": "cloudflare_account_or_token_direct_deploy",
+      "risk": "A Cloudflare account or token holder could deploy directly outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "local_authenticated_wrangler_direct_deploy",
+      "bypass_id": "local_authenticated_wrangler_direct_deploy",
+      "risk": "A local authenticated wrangler deploy command remains a root authority escape hatch if executed outside governed workflow.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
     }
   ],
   "closure_verification": {
