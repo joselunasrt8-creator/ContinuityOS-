@@ -191,6 +191,49 @@
         "root_authority_escape_hatches_in_bypass_artifacts",
         "package_deploy_disabled"
       ]
+    },
+    {
+      "bypass_id": "github_direct_push_to_main",
+      "category": "source_control_mutation_bypass",
+      "observed_paths": [
+        "GitHub main branch direct push"
+      ],
+      "current_evidence": "Branch protection policy requires direct push restriction and merge governance treats direct push as merge legitimacy NULL plus root authority containment evidence.",
+      "risk": "Direct push can mutate main without PREO_VALID, SCO visibility, or required GitHub checks.",
+      "required_response": "MERGE_LEGITIMACY_NULL_or_ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
+      "required_tests": [
+        "branch_protection_required_checks_match_emitted_jobs",
+        "bypass_path_maps_reconcile"
+      ]
+    },
+    {
+      "bypass_id": "github_force_push_to_main",
+      "category": "source_control_history_rewrite_bypass",
+      "observed_paths": [
+        "GitHub main branch force push"
+      ],
+      "current_evidence": "Branch protection policy disallows force pushes and merge governance treats history rewrites as legitimacy NULL plus root authority containment evidence.",
+      "risk": "Force push can rewrite proof lineage and enable stale review or check reuse.",
+      "required_response": "MERGE_LEGITIMACY_NULL_or_ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
+      "required_tests": [
+        "branch_protection_required_checks_match_emitted_jobs",
+        "bypass_path_maps_reconcile"
+      ]
+    },
+    {
+      "bypass_id": "github_branch_protection_bypass",
+      "category": "root_authority_escape_hatch",
+      "observed_paths": [
+        "GitHub repository settings",
+        "branch protection bypass"
+      ],
+      "current_evidence": "Branch protection and merge governance classify bypass as root authority evidence only, never merge legitimacy.",
+      "risk": "Admin or ruleset bypass can skip required checks outside PREO/SCO lineage.",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED_or_NULL_never_legitimacy",
+      "required_tests": [
+        "root_authority_escape_hatches_in_bypass_artifacts",
+        "bypass_path_maps_reconcile"
+      ]
     }
   ]
 }

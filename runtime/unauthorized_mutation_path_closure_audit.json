@@ -2,7 +2,7 @@
   "artifact": "UNAUTHORIZED_MUTATION_PATH_CLOSURE_AUDIT",
   "audit_id": "issue-342-unauthorized-mutation-path-closure-v1",
   "inventory_hash": "3868e3cf77643633bc161838474cb9cee219668e8e54162af84bfe274829d25b",
-  "bypass_hash": "bf5450c0157b40c0a6ade58220cbb9b806273d3ad21d04412bf52124b4785342",
+  "bypass_hash": "879f8a29da4ebdef08374c2ee5f2cb43f0a9c258b21a78c5ef2fdee669a898c8",
   "route_hash": "d543816cec926a69e9e45c4c56f81e245f9a70108bbe42b088221d63bab94741",
   "workflow_hash": "08799a1935c6f876c02a50ac2f0a7cbde420400a36df765385b380f1feca6555",
   "registry_hash": "41fcf83b6824c16a96a4be2672453d8d9442ea720f7b5935c825f3e3fd0c9fb8",

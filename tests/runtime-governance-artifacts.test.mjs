@@ -64,12 +64,43 @@ test('bypass paths identify direct deploy, raw DB write, webhook, hidden, exact-
     'github_repository_environment_secret_root_override',
     'cloudflare_account_or_token_direct_deploy',
     'local_authenticated_wrangler_direct_deploy',
+    'github_direct_push_to_main',
+    'github_force_push_to_main',
+    'github_branch_protection_bypass',
   ]) {
     requireBypass(id);
   }
 
   assert.equal(bypass.fail_closed_response, 'NULL');
   assert.ok(bypass.bypass_paths.every((path) => /NULL|block|governed|quarantine/i.test(path.required_response)));
+});
+
+
+test('merge legitimacy governance closes source-control merge method and root bypass gaps', () => {
+  const merge = readJson('governance/runtime/MERGE_GOVERNANCE_RULES.json');
+  const branch = readJson('governance/runtime/BRANCH_PROTECTION_POLICY.json');
+
+  assert.equal(merge.preo_valid_canonical_gate.canonical_gate, 'PREO_VALID');
+  assert.equal(merge.preo_valid_canonical_gate.merge_legitimacy_without_preo_valid, 'NULL');
+  assert.deepEqual(merge.required_checks, [
+    'merge-governance-check',
+    'generate-preo-candidate',
+    'generate-sco-candidate',
+  ]);
+  assert.equal(merge.pr_head_sha_binding.stale_review_reuse_result, 'NULL');
+  assert.equal(merge.pr_head_sha_binding.stale_check_reuse_result, 'NULL');
+  assert.equal(merge.sco_enforcement.governed_mutation_without_sco_result, 'NULL');
+  assert.equal(merge.merge_method_policy.merge_queue.allowed_only_if_required_checks_bind_current_head_sha, true);
+  assert.equal(merge.merge_method_policy.squash_merge.stale_review_or_check_reuse_result, 'NULL');
+  assert.equal(merge.merge_method_policy.rebase_merge.stale_review_or_check_reuse_result, 'NULL');
+  assert.equal(merge.bypass_path_policy.direct_push_to_main.allowed, false);
+  assert.equal(merge.bypass_path_policy.force_push_to_main.allowed, false);
+  assert.equal(merge.bypass_path_policy.branch_protection_bypass.legitimacy_source, false);
+  assert.equal(merge.root_authority_policy.admin_bypass_is_legitimacy, false);
+  assert.equal(merge.root_authority_policy.root_authority_evidence_may_authorize_merge, false);
+  assert.equal(branch.required_controls.restrict_direct_push_to_main, true);
+  assert.equal(branch.required_controls.allow_force_pushes, false);
+  assert.equal(branch.required_controls.require_merge_queue_required_checks_on_enqueued_head, true);
 });
 
 test('exact-object validation requirements preserve validated_object equals executed_object', () => {

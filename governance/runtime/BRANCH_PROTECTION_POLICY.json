@@ -19,7 +19,10 @@
     "restrict_direct_push_to_main": true,
     "allow_force_pushes": false,
     "allow_branch_deletion": false,
-    "require_conversation_resolution": true
+    "require_conversation_resolution": true,
+    "require_merge_queue_required_checks_on_enqueued_head": true,
+    "squash_merge_requires_current_head_sha_checks": true,
+    "rebase_merge_requires_current_head_sha_checks": true
   },
   "admin_bypass_policy": {
     "allow_admin_bypass": false,
@@ -33,7 +36,10 @@
     "generate-preo-candidate passing",
     "generate-sco-candidate passing",
     "required status checks passing",
-    "branch synchronized with main"
+    "branch synchronized with main",
+    "PREO_VALID remains canonical merge gate",
+    "admin or branch protection bypass is root authority evidence only",
+    "merge queue, squash merge, and rebase merge require current head_sha-bound checks"
   ],
   "forbidden_paths": [
     "direct push to main",
@@ -41,7 +47,11 @@
     "merge without required checks",
     "merge with nonexistent required checks",
     "governed mutation without SCO visibility",
-    "merge legitimacy without PREO_VALID visibility"
+    "merge legitimacy without PREO_VALID visibility",
+    "force push history rewrite",
+    "branch protection bypass treated as merge legitimacy",
+    "merge queue entry without exact head_sha-bound required checks",
+    "squash or rebase merge using stale review/check evidence"
   ],
   "enforcement_classification": {
     "current": "advisory",
@@ -74,5 +84,11 @@
     "required_check_without_emitted_job": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
     "fail_closed": true,
     "rationale": "Branch protection requirements must bind to emitted GitHub Actions job check-run names; unresolved required checks create governance drift and cannot produce merge legitimacy."
+  },
+  "merge_method_policy": {
+    "merge_queue": "allowed only as branch-protection orchestration when required checks resolve against current/enqueued head_sha",
+    "squash_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
+    "rebase_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
+    "gap_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
   }
 }

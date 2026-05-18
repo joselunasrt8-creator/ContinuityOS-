@@ -41,7 +41,13 @@
     "Cross-registry proof lineage drift -> merge legitimacy NULL",
     "Cross-registry replay drift -> deployment legitimacy NULL",
     "Cross-registry ambiguity -> legitimacy NULL and reconciliation required",
-    "Cross-registry reconciliation may not authorize execution, proof, merge, deployment, authority creation, or automatic record repair"
+    "Cross-registry reconciliation may not authorize execution, proof, merge, deployment, authority creation, or automatic record repair",
+    "Direct push to governed branches -> merge legitimacy NULL and root authority evidence containment required",
+    "Force push to governed branches -> merge legitimacy NULL and root authority evidence containment required",
+    "Branch protection bypass -> root authority evidence only and may NEVER create merge legitimacy",
+    "Merge queue may only preserve legitimacy when required checks run against the enqueued exact head_sha and branch protection remains fail-closed",
+    "Squash merge may not reuse stale review or check evidence; PREO/SCO remain bound to exact PR head_sha and proof must bind resulting merge_commit_sha",
+    "Rebase merge may not reuse stale review or check evidence; PREO/SCO remain bound to exact PR head_sha and proof must bind resulting merge_commit_sha"
   ],
   "required_proof_fields": [
     "pr_number",
@@ -213,5 +219,88 @@
     "may_authorize_merge": false,
     "may_repair_records_automatically": false,
     "legitimacy_on_ambiguity": "NULL"
+  },
+  "required_checks": [
+    "merge-governance-check",
+    "generate-preo-candidate",
+    "generate-sco-candidate"
+  ],
+  "preo_valid_canonical_gate": {
+    "canonical_gate": "PREO_VALID",
+    "candidate_artifact_status": "PREO_CANDIDATE",
+    "merge_legitimacy_without_preo_valid": "NULL",
+    "workflow_success_as_substitute_for_preo_valid": "forbidden",
+    "required_check_drift_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+  },
+  "pr_head_sha_binding": {
+    "preo_head_sha_required": true,
+    "sco_head_sha_required": true,
+    "stale_review_reuse_result": "NULL",
+    "stale_check_reuse_result": "NULL",
+    "head_sha_mismatch_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+  },
+  "sco_enforcement": {
+    "required_for_paths": [
+      "governance/**",
+      ".github/workflows/**",
+      "src/**",
+      "schema.sql",
+      "migrations/**",
+      "wrangler.toml"
+    ],
+    "governed_mutation_without_sco_result": "NULL",
+    "sco_scope_mismatch_result": "NULL"
+  },
+  "merge_method_policy": {
+    "merge_queue": {
+      "classification": "branch_protection_orchestration",
+      "allowed_only_if_required_checks_bind_current_head_sha": true,
+      "legitimacy_source": "PREO_VALID plus required GitHub checks",
+      "untracked_gap_result": "NULL"
+    },
+    "squash_merge": {
+      "classification": "github_merge_method",
+      "allowed_only_if_preo_sco_bind_pr_head_sha": true,
+      "required_proof_output_binding": "merge_commit_sha",
+      "stale_review_or_check_reuse_result": "NULL"
+    },
+    "rebase_merge": {
+      "classification": "github_merge_method",
+      "allowed_only_if_preo_sco_bind_pr_head_sha": true,
+      "required_proof_output_binding": "merge_commit_sha",
+      "stale_review_or_check_reuse_result": "NULL"
+    }
+  },
+  "bypass_path_policy": {
+    "direct_push_to_main": {
+      "classification": "source_control_mutation_bypass",
+      "allowed": false,
+      "result": "MERGE_LEGITIMACY_NULL",
+      "root_authority_evidence": true
+    },
+    "force_push_to_main": {
+      "classification": "source_control_history_rewrite_bypass",
+      "allowed": false,
+      "result": "MERGE_LEGITIMACY_NULL",
+      "root_authority_evidence": true
+    },
+    "branch_protection_bypass": {
+      "classification": "root_authority_escape_hatch",
+      "allowed": false,
+      "result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "legitimacy_source": false
+    }
+  },
+  "root_authority_policy": {
+    "admin_bypass_is_legitimacy": false,
+    "admin_bypass_classification": "root_authority_evidence_only",
+    "classification_is_authorization": false,
+    "root_authority_evidence_may_authorize_merge": false,
+    "root_authority_evidence_result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+  },
+  "deterministic_artifact_policy": {
+    "required_status_checks_must_match_emitted_job_names": true,
+    "stale_required_check_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "generated_governance_artifacts_must_hash_deterministically": true
   }
 }
