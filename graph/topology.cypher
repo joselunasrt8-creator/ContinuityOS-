@@ -1,73 +1,105 @@
-cat > graph/topology.cypher <<'EOF'
-MERGE (session:Route {
-  id: "/session",
-  classification: "SESSION_ESTABLISHMENT",
-  executable: false
-})
-
-MERGE (continuity:Route {
-  id: "/continuity",
-  classification: "CONTINUITY_BINDING",
-  executable: false
-})
-
-MERGE (authority:Route {
-  id: "/authority",
-  classification: "AUTHORITY_ISSUANCE",
-  executable: false
-})
-
-MERGE (compile:Route {
-  id: "/compile",
-  classification: "AEO_COMPILATION",
-  executable: false
-})
-
-MERGE (validate:Route {
-  id: "/validate",
-  classification: "VALIDATION_BOUNDARY",
-  executable: false
-})
-
-MERGE (execute:Route {
-  id: "/execute",
-  classification: "EXECUTION_BOUNDARY",
-  executable: true
-})
-
-MERGE (proof:Route {
-  id: "/proof",
-  classification: "PROOF_PERSISTENCE",
-  executable: false
-})
-
-MERGE (session)-[:NEXT]->(continuity)
-
-MERGE (continuity)-[:NEXT]->(authority)
-
-MERGE (authority)-[:NEXT]->(compile)
-
-MERGE (compile)-[:NEXT]->(validate)
-
-MERGE (validate)-[:NEXT]->(execute)
-
-MERGE (execute)-[:NEXT]->(proof)
-
 MERGE (runtime:Topology {
-  artifact: "RUNTIME_TOPOLOGY",
-  status: "NON_OPERATIVE",
-  authority_creating: false,
-  execution_authorizing: false,
-  runtime_mutating: false,
-  invariant:
-    "no valid lineage -> no valid execution -> no valid proof"
+  id: "RUNTIME_TOPOLOGY",
+  status: "NON_OPERATIVE"
 })
 
-MERGE (runtime)-[:CONTAINS]->(session)
-MERGE (runtime)-[:CONTAINS]->(continuity)
-MERGE (runtime)-[:CONTAINS]->(authority)
-MERGE (runtime)-[:CONTAINS]->(compile)
-MERGE (runtime)-[:CONTAINS]->(validate)
-MERGE (runtime)-[:CONTAINS]->(execute)
-MERGE (runtime)-[:CONTAINS]->(proof)
-EOF
+MERGE (governance:Topology {
+  id: "GOVERNANCE_TOPOLOGY",
+  status: "NON_OPERATIVE"
+})
+
+MERGE (constitutional:Domain {
+  id: "CONSTITUTIONAL_GOVERNANCE"
+})
+
+MERGE (runtime)-[:GOVERNED_BY]->(governance)
+
+MERGE (governance)-[:CONSTRAINED_BY]->(constitutional)
+
+MERGE (economic_governance:RuntimeRoute {
+  id: "economic-governance"
+})
+
+MERGE (runtime_root:RuntimeRoute {
+  id: "runtime"
+})
+
+MERGE (economic_governance)-[:PART_OF]->(runtime)
+
+MERGE (runtime_root)-[:PART_OF]->(runtime)
+
+MERGE (continuity:GovernanceArtifact {
+  id: "CONTINUITY_ASSUMPTIONS"
+})
+
+MERGE (authority:GovernanceArtifact {
+  id: "ROOT_AUTHORITY_REGISTRY"
+})
+
+MERGE (execution_surfaces:GovernanceArtifact {
+  id: "EXECUTION_SURFACES"
+})
+
+MERGE (mutation_control:GovernanceArtifact {
+  id: "GOVERNANCE_MUTATION_CONTROL"
+})
+
+MERGE (constitutional_boundary:GovernanceArtifact {
+  id: "CONSTITUTIONAL_BOUNDARY"
+})
+
+MERGE (continuity)-[:PART_OF]->(governance)
+
+MERGE (authority)-[:PART_OF]->(governance)
+
+MERGE (execution_surfaces)-[:PART_OF]->(governance)
+
+MERGE (mutation_control)-[:PART_OF]->(governance)
+
+MERGE (constitutional_boundary)-[:PART_OF]->(governance)
+
+MERGE (ra0:AuthorityClass {
+  id: "RA-0_ABSOLUTE_ROOT"
+})
+
+MERGE (ra1:AuthorityClass {
+  id: "RA-1_INFRASTRUCTURE_ADMIN"
+})
+
+MERGE (ra6:AuthorityClass {
+  id: "RA-6_LOCAL_OPERATOR_ROOT"
+})
+
+MERGE (authority)-[:DEFINES]->(ra0)
+
+MERGE (authority)-[:DEFINES]->(ra1)
+
+MERGE (authority)-[:DEFINES]->(ra6)
+
+MERGE (identity:ContinuityAssumption {
+  id: "IDENTITY_CONTINUITY"
+})
+
+MERGE (session:ContinuityAssumption {
+  id: "SESSION_CONTINUITY"
+})
+
+MERGE (proof:ContinuityAssumption {
+  id: "PROOF_CONTINUITY"
+})
+
+MERGE (continuity)-[:ASSUMES]->(identity)
+
+MERGE (continuity)-[:ASSUMES]->(session)
+
+MERGE (continuity)-[:ASSUMES]->(proof)
+
+MERGE (runtime)-[:REQUIRES]->(continuity)
+
+MERGE (runtime)-[:CONSTRAINED_BY]->(authority)
+
+MERGE (runtime)-[:OBSERVED_BY]->(execution_surfaces)
+
+MERGE (runtime)-[:PROTECTED_BY]->(mutation_control)
+
+MERGE (runtime)-[:BOUNDED_BY]->(constitutional_boundary)
