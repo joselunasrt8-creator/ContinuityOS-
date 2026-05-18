@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS execution_registry (
   source_tree_hash TEXT,
   workflow_run_id TEXT,
   workflow_sha TEXT,
-  UNIQUE(decision_id, validated_object_hash),
+  UNIQUE(execution_id, decision_id, validated_object_hash),
   UNIQUE(workflow_run_id)
 );
 
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS proof_registry (
   source_tree_hash TEXT,
   workflow_run_id TEXT,
   workflow_sha TEXT,
-  UNIQUE(decision_id, validated_object_hash),
+  UNIQUE(execution_id, decision_id, validated_object_hash),
   UNIQUE(workflow_run_id)
 );
 
@@ -184,8 +184,8 @@ CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (
   UNIQUE(proof_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique
-  ON proof_registry (decision_id, validated_object_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash_unique
+  ON proof_registry (execution_id, decision_id, validated_object_hash);
 
 CREATE TABLE IF NOT EXISTS invocation_registry (
   decision_id TEXT NOT NULL,

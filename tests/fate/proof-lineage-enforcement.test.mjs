@@ -61,8 +61,8 @@ test('proof creation binds authority and execution lineage into persisted proof'
 test('duplicate proof is rejected as proof replay', () => {
   assert.match(
     source,
-    /CREATE TABLE IF NOT EXISTS proof_registry[\s\S]*UNIQUE\(decision_id, validated_object_hash\)/,
-    'proof registry must enforce one canonical proof per decision hash',
+    /CREATE TABLE IF NOT EXISTS proof_registry[\s\S]*UNIQUE\(execution_id, decision_id, validated_object_hash\)/,
+    'proof registry must enforce one canonical proof per execution+decision+hash lineage',
   )
 
   assert.match(
@@ -146,4 +146,32 @@ test('valid_execute_proof_path_preserved', () => {
     /return json\(\{ status:"PROVEN", result:"OK", proof_id, proof:/,
     'proof success path must remain intact',
   )
+})
+
+
+test('duplicate proof replay returns deterministic existing proof evidence without state mutation', () => {
+  assert.match(
+    source,
+    /SELECT \* FROM proof_registry WHERE execution_id=\?1 AND decision_id=\?2 AND validated_object_hash=\?3 ORDER BY created_at ASC, proof_id ASC LIMIT 2/,
+    'proof must preflight canonical lineage duplicates before writes',
+  )
+
+  assert.match(
+    source,
+    /if \(proofCandidates\.length > 1\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous" \}/,
+    'ambiguous duplicate proof lineage must fail closed',
+  )
+
+  assert.match(
+    source,
+    /if \(canonicalExistingProof\) \{[\s\S]*return json\(\{ status:"PROVEN", result:"OK", proof_id: String\(canonicalExistingProof\.proof_id \|\| ""\), proof: canonicalExistingProof \}\)/,
+    'duplicate replay must return deterministic canonical existing proof evidence',
+  )
+})
+
+test('duplicate proof preflight occurs before authority consumption mutation path', () => {
+  const proofStart = source.indexOf('if (url.pathname === "/proof" && request.method === "POST") {')
+  const duplicatePreflight = source.indexOf('SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 2', proofStart)
+  const authorityConsume = source.indexOf("UPDATE authority_registry SET status='CONSUMED'", proofStart)
+  assert.ok(proofStart >= 0 && duplicatePreflight > proofStart && authorityConsume > duplicatePreflight, 'expected duplicate proof preflight before authority consumption')
 })
