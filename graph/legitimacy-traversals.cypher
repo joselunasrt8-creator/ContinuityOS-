@@ -1,164 +1,70 @@
-// MindShift Legitimacy Traversal Queries
-// Status: Non-Operative
-// Boundary: Traversal is observability only.
-// Invariant: query visibility != runtime authority.
+MATCH path = (authority:GovernanceArtifact)-[:AUTHORIZES|BOUNDS*1..5]->(target)
+RETURN
+  authority.id AS authority_origin,
+  target.id AS authority_target,
+  path
+ORDER BY authority_origin;
 
-// -----------------------------------------------------------------------------
-// 1. Authority-related files and referenced primitives
-// -----------------------------------------------------------------------------
-MATCH p=(file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(authority:Authority)
-RETURN p, edge.keywords AS matched_keywords
-ORDER BY file.path;
+MATCH path = (continuity:GovernanceArtifact)-[:REQUIRES|ASSUMES|BINDS*1..6]->(dependency)
+RETURN
+  continuity.id AS continuity_origin,
+  dependency.id AS continuity_dependency,
+  path
+ORDER BY continuity_origin;
 
-// -----------------------------------------------------------------------------
-// 2. AEO-related files and exact-object surfaces
-// -----------------------------------------------------------------------------
-MATCH p=(file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(aeo:AEO)
-RETURN p, edge.keywords AS matched_keywords
-ORDER BY file.path;
+MATCH path = (runtime:Topology)-[:CONSTRAINED_BY|PROTECTED_BY|OBSERVED_BY|BOUNDED_BY*1..5]->(boundary)
+RETURN
+  runtime.id AS runtime_origin,
+  boundary.id AS runtime_boundary,
+  path
+ORDER BY runtime_origin;
 
-// -----------------------------------------------------------------------------
-// 3. Validation-related files
-// -----------------------------------------------------------------------------
-MATCH p=(file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(validation:Validation)
-RETURN p, edge.keywords AS matched_keywords
-ORDER BY file.path;
+MATCH path = (drift:DriftClass)-[:THREATENS*1..5]->(target)
+RETURN
+  drift.id AS drift_origin,
+  target.id AS threatened_target,
+  path
+ORDER BY drift_origin;
 
-// -----------------------------------------------------------------------------
-// 4. Execution-related files
-// -----------------------------------------------------------------------------
-MATCH p=(file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(execution:Execution)
-RETURN p, edge.keywords AS matched_keywords
-ORDER BY file.path;
+MATCH path = (governance:Topology)-[:RECONCILES*1..5]->(drift)
+RETURN
+  governance.id AS governance_origin,
+  drift.id AS reconciled_drift,
+  path
+ORDER BY governance_origin;
 
-// -----------------------------------------------------------------------------
-// 5. Proof-related files and surfaces
-// -----------------------------------------------------------------------------
-MATCH p=(file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(proof:Proof)
-RETURN p, edge.keywords AS matched_keywords
-ORDER BY file.path;
+MATCH path = (surface:GovernanceArtifact)-[:OBSERVES|DRIFT_DETECTS*1..5]->(runtime)
+RETURN
+  surface.id AS observability_origin,
+  runtime.id AS observed_runtime,
+  path
+ORDER BY observability_origin;
 
-// -----------------------------------------------------------------------------
-// 6. Canonical primitive coverage by file
-// -----------------------------------------------------------------------------
-MATCH (file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(primitive)
-WHERE primitive:Authority
-   OR primitive:ATAO
-   OR primitive:AEO
-   OR primitive:Validation
-   OR primitive:Execution
-   OR primitive:Proof
-   OR primitive:Registry
-   OR primitive:Reconciliation
-RETURN file.path AS file,
-       collect(DISTINCT labels(primitive)[0]) AS primitives,
-       count(DISTINCT primitive) AS primitive_count
-ORDER BY primitive_count DESC, file;
+MATCH path = (root:AuthorityClass)-[:OVERRIDES|ADMINISTERS|MUTATES*1..5]->(runtime)
+RETURN
+  root.id AS root_authority,
+  runtime.id AS runtime_target,
+  path
+ORDER BY root_authority;
 
-// -----------------------------------------------------------------------------
-// 7. Files that reference validation but not proof
-// -----------------------------------------------------------------------------
-MATCH (file:File)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Validation)
-WHERE NOT (file)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Proof)
-RETURN file.path AS file
-ORDER BY file;
+MATCH path = (identity:ContinuityAssumption)-[:BINDS|ENABLES*1..5]->(runtime)
+RETURN
+  identity.id AS continuity_anchor,
+  runtime.id AS enabled_runtime,
+  path
+ORDER BY continuity_anchor;
 
-// -----------------------------------------------------------------------------
-// 8. Files that reference execution but not validation
-// -----------------------------------------------------------------------------
-MATCH (file:File)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Execution)
-WHERE NOT (file)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Validation)
-RETURN file.path AS file
-ORDER BY file;
+MATCH path = (mutation:GovernanceArtifact)-[:PROTECTS|DRIFT_CONSTRAINS|DETECTS*1..5]->(drift)
+RETURN
+  mutation.id AS governance_control,
+  drift.id AS constrained_drift,
+  path
+ORDER BY governance_control;
 
-// -----------------------------------------------------------------------------
-// 9. Files that reference proof but not registry
-// -----------------------------------------------------------------------------
-MATCH (file:File)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Proof)
-WHERE NOT (file)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Registry)
-RETURN file.path AS file
-ORDER BY file;
-
-// -----------------------------------------------------------------------------
-// 10. Bypass paths near execution surfaces
-// -----------------------------------------------------------------------------
-MATCH (bypass:BypassPath)
-OPTIONAL MATCH (bypass)-[edge:GRAPH_EDGE]->(target)
-RETURN bypass.path AS bypass_file,
-       collect(DISTINCT edge.type) AS observed_edges,
-       collect(DISTINCT labels(target)) AS target_labels
-ORDER BY bypass_file;
-
-// -----------------------------------------------------------------------------
-// 11. Execution surfaces lacking proof reference
-// -----------------------------------------------------------------------------
-MATCH (surface:ExecutionSurface)
-WHERE NOT (surface)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Proof)
-  AND NOT (surface)-[:GRAPH_EDGE {type: "PRODUCES_PROOF"}]->(:Proof)
-RETURN surface.path AS surface
-ORDER BY surface;
-
-// -----------------------------------------------------------------------------
-// 12. Execution surfaces lacking validation reference
-// -----------------------------------------------------------------------------
-MATCH (surface:ExecutionSurface)
-WHERE NOT (surface)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Validation)
-RETURN surface.path AS surface
-ORDER BY surface;
-
-// -----------------------------------------------------------------------------
-// 13. Governance object coverage by execution surface
-// -----------------------------------------------------------------------------
-MATCH (surface:ExecutionSurface)
-OPTIONAL MATCH (surface)-[:GRAPH_EDGE {type: "REFERENCES"}]->(governance:GovernanceObject)
-RETURN surface.path AS surface,
-       count(DISTINCT governance) AS governance_reference_count,
-       collect(DISTINCT governance.name) AS governance_objects
-ORDER BY governance_reference_count ASC, surface;
-
-// -----------------------------------------------------------------------------
-// 14. Registry/proof continuity references
-// -----------------------------------------------------------------------------
-MATCH (file:File)-[:GRAPH_EDGE {type: "REFERENCES"}]->(proof:Proof)
-OPTIONAL MATCH (file)-[:GRAPH_EDGE {type: "REFERENCES"}]->(registry:Registry)
-RETURN file.path AS file,
-       proof.name AS proof_reference,
-       collect(DISTINCT registry.name) AS registry_references
-ORDER BY file;
-
-// -----------------------------------------------------------------------------
-// 15. Reconciliation-related files
-// -----------------------------------------------------------------------------
-MATCH p=(file:File)-[edge:GRAPH_EDGE {type: "REFERENCES"}]->(reconciliation:Reconciliation)
-RETURN p, edge.keywords AS matched_keywords
-ORDER BY file.path;
-
-// -----------------------------------------------------------------------------
-// 16. Potential legitimacy gap: execution + bypass + no proof
-// -----------------------------------------------------------------------------
-MATCH (file:File)
-WHERE file:ExecutionSurface
-  AND file:BypassPath
-  AND NOT (file)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Proof)
-RETURN file.path AS file
-ORDER BY file;
-
-// -----------------------------------------------------------------------------
-// 17. Potential legitimacy gap: execution route + no validation
-// -----------------------------------------------------------------------------
-MATCH (file:File)-[:GRAPH_EDGE {type: "DECLARES"}]->(route:RuntimeRoute)
-WHERE file:ExecutionSurface
-  AND NOT (file)-[:GRAPH_EDGE {type: "REFERENCES"}]->(:Validation)
-RETURN file.path AS file,
-       route.route AS route
-ORDER BY file, route;
-
-// -----------------------------------------------------------------------------
-// 18. Boundary invariant audit
-// -----------------------------------------------------------------------------
-MATCH (n:GraphNode)
-WHERE n.runtime_authority <> false OR n.mode <> "observability_only"
-RETURN n;
-
-// Expected result for query 18:
-// no records.
+MATCH path = (runtime:Topology)-[:GOVERNED_BY|REQUIRES|CONSTRAINED_BY|OBSERVED_BY|PROTECTED_BY|BOUNDED_BY*1..10]->(target)
+RETURN
+  runtime.id AS runtime_root,
+  target.id AS reachable_target,
+  length(path) AS traversal_depth,
+  path
+ORDER BY traversal_depth DESC;
