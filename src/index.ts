@@ -5271,6 +5271,19 @@ function proofExecutionLineageMatches(proof: any, execution: any): boolean {
     && String(executionLineage?.invocation_nonce || "") === String(execution?.invocation_nonce || "")
 }
 
+type CanonicalProofResolution =
+  | { status: "NONE", candidates: any[], canonical_candidates: any[], canonical_proof: null }
+  | { status: "SELECTED", candidates: any[], canonical_candidates: any[], canonical_proof: any }
+  | { status: "AMBIGUOUS", candidates: any[], canonical_candidates: any[], canonical_proof: null }
+
+function resolveCanonicalProofEvidence(proofs: any[], execution: any): CanonicalProofResolution {
+  const candidates = sortProofLineageRows(Array.isArray(proofs) ? proofs : [])
+  const canonical_candidates = candidates.filter((proof: any) => proofExecutionLineageMatches(proof, execution))
+  if (candidates.length === 0) return { status: "NONE", candidates, canonical_candidates, canonical_proof: null }
+  if (candidates.length === 1 && canonical_candidates.length === 1) return { status: "SELECTED", candidates, canonical_candidates, canonical_proof: canonical_candidates[0] }
+  return { status: "AMBIGUOUS", candidates, canonical_candidates, canonical_proof: null }
+}
+
 function proofAmbiguityReplayEvidence(candidate_count: number, canonical_candidate_count: number) {
   return {
     classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED",
@@ -5286,6 +5299,8 @@ function proofAmbiguityReplayEvidence(candidate_count: number, canonical_candida
     replay_neutral: true,
     lifecycle_advanced: false,
     proof_registry_appended: false,
+    proof_registry_mutated: false,
+    registry_mutation_blocked: ["authority_registry", "execution_registry", "invocation_registry", "proof_registry"],
     authority_registry_mutated: false,
     execution_registry_mutated: false,
     invocation_registry_mutated: false,
@@ -7053,13 +7068,14 @@ export default {
       if (String(authority.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: authority.continuity_id, provided_continuity_id: execution.continuity_id }, drift_class: "proof_drift" })
       if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
       const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(execution_id,decision_id,validated_object_hash).all<any>()
-      const proofCandidates = existingProofs.results || []
+      const canonicalProofResolution = resolveCanonicalProofEvidence(existingProofs.results || [], execution)
+      const proofCandidates = canonicalProofResolution.candidates
       const canonicalProofCandidates = proofCandidates.filter((proof: any) => proofExecutionLineageMatches(proof, execution))
       if (proofCandidates.length > 1 || (proofCandidates.length === 1 && canonicalProofCandidates.length !== 1)) {
         const ambiguityReplay = proofAmbiguityReplayEvidence(proofCandidates.length, canonicalProofCandidates.length)
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous", replay: ambiguityReplay }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "duplicate_or_ambiguous_proof_lineage", classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED", drift_classes: ["replay_drift", "proof_lineage_drift"], candidate_count: proofCandidates.length, canonical_candidate_count: canonicalProofCandidates.length }, drift_class: "proof_lineage_drift" })
       }
-      const canonicalExistingProof = canonicalProofCandidates[0] || null
+      const canonicalExistingProof = canonicalProofResolution.canonical_proof
       if (canonicalExistingProof) {
         const canonicalEvidenceReplay = {
           classification: "PROOF_CANONICAL_EVIDENCE_REPLAY_CONTAINED",
@@ -7071,6 +7087,8 @@ export default {
           replay_neutral: true,
           lifecycle_advanced: false,
           proof_registry_appended: false,
+          proof_registry_mutated: false,
+          registry_mutation_blocked: ["authority_registry", "execution_registry", "invocation_registry", "proof_registry"],
           authority_registry_mutated: false,
           execution_registry_mutated: false,
           invocation_registry_mutated: false,

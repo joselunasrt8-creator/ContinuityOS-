@@ -30,7 +30,7 @@ test('proof with wrong hash returns NULL / INVALID', () => {
 })
 
 test('duplicate proof is blocked as NULL / INVALID', () => {
-  assert.match(source, /CREATE TABLE IF NOT EXISTS proof_registry[\s\S]*UNIQUE\(decision_id, validated_object_hash\)/)
+  assert.match(source, /CREATE TABLE IF NOT EXISTS proof_registry[\s\S]*UNIQUE\(execution_id, decision_id, validated_object_hash\)/)
   assert.match(source, /reason:"proof_replay"/)
   assert.match(source, /REPLAY_BLOCKED/)
 })
