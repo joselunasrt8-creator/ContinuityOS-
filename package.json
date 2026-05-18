@@ -7,6 +7,8 @@
   "scripts": {
     "deploy": "echo \"Direct deploy disabled as a convenience guard. Production deploys must use .github/workflows/governed-deploy.yml.\" && exit 1",
 
+    "deploy:dry-run": "npx wrangler deploy src/index.ts --name mindshift-demo --compatibility-date 2026-05-18 --dry-run",
+
     "dev": "wrangler dev --local",
 
     "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local",

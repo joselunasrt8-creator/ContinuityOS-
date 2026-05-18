@@ -27,6 +27,17 @@ test('no package deploy script bypass exists', () => {
   assert.match(packageJson.scripts.deploy, /exit 1/)
 })
 
+test('repo-owned Wrangler dry-run command is deterministic and non-deploying', () => {
+  assert.equal(
+    packageJson.scripts['deploy:dry-run'],
+    'npx wrangler deploy src/index.ts --name mindshift-demo --compatibility-date 2026-05-18 --dry-run'
+  )
+  assert.match(packageJson.scripts['deploy:dry-run'], /src\/index\.ts/)
+  assert.match(packageJson.scripts['deploy:dry-run'], /--name mindshift-demo/)
+  assert.match(packageJson.scripts['deploy:dry-run'], /--compatibility-date 2026-05-18/)
+  assert.match(packageJson.scripts['deploy:dry-run'], /--dry-run/)
+})
+
 test('no direct wrangler deploy path exists outside governed workflow', () => {
   assert.doesNotMatch(packageJson.scripts.deploy, /wrangler\s+deploy/)
   for (const f of workflows) {
