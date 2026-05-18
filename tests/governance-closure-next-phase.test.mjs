@@ -11,6 +11,10 @@ const branchProtection = JSON.parse(
 const mergeRules = JSON.parse(
   readFileSync(join(root, 'governance', 'runtime', 'MERGE_GOVERNANCE_RULES.json'), 'utf8'),
 );
+const preoRequirements = JSON.parse(
+  readFileSync(join(root, 'governance', 'runtime', 'PREO_REQUIREMENTS.json'), 'utf8'),
+);
+const prTemplate = readFileSync(join(root, '.github', 'pull_request_template.md'), 'utf8');
 
 function extractWorkflowInventory() {
   return readdirSync(workflowDir)
@@ -125,5 +129,71 @@ test('PREO_VALID remains the canonical gate for merge legitimacy', () => {
   assert.equal(
     parityOutcome.merge_legitimacy,
     'ELIGIBLE_ONLY_AFTER_REQUIRED_CHECKS_AND_REVIEW_PASS',
+  );
+});
+
+test('protection-critical emitted checks are represented canonically with no stale names', () => {
+  const requiredChecks = branchProtection.required_controls.required_status_checks;
+  const mergeRequiredChecks = mergeRules.required_checks;
+
+  assert.deepEqual(
+    [...requiredChecks].sort(),
+    [...mergeRequiredChecks].sort(),
+    'branch protection and merge governance required checks must remain identical',
+  );
+
+  const canonicalChecks = branchProtection.emitted_check_inventory.map((entry) => entry.required_check);
+  assert.deepEqual(
+    [...canonicalChecks].sort(),
+    [...requiredChecks].sort(),
+    'canonical emitted inventory must track every required check exactly once',
+  );
+
+  const stale = canonicalChecks.filter((name) => !emittedCheckNames.has(name));
+  assert.deepEqual(stale, [], 'canonical inventory cannot reference stale/non-emitted checks');
+});
+
+test('PREO, PR template, and branch protection artifacts align on merge legitimacy gates', () => {
+  assert.ok(
+    preoRequirements.rules.some((rule) =>
+      rule.includes('PREO_VALID requires all branch protection required_status_checks to resolve to emitted GitHub Actions job check-run names'),
+    ),
+    'PREO requirements must bind PREO_VALID to branch-protection required-check emission parity',
+  );
+
+  assert.match(prTemplate, /`npm test`/, 'PR template must require test evidence before merge');
+  assert.match(prTemplate, /`npx tsc --noEmit`/, 'PR template must require static verification evidence before merge');
+  assert.equal(branchProtection.status, 'policy_only_non_enforcing');
+});
+
+test('governed deploy and constitutional workflows are emitted and non-authoritative for branch protection', () => {
+  assert.ok(
+    emittedInventory.some(
+      (entry) =>
+        entry.workflow_file === '.github/workflows/constitutional-integrity.yml' &&
+        entry.workflow_name === 'constitutional-integrity' &&
+        entry.job_name === 'constitutional-integrity',
+    ),
+    'constitutional integrity workflow/job must remain emitted for governance integrity checks',
+  );
+
+  assert.ok(
+    emittedInventory.some(
+      (entry) =>
+        entry.workflow_file === '.github/workflows/prepare-governed-deploy.yml' &&
+        entry.workflow_name === 'prepare-governed-deploy' &&
+        entry.job_name === 'prepare-governed-deploy-inputs',
+    ),
+    'prepare governed deploy workflow/job must remain emitted for dry-run input preparation',
+  );
+
+  assert.ok(
+    emittedInventory.some(
+      (entry) =>
+        entry.workflow_file === '.github/workflows/governed-deploy.yml' &&
+        entry.workflow_name === 'governed-deploy' &&
+        entry.job_name === 'governed-production-deploy',
+    ),
+    'governed deploy workflow/job must remain emitted as the governed deploy execution surface',
   );
 });
