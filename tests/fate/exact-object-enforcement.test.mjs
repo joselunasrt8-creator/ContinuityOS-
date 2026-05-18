@@ -121,3 +121,60 @@ test('mutation after validation is rejected as NULL with canonical hash_mismatch
     'mutated object hash must be classified as hash_drift',
   )
 })
+
+
+test('validate_rejects_uncompiled_hash', () => {
+  assert.match(
+    source,
+    /if \(!compiled\) {[\s\S]*return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/,
+    'validate must fail-closed with hash_mismatch when decision_id + validated_object_hash has no compiled AEO row',
+  )
+})
+
+test('validate_rejects_cross_context_hash', () => {
+  assert.match(
+    source,
+    /SELECT decision_id,authority_id,continuity_id FROM aeo_registry WHERE validated_object_hash=\?1 AND status='COMPILED'/,
+    'validate must detect compiled hash reused under another decision lineage',
+  )
+
+  assert.match(
+    source,
+    /if \(compiledForOtherLineage\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"lineage_mismatch" \}/,
+    'cross-context compiled hashes must return NULL lineage_mismatch',
+  )
+})
+
+test('validate_preserves_compiled_hash_path', () => {
+  assert.match(
+    source,
+    /if \(!compiledCanonicalAeo \|\| compiledHash !== validated_object_hash \|\| compiledHash !== String\(compiled\.validated_object_hash \|\| ""\)\) return rejectWithTelemetry/,
+    'validate must only pass when caller hash equals canonical compiled AEO hash',
+  )
+
+  assert.match(
+    source,
+    /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce \}\)/,
+    'canonical compile→validate path must still return VALID',
+  )
+})
+
+test('validation rejection does not write validation_registry', () => {
+  const noCompiledStart = source.indexOf('if (!compiled) {')
+  const validationInsert = source.indexOf('INSERT INTO validation_registry')
+  assert.ok(noCompiledStart >= 0 && validationInsert > noCompiledStart, 'expected validate fail-closed and validation insert in source')
+
+  const noCompiledBlock = source.slice(noCompiledStart, validationInsert)
+  assert.match(noCompiledBlock, /return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"(?:lineage_mismatch|hash_mismatch)" \}/)
+  assert.doesNotMatch(noCompiledBlock, /INSERT INTO validation_registry/, 'fail-closed validation rejection path must not write validation_registry')
+})
+
+test('validation rejection does not consume invocation_registry', () => {
+  const invocationInsert = source.indexOf('INSERT OR IGNORE INTO invocation_registry')
+  const noCompiledStart = source.indexOf('if (!compiled) {')
+  assert.ok(noCompiledStart >= 0 && invocationInsert > noCompiledStart, 'expected validate fail-closed branch before nonce reservation')
+
+  const noCompiledBlock = source.slice(noCompiledStart, invocationInsert)
+  assert.match(noCompiledBlock, /return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"(?:lineage_mismatch|hash_mismatch)" \}/)
+  assert.doesNotMatch(noCompiledBlock, /invocation_registry/, 'fail-closed validation rejection path must not consume invocation nonce')
+})
