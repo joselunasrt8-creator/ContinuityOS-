@@ -27,7 +27,9 @@
 
     "graph:aeo": "npx tsx graph/aeo/ingest_aeo_instances.ts",
 
-    "graph:full": "npm run graph:extract && npm run graph:load && npm run graph:runtime && npm run graph:governance"
+    "graph:full": "npm run graph:extract && npm run graph:load && npm run graph:runtime && npm run graph:governance",
+
+    "governance:regenerate": "node scripts/regenerate-governance-artifacts.mjs"
   },
 
   "devDependencies": {

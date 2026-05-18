@@ -1,10 +1,10 @@
 {
   "artifact": "UNAUTHORIZED_MUTATION_PATH_CLOSURE_AUDIT",
   "audit_id": "issue-342-unauthorized-mutation-path-closure-v1",
-  "inventory_hash": "b61c28e843c9c90f92d3fd727f9a1f862f1d5f55bfc71c139e1d90ce82a1d3f7",
+  "inventory_hash": "c44cbd80f4d9ce51477be44b9b61ce7b9a933a98fad6b42c319a6bd0905d7b11",
   "bypass_hash": "1affab899d0e585cf79ff322b951b6b056d5dcae3902e7e2191d29cb944c809f",
   "route_hash": "d543816cec926a69e9e45c4c56f81e245f9a70108bbe42b088221d63bab94741",
-  "workflow_hash": "4ba6fde907998dd82cbc585e5a0482e241a39d8ba89943a7efb449bc93fe1412",
+  "workflow_hash": "8d8a6b2d0b6dfc5bb3e57ff71c20437f41dd1afebd0494c2ce2d0f241903ce5f",
   "registry_hash": "41fcf83b6824c16a96a4be2672453d8d9442ea720f7b5935c825f3e3fd0c9fb8",
   "drift_classes": [],
   "unresolved_surfaces": [],
