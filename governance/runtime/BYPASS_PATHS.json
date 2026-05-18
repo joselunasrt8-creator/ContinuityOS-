@@ -55,6 +55,24 @@
       "bypass_id": "local_authenticated_wrangler_direct_deploy",
       "risk": "A local authenticated wrangler deploy command remains a root authority escape hatch if executed outside governed workflow.",
       "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "direct_push_to_main",
+      "bypass_id": "direct_push_to_main",
+      "risk": "source-control mutation without PREO_VALID, SCO visibility, or required GitHub checks",
+      "required_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "force_push_to_main",
+      "bypass_id": "force_push_to_main",
+      "risk": "history rewrite can discard governed proof lineage and reuse stale review state",
+      "required_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "branch_protection_bypass",
+      "bypass_id": "branch_protection_bypass",
+      "risk": "admin or ruleset bypass may mutate main outside legitimacy evidence",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL; never legitimacy"
     }
   ],
   "closure_verification": {

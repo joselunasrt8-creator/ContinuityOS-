@@ -123,7 +123,46 @@
       ],
       "drift_observable": true,
       "non_bypassable": true
+    },
+    {
+      "id": "github_direct_push_to_main",
+      "classification": "source_control_mutation_bypass",
+      "allowed": false,
+      "result": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "governance_policy_refs": [
+        "PREO_POLICY",
+        "SCO_POLICY",
+        "REPLAY_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "github_force_push_to_main",
+      "classification": "source_control_history_rewrite_bypass",
+      "allowed": false,
+      "result": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "governance_policy_refs": [
+        "PREO_POLICY",
+        "SCO_POLICY",
+        "REPLAY_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
+    },
+    {
+      "id": "github_branch_protection_bypass",
+      "classification": "root_authority_escape_hatch",
+      "allowed": false,
+      "result": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL; never merge legitimacy",
+      "governance_policy_refs": [
+        "PREO_POLICY",
+        "SCO_POLICY",
+        "DEPLOY_POLICY"
+      ],
+      "drift_observable": true,
+      "non_bypassable": true
     }
   ],
-  "inventory_hash": "3d8e5072abb3fcbd9b1d38b9299503f3f7def68911ffec4235bd6d81040d0200"
+  "inventory_hash": "e6dd73758fe98bfce9169fd0edaa10f3f1738a96a0baf944361ae370a303ebb0"
 }
