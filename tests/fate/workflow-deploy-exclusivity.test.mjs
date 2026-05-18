@@ -41,6 +41,10 @@ test('governed-deploy workflow requires canonical governance fields', () => {
     'decision_id',
     'validated_object_hash',
     'invocation_nonce',
+    '/session',
+    '/continuity',
+    '/authority',
+    '/compile',
     '/validate',
     '/execute',
     '/proof'
@@ -49,4 +53,33 @@ test('governed-deploy workflow requires canonical governance fields', () => {
   for (const field of requiredFields) {
     assert.match(governedDeploy, new RegExp(field));
   }
+});
+
+
+test('governed-deploy workflow preserves exact canonical lifecycle order', () => {
+  const governedDeploy = readFileSync(
+    path.join(workflowDir.pathname, 'governed-deploy.yml'),
+    'utf8'
+  );
+
+  const canonicalLifecycle = [
+    'POST "$CLEAN_WORKER_URL/session"',
+    'POST "$CLEAN_WORKER_URL/continuity"',
+    'POST "$CLEAN_WORKER_URL/authority"',
+    'POST "$CLEAN_WORKER_URL/compile"',
+    'POST "$CLEAN_WORKER_URL/validate"',
+    'POST "$CLEAN_WORKER_URL/execute"',
+    'POST "$CLEAN_WORKER_URL/proof"'
+  ];
+
+  let previousIndex = -1;
+  for (const routeInvocation of canonicalLifecycle) {
+    const currentIndex = governedDeploy.indexOf(routeInvocation);
+    assert.notEqual(currentIndex, -1, `${routeInvocation} must exist in governed deploy lifecycle`);
+    assert.ok(currentIndex > previousIndex, `${routeInvocation} must appear after the previous canonical lifecycle step`);
+    previousIndex = currentIndex;
+  }
+
+  assert.match(governedDeploy, /--arg continuity_id "\$CONTINUITY_ID"/);
+  assert.match(governedDeploy, /AUTHORITY_CONTINUITY_ID.*!= "\$CONTINUITY_ID"/);
 });

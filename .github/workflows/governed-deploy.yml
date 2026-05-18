@@ -115,9 +115,62 @@ jobs:
 
           echo "SESSION_ID=$SESSION_ID" >> "$GITHUB_ENV"
 
+      - name: Save continuity response
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o continuity.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/continuity" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --arg expires_at "$(date -u -d '+1 hour' '+%Y-%m-%dT%H:%M:%SZ')" \
+              '{session_id: $session_id, authority_chain: [$decision_id], actor_chain: ["github_actions"], scope: {environment: $environment}, constraints: {repo: $repo, branch: $branch, workflow: $workflow, max_executions: 1}, expires_at: $expires_at}')")
+
+          echo "CONTINUITY_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload continuity artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: continuity
+          path: continuity.json
+
+      - name: Assert continuity response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$CONTINUITY_RESPONSE_CODE" -lt 200 ] || [ "$CONTINUITY_RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Continuity endpoint error"
+            cat continuity.json
+            exit 1
+          fi
+
+          CONTINUITY_STATUS=$(jq -r '.status // empty' continuity.json)
+          CONTINUITY_ID=$(jq -r '.continuity_id // empty' continuity.json)
+          CONTINUITY_HASH=$(jq -r '.continuity_hash // empty' continuity.json)
+
+          if [ "$CONTINUITY_STATUS" != "CONTINUITY_ACTIVE" ] || [ -z "$CONTINUITY_ID" ] || [ -z "$CONTINUITY_HASH" ]; then
+            echo "NULL — Continuity response is non-canonical"
+            cat continuity.json
+            exit 1
+          fi
+
+          echo "CONTINUITY_ID=$CONTINUITY_ID" >> "$GITHUB_ENV"
+
       - name: Save authority response
         run: |
           set -euo pipefail
+
+          if [ -z "${CONTINUITY_ID:-}" ]; then
+            echo "NULL — Missing continuity before authority"
+            exit 1
+          fi
 
           RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
             -X POST "$CLEAN_WORKER_URL/authority" \
@@ -125,6 +178,7 @@ jobs:
             -H "X-API-Key: $API_KEY" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
+              --arg continuity_id "$CONTINUITY_ID" \
               --arg decision_id "$DECISION_ID" \
               --arg owner "github_actions" \
               --arg intent "$DEPLOY_INTENT" \
@@ -133,7 +187,7 @@ jobs:
               --arg branch "$DEPLOY_BRANCH" \
               --arg workflow "$DEPLOY_WORKFLOW" \
               --arg expiry "$(date -u -d '+1 hour' '+%Y-%m-%dT%H:%M:%SZ')" \
-              '{session_id: $session_id, decision_id: $decision_id, owner: $owner, intent: $intent, scope: {environment: $environment}, constraints: {repo: $repo, branch: $branch, workflow: $workflow}, expiry: $expiry}')")
+              '{session_id: $session_id, continuity_id: $continuity_id, decision_id: $decision_id, owner: $owner, intent: $intent, scope: {environment: $environment}, constraints: {repo: $repo, branch: $branch, workflow: $workflow, max_executions: 1}, expiry: $expiry}')")
 
           echo "AUTHORITY_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
 
@@ -155,9 +209,16 @@ jobs:
 
           AUTHORITY_STATUS=$(jq -r '.status // empty' authority.json)
           AUTHORITY_DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
+          AUTHORITY_CONTINUITY_ID=$(jq -r '.continuity_id // empty' authority.json)
 
           if [ "$AUTHORITY_STATUS" = "NULL" ] || [ "$AUTHORITY_STATUS" != "ACTIVE" ] || [ "$AUTHORITY_DECISION_ID" != "$DECISION_ID" ]; then
             echo "NULL — Authority response is non-canonical"
+            cat authority.json
+            exit 1
+          fi
+
+          if [ -z "$AUTHORITY_CONTINUITY_ID" ] || [ "$AUTHORITY_CONTINUITY_ID" != "$CONTINUITY_ID" ]; then
+            echo "NULL — Authority continuity binding is non-canonical"
             cat authority.json
             exit 1
           fi
