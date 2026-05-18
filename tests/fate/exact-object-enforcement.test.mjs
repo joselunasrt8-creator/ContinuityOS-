@@ -265,3 +265,58 @@ test('execution rejection does not create proof_registry entry', () => {
   assert.doesNotMatch(executeBlock, /INSERT INTO proof_registry/, 'execute rejection paths must not create proof_registry entries')
   assert.doesNotMatch(executeBlock, /UPDATE authority_registry SET status='CONSUMED'/, 'execute rejection paths must not mutate authority to proof-consumed state')
 })
+
+test('execute_requires_prior_valid_validation', () => {
+  assert.match(
+    source,
+    /SELECT \* FROM validation_registry WHERE decision_id=\?1 AND validated_object_hash=\?2 AND invocation_nonce=\?3 AND result='VALID' AND status='VALID'/,
+    'execute must directly re-check validation_registry for a VALID row scoped to decision_id + validated_object_hash + invocation_nonce',
+  )
+
+  assert.match(
+    source,
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"no_valid_validation" \}/,
+    'execute must fail closed when no VALID validation row exists',
+  )
+})
+
+test('execute_rejects_validate_execute_hash_drift', () => {
+  assert.match(
+    source,
+    /if \(String\(validation\.validated_object_hash \|\| ""\) !== validated_object_hash\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"lineage_mismatch" \}/,
+    'execute must reject when validation row hash drifts from execute hash',
+  )
+})
+
+test('execute_rejects_cross_authority_valid_hash', () => {
+  assert.match(
+    source,
+    /if \(String\(validation\.delegated_authority_id \|\| ""\) !== String\(authority\.delegated_authority_id \|\| ""\) \|\| String\(validation\.delegated_replay_chain_hash \|\| ""\) !== String\(authority\.delegated_replay_chain_hash \|\| ""\)\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"lineage_mismatch" \}/,
+    'execute must reject cross-authority/cross-replay lineage reuse where delegated lineage fields exist',
+  )
+})
+
+test('execute_rejection_does_not_write_execution_registry', () => {
+  const executeStart = source.indexOf('if (url.pathname === "/execute" && request.method === "POST") {')
+  const executionInsert = source.indexOf('INSERT INTO execution_registry', executeStart)
+  const validationMismatchStart = source.indexOf('if (String(validation.validated_object_hash || "") !== validated_object_hash)', executeStart)
+  assert.ok(executeStart >= 0 && validationMismatchStart > executeStart && executionInsert > validationMismatchStart, 'expected execute hash-lineage fail-closed branch before execution insert')
+
+  const failClosedBlock = source.slice(validationMismatchStart, executionInsert)
+  assert.match(failClosedBlock, /reason:"(?:lineage_mismatch|hash_not_compiled|no_valid_validation)"/)
+  assert.doesNotMatch(failClosedBlock, /INSERT INTO execution_registry/, 'execute rejection must be side-effect-free for execution_registry writes')
+})
+
+test('valid_validate_execute_path_preserved', () => {
+  assert.match(
+    source,
+    /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce \}\)/,
+    'validate canonical success path must remain intact',
+  )
+
+  assert.match(
+    source,
+    /return json\(\{ status:"EXECUTED", session_id, execution_id \}\)/,
+    'execute canonical success path must remain intact',
+  )
+})
