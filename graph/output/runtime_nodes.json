@@ -1,5 +1,9 @@
 [
   {
+    "id": "canonical",
+    "type": "runtime_route"
+  },
+  {
     "id": "economic-governance",
     "type": "runtime_route"
   },

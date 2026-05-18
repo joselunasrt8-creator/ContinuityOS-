@@ -38,6 +38,15 @@ MERGE (topology_drift:DriftClass {
   severity: "HIGH"
 })
 
+WITH topology_drift,
+     authority_drift,
+     continuity_drift,
+     proof_drift,
+     registry_drift,
+     execution_drift,
+     governance_drift,
+     federation_drift
+
 MATCH (runtime:Topology {
   id: "RUNTIME_TOPOLOGY"
 })

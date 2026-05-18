@@ -13,15 +13,21 @@ const password =
 
 const driver = neo4j.driver(
   uri,
-  neo4j.auth.basic(username, password)
+  neo4j.auth.basic(username, password),
+  {
+    encrypted: false
+  }
 )
 
 const graphFiles = [
   "graph/topology.cypher",
   "graph/legitimacy_edges.cypher",
   "graph/drift_taxonomy.cypher",
-  "graph/reconciliation-views.cypher",
-  "graph/legitimacy-traversals.cypher"
+  "graph/proof_chain.cypher",
+  "graph/execution_lineage.cypher",
+  "graph/revocation_propagation.cypher",
+  "graph/federated_reconciliation.cypher",
+  "graph/runtime_quarantine.cypher"
 ]
 
 async function loadGraph() {
