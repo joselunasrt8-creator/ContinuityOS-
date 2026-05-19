@@ -142,6 +142,31 @@ export function detectRootAuthorityDrift(inventory, topology_hash = hashRootAuth
   return Object.freeze({ drift_type: 'RootAuthorityDrift', drift_classes, containment_status: drift_classes.length > 0 ? 'ROOT_AUTHORITY_CONTAINMENT_REQUIRED' : 'ROOT_AUTHORITY_CONTAINED', declared_root_surfaces: inventory.surfaces.filter((surface) => surface.declared).map((surface) => surface.surface_id).sort(), undeclared_root_surfaces: boundary.overflow_surfaces, undeclared_surfaces: boundary.overflow_surfaces, topology_hash, drift_hash, merge_legitimacy: drift_classes.length > 0 ? 'NULL' : 'UNCHANGED', fail_closed: drift_classes.length > 0, evidence_only: true, replay_neutral: true, non_authoritative: true, secret_material_persisted: false })
 }
 
+
+
+export function classifyProductionMutationCapability(surface = {}) {
+  const material = `${surface.surface_id ?? ''} ${surface.authority_origin ?? ''} ${surface.declared_boundary ?? ''} ${(surface.classifications || []).join(' ')}`.toLowerCase()
+  if (/wrangler_local|local_deploy|package_script|break-glass|emergency/.test(material)) return 'BYPASS_CAPABLE_NON_GOVERNED'
+  if (/workflow_dispatch|governed-deploy-workflow-only|trigger-only/.test(material)) return 'GOVERNED_TRIGGER_ONLY'
+  if (/cloudflare_account|github_admin|workflow_file_mutation|secret_mutation|environment/.test(material)) return 'ROOT_GOVERNED_MUTATION_REQUIRES_CANONICAL_RUNTIME'
+  return 'OBSERVABILITY_ONLY'
+}
+
+export function deriveRevocationPropagation(inventory) {
+  const propagation = inventory.surfaces.map((surface) => ({
+    surface_id: surface.surface_id,
+    revocation_required: true,
+    propagation_scope: ['session', 'continuity', 'authority', 'compile', 'validate', 'execute', 'proof'],
+    production_mutation_capability: classifyProductionMutationCapability(surface),
+    blocked_when_revoked: true,
+  }))
+  return Object.freeze({
+    artifact_type: 'RootAuthorityRevocationPropagation',
+    fail_closed_on_missing_revocation: true,
+    propagation,
+  })
+}
+
 export function buildRootAuthorityContainmentEnvelope(input = {}, generated_at = '1970-01-01T00:00:00.000Z') {
   const inventory = canonicalizeRootAuthorityInventory(input)
   const topology_hash = hashRootAuthorityTopology(inventory)

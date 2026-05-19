@@ -1,0 +1,17 @@
+{
+  "artifact_type": "break_glass_containment_semantics",
+  "version": "1.0",
+  "mode": "EMERGENCY_BREAK_GLASS_CONTAINED",
+  "requirements": [
+    "break-glass requests are observability objects only",
+    "break-glass can never directly execute deploy",
+    "break-glass requires explicit revocation propagation across canonical path",
+    "break-glass evidence invalidates merge legitimacy when unresolved"
+  ],
+  "containment_result_when_unresolved": "NULL",
+  "canonical_path": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+  "evidence_only": true,
+  "non_authoritative": true,
+  "executable": false,
+  "deployment_capable": false
+}
