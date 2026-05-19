@@ -107,3 +107,20 @@ Otherwise:
 ```text
 system integrity = broken for that execution surface
 ```
+
+## Issue #584 containment update (2026-05-19)
+
+- `wrangler.toml` has no Git Integration production toggle; runtime governance therefore treats Cloudflare Git Integration as an external-root settings dependency.
+- `package.json` keeps direct deploy fail-closed (`npm run deploy` exits non-zero).
+- `.github/workflows/governed-deploy.yml` remains the only declared canonical production deploy workflow.
+- Cloudflare Git Integration is now explicitly classified in `runtime/sovereignty/root_authority_inventory.json` as:
+  - `production_capability: true`
+  - `governed_by_mindshift: false`
+  - `preview_target_only: true`
+  - `production_mutation_allowed: false`
+  - `bypass_risk: P3`
+  - `status: OPEN`
+
+Containment decision:
+- Selected strategy: constrain Git Integration to preview-only and classify production mutation capability as explicitly OPEN until account-level disablement evidence is present.
+- No new runtime path or execution surface was added.
