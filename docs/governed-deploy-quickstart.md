@@ -1,6 +1,6 @@
 # Governed Deploy Quickstart (Install-Base Wedge)
 
-This quickstart makes governed deploy the default developer workflow by treating install base as a workflow dependency:
+This quickstart makes governed deploy the default developer workflow for install base:
 
 **developer wants to deploy**
 → **/authority**
@@ -13,113 +13,115 @@ If no valid object exists, nothing happens.
 
 ---
 
-## Why this is the default path
+## Scope and invariants
 
-Governed deploy is the only operational path that preserves:
+This runbook does **not** add new deploy paths or authority semantics.
+It uses the existing canonical runtime path only:
 
-- exact-object discipline (`validated_object == executed_object`)
+`/authority → /compile → /validate → /execute → /proof`
+
+Preserved invariants:
+
+- exact object discipline (`validated_object == executed_object`)
 - fail-closed behavior (`NULL` blocks execution)
-- replay protection (single-use invocation/authority semantics)
-- proof persistence (append-only deployment lineage)
-
-`npm run deploy` is intentionally blocked as a convenience guard; governed deploy is enforced by runtime boundary checks, validation, replay controls, and proof requirements.
+- replay resistance (single-use authority/invocation semantics)
+- proof persistence (append-only lineage evidence)
 
 ---
 
-## Canonical sequence (developer runbook)
+## Canonical developer workflow (repeatable)
 
-Use the runtime in this exact order for any deployment-capable mutation:
+Use this sequence for any deploy-capable mutation.
 
-1. **Authority** — `POST /authority`
-   - obtain bounded authority for the deploy decision
-2. **Compile** — `POST /compile`
-   - compile deterministic canonical AEO
-   - capture `decision_id` + `validated_object_hash`
-3. **Validate** — `POST /validate`
+1. **Request authority**: `POST /authority`
+2. **Compile deterministic AEO**: `POST /compile`
+   - record `decision_id`
+   - record `validated_object_hash`
+3. **Validate exact object**: `POST /validate`
    - must return `status="VALID"` and `result="VALID"`
-4. **Execute** — `POST /execute`
-   - executes only through governed boundary
-   - governed production workflow target is `governed-deploy.yml`
-5. **Proof** — `POST /proof`
-   - persists proof tied to the execution lineage
+4. **Execute via boundary**: `POST /execute`
+   - production target remains `governed-deploy.yml`
+5. **Persist proof**: `POST /proof`
+   - proof anchors execution and object lineage
 
-Do not reorder these steps. Do not skip steps.
+Do not reorder or skip steps.
 
 ---
 
 ## VALID path vs NULL path
 
-### VALID path
+### VALID path (expected success)
 
-A deploy proceeds only when validation is explicitly successful:
+A governed deploy proceeds only if:
 
-- `POST /validate` returns `VALID | VALID`
-- `validated_object_hash` from compile is unchanged
-- authority, session, continuity, and invocation lineage checks hold
-- execution is admitted at boundary
-- proof is persisted
+- authority/session/continuity checks pass
+- compile output hash remains unchanged through validation/execution
+- validation returns `VALID | VALID`
+- execution is admitted through `/execute`
+- proof persistence succeeds
 
-### NULL path (fail-closed)
+### NULL path (expected fail-closed safety)
 
-Any invalid condition yields `status="NULL"` and blocks state change, including (non-exhaustive):
+Runtime returns `status="NULL"` (and blocks mutation) when any guard fails, including:
 
-- invalid authority/session/continuity
-- hash mismatch between compiled and provided object
-- replay indicators (nonce/authority/proof reuse)
-- lineage mismatch between authority/validation/execution/proof
-- revoked continuity
+- missing/expired/revoked authority or broken lineage
+- `validated_object_hash` mismatch
+- replay signal (reused nonce, reused consumed authority, duplicate lineage)
+- execution attempt without prior `VALID`
+- proof write that is orphaned or inconsistent with execution lineage
 
-`NULL` is the expected safety outcome for ambiguous, stale, or replayed requests.
+`NULL` is the correct safety outcome for ambiguity, staleness, replay, and bypass attempts.
 
 ---
 
-## Proof lookup
+## Proof lookup (operational verification)
 
-After successful `POST /proof`, lookup uses stable lineage keys:
+After `POST /proof` succeeds, verify deploy legitimacy using persisted lineage keys:
 
-- `proof_id` (canonical proof record id)
-- `decision_id`
+- `proof_id`
 - `execution_id`
+- `decision_id`
 - `validated_object_hash`
-- `decision_hash` (canonical uniqueness anchor)
+- `decision_hash`
 
-Operationally, this means a developer can verify deploy legitimacy by checking proof lineage, not by trusting an external deploy side effect.
-
----
-
-## Replay behavior (what developers should expect)
-
-Replay attempts are blocked. Typical outcomes:
-
-- reused invocation nonce → blocked
-- reused authority after consumption → blocked
-- duplicate/ambiguous proof lineage → blocked (`NULL`)
-- duplicate proof creation for same decision hash → blocked
-
-Replay rejection is part of normal operation, not an outage.
+Proof lookup confirms that the executed deploy came from the exact validated object and canonical path.
 
 ---
 
-## Why direct deploy is not the governed path
+## Replay behavior (developer expectations)
 
-Direct deploy shortcuts (CLI-first deploys, raw workflow dispatches, or ad-hoc mutation paths) are not governed because they can bypass one or more required controls:
+Replay protection is active by design:
 
-- authority binding
-- exact-object compile/validate equivalence
-- replay checks
-- proof persistence
+- replaying consumed authority is rejected
+- replaying invocation nonce is rejected
+- replaying identical execution lineage is rejected
+- duplicate or ambiguous proof lineage is rejected
 
-MindShift deploy legitimacy requires the full `/authority → /compile → /validate → /execute → /proof` chain. Anything else is non-governed and should be treated as blocked/invalid for production mutation.
+Expected outcome for replay attempts: `NULL` / blocked execution.
+
+---
+
+## Why direct deploy is not governed deploy
+
+Direct deploy paths (for example ad-hoc CLI deploy, raw dispatch, or mutation outside the canonical runtime sequence) are not governed because they can skip one or more required controls:
+
+- no bounded `/authority`
+- no exact `/compile` object anchoring
+- no strict `/validate` gate
+- no canonical `/execute` boundary admission
+- no guaranteed `/proof` persistence
+
+`npm run deploy` remains blocked as a convenience guard, while the true lock is runtime governance enforcement.
 
 ---
 
 ## Install-base wedge checklist
 
-Use this as the repeatable default for every developer deploy request:
+Use this checklist on every deploy request:
 
-- [ ] I requested authority before compiling.
-- [ ] I compiled canonical AEO and recorded `validated_object_hash`.
+- [ ] Authority issued via `/authority`.
+- [ ] AEO compiled via `/compile` and `validated_object_hash` recorded.
 - [ ] Validation returned `VALID | VALID`.
-- [ ] Execution occurred only via `/execute` governed boundary.
+- [ ] Execution occurred only through `/execute` boundary.
 - [ ] Proof persisted via `/proof` and is queryable by lineage keys.
-- [ ] Any replay-like retry returned `NULL` (expected fail-closed behavior).
+- [ ] Replay-like retries returned `NULL` (expected fail-closed behavior).
