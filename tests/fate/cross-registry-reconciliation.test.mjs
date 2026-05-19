@@ -8,6 +8,7 @@ import {
   hashCanonical,
   routeEvidenceFlags,
   traverseCrossRegistries,
+  deterministicReconciliationReport,
 } from '../../runtime/reconciliation/cross-registry-reconciliation-engine.js'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
@@ -104,6 +105,35 @@ test('duplicate proof is quarantined', () => {
 test('revoked authority reuse fails closed', () => {
   const state = coherentState(); state.authority_registry[0].status = 'REVOKED'
   expectNull(traverseCrossRegistries(state), 'AUTHORITY_REUSE_BLOCKED')
+})
+
+
+
+test('orphan proof fails closed', () => {
+  const state = coherentState(); state.execution_registry = []
+  expectNull(traverseCrossRegistries(state), 'ORPHANED_PROOF_RECORD')
+})
+
+test('missing ancestry fails closed on execution continuity lineage', () => {
+  const state = coherentState(); state.continuity_registry = []
+  expectNull(traverseCrossRegistries(state), 'ORPHANED_EXECUTION_RECORD')
+})
+
+test('reconciliation traversal is read-only and does not mutate registry state', () => {
+  const state = coherentState()
+  const before = hashCanonical(state)
+  traverseCrossRegistries(state)
+  const after = hashCanonical(state)
+  assert.equal(after, before)
+})
+
+test('deterministic reconciliation report object is stable and evidence-only', () => {
+  const snapshot = traverseCrossRegistries(coherentState())
+  const reportA = deterministicReconciliationReport(snapshot)
+  const reportB = deterministicReconciliationReport(snapshot)
+  assert.equal(hashCanonical(reportA), hashCanonical(reportB))
+  assert.equal(reportA.object_type, 'DeterministicCrossRegistryReconciliationReport')
+  assert.deepEqual(reportA.evidence_flags, routeEvidenceFlags())
 })
 
 test('proof hash mismatch fails closed', () => {

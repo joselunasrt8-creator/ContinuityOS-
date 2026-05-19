@@ -286,5 +286,31 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   })
 }
 
+
+export function deterministicReconciliationReport(snapshot = {}) {
+  const report = {
+    object_type: 'DeterministicCrossRegistryReconciliationReport',
+    reconciliation_id: String(snapshot.reconciliation_id || ''),
+    registry_set_hash: String(snapshot.registry_set_hash || ''),
+    lineage_graph_hash: String(snapshot.lineage_graph_hash || ''),
+    continuity_graph_hash: String(snapshot.continuity_graph_hash || ''),
+    proof_graph_hash: String(snapshot.proof_graph_hash || ''),
+    replay_graph_hash: String(snapshot.replay_graph_hash || ''),
+    topology_binding_hash: String(snapshot.topology_binding_hash || ''),
+    governance_binding_hash: String(snapshot.governance_binding_hash || ''),
+    reconciliation_equivalence_hash: String(snapshot.reconciliation_equivalence_hash || ''),
+    containment_status: String(snapshot.containment_status || 'RECONCILIATION_REQUIRED'),
+    legitimacy_status: String(snapshot.legitimacy_status || 'NULL'),
+    drift_classes: asArray(snapshot.drift_classes).map(String).sort(),
+    unresolved_edges: sortRecords(asArray(snapshot.unresolved_edges)),
+    orphaned_records: sortRecords(asArray(snapshot.orphaned_records)),
+    drift: sortRecords(asArray(snapshot.drift)),
+    equivalence: normalize(snapshot.equivalence && typeof snapshot.equivalence === 'object' ? snapshot.equivalence : {}),
+    continuity_proof: normalize(snapshot.continuity_proof && typeof snapshot.continuity_proof === 'object' ? snapshot.continuity_proof : {}),
+    evidence_flags: routeEvidenceFlags(),
+  }
+  return Object.freeze(report)
+}
+
 export function routeEvidenceFlags() { return { ...EVIDENCE_FLAGS } }
 export function canAuthorizeFromReconciliation() { return false }
