@@ -68,7 +68,7 @@ The purpose of this registry is to:
 | risk_class | P0 |
 | bypass_condition | Infrastructure root credentials mutate runtime outside canonical legitimacy chain |
 | closure_condition | All production mutation authority traverses canonical governed execution lifecycle |
-| current_state | Runtime governance stronger than infrastructure sovereignty |
+| current_state | Runtime governance stronger than infrastructure sovereignty; PR #582 triggered a Cloudflare Git Integration deployment from commit 77c2b95 outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof. Classified as preview/non-production based on PR-linked Git Integration evidence; sovereignty gap tracked under #578, not #577 production deploy blocker unless production-capable. |
 | required_tests | deploy bypass detection, workflow provenance verification, authority equivalence verification |
 | required_proofs | deploy provenance evidence, immutable workflow lineage |
 | status | OPEN |
