@@ -20,6 +20,28 @@ export const fixtures = Object.freeze({
   federationEnvelope: fixture('federation-envelope'),
 })
 
+
+export const NULL_TELEMETRY_REASONS = Object.freeze([
+  'missing_authority',
+  'hash_mismatch',
+  'replay_detected',
+  'proof_mismatch',
+  'boundary_bypass',
+])
+
+export function telemetryForBlockedExecution(reason, payload = {}) {
+  if (!NULL_TELEMETRY_REASONS.includes(reason)) throw new Error(`unknown NULL telemetry reason: ${reason}`)
+  return {
+    object_type: 'Telemetry',
+    outcome: OUTCOME.NULL,
+    reason,
+    payload,
+    non_authoritative: true,
+    authority_created: false,
+    logs_are_proof: false,
+  }
+}
+
 export function hashObject(value) {
   return hashCanonical(value)
 }
