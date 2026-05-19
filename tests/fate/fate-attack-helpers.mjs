@@ -23,10 +23,20 @@ export const fixtures = Object.freeze({
 
 export const NULL_TELEMETRY_REASONS = Object.freeze([
   'missing_authority',
+  'revoked_authority',
+  'expired_authority',
+  'unauthorized_target',
+  'malformed_aeo_missing_field',
+  'malformed_aeo_extra_field',
   'hash_mismatch',
+  'post_validation_mutation',
   'replay_detected',
   'proof_mismatch',
+  'orphan_proof',
+  'stale_registry_lineage',
   'boundary_bypass',
+  'policy_invalid',
+  'schema_version_mismatch',
 ])
 
 export function telemetryForBlockedExecution(reason, payload = {}) {
