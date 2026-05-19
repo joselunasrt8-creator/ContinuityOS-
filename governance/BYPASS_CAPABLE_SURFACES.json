@@ -1,0 +1,13 @@
+{
+  "issue_reference": "#578",
+  "surfaces": [
+    {"surface_name":"Cloudflare Git Integration","authority_source":"Cloudflare account integration settings","mutation_capability":true,"production_capability":true,"governed_by_mindshift":false,"bypass_risk":"P3","evidence_path":"wrangler.toml","containment_recommendation":"Do not classify closed; treat as production-capable bypass pending account-level containment.","issue_reference":"#578"},
+    {"surface_name":"GitHub Actions workflow dispatch authority","authority_source":"workflow_dispatch","mutation_capability":true,"production_capability":true,"governed_by_mindshift":true,"bypass_risk":"P2","evidence_path":".github/workflows/governed-deploy.yml","containment_recommendation":"Maintain hard-fail checks and canonical input requirements.","issue_reference":"#578"},
+    {"surface_name":"local Wrangler authority","authority_source":"authenticated local wrangler session","mutation_capability":true,"production_capability":true,"governed_by_mindshift":false,"bypass_risk":"P3","evidence_path":"package.json","containment_recommendation":"Direct deploy remains blocked in package script; retain explicit bypass classification.","issue_reference":"#578"}
+  ],
+  "issue_577_separation": {
+    "production_deploy_closure_issue": "#577",
+    "sovereignty_containment_issue": "#578",
+    "status": "SEPARATE_TRACKS_REQUIRED"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "issue_reference": "#578",
+  "assumptions": [
+    {
+      "surface_name": "Cloudflare Git Integration",
+      "authority_source": "Cloudflare account integration settings",
+      "mutation_capability": true,
+      "production_capability": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "evidence_path": [
+        "wrangler.toml",
+        ".github/workflows/governed-deploy.yml",
+        "package.json"
+      ],
+      "containment_recommendation": "Treat as external production-capable bypass until deployment permissions are constrained to governed pipeline-only targets and continuously audited.",
+      "status": "OPEN"
+    },
+    {
+      "surface_name": "GitHub admin authority",
+      "authority_source": "GitHub repository owner/admin",
+      "mutation_capability": true,
+      "production_capability": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "evidence_path": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/root_authority_registry.json"
+      ],
+      "containment_recommendation": "Require branch protection, CODEOWNERS, and environment restrictions as compensating controls; maintain explicit sovereignty assumption.",
+      "status": "OPEN"
+    }
+  ]
+}
