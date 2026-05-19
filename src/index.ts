@@ -2377,6 +2377,17 @@ async function cascadeSessionRevocation(env: Env, session_id: string) {
   await env.DB.prepare(`UPDATE invocation_registry SET status='REVOKED' WHERE continuity_id IN (SELECT continuity_id FROM continuity_registry WHERE session_id=?1) AND status='RESERVED'`).bind(session_id).run()
 }
 
+
+
+async function continuityIsRevokedOrAmbiguous(env: Env, continuity_id: string): Promise<boolean> {
+  if (!continuity_id) return true
+  const rows = await env.DB.prepare(`SELECT status, revoked_at FROM continuity_registry WHERE continuity_id=?1 LIMIT 2`).bind(continuity_id).all<any>()
+  const results = Array.isArray(rows.results) ? rows.results : []
+  if (results.length !== 1) return true
+  const continuity = results[0] || {}
+  return String(continuity.status || "") !== "ACTIVE" || Boolean(String(continuity.revoked_at || ""))
+}
+
 async function activeContinuity(env: Env, continuity_id: string, session: any, decision_id?: string): Promise<any | null> {
   if (!continuity_id || !session) return null
   const now = new Date().toISOString()
@@ -5289,6 +5300,8 @@ function proofExecutionLineageMatches(proof: any, execution: any): boolean {
   let executionLineage: any
   try { executionLineage = JSON.parse(String(proof?.execution_lineage || "{}")) } catch { return false }
   if (String(execution?.status || "") !== "EXECUTED") return false
+  if (String(execution?.continuity_id || "") === "") return false
+  if (String(proof?.continuity_id || "") !== String(execution?.continuity_id || "")) return false
   return String(proof?.execution_id || "") === String(execution?.execution_id || "")
     && String(proof?.decision_id || "") === String(execution?.decision_id || "")
     && String(proof?.validated_object_hash || "") === String(execution?.validated_object_hash || "")
@@ -7089,6 +7102,8 @@ export default {
       if (String(authority.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: authority.continuity_id, provided_continuity_id: execution.continuity_id }, drift_class: "proof_drift" })
       if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
       if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+      const executionContinuityRevoked = await continuityIsRevokedOrAmbiguous(env, String(execution.continuity_id || ""))
+      if (executionContinuityRevoked) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"revoked_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lookup_blocked_by_revocation" }, drift_class: "proof_drift" })
       // canonical legacy source audit fragment (non-executable): SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3
       const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE decision_hash=?1 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(decision_hash).all<any>()
       const canonicalProofResolution = resolveCanonicalProofEvidence(existingProofs.results || [], execution)
