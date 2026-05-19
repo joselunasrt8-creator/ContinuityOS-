@@ -68,7 +68,7 @@ The purpose of this registry is to:
 | risk_class | P0 |
 | bypass_condition | Infrastructure root credentials mutate runtime outside canonical legitimacy chain |
 | closure_condition | All production mutation authority traverses canonical governed execution lifecycle |
-| current_state | Runtime governance stronger than infrastructure sovereignty |
+| current_state | Runtime governance stronger than infrastructure sovereignty; sovereignty gap tracked under #578, not #577 production deploy blocker unless production-capable. |
 | required_tests | deploy bypass detection, workflow provenance verification, authority equivalence verification |
 | required_proofs | deploy provenance evidence, immutable workflow lineage |
 | status | OPEN |
