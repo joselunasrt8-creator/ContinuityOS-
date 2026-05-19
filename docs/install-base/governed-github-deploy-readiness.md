@@ -144,6 +144,79 @@ Execution must return `NULL` (or otherwise fail closed) for conditions including
 5. Require proof persistence as completion criteria for deploy change control.
 6. Validate that direct deploy paths are blocked or excluded from production legitimacy.
 
+## Minimum copy/paste external-repo adoption path
+
+Use this as the smallest bounded install path for a new repository.
+
+### A) Required runtime endpoints (in strict order)
+
+1. `POST /session`
+2. `POST /continuity`
+3. `POST /authority`
+4. `POST /compile`
+5. `POST /validate`
+6. `POST /execute`
+7. `POST /proof`
+
+Every state-changing deploy attempt must run this chain and must fail closed to `NULL` when any step is invalid.
+
+### B) Required GitHub workflow shape
+
+- Keep `workflow_dispatch` as the deploy trigger for governed execution.
+- Require these dispatch inputs:
+  - `decision_id`
+  - `validated_object_hash`
+  - `invocation_nonce`
+- Call runtime endpoints in canonical order only.
+- Hard-fail on missing inputs, missing secrets, wrong workflow identity, or any non-`VALID` validation state.
+- Persist response artifacts for all seven runtime steps as reviewable evidence.
+
+### C) Required secrets / environment
+
+- `MINDSHIFT_WORKER_URL`
+- `MINDSHIFT_API_KEY`
+- repository + branch + workflow bindings in authority/constraint scope
+
+If any required secret or binding is absent, workflow outcome must be fail-closed (`NULL` or blocked dispatch).
+
+### D) Required proof fields (minimum)
+
+- `decision_id`
+- `validated_object_hash`
+- `execution_id`
+- `proof_id`
+- `workflow` / workflow run identity
+- `commit_sha` lineage identity
+
+These fields are the minimum object identity needed for deterministic replay checks and proof lookup.
+
+### E) Replay behavior expectations
+
+Treat the following as expected-safe failures:
+
+- reused `invocation_nonce` -> blocked/`NULL`
+- reused consumed authority -> blocked/`NULL`
+- duplicate decision+object lineage -> blocked/`NULL` (or quarantined as non-authoritative evidence)
+
+### F) NULL conditions checklist
+
+Execution must fail closed to `NULL` for:
+
+- missing/expired/revoked authority
+- broken continuity lineage
+- scope mismatch (repo/branch/workflow/environment)
+- hash drift (`validated_object_hash` mismatch)
+- replay indicators (nonce/authority/lineage reuse)
+- proof lineage mismatch or orphaned proof attempt
+
+### G) Exact-object discipline check
+
+Before shipping, verify:
+
+- hash emitted by `/compile` is exactly the hash consumed by `/validate` and `/execute`
+- proof persists lineage for the same decision+object identity
+- any mutated object after validation returns `NULL`
+
 ## Remaining Gaps Before External Adoption
 
 Only concrete gaps currently visible from repository/runtime surfaces:
