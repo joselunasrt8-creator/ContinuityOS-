@@ -1456,7 +1456,7 @@
       "surface_id": "package_script:test",
       "surface_type": "package_script",
       "source_file": "package.json",
-      "entrypoint": "test: node --test tests/*.test.mjs tests/fate/*.test.mjs",
+      "entrypoint": "test: node --test",
       "mutation_capability": false,
       "execution_capability": false,
       "deployment_capability": false,

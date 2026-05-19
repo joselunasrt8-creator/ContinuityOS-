@@ -155,7 +155,7 @@ test('execution and proof preserve continuity lineage', () => {
 
   assert.match(
     source,
-    /INSERT INTO execution_registry[\s\S]*continuity_id[\s\S]*\.bind\(execution_id, authority\.session_id, decision_id, validated_object_hash, invocation_nonce, new Date\(\)\.toISOString\(\), String\(authority\.continuity_id \|\| ""\)[\s\S]*provenance\.workflow_sha\)/,
+    /INSERT INTO execution_registry[\s\S]*continuity_id[\s\S]*\.bind\(execution_id, authority\.session_id, decision_id, validated_object_hash, invocation_nonce, new Date\(\)\.toISOString\(\), String\(authority\.continuity_id \|\| ""\)[\s\S]*provenance\.workflow_sha[\s\S]*\)/,
     'execution must persist authority continuity_id into execution lineage',
   )
 

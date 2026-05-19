@@ -58,10 +58,11 @@ function assertNotNull(dbPath, table, expected) {
 
 function assertIndex(dbPath, table, indexName, expectedColumns, unique = false) {
   const indexes = indexList(dbPath, table)
-  const index = indexes.find((entry) => entry.name === indexName)
+  const matchingIndexes = indexes.filter((entry) => entry.name === indexName)
+  const index = matchingIndexes.find((entry) => indexInfo(dbPath, entry.name).map((info) => info.name).join('|') === expectedColumns.join('|')) || matchingIndexes[0]
   assert.ok(index, `${table} must have index ${indexName}`)
   assert.equal(Boolean(index.unique), unique, `${indexName} unique flag must be ${unique}`)
-  assert.deepEqual(indexInfo(dbPath, indexName).map((entry) => entry.name), expectedColumns)
+  assert.deepEqual(indexInfo(dbPath, index.name).map((entry) => entry.name), expectedColumns)
 }
 
 test('migration chain reproduces canonical runtime registry schemas', () => {
@@ -96,10 +97,10 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertIndex(dbPath, 'execution_registry', 'idx_execution_registry_decision_hash', ['decision_id', 'validated_object_hash'])
     assert.ok(indexList(dbPath, 'execution_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'execution_registry must retain UNIQUE(decision_id, validated_object_hash) replay guard')
 
-    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash'])
+    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'decision_hash', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash'])
     assertNotNull(dbPath, 'proof_registry', ['session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_execution_decision_hash', ['execution_id', 'decision_id', 'validated_object_hash'])
-    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
+    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_hash'], true)
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_workflow_run_unique', ['workflow_run_id'], true)
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_provenance', ['repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'workflow_run_id'])
 
@@ -614,13 +615,13 @@ test('runtime non-session startup quarantines historical duplicate proof lineage
     assert.deepEqual(payload, { status: 'NULL', reason: 'invalid_session' })
     assert.equal(runSqlite([dbPath, `SELECT proof_id FROM proof_registry WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-canonical')
     assert.equal(runSqlite([dbPath, `SELECT proof_id || ':' || canonical_proof_id || ':' || archive_reason FROM proof_registry_duplicate_archive WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-duplicate:proof-canonical:duplicate_proof_lineage')
-    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_id', 'validated_object_hash'], true)
+    assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_hash'], true)
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_workflow_run_unique', ['workflow_run_id'], true)
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_provenance', ['repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'workflow_run_id'])
 
     const duplicateInsert = spawnSync('sqlite3', [dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,created_at) VALUES ('proof-after-cleanup','session-1','execution-3','decision-historical','hash-historical','2026-01-03T00:00:00.000Z');`], { encoding: 'utf8' })
     assert.notEqual(duplicateInsert.status, 0)
-    assert.match(duplicateInsert.stderr, /UNIQUE constraint failed/)
+    assert.match(duplicateInsert.stderr, /UNIQUE constraint failed|proof_registry decision_hash mismatch/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

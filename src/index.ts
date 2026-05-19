@@ -212,7 +212,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   preo_registry: ["preo_id", "decision_id", "authority_id", "continuity_id", "reviewed_hash", "reviewed_tree_hash", "merge_commit_sha", "canonical_preo", "status", "created_at"],
   validation_registry: ["validation_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "environment", "result", "reason", "status", "created_at", "continuity_id", "delegated_authority_id", "delegated_replay_chain_hash"],
   execution_registry: ["execution_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha", "delegated_authority_id", "delegated_replay_chain_hash", "delegation_lineage_hash", "delegation_root_hash"],
-  proof_registry: ["proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "continuity_id", "continuity_hash", "identity_id", "authority_lineage", "execution_lineage", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha", "delegated_authority_id", "delegated_replay_chain_hash", "delegation_lineage_hash", "delegation_root_hash"],
+  proof_registry: ["proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "decision_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "continuity_id", "continuity_hash", "identity_id", "authority_lineage", "execution_lineage", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha", "delegated_authority_id", "delegated_replay_chain_hash", "delegation_lineage_hash", "delegation_root_hash"],
   proof_registry_duplicate_archive: ["archive_id", "proof_id", "session_id", "execution_id", "decision_id", "validated_object_hash", "surface", "run_id", "commit_sha", "workflow", "environment", "created_at", "archived_at", "archive_reason", "canonical_proof_id"],
   proof_quarantine_registry: ["quarantine_id", "proof_id", "lineage_hash", "quarantine_reason", "canonical_proof_selected", "duplicate_proof_archived", "quarantine_generated_at", "replay_neutral", "evidence_only"],
   invocation_registry: ["decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id"],
@@ -1080,6 +1080,10 @@ function missingDeploymentProvenance(provenance: DeploymentProvenance): string[]
   return Object.entries(provenance).filter(([, value]) => !value).map(([key]) => key)
 }
 
+function proofDecisionHash(decision_id: string, validated_object_hash: string) {
+  return `${decision_id}\u001f${validated_object_hash}`
+}
+
 function toCanonicalAeo(input: any): CanonicalAEO | null {
   const keys = Object.keys(input || {}).sort()
   if (keys.length !== REQUIRED_AEO_KEYS.length) return null
@@ -1117,8 +1121,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS execution_registry (execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, repository TEXT, branch TEXT, pull_request_id TEXT, merge_commit_sha TEXT, source_tree_hash TEXT, workflow_run_id TEXT, workflow_sha TEXT, delegated_authority_id TEXT, delegated_replay_chain_hash TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, UNIQUE(decision_id, validated_object_hash), UNIQUE(continuity_id, decision_id, validated_object_hash), UNIQUE(workflow_run_id))`,
       `CREATE INDEX IF NOT EXISTS idx_execution_registry_decision_hash ON execution_registry(decision_id, validated_object_hash)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_registry_workflow_run_unique ON execution_registry(workflow_run_id)`,
-      `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, continuity_id TEXT, continuity_hash TEXT, identity_id TEXT, authority_lineage TEXT, execution_lineage TEXT, repository TEXT, branch TEXT, pull_request_id TEXT, merge_commit_sha TEXT, source_tree_hash TEXT, workflow_run_id TEXT, workflow_sha TEXT, delegated_authority_id TEXT, delegated_replay_chain_hash TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, UNIQUE(execution_id, decision_id, validated_object_hash), UNIQUE(workflow_run_id))`,
+      `CREATE TABLE IF NOT EXISTS proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, decision_hash TEXT, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, continuity_id TEXT, continuity_hash TEXT, identity_id TEXT, authority_lineage TEXT, execution_lineage TEXT, repository TEXT, branch TEXT, pull_request_id TEXT, merge_commit_sha TEXT, source_tree_hash TEXT, workflow_run_id TEXT, workflow_sha TEXT, delegated_authority_id TEXT, delegated_replay_chain_hash TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, UNIQUE(execution_id, decision_id, validated_object_hash), UNIQUE(workflow_run_id))`,
       `CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash ON proof_registry(execution_id, decision_id, validated_object_hash)`,
+      `CREATE TRIGGER IF NOT EXISTS trg_proof_registry_decision_hash_guard BEFORE INSERT ON proof_registry WHEN NEW.decision_hash IS NULL OR NEW.decision_hash = '' OR NEW.decision_hash != NEW.decision_id || char(31) || NEW.validated_object_hash BEGIN SELECT RAISE(ABORT, 'proof_registry decision_hash mismatch'); END`,
       `CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (archive_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, archived_at TEXT NOT NULL, archive_reason TEXT NOT NULL, canonical_proof_id TEXT NOT NULL, UNIQUE(proof_id))`,
       `CREATE TABLE IF NOT EXISTS proof_quarantine_registry (quarantine_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, lineage_hash TEXT NOT NULL, quarantine_reason TEXT NOT NULL, canonical_proof_selected TEXT NOT NULL, duplicate_proof_archived TEXT NOT NULL, quarantine_generated_at TEXT NOT NULL, replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'))`,
       `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
@@ -1267,6 +1272,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_MIGRATIONS_VALIDATED")
     if (options.stabilizeProofRegistry === false) return
     await validateProofArchiveCompatibility(env)
+    await backfillProofDecisionHashes(env)
     const quarantine = await quarantineHistoricalProofDuplicates(env)
     if (quarantine.detected) await emitBootstrapDiagnostic(env, "BOOTSTRAP_DUPLICATE_PROOF_DETECTED")
     if (quarantine.quarantined > 0) await emitBootstrapDiagnostic(env, "BOOTSTRAP_DUPLICATE_PROOF_QUARANTINED")
@@ -1274,7 +1280,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_PROOF_LINEAGE_RECONCILED")
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_REGISTRY_STABILIZED")
     await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_execution_decision_hash_unique`).run()
-    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
+    await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_decision_hash_unique`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_hash)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique ON proof_registry(workflow_run_id)`).run()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_UNIQUENESS_ENFORCED")
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_proof_registry_provenance ON proof_registry(repository, branch, pull_request_id, merge_commit_sha, workflow_run_id)`).run()
@@ -4519,11 +4526,10 @@ function sortProofLineageRows(rows: any[]): any[] {
   })
 }
 
-
 async function quarantineHistoricalProofDuplicates(env: Env): Promise<ProofDuplicateQuarantineSummary> {
   const duplicateRows = await env.DB.prepare(`SELECT rowid AS __rowid,* FROM proof_registry
-    WHERE decision_id || char(31) || validated_object_hash IN (
-      SELECT decision_id || char(31) || validated_object_hash FROM proof_registry GROUP BY decision_id, validated_object_hash HAVING COUNT(*) > 1
+    WHERE decision_hash IN (
+      SELECT decision_hash FROM proof_registry GROUP BY decision_hash HAVING COUNT(*) > 1
     )
     ORDER BY decision_id ASC, validated_object_hash ASC, created_at ASC, proof_id ASC`).all<any>()
   const rows = Array.isArray(duplicateRows?.results) ? duplicateRows.results : []
@@ -4531,7 +4537,7 @@ async function quarantineHistoricalProofDuplicates(env: Env): Promise<ProofDupli
 
   const groups = new Map<string, any[]>()
   for (const row of rows) {
-    const key = `${String(row.decision_id || "")}\u001f${String(row.validated_object_hash || "")}`
+    const key = String(row.decision_hash || proofDecisionHash(String(row.decision_id || ""), String(row.validated_object_hash || "")))
     const group = groups.get(key) || []
     group.push(row)
     groups.set(key, group)
@@ -4585,6 +4591,11 @@ async function quarantineHistoricalProofDuplicates(env: Env): Promise<ProofDupli
   return { detected: true, quarantined }
 }
 
+
+async function backfillProofDecisionHashes(env: Env) {
+  await env.DB.prepare(`UPDATE proof_registry SET decision_hash = decision_id || char(31) || validated_object_hash WHERE decision_hash IS NULL OR decision_hash = ''`).run()
+}
+
 async function validateProofArchiveCompatibility(env: Env) {
   await env.DB.prepare(`INSERT OR IGNORE INTO proof_registry_duplicate_archive (archive_id,proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at,archived_at,archive_reason,canonical_proof_id)
     SELECT 'bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe',NULL,NULL,NULL,NULL,NULL,'bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','archive_compatibility_probe','bootstrap_archive_compatibility_probe'
@@ -4593,7 +4604,9 @@ async function validateProofArchiveCompatibility(env: Env) {
 
 async function proofRegistryStabilized(env: Env): Promise<boolean> {
   const duplicates = await env.DB.prepare(`SELECT COUNT(*) AS count FROM (
-    SELECT decision_id, validated_object_hash FROM proof_registry GROUP BY decision_id, validated_object_hash HAVING COUNT(*) > 1
+    SELECT decision_hash FROM proof_registry WHERE decision_hash IS NULL OR decision_hash = '' OR decision_hash != decision_id || char(31) || validated_object_hash
+    UNION ALL
+    SELECT decision_hash FROM proof_registry GROUP BY decision_hash HAVING COUNT(*) > 1
   )`).first<any>()
   return Number(duplicates?.count || 0) === 0
 }
@@ -6974,7 +6987,6 @@ export default {
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
       const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND result='VALID' AND status='VALID'`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
-      // canonical legacy source audit fragment (non-executable): if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"no_valid_validation" })
       if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, invocation_nonce, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (String(validation.validated_object_hash || "") !== validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, provided_hash: validation.validated_object_hash, indicator: "validated_hash_lineage_mismatch" }, drift_class: "hash_drift" })
       const session = await activeSession(env, session_id)
@@ -6996,7 +7008,6 @@ export default {
       try { executionAeo = JSON.parse(String(compiled?.canonical_aeo || "{}")) } catch { executionAeo = null }
       const executionCanonicalAeo = toCanonicalAeo(executionAeo)
       const execHash = executionCanonicalAeo ? await sha256Hex(canonicalize(executionCanonicalAeo)) : ""
-      // canonical legacy source audit fragment (non-executable): if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_not_compiled" })
       if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
       const delegatedExecution = await validateDelegatedAuthorityLineage(env, authority, executionCanonicalAeo)
@@ -7036,6 +7047,7 @@ export default {
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", execution_id, severity: "WARN", payload: { route: "/proof" }, drift_class: "proof_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "WARN", payload: { route: "/proof" }, drift_class: "proof_drift" })
       const proof_id = crypto.randomUUID()
+      const decision_hash = proofDecisionHash(decision_id, validated_object_hash)
       const created_at = new Date().toISOString()
       let execution: any = null
       let session: any = null
@@ -7073,7 +7085,7 @@ export default {
       if (!validation || String(validation.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", expected_continuity_id: execution.continuity_id, provided_continuity_id: validation?.continuity_id || null }, drift_class: "proof_drift" })
       if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       // canonical legacy source audit fragment (non-executable): SELECT * FROM proof_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 ORDER BY created_at ASC, proof_id ASC LIMIT 3
-      const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE decision_id=?1 AND validated_object_hash=?2 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(decision_id,validated_object_hash).all<any>()
+      const existingProofs = await env.DB.prepare(`SELECT * FROM proof_registry WHERE decision_hash=?1 ORDER BY created_at ASC, proof_id ASC LIMIT 3`).bind(decision_hash).all<any>()
       const canonicalProofResolution = resolveCanonicalProofEvidence(existingProofs.results || [], execution)
       const proofCandidates = canonicalProofResolution.candidates
       const canonicalProofCandidates = proofCandidates.filter((proof: any) => proofExecutionLineageMatches(proof, execution))
@@ -7179,14 +7191,15 @@ export default {
       })
       try {
         const proofStatements = [
-          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,delegated_authority_id,delegated_replay_chain_hash,delegation_lineage_hash,delegation_root_hash)
-            SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?15, ?16, ?17, ?18, ?19, ?20, ?21, a.delegated_authority_id, a.delegated_replay_chain_hash, a.delegation_lineage_hash, a.delegation_root_hash
+          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,decision_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,delegated_authority_id,delegated_replay_chain_hash,delegation_lineage_hash,delegation_root_hash)
+            SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?22, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?15, ?16, ?17, ?18, ?19, ?20, ?21, a.delegated_authority_id, a.delegated_replay_chain_hash, a.delegation_lineage_hash, a.delegation_root_hash
             FROM authority_registry a JOIN session_registry s ON s.session_id=a.session_id JOIN continuity_registry c ON c.continuity_id=a.continuity_id
             WHERE a.decision_id=?4 AND a.session_id=?2 AND a.status='EXECUTED' AND c.status='ACTIVE' AND c.expires_at>?13
               AND a.continuity_id=?14
               AND EXISTS (SELECT 1 FROM execution_registry WHERE execution_id=?3 AND decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='EXECUTED')
               AND EXISTS (SELECT 1 FROM validation_registry WHERE decision_id=?4 AND validated_object_hash=?5 AND session_id=?2 AND continuity_id=a.continuity_id AND status='VALID' AND result='VALID')
-              AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),provenance.workflow_run_id,provenance.workflow_sha,String(b.workflow||GOVERNED_WORKFLOW),String(b.environment||""),created_at,String(execution.continuity_id || ""),provenance.repository,provenance.branch,provenance.pull_request_id,provenance.merge_commit_sha,provenance.source_tree_hash,provenance.workflow_run_id,provenance.workflow_sha),
+              AND NOT EXISTS (SELECT 1 FROM proof_registry WHERE decision_hash=?22)
+              AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),provenance.workflow_run_id,provenance.workflow_sha,String(b.workflow||GOVERNED_WORKFLOW),String(b.environment||""),created_at,String(execution.continuity_id || ""),provenance.repository,provenance.branch,provenance.pull_request_id,provenance.merge_commit_sha,provenance.source_tree_hash,provenance.workflow_run_id,provenance.workflow_sha,decision_hash),
           env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND session_id=?2 AND status='EXECUTED' AND continuity_id=?5 AND EXISTS (SELECT 1 FROM proof_registry WHERE proof_id=?3 AND decision_id=?1 AND validated_object_hash=?4)`).bind(decision_id,session_id,proof_id,validated_object_hash,String(execution.continuity_id || ""))
         ]
         if (validatedAttestation) {

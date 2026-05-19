@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS proof_registry (
   execution_id TEXT NOT NULL,
   decision_id TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
+  decision_hash TEXT,
   authority_lineage TEXT NOT NULL,
   execution_lineage TEXT NOT NULL,
   surface TEXT,
@@ -158,6 +159,15 @@ CREATE TABLE IF NOT EXISTS proof_registry (
 
 CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash
   ON proof_registry (execution_id, decision_id, validated_object_hash);
+
+CREATE TRIGGER IF NOT EXISTS trg_proof_registry_decision_hash_guard
+BEFORE INSERT ON proof_registry
+WHEN NEW.decision_hash IS NULL
+  OR NEW.decision_hash = ''
+  OR NEW.decision_hash != NEW.decision_id || char(31) || NEW.validated_object_hash
+BEGIN
+  SELECT RAISE(ABORT, 'proof_registry decision_hash mismatch');
+END;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique
   ON proof_registry (workflow_run_id);
@@ -185,7 +195,7 @@ CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique
-  ON proof_registry (decision_id, validated_object_hash);
+  ON proof_registry (decision_hash);
 
 CREATE TABLE IF NOT EXISTS invocation_registry (
   decision_id TEXT NOT NULL,

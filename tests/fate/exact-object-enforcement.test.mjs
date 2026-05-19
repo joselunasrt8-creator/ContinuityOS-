@@ -45,8 +45,8 @@ test('execution requires decision_id, validated_object_hash, and a VALID validat
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"no_valid_validation\" \}/,
-    'missing validation hash match must return NULL / INVALID with no_valid_validation',
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"hash_mismatch\" \}/,
+    'missing validation hash match must return NULL / INVALID with hash_mismatch',
   )
 
   assert.match(
@@ -188,8 +188,8 @@ test('execute_rejects_uncompiled_hash', () => {
 
   assert.match(
     source,
-    /if \(!compiled \|\| !executionCanonicalAeo \|\| execHash !== validated_object_hash \|\| execHash !== String\(compiled\.validated_object_hash \|\| ""\)\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_not_compiled" \}/,
-    'execute must fail closed with hash_not_compiled when hash is not a canonical compiled object',
+    /if \(!compiled \|\| !executionCanonicalAeo \|\| execHash !== validated_object_hash \|\| execHash !== String\(compiled\.validated_object_hash \|\| ""\)\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/,
+    'execute must fail closed with hash_mismatch when hash is not a canonical compiled object',
   )
 })
 
@@ -202,8 +202,8 @@ test('execute_rejects_unvalidated_hash', () => {
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"no_valid_validation" \}/,
-    'execute must reject unvalidated hashes with no_valid_validation',
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/,
+    'execute must reject unvalidated hashes with hash_mismatch',
   )
 })
 
@@ -242,7 +242,7 @@ test('execution rejection does not write execution_registry', () => {
   assert.ok(executeStart >= 0 && unvalidatedStart > executeStart && executionInsert > unvalidatedStart, 'expected execute fail-closed branch before execution insert')
 
   const failClosedBlock = source.slice(unvalidatedStart, executionInsert)
-  assert.match(failClosedBlock, /reason:"(?:no_valid_validation|hash_not_compiled|lineage_mismatch)"/)
+  assert.match(failClosedBlock, /reason:"(?:hash_mismatch|hash_mismatch|lineage_mismatch)"/)
   assert.doesNotMatch(failClosedBlock, /INSERT INTO execution_registry/, 'execute fail-closed rejection path must not write execution_registry')
 })
 
@@ -253,7 +253,7 @@ test('execution rejection does not consume invocation_registry', () => {
   assert.ok(executeStart >= 0 && uncompiledStart > executeStart && invocationConsume > uncompiledStart, 'expected execute fail-closed compiled guard before nonce consumption')
 
   const failClosedBlock = source.slice(uncompiledStart, invocationConsume)
-  assert.match(failClosedBlock, /reason:"(?:hash_not_compiled|lineage_mismatch)"/)
+  assert.match(failClosedBlock, /reason:"(?:hash_mismatch|lineage_mismatch)"/)
   assert.doesNotMatch(failClosedBlock, /UPDATE invocation_registry SET status='EXECUTED'/, 'execute fail-closed rejection path must not consume invocation nonce')
 })
 
@@ -275,7 +275,7 @@ test('execute_requires_prior_valid_validation', () => {
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"no_valid_validation" \}/,
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/,
     'execute must fail closed when no VALID validation row exists',
   )
 })
@@ -303,7 +303,7 @@ test('execute_rejection_does_not_write_execution_registry', () => {
   assert.ok(executeStart >= 0 && validationMismatchStart > executeStart && executionInsert > validationMismatchStart, 'expected execute hash-lineage fail-closed branch before execution insert')
 
   const failClosedBlock = source.slice(validationMismatchStart, executionInsert)
-  assert.match(failClosedBlock, /reason:"(?:lineage_mismatch|hash_not_compiled|no_valid_validation)"/)
+  assert.match(failClosedBlock, /reason:"(?:lineage_mismatch|hash_mismatch|hash_mismatch)"/)
   assert.doesNotMatch(failClosedBlock, /INSERT INTO execution_registry/, 'execute rejection must be side-effect-free for execution_registry writes')
 })
 
