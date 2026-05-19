@@ -91,6 +91,7 @@ WHERE rowid IN (
 );
 
 DROP INDEX IF EXISTS idx_proof_registry_decision_hash_unique;
+DROP TRIGGER IF EXISTS trg_proof_registry_decision_hash_guard;
 
 CREATE TRIGGER IF NOT EXISTS trg_proof_registry_decision_hash_guard
 BEFORE INSERT ON proof_registry
