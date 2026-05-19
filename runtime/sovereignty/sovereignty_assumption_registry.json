@@ -51,6 +51,11 @@
       "assumption_id": "workflow_dispatch_trigger_only",
       "statement": "workflow_dispatch is observed as trigger-only and does not inspect secrets or authorize execution.",
       "continuity": "stable"
+    },
+    {
+      "assumption_id": "cloudflare_git_integration_preview_only_dependency",
+      "statement": "Cloudflare Git Integration is treated as preview-only and non-governing; any production mutation capability remains an OPEN sovereignty risk until independently disabled at Cloudflare account settings.",
+      "continuity": "fail_closed"
     }
   ],
   "replay_neutral": true,

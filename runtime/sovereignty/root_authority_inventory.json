@@ -247,6 +247,30 @@
       "creates_authority": false,
       "workflow_dispatch_semantics": "NOT_APPLICABLE",
       "deployment_token_observability": "NOT_APPLICABLE"
+    },
+    {
+      "surface_id": "cloudflare_git_integration",
+      "authority_origin": "cloudflare_git_integration",
+      "declared_boundary": "preview-only-production-mutation-disabled",
+      "classifications": [
+        "ROOT_DEPLOY_AUTHORITY",
+        "ROOT_INFRASTRUCTURE_MUTATION_AUTHORITY",
+        "ROOT_AUTHORITY_BYPASS_RISK",
+        "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"
+      ],
+      "secret_material": "NOT_INSPECTED",
+      "executable": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "workflow_dispatch_semantics": "NOT_APPLICABLE",
+      "deployment_token_observability": "NOT_APPLICABLE",
+      "production_capability": true,
+      "governed_by_mindshift": false,
+      "preview_target_only": true,
+      "production_mutation_allowed": false,
+      "bypass_risk": "P3",
+      "status": "OPEN",
+      "containment_status": "PREVIEW_ONLY_CONSTRAINED_PRODUCTION_DISABLED"
     }
   ],
   "evidence_only": true,
@@ -266,7 +290,8 @@
     "repository_secret_mutation_authority",
     "root_runtime_authority_assumption",
     "wrangler_deploy_capability",
-    "wrangler_local_deploy_authority"
+    "wrangler_local_deploy_authority",
+    "cloudflare_git_integration"
   ],
   "undeclared_root_surfaces": [],
   "containment_status": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
