@@ -40,3 +40,26 @@ test('replay evidence responses remain non-authoritative', () => {
   assert.match(source, /runtime_authority_granted: false/)
   assert.match(source, /proof_issue_authority_granted: false/)
 })
+
+test('replay recovery remains deterministic after proof registry reorder and hydration variance', () => {
+  assert.match(source, /function sortProofLineageRows\(rows: any\[\]\): any\[\] \{/)
+  assert.match(source, /const created = String\(a\.created_at \|\| ""\)\.localeCompare\(String\(b\.created_at \|\| ""\)\)/)
+  assert.match(source, /const canonical = canonicalize\(proofLineageMaterial\(a\)\)\.localeCompare\(canonicalize\(proofLineageMaterial\(b\)\)\)/)
+  assert.match(source, /return String\(a\.proof_id \|\| ""\)\.localeCompare\(String\(b\.proof_id \|\| ""\)\)/)
+})
+
+test('replay recovery after duplicate quarantine restoration does not replace canonical lineage', () => {
+  assert.match(source, /CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive/)
+  assert.match(source, /CREATE TABLE IF NOT EXISTS proof_quarantine_registry/)
+  assert.match(source, /archive_reason TEXT NOT NULL/)
+  assert.match(source, /canonical_proof_id TEXT NOT NULL/)
+  assert.match(source, /reason:"proof_replay"/)
+  assert.match(source, /proof_registry_appended: false/)
+})
+
+test('replay attempts against archived duplicate proofs remain side-effect free', () => {
+  assert.match(source, /INSERT OR IGNORE INTO proof_registry_duplicate_archive/)
+  assert.match(source, /INSERT OR IGNORE INTO proof_quarantine_registry/)
+  assert.match(source, /classification: "PROOF_CANONICAL_EVIDENCE_REPLAY_CONTAINED"/)
+  assert.match(source, /registry_mutation_blocked: \["authority_registry", "execution_registry", "invocation_registry", "proof_registry"\]/)
+})

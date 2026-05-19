@@ -41,3 +41,19 @@ test('proof persists authority/session lineage', () => {
   assert.match(source, /UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=\?1 AND session_id=\?2 AND status='EXECUTED'/)
   assert.match(source, /proof: \{ proof_id, identity_id: String\(authority\.identity_id \|\| ""\), session_id, continuity_id: String\(authority\.continuity_id/)
 })
+
+test('canonical proof lookup stability fails closed when canonical candidate is ambiguous', () => {
+  assert.match(source, /type CanonicalProofResolution =/)
+  assert.match(source, /\| \{ status: "SELECTED", candidates: any\[\], canonical_candidates: any\[\], canonical_proof: any \}/)
+  assert.match(source, /\| \{ status: "AMBIGUOUS", candidates: any\[\], canonical_candidates: any\[\], canonical_proof: null \}/)
+  assert.match(source, /const canonical_candidates = candidates\.filter\(\(proof: any\) => proofExecutionLineageMatches\(proof, execution\)\)/)
+  assert.match(source, /if \(candidates\.length === 1 && canonical_candidates\.length === 1\) return \{ status: "SELECTED"/)
+  assert.match(source, /return \{ status: "AMBIGUOUS", candidates, canonical_candidates, canonical_proof: null \}/)
+})
+
+test('deterministic proof lineage restoration preserves execution, decision, hash, and nonce', () => {
+  assert.match(source, /String\(proof\?\.execution_id \|\| ""\) === String\(execution\?\.execution_id \|\| ""\)/)
+  assert.match(source, /String\(proof\?\.decision_id \|\| ""\) === String\(execution\?\.decision_id \|\| ""\)/)
+  assert.match(source, /String\(proof\?\.validated_object_hash \|\| ""\) === String\(execution\?\.validated_object_hash \|\| ""\)/)
+  assert.match(source, /String\(executionLineage\?\.invocation_nonce \|\| ""\) === String\(execution\?\.invocation_nonce \|\| ""\)/)
+})
