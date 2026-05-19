@@ -1,0 +1,35 @@
+{
+  "artifact": "INSTALL_BASE_TELEMETRY_REPORT",
+  "generated_from": "reconciliation+proof+NULL+sovereignty+governed-deploy artifacts",
+  "canonical_chain": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "read_only": true,
+  "non_authoritative": true,
+  "creates_authority": false,
+  "creates_proof": false,
+  "metrics": {
+    "governed_execution_count": 1,
+    "governed_deploy_count": 1,
+    "proof_persisted_count": 12,
+    "validation_success_count": 1,
+    "validation_null_count": 12,
+    "replay_rejection_count": 4,
+    "hash_mismatch_rejection_count": 4,
+    "boundary_bypass_rejection_count": 3,
+    "orphan_proof_detection_count": 1,
+    "governed_surface_count": 13,
+    "ungoverned_surface_count": 15,
+    "open_sovereignty_gap_count": 13,
+    "contained_sovereignty_gap_count": 9,
+    "install_base_artifacts_present": true,
+    "graph_projection_present": true
+  },
+  "report_hash": "6e2f8cfa1340b3967f214e1f211a1dd998a9114d056dd38058d63d89e6135e8b"
+}
