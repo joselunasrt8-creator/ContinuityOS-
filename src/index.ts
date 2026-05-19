@@ -6905,8 +6905,18 @@ export default {
 
         const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
         if (!authority) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
-        if (!["ACTIVE", "VALIDATED", "RESERVED"].includes(String(authority.status || ""))) {
-          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_unusable" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+        const authorityStatus = String(authority.status || "")
+        if (isExpired(authority.expiry)) {
+          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_expired" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "expired_authority_blocked" }, drift_class: "authority_drift" })
+        }
+        if (authorityStatus === "REVOKED") {
+          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_revoked" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "revoked_authority_blocked" }, drift_class: "authority_drift" })
+        }
+        if (authorityStatus === "CONSUMED") {
+          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_consumed" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+        }
+        if (authorityStatus !== "ACTIVE") {
+          return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "authority_not_active" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", authority_status: authority.status, indicator: "authority_not_active_at_compile" }, drift_class: "authority_drift" })
         }
         const session = await activeSession(env, String(authority.session_id || ""))
         if (!session) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "authority_drift" })
