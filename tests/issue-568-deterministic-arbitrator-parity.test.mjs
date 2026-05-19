@@ -21,7 +21,7 @@ test('Issue #568: /execute rejects LLM proposal bypass of validator/arbitrator r
 test('Issue #568: agent/LLM output remains proposal-only and cannot execute without exact AEO', () => {
   assert.match(source, /keys\.length !== REQUIRED_AEO_KEYS\.length/)
   assert.match(source, /keys\.join\("\|"\) !== \[\.\.\.REQUIRED_AEO_KEYS\]\.sort\(\)\.join\("\|"\)/)
-  assert.match(source, /status:\s*"NULL",\s*route:\s*"\/compile",\s*reason:\s*"invalid_aeo"/)
+  assert.match(source, /status:\s*"NULL",\s*route:\s*"\/compile",\s*reason:\s*"invalid_canonical_aeo"/)
 })
 
 test('Issue #568: model confidence cannot replace deterministic validator result', () => {
@@ -67,5 +67,5 @@ test('Issue #568 overlap #569: FATE/synthetic artifacts stay evidence-only and m
 
 test('Issue #568: compile returns NULL when proposal cannot compile to exact five-field AEO', () => {
   const compileBlock = routeBlock('/compile', '/validate')
-  assert.match(compileBlock, /reason:\s*"invalid_aeo"|reason:\s*"compile_exception"|reason:\s*"missing_decision_id"/)
+  assert.match(compileBlock, /reason:\s*"invalid_canonical_aeo"|reason:\s*"compile_exception"|reason:\s*"missing_decision_id"/)
 })
