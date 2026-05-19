@@ -109,7 +109,7 @@ test('recursive continuity depth overflow fails closed', () => {
 
   assert.match(
     source,
-    /while \(current_id\)[\s\S]*visited\.has\(current_id\)[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null[\s\S]*return \{ \.\.\.requestedContinuity, canonical: requestedCanonical, ancestry \}/,
+    /while \(current_id\)[\s\S]*visited\.has\(current_id\)[\s\S]*await cascadeRevocation\(env, continuity_id\)[\s\S]*return null[\s\S]*return \{ \.\.\.lineage\.requestedContinuity, canonical: lineage\.requestedCanonical, ancestry: lineage\.ancestry \}/,
     'recursive lineage traversal must retain cycle fail-closed behavior and only return validated ancestry',
   )
 })

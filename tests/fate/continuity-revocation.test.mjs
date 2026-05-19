@@ -11,8 +11,8 @@ test('revoked continuity invalidates canonical proof lookup before resolution', 
 })
 
 test('ambiguous continuity revocation state fails closed as NULL', () => {
-  assert.match(source, /if \(results\.length !== 1\) return true/)
-  assert.match(source, /return String\(continuity\.status \|\| ""\) !== "ACTIVE" \|\| Boolean\(String\(continuity\.revoked_at \|\| ""\)\)/)
+  assert.match(source, /if \(!session \|\| String\(session\.identity_id \|\| ""\) !== String\(row\.identity_id \|\| ""\) \|\| String\(session\.continuity_status \|\| ""\) !== "ACTIVE" \|\| isExpired\(String\(session\.expires_at \|\| ""\)\)\) return true/)
+  assert.match(source, /const lineage = await resolveContinuityLineage\(env, continuity_id, session\)[\s\S]*return !lineage/)
 })
 
 test('execution lineage continuity binding is required for canonical proof restoration', () => {

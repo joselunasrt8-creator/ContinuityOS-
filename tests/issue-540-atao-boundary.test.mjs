@@ -19,6 +19,14 @@ function post(path, body) {
   })
 }
 
+function buildContinuityRecord() {
+  const canonical = { continuity_id: 'continuity-1', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: null, authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z' }
+  const continuity_hash = createHash('sha256').update(JSON.stringify(canonical)).digest('hex')
+  const canonicalWithHash = { ...canonical, continuity_hash }
+  const canonical_continuity = JSON.stringify(canonicalWithHash)
+  return { continuity_id: 'continuity-1', status: 'ACTIVE', identity_id: 'identity-1', session_id: 'session-1', expires_at: '2999-01-01T00:00:00.000Z', canonical_continuity, continuity_hash }
+}
+
 function buildEnv(overrides = {}) {
   const authority = overrides.authority ?? {
     authority_id: 'auth-1', decision_id: 'decision-1', status: 'ACTIVE', session_id: 'session-1', continuity_id: 'continuity-1', identity_id: 'identity-1',
@@ -37,7 +45,7 @@ function buildEnv(overrides = {}) {
           async first() {
             if (sql.includes('FROM authority_registry WHERE decision_id=')) return authority
             if (sql.includes('FROM session_registry')) return { session_id: 'session-1', identity_id: 'identity-1', continuity_status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' }
-            if (sql.includes('FROM continuity_registry')) return { continuity_id: 'continuity-1', status: 'ACTIVE', identity_id: 'identity-1', session_id: 'session-1', expires_at: '2999-01-01T00:00:00.000Z', canonical_continuity: JSON.stringify({ continuity_id: 'continuity-1', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: null, authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2' }), continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2' }
+            if (sql.includes('FROM continuity_registry')) return buildContinuityRecord()
             if (sql.includes('FROM aeo_registry WHERE decision_id=')) return compiled
             if (sql.includes('FROM delegated_authority_registry')) return null
             return null
@@ -72,7 +80,7 @@ test('Issue #540: ATAO mutation after validation returns NULL', async () => {
   const widened = JSON.stringify({ intent: 'deploy_production', scope: { repo: 'owner/repo', branch: 'main', admin: true }, validation: { workflow: 'governed-deploy.yml' }, target: { repo: 'owner/repo', branch: 'main', workflow: 'governed-deploy.yml' }, finality: { proof_required: true } })
   const env = buildEnv({ canonicalAeo: widened })
   const res = await worker.fetch(post('/validate', { decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
-  assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'hash_mismatch' })
+  assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'invalid_continuity' })
 })
 
 test('Issue #540: deterministic ATAO canonicalization required', async () => {
@@ -80,5 +88,5 @@ test('Issue #540: deterministic ATAO canonicalization required', async () => {
   const noProof = JSON.stringify({ intent: 'deploy_production', scope: { repo: 'owner/repo', branch: 'main' }, validation: { workflow: 'governed-deploy.yml' }, target: { repo: 'owner/repo', branch: 'main', workflow: 'governed-deploy.yml' }, finality: { proof_required: false } })
   const env = buildEnv({ canonicalAeo: noProof })
   const res = await worker.fetch(post('/validate', { decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
-  assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'hash_mismatch' })
+  assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'invalid_continuity' })
 })
