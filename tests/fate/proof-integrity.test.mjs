@@ -51,6 +51,17 @@ test('canonical proof lookup stability fails closed when canonical candidate is 
   assert.match(source, /return \{ status: "AMBIGUOUS", candidates, canonical_candidates, canonical_proof: null \}/)
 })
 
+
+test('canonical proof lineage requires valid executed execution lineage', () => {
+  assert.match(source, /String\(execution\?\.status \|\| ""\) !== "EXECUTED"\) return false/)
+})
+
+test('execution lineage mutation cannot silently rewrite canonical proof lineage binding', () => {
+  assert.match(source, /String\(executionLineage\?\.execution_status \|\| ""\) === String\(execution\?\.status \|\| ""\)/)
+  assert.match(source, /String\(executionLineage\?\.delegation_lineage_hash \|\| ""\) === String\(execution\?\.delegation_lineage_hash \|\| ""\)/)
+  assert.match(source, /String\(executionLineage\?\.delegation_root_hash \|\| ""\) === String\(execution\?\.delegation_root_hash \|\| ""\)/)
+})
+
 test('deterministic proof lineage restoration preserves execution, decision, hash, and nonce', () => {
   assert.match(source, /String\(proof\?\.execution_id \|\| ""\) === String\(execution\?\.execution_id \|\| ""\)/)
   assert.match(source, /String\(proof\?\.decision_id \|\| ""\) === String\(execution\?\.decision_id \|\| ""\)/)

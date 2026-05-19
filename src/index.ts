@@ -5288,13 +5288,17 @@ async function appendGovernanceCompressionObservation(env: Env, envelope: Govern
 function proofExecutionLineageMatches(proof: any, execution: any): boolean {
   let executionLineage: any
   try { executionLineage = JSON.parse(String(proof?.execution_lineage || "{}")) } catch { return false }
+  if (String(execution?.status || "") !== "EXECUTED") return false
   return String(proof?.execution_id || "") === String(execution?.execution_id || "")
     && String(proof?.decision_id || "") === String(execution?.decision_id || "")
     && String(proof?.validated_object_hash || "") === String(execution?.validated_object_hash || "")
     && String(executionLineage?.execution_id || "") === String(execution?.execution_id || "")
     && String(executionLineage?.decision_id || "") === String(execution?.decision_id || "")
     && String(executionLineage?.validated_object_hash || "") === String(execution?.validated_object_hash || "")
+    && String(executionLineage?.execution_status || "") === String(execution?.status || "")
     && String(executionLineage?.invocation_nonce || "") === String(execution?.invocation_nonce || "")
+    && String(executionLineage?.delegation_lineage_hash || "") === String(execution?.delegation_lineage_hash || "")
+    && String(executionLineage?.delegation_root_hash || "") === String(execution?.delegation_root_hash || "")
 }
 
 type CanonicalProofResolution =
