@@ -10,6 +10,8 @@ import {
   computeAuthorityContainmentBoundary,
   detectRootAuthorityDrift,
   hashRootAuthorityTopology,
+  classifyProductionMutationCapability,
+  deriveRevocationPropagation,
 } from '../../runtime/sovereignty/root-authority-containment.js'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
@@ -24,6 +26,9 @@ const rulesArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty
 const sovereigntyGaps = JSON.parse(readFileSync(new URL('../../runtime/sovereignty_gaps.json', import.meta.url), 'utf8'))
 const rootBypassArtifact = JSON.parse(readFileSync(new URL('../../BYPASS_PATHS.json', import.meta.url), 'utf8'))
 const runtimeBypassArtifact = JSON.parse(readFileSync(new URL('../../runtime/bypass_paths.json', import.meta.url), 'utf8'))
+
+const authorityGraphArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/infrastructure_authority_graph.json', import.meta.url), 'utf8'))
+const breakGlassArtifact = JSON.parse(readFileSync(new URL('../../runtime/sovereignty/break_glass_containment_semantics.json', import.meta.url), 'utf8'))
 
 class D1 {
   constructor() {
@@ -292,4 +297,24 @@ test('root authority escape hatches are evidence-only bypass paths and sovereign
     'cloudflare_account_or_token_direct_deploy',
     'local_wrangler_authenticated_deploy',
   ]) assert.ok(gapIds.has(gapId), `sovereignty gap missing ${gapId}`)
+})
+
+
+test('governed and non-governed authority graph and break-glass semantics are explicit and non-authoritative', () => {
+  assert.ok(authorityGraphArtifact.governed_nodes.includes('github_actions_workflow_dispatch'))
+  assert.ok(authorityGraphArtifact.non_governed_nodes.includes('wrangler_local_deploy_authority'))
+  assert.equal(authorityGraphArtifact.classification_authorizes_execution, false)
+  assert.equal(breakGlassArtifact.mode, 'EMERGENCY_BREAK_GLASS_CONTAINED')
+  assert.equal(breakGlassArtifact.containment_result_when_unresolved, 'NULL')
+  assert.equal(breakGlassArtifact.executable, false)
+})
+
+test('production mutation and revocation propagation classification are deterministic and fail-closed', () => {
+  assert.equal(classifyProductionMutationCapability({ surface_id: 'wrangler_local_deploy_authority' }), 'BYPASS_CAPABLE_NON_GOVERNED')
+  assert.equal(classifyProductionMutationCapability({ surface_id: 'github_actions_workflow_dispatch', declared_boundary: 'trigger-only-no-secret-inspection' }), 'GOVERNED_TRIGGER_ONLY')
+  const inv = canonicalizeRootAuthorityInventory({ surfaces: [{ surface_id: 'repository_secret_mutation_authority', authority_origin: 'github_repository_secrets', declared_boundary: 'observability-only-no-secret-inspection' }] })
+  const revocation = deriveRevocationPropagation(inv)
+  assert.equal(revocation.fail_closed_on_missing_revocation, true)
+  assert.equal(revocation.propagation[0].blocked_when_revoked, true)
+  assert.deepEqual(revocation.propagation[0].propagation_scope, ['session', 'continuity', 'authority', 'compile', 'validate', 'execute', 'proof'])
 })

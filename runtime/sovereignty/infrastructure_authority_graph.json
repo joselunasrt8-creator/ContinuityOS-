@@ -1,0 +1,29 @@
+{
+  "artifact_type": "infrastructure_authority_graph",
+  "version": "1.0",
+  "governed_nodes": [
+    "cloudflare_deployment_token_authority",
+    "github_actions_workflow_dispatch",
+    "wrangler_deploy_capability"
+  ],
+  "non_governed_nodes": [
+    "cloudflare_account_authority",
+    "github_admin_authority",
+    "github_workflow_file_mutation",
+    "repository_secret_mutation_authority",
+    "wrangler_local_deploy_authority",
+    "local_deploy_credentials_presence",
+    "package_script_deploy_guard"
+  ],
+  "edges": [
+    {"from": "github_actions_workflow_dispatch", "to": "wrangler_deploy_capability", "type": "governed_trigger_path"},
+    {"from": "wrangler_local_deploy_authority", "to": "cloudflare_account_authority", "type": "bypass_capable_path"},
+    {"from": "github_admin_authority", "to": "github_workflow_file_mutation", "type": "admin_mutation_path"},
+    {"from": "github_workflow_file_mutation", "to": "workflow_dispatch_escalation", "type": "escalation_path"},
+    {"from": "repository_secret_mutation_authority", "to": "workflow_dispatch_escalation", "type": "secret_escalation_path"}
+  ],
+  "classification_authorizes_execution": false,
+  "classification_authorizes_merge": false,
+  "evidence_only": true,
+  "non_authoritative": true
+}
