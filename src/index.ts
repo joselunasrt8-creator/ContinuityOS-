@@ -3791,7 +3791,8 @@ async function deterministicReconciliationReportHash(report: Omit<Reconciliation
 
 async function deterministicReconciliationReport(result: ReconciliationResult, created_at: string): Promise<ReconciliationReport> {
   const merkle = await reconciliationMerkleEvidence(result)
-  const checked_registries = result.deterministic_traversal_trace.map((entry) => entry.registry)
+  const traversed = new Set(result.deterministic_traversal_trace.map((entry) => entry.registry))
+  const checked_registries = result.canonical_registry_ordering.filter((registry) => traversed.has(registry))
   const drift_results = result.drift_classifications.map((drift) => drift.drift_class).sort()
   const quarantine_candidates = result.drift_classifications
     .filter((drift) => drift.severity === "CRITICAL" || drift.severity === "HIGH")
