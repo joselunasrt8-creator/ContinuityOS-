@@ -2639,6 +2639,7 @@ type ReconciliationResult = {
 type ReconciliationReport = {
   report_id: string
   traversal_id: string
+  traversal_hash: string
   reconciliation_merkle_root: string
   registry_order: readonly ReconciliationRegistry[]
   checked_registries: ReconciliationRegistry[]
@@ -3785,6 +3786,36 @@ async function deterministicReconciliationSnapshot(result: ReconciliationResult)
   })
 }
 
+async function deterministicTraversalHash(result: ReconciliationResult, reconciliation_merkle_root: string, traversal_id: string): Promise<string> {
+  const canonicalTrace = result.canonical_registry_ordering
+    .map((registry) => result.deterministic_traversal_trace.find((entry) => entry.registry === registry) || null)
+    .filter((entry): entry is ReconciliationTraceEntry => Boolean(entry))
+    .map((entry) => canonicalRecord({
+      registry: entry.registry,
+      canonical_traversal_position: entry.canonical_traversal_position,
+      reconciliation_depth: entry.reconciliation_depth,
+      lookup_key: entry.lookup_key,
+      row_count: entry.row_count,
+      lineage_hash: String(entry.lineage_hash || ""),
+      canonical_identifiers: entry.canonical_identifiers || null
+    }))
+  const drift_classes = result.drift_classifications.map((drift) => drift.drift_class).sort()
+  const hashContinuity = canonicalTrace.map((entry) => ({
+    proof_hash: String((entry.canonical_identifiers as any)?.proof_id || ""),
+    execution_hash: String((entry.canonical_identifiers as any)?.execution_id || ""),
+    validation_hash: String((entry.canonical_identifiers as any)?.validated_object_hash || "")
+  }))
+  return sha256Hex(canonicalize({
+    traversal_id,
+    lineage_anchor: result.lineage_anchor,
+    registry_order: result.canonical_registry_ordering,
+    checked_registries: canonicalTrace.map((entry) => entry.registry),
+    drift_classes,
+    reconciliation_merkle_root,
+    hash_continuity: hashContinuity
+  }))
+}
+
 async function deterministicReconciliationReportHash(report: Omit<ReconciliationReport, "report_id">): Promise<string> {
   return sha256Hex(canonicalize(report))
 }
@@ -3803,8 +3834,10 @@ async function deterministicReconciliationReport(result: ReconciliationResult, c
     canonical_registry_ordering: result.canonical_registry_ordering,
     deterministic_traversal_trace: result.deterministic_traversal_trace
   }))
+  const traversal_hash = await deterministicTraversalHash(result, merkle.root, traversal_id)
   const reportPayload = {
     traversal_id,
+    traversal_hash,
     reconciliation_merkle_root: merkle.root,
     registry_order: result.canonical_registry_ordering,
     checked_registries,

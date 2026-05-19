@@ -27,7 +27,7 @@ test('deterministic snapshots and quarantine remain evidence-only and replay-neu
 
 test('reconciliation report artifact is deterministic, canonical, and evidence-only', () => {
   assert.match(source, /type ReconciliationReport = \{/)
-  for (const field of ['report_id', 'traversal_id', 'reconciliation_merkle_root', 'registry_order', 'checked_registries', 'drift_results', 'quarantine_candidates', 'evidence_only: true', 'replay_neutral: true', 'created_at']) {
+  for (const field of ['report_id', 'traversal_id', 'traversal_hash', 'reconciliation_merkle_root', 'registry_order', 'checked_registries', 'drift_results', 'quarantine_candidates', 'evidence_only: true', 'replay_neutral: true', 'created_at']) {
     assert.match(source, new RegExp(field))
   }
   assert.match(source, /async function deterministicReconciliationReportHash/)
