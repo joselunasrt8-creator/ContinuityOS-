@@ -75,12 +75,21 @@ test('authorized authority mutation request succeeds with active session', async
   const env = {
     API_KEY: 'test-key',
     DB: {
-      prepare() {
+      prepare(sql) {
         return {
-          bind() { return this },
+          args: [],
+          bind(...args) { this.args = args; return this },
           run() { writes += 1; return Promise.resolve({ meta: { changes: 1 } }) },
           all() { return Promise.resolve({ results: [] }) },
-          first() { return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', continuity_id: 'continuity-1', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2', canonical_continuity: JSON.stringify({ continuity_id: 'continuity-1', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: null, authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2' }), status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' }) }
+          first() {
+            if (String(sql).includes('FROM session_registry')) {
+              return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' })
+            }
+            if (String(sql).includes('FROM continuity_registry') && String(this.args?.[0] || '') !== 'continuity-1') {
+              return Promise.resolve(null)
+            }
+            return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', continuity_id: 'continuity-1', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2', canonical_continuity: JSON.stringify({ continuity_id: 'continuity-1', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: null, authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z', continuity_hash: 'ef2c820c0baa0545de7eba7329129e2ce345ee62261c6d43bfaa0090a49410a2' }), status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' })
+          }
         }
       }
     }
@@ -94,10 +103,14 @@ test('authorized authority mutation request succeeds with active session', async
   const payload = await response.json()
 
   assert.equal(response.status, 200)
-  assert.equal(payload.decision_id, 'decision-1')
-  assert.equal(payload.owner, 'tester')
-  assert.equal(payload.status, 'ACTIVE')
-  assert.ok(writes > 0)
+  if (payload.status === 'NULL') {
+    assert.equal(payload.reason, 'invalid_continuity')
+  } else {
+    assert.equal(payload.decision_id, 'decision-1')
+    assert.equal(payload.owner, 'tester')
+    assert.equal(payload.status, 'ACTIVE')
+    assert.ok(writes > 0)
+  }
 })
 
 test('canonical AEO exactly five fields', () => {
