@@ -1,0 +1,27 @@
+{
+  "snapshot_type": "FederatedLegitimacySnapshot",
+  "canonical_order": [
+    "node",
+    "lineage_root",
+    "continuity_root",
+    "proof_root",
+    "replay_root",
+    "validation_root",
+    "topology_root"
+  ],
+  "evidence_only": true,
+  "read_only": true,
+  "immutable_snapshot": true,
+  "mutation_capable": false,
+  "remote_authority_denied": true,
+  "remote_execution_legitimacy": false,
+  "forbidden_federation_modes": [
+    "REMOTE_EXECUTION",
+    "REMOTE_AUTHORITY",
+    "REMOTE_PROOF_ISSUANCE"
+  ],
+  "allowed_federation_modes": [
+    "OBSERVE_ONLY",
+    "RECONCILE_ONLY"
+  ]
+}
