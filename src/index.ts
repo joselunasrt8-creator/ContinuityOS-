@@ -2636,6 +2636,18 @@ type ReconciliationResult = {
   deterministic_traversal_trace: ReconciliationTraceEntry[]
   drift_classifications: ReconciliationDrift[]
 }
+type ReconciliationReport = {
+  report_id: string
+  traversal_id: string
+  reconciliation_merkle_root: string
+  registry_order: readonly ReconciliationRegistry[]
+  checked_registries: ReconciliationRegistry[]
+  drift_results: DriftClass[]
+  quarantine_candidates: string[]
+  evidence_only: true
+  replay_neutral: true
+  created_at: string
+}
 
 function reconciliationAnchorKey(anchor: ReconciliationAnchor): string {
   return canonicalize({
@@ -3771,6 +3783,37 @@ async function deterministicReconciliationSnapshot(result: ReconciliationResult)
     status: result.result,
     traversal_trace: result.deterministic_traversal_trace
   })
+}
+
+async function deterministicReconciliationReportHash(report: Omit<ReconciliationReport, "report_id">): Promise<string> {
+  return sha256Hex(canonicalize(report))
+}
+
+async function deterministicReconciliationReport(result: ReconciliationResult, created_at: string): Promise<ReconciliationReport> {
+  const merkle = await reconciliationMerkleEvidence(result)
+  const checked_registries = result.deterministic_traversal_trace.map((entry) => entry.registry)
+  const drift_results = result.drift_classifications.map((drift) => drift.drift_class).sort()
+  const quarantine_candidates = result.drift_classifications
+    .filter((drift) => drift.severity === "CRITICAL" || drift.severity === "HIGH")
+    .map((drift) => drift.lineage_anchor)
+    .sort()
+  const traversal_id = await sha256Hex(canonicalize({
+    anchor: result.lineage_anchor,
+    canonical_registry_ordering: result.canonical_registry_ordering,
+    deterministic_traversal_trace: result.deterministic_traversal_trace
+  }))
+  const reportPayload = {
+    traversal_id,
+    reconciliation_merkle_root: merkle.root,
+    registry_order: result.canonical_registry_ordering,
+    checked_registries,
+    drift_results,
+    quarantine_candidates,
+    evidence_only: true as const,
+    replay_neutral: true as const,
+    created_at
+  }
+  return { report_id: await deterministicReconciliationReportHash(reportPayload), ...reportPayload }
 }
 
 async function deterministicReconciliationCheckpoint(result: ReconciliationResult, created_at: string, runtime_id = LOCAL_FEDERATION_RUNTIME_ID): Promise<ReconciliationCheckpoint> {
@@ -6184,9 +6227,10 @@ export default {
       try {
         const anchor = reconciliationAnchorFromRequest(url)
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
+        const report = await deterministicReconciliationReport(result, new Date().toISOString())
         const summary = await reconciliationSummaryObject(result, new Date().toISOString())
         const portable = await portableReconciliationEnvelope(summary as unknown as Record<string, unknown>)
-        return json({ status: result.result, route: "/reconcile/report", reason: "observability_only", report: summary, portable })
+        return json({ status: result.result, route: "/reconcile/report", reason: "observability_only", report, summary, portable, evidence_only: true, replay_neutral: true, read_only: true, mutation_capable: false, authority_created: false, execution_started: false, proof_created: false, authority_consumed: false, canonical_lifecycle_mutated: false })
       } catch {
         return json({ status: "NULL", route: "/reconcile/report", reason: "reconciliation_unavailable" })
       }
@@ -6223,11 +6267,12 @@ export default {
         const anchor = reconciliationAnchorFromRequest(url)
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
         const emitted_at = new Date().toISOString()
+        const report = await deterministicReconciliationReport(result, emitted_at)
         const summary = await reconciliationSummaryObject(result, emitted_at)
         const snapshot = await deterministicReconciliationSnapshot(result)
         const bundle = await portableLegitimacyBundleFromResult(result, emitted_at)
         const drift = await federatedDriftClassificationsAfterPortableBundleResolution(result, bundle)
-        return json({ status: reconciliationStatusAfterPortableBundleResolution(result, bundle), route: "/federation/reconcile/report", reason: "observability_only", report: summary, deterministic_snapshot: snapshot, portable_legitimacy_bundle: bundle, drift, federation_boundary: "portable_evidence_not_portable_authority" })
+        return json({ status: reconciliationStatusAfterPortableBundleResolution(result, bundle), route: "/federation/reconcile/report", reason: "observability_only", report, summary, deterministic_snapshot: snapshot, portable_legitimacy_bundle: bundle, drift, federation_boundary: "portable_evidence_not_portable_authority", evidence_only: true, replay_neutral: true, read_only: true, mutation_capable: false, authority_created: false, execution_started: false, proof_created: false, authority_consumed: false, canonical_lifecycle_mutated: false })
       } catch {
         return json({ status: "NULL", route: "/federation/reconcile/report", reason: "reconciliation_unavailable" })
       }

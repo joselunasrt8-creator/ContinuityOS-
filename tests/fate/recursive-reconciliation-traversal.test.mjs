@@ -113,3 +113,17 @@ test('canonical identifier extraction is row-payload-only and preserves traversa
   assert.ok(doc.includes('`canonical_identifiers`'))
   assert.ok(doc.includes('do not alter traversal ordering'))
 })
+
+test('reconciliation report route remains read-only and cannot mint authority/execution/proof capability', () => {
+  assert.match(source, /if \(url\.pathname === "\/reconcile\/report" && request\.method === "GET"\)/)
+  assert.match(source, /deterministicReconciliationReport\(result, new Date\(\)\.toISOString\(\)\)/)
+  assert.match(source, /evidence_only: true/)
+  assert.match(source, /replay_neutral: true/)
+  assert.match(source, /read_only: true/)
+  assert.match(source, /mutation_capable: false/)
+  assert.match(source, /authority_created: false/)
+  assert.match(source, /execution_started: false/)
+  assert.match(source, /proof_created: false/)
+  assert.match(source, /authority_consumed: false/)
+  assert.match(source, /canonical_lifecycle_mutated: false/)
+})

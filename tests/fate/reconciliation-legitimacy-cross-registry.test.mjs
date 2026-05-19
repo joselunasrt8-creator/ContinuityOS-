@@ -24,3 +24,18 @@ test('deterministic snapshots and quarantine remain evidence-only and replay-neu
   assert.match(source, /replay_neutral: true/)
   assert.match(doc, /fail-closed/i)
 })
+
+test('reconciliation report artifact is deterministic, canonical, and evidence-only', () => {
+  assert.match(source, /type ReconciliationReport = \{/)
+  for (const field of ['report_id', 'traversal_id', 'reconciliation_merkle_root', 'registry_order', 'checked_registries', 'drift_results', 'quarantine_candidates', 'evidence_only: true', 'replay_neutral: true', 'created_at']) {
+    assert.match(source, new RegExp(field))
+  }
+  assert.match(source, /async function deterministicReconciliationReportHash/)
+  assert.match(source, /return sha256Hex\(canonicalize\(report\)\)/)
+  assert.match(source, /async function deterministicReconciliationReport\(/)
+  assert.match(source, /registry_order: result\.canonical_registry_ordering/)
+  assert.match(source, /const checked_registries = result\.deterministic_traversal_trace\.map\(\(entry\) => entry\.registry\)/)
+  assert.match(source, /const drift_results = result\.drift_classifications\.map\(\(drift\) => drift\.drift_class\)\.sort\(\)/)
+  assert.match(source, /const reportPayload = \{/)
+  assert.match(source, /return \{ report_id: await deterministicReconciliationReportHash\(reportPayload\), \.\.\.reportPayload \}/)
+})
