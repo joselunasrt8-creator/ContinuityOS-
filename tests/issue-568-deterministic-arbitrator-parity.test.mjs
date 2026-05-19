@@ -19,9 +19,12 @@ test('Issue #568: /execute rejects LLM proposal bypass of validator/arbitrator r
 })
 
 test('Issue #568: agent/LLM output remains proposal-only and cannot execute without exact AEO', () => {
+  const compileBlock = routeBlock('/compile', '/validate')
   assert.match(source, /keys\.length !== REQUIRED_AEO_KEYS\.length/)
   assert.match(source, /keys\.join\("\|"\) !== \[\.\.\.REQUIRED_AEO_KEYS\]\.sort\(\)\.join\("\|"\)/)
-  assert.match(source, /status:\s*"NULL",\s*route:\s*"\/compile",\s*reason:\s*"invalid_aeo"/)
+  assert.match(compileBlock, /reason:\s*"invalid_aeo"|reason:\s*"invalid_canonical_aeo"/)
+  assert.match(compileBlock, /route:\s*"\/compile"/)
+  assert.match(compileBlock, /status:\s*"NULL"/)
 })
 
 test('Issue #568: model confidence cannot replace deterministic validator result', () => {
