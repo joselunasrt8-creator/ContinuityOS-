@@ -64,59 +64,59 @@ test('same registry state produces same reconciliation hash regardless of input 
 
 test('orphan authority fails closed', () => {
   const state = coherentState(); state.session_registry = []
-  expectNull(traverseCrossRegistries(state), 'ORPHANED_AUTHORITY_RECORD')
+  expectNull(traverseCrossRegistries(state), 'LINEAGE_DRIFT')
 })
 
 test('orphan validation fails closed', () => {
   const state = coherentState(); state.aeo_registry = []
-  expectNull(traverseCrossRegistries(state), 'ORPHANED_VALIDATION_RECORD')
+  expectNull(traverseCrossRegistries(state), 'VALIDATION_DRIFT')
 })
 
 test('orphan execution fails closed', () => {
   const state = coherentState(); state.validation_registry = []
-  expectNull(traverseCrossRegistries(state), 'ORPHANED_EXECUTION_RECORD')
+  expectNull(traverseCrossRegistries(state), 'ORPHAN_EXECUTION')
 })
 
 test('missing proof lineage fails closed', () => {
   const state = coherentState(); state.proof_registry = []
-  expectNull(traverseCrossRegistries(state), 'MISSING_PROOF_LINEAGE')
+  expectNull(traverseCrossRegistries(state), 'PROOF_DRIFT')
 })
 
 test('missing authority lineage fails closed', () => {
   const state = coherentState(); state.authority_registry = []
-  expectNull(traverseCrossRegistries(state), 'AUTHORITY_LINEAGE_INVALID')
+  expectNull(traverseCrossRegistries(state), 'LINEAGE_DRIFT')
 })
 
 test('mismatched object hash fails closed', () => {
   const state = coherentState(); state.aeo_registry[0].canonical_aeo = '{"finality":{"proof_required":false},"intent":"deploy","scope":{"surface":"github"},"target":{"branch":"main"},"validation":{"mode":"strict"}}'
-  expectNull(traverseCrossRegistries(state), 'CANONICAL_OBJECT_HASH_MISMATCH')
+  expectNull(traverseCrossRegistries(state), 'LINEAGE_DRIFT')
 })
 
 test('canonical object hash mismatch fails closed', () => {
   const state = coherentState(); state.aeo_registry[0].canonical_aeo = '{"intent":"deploy"}'
-  expectNull(traverseCrossRegistries(state), 'CANONICAL_OBJECT_HASH_MISMATCH')
+  expectNull(traverseCrossRegistries(state), 'LINEAGE_DRIFT')
 })
 
 test('duplicate proof is quarantined', () => {
   const state = coherentState(); state.proof_registry.push({ ...state.proof_registry[0], proof_id: 'p2' })
-  expectNull(traverseCrossRegistries(state), 'DUPLICATE_PROOF_QUARANTINED')
+  expectNull(traverseCrossRegistries(state), 'PROOF_DRIFT')
 })
 
 test('revoked authority reuse fails closed', () => {
   const state = coherentState(); state.authority_registry[0].status = 'REVOKED'
-  expectNull(traverseCrossRegistries(state), 'AUTHORITY_REUSE_BLOCKED')
+  expectNull(traverseCrossRegistries(state), 'REPLAY_DRIFT')
 })
 
 
 
 test('orphan proof fails closed', () => {
   const state = coherentState(); state.execution_registry = []
-  expectNull(traverseCrossRegistries(state), 'ORPHANED_PROOF_RECORD')
+  expectNull(traverseCrossRegistries(state), 'ORPHAN_PROOF')
 })
 
 test('missing ancestry fails closed on execution continuity lineage', () => {
   const state = coherentState(); state.continuity_registry = []
-  expectNull(traverseCrossRegistries(state), 'ORPHANED_EXECUTION_RECORD')
+  expectNull(traverseCrossRegistries(state), 'ORPHAN_EXECUTION')
 })
 
 test('reconciliation traversal is read-only and does not mutate registry state', () => {
@@ -138,32 +138,32 @@ test('deterministic reconciliation report object is stable and evidence-only', (
 
 test('proof hash mismatch fails closed', () => {
   const state = coherentState(); state.proof_registry[0].validated_object_hash = 'different'
-  expectNull(traverseCrossRegistries(state), 'EXECUTION_PROOF_HASH_MISMATCH')
+  expectNull(traverseCrossRegistries(state), 'PROOF_DRIFT')
 })
 
 test('replay graph fragmentation fails closed', () => {
   const state = coherentState(); state.validation_registry.push({ ...state.validation_registry[0], validation_id: 'v2', decision_id: 'd2', validated_object_hash: 'h2' })
-  expectNull(traverseCrossRegistries(state), 'REPLAY_GRAPH_FRAGMENTATION')
+  expectNull(traverseCrossRegistries(state), 'REPLAY_DRIFT')
 })
 
 test('topology binding divergence fails closed', () => {
   const state = coherentState(); state.runtime_topology_registry[0].deployment_capable = 'true'
-  expectNull(traverseCrossRegistries(state), 'TOPOLOGY_BINDING_DIVERGENCE')
+  expectNull(traverseCrossRegistries(state), 'TOPOLOGY_DRIFT')
 })
 
 test('governance containment divergence fails closed', () => {
   const state = coherentState(); state.recursive_governance_containment_registry[0].creates_authority = 'true'
-  expectNull(traverseCrossRegistries(state), 'GOVERNANCE_BINDING_DIVERGENCE')
+  expectNull(traverseCrossRegistries(state), 'TOPOLOGY_DRIFT')
 })
 
 test('root authority evidence cannot become authority', () => {
   const state = coherentState(); state.root_authority_observability_registry[0].creates_authority = 'true'
-  expectNull(traverseCrossRegistries(state), 'ROOT_AUTHORITY_EVIDENCE_ESCALATION')
+  expectNull(traverseCrossRegistries(state), 'REGISTRY_DRIFT')
 })
 
 test('observability evidence cannot become proof', () => {
   const state = coherentState(); state.unauthorized_mutation_closure_registry[0].proof_generating = 'true'
-  expectNull(traverseCrossRegistries(state), 'OBSERVABILITY_RECORD_AUTHORITY_ESCALATION')
+  expectNull(traverseCrossRegistries(state), 'REGISTRY_DRIFT')
 })
 
 test('append-only registry rejects UPDATE and DELETE', () => {
@@ -197,10 +197,25 @@ test('reconciliation evidence cannot authorize execution proof or merge', () => 
 
 test('ambiguous registry state resolves NULL', () => {
   const state = coherentState(); state.authority_registry.push({ ...state.authority_registry[0], authority_id: 'auth2' })
-  expectNull(traverseCrossRegistries(state), 'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY')
+  expectNull(traverseCrossRegistries(state), 'RECONCILIATION_DRIFT')
 })
 
 test('drift taxonomy is complete and deterministic', () => {
   assert.deepEqual(taxonomy.drift_classes, CROSS_REGISTRY_DRIFT_CLASSES)
   assert.equal(hashCanonical(taxonomy.drift_classes), hashCanonical(CROSS_REGISTRY_DRIFT_CLASSES))
+})
+
+
+test('execution status divergence is classified as EXECUTION_DRIFT', () => {
+  const state = coherentState(); state.execution_registry[0].status = 'PENDING'
+  expectNull(traverseCrossRegistries(state), 'EXECUTION_DRIFT')
+})
+
+test('quarantine classification is deterministic for orphan proof/execution', () => {
+  const state = coherentState(); state.validation_registry = []; state.execution_registry = []
+  const a = traverseCrossRegistries(state)
+  const b = traverseCrossRegistries(state)
+  assert.equal(hashCanonical(a.drift_classes), hashCanonical(b.drift_classes))
+  assert.ok(a.drift_classes.includes('ORPHAN_PROOF'))
+  assert.ok(a.drift_classes.includes('ORPHAN_EXECUTION'))
 })

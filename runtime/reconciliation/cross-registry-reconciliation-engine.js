@@ -18,28 +18,17 @@ export const CANONICAL_CROSS_REGISTRY_ORDER = Object.freeze([
 ])
 
 export const CROSS_REGISTRY_DRIFT_CLASSES = Object.freeze([
-  'REGISTRY_LINEAGE_MISMATCH',
-  'ORPHANED_AUTHORITY_RECORD',
-  'ORPHANED_AEO_RECORD',
-  'ORPHANED_VALIDATION_RECORD',
-  'ORPHANED_EXECUTION_RECORD',
-  'ORPHANED_PROOF_RECORD',
-  'ORPHANED_INVOCATION_RECORD',
-  'VALIDATED_HASH_DISCONTINUITY',
-  'EXECUTION_PROOF_HASH_MISMATCH',
-  'CANONICAL_OBJECT_HASH_MISMATCH',
-  'MISSING_PROOF_LINEAGE',
-  'DUPLICATE_PROOF_QUARANTINED',
-  'AUTHORITY_LINEAGE_INVALID',
-  'AUTHORITY_REUSE_BLOCKED',
-  'SESSION_CONTINUITY_DIVERGENCE',
-  'AUTHORITY_CONTINUITY_DIVERGENCE',
-  'REPLAY_GRAPH_FRAGMENTATION',
-  'TOPOLOGY_BINDING_DIVERGENCE',
-  'GOVERNANCE_BINDING_DIVERGENCE',
-  'ROOT_AUTHORITY_EVIDENCE_ESCALATION',
-  'OBSERVABILITY_RECORD_AUTHORITY_ESCALATION',
-  'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY',
+  'LINEAGE_DRIFT',
+  'CONTINUITY_DRIFT',
+  'PROOF_DRIFT',
+  'EXECUTION_DRIFT',
+  'VALIDATION_DRIFT',
+  'REPLAY_DRIFT',
+  'REGISTRY_DRIFT',
+  'RECONCILIATION_DRIFT',
+  'TOPOLOGY_DRIFT',
+  'ORPHAN_PROOF',
+  'ORPHAN_EXECUTION',
 ])
 
 const EVIDENCE_FLAGS = Object.freeze({
@@ -126,34 +115,34 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   for (const authority of authorities) {
     const session = one(sessions, (row) => field(row, 'session_id') === field(authority, 'session_id'))
     const continuity = one(continuities, (row) => field(row, 'continuity_id') === field(authority, 'continuity_id'))
-    ctx.edges.push(edge('authority_registry', recordIdentity(authority), 'session_registry', field(authority, 'session_id'), 'AUTHORITY_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_AUTHORITY_RECORD'))
-    ctx.edges.push(edge('authority_registry', recordIdentity(authority), 'continuity_registry', field(authority, 'continuity_id'), 'AUTHORITY_CONTINUITY', continuity.match && !continuity.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_AUTHORITY_RECORD'))
-    if (!session.match || !continuity.match) addDrift(ctx, 'ORPHANED_AUTHORITY_RECORD', 'authority_registry', authority, 'authority requires valid session and continuity')
-    if (session.ambiguous || continuity.ambiguous) addDrift(ctx, 'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY', 'authority_registry', authority, 'authority lineage resolves ambiguously')
-    if (continuity.match && field(continuity.match, 'session_id') !== field(authority, 'session_id')) addDrift(ctx, 'SESSION_CONTINUITY_DIVERGENCE', 'authority_registry', authority, 'authority session differs from continuity session')
+    ctx.edges.push(edge('authority_registry', recordIdentity(authority), 'session_registry', field(authority, 'session_id'), 'AUTHORITY_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'LINEAGE_DRIFT'))
+    ctx.edges.push(edge('authority_registry', recordIdentity(authority), 'continuity_registry', field(authority, 'continuity_id'), 'AUTHORITY_CONTINUITY', continuity.match && !continuity.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'LINEAGE_DRIFT'))
+    if (!session.match || !continuity.match) addDrift(ctx, 'LINEAGE_DRIFT', 'authority_registry', authority, 'authority requires valid session and continuity')
+    if (session.ambiguous || continuity.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'authority_registry', authority, 'authority lineage resolves ambiguously')
+    if (continuity.match && field(continuity.match, 'session_id') !== field(authority, 'session_id')) addDrift(ctx, 'CONTINUITY_DRIFT', 'authority_registry', authority, 'authority session differs from continuity session')
   }
 
   for (const aeo of aeos) {
     const authority = one(authorities, (row) => field(row, 'authority_id') === field(aeo, 'authority_id'))
-    ctx.edges.push(edge('aeo_registry', recordIdentity(aeo), 'authority_registry', field(aeo, 'authority_id'), 'AEO_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_AEO_RECORD'))
-    if (!authority.match) addDrift(ctx, 'ORPHANED_AEO_RECORD', 'aeo_registry', aeo, 'AEO requires valid authority')
-    if (authority.ambiguous) addDrift(ctx, 'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY', 'aeo_registry', aeo, 'AEO authority resolves ambiguously')
-    if (authority.match && field(aeo, 'continuity_id') && field(authority.match, 'continuity_id') && field(aeo, 'continuity_id') !== field(authority.match, 'continuity_id')) addDrift(ctx, 'AUTHORITY_CONTINUITY_DIVERGENCE', 'aeo_registry', aeo, 'AEO continuity differs from authority continuity')
+    ctx.edges.push(edge('aeo_registry', recordIdentity(aeo), 'authority_registry', field(aeo, 'authority_id'), 'AEO_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'LINEAGE_DRIFT'))
+    if (!authority.match) addDrift(ctx, 'LINEAGE_DRIFT', 'aeo_registry', aeo, 'AEO requires valid authority')
+    if (authority.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'aeo_registry', aeo, 'AEO authority resolves ambiguously')
+    if (authority.match && field(aeo, 'continuity_id') && field(authority.match, 'continuity_id') && field(aeo, 'continuity_id') !== field(authority.match, 'continuity_id')) addDrift(ctx, 'CONTINUITY_DRIFT', 'aeo_registry', aeo, 'AEO continuity differs from authority continuity')
   }
 
   for (const validation of validations) {
     const aeo = one(aeos, (row) => field(row, 'decision_id') === field(validation, 'decision_id') && field(row, 'validated_object_hash') === field(validation, 'validated_object_hash'))
     const session = one(sessions, (row) => field(row, 'session_id') === field(validation, 'session_id'))
     const invocation = one(invocations, (row) => field(row, 'invocation_nonce') === field(validation, 'invocation_nonce') && field(row, 'validated_object_hash') === field(validation, 'validated_object_hash'))
-    ctx.edges.push(edge('validation_registry', recordIdentity(validation), 'aeo_registry', recordIdentity(aeo.match), 'VALIDATION_AEO', aeo.match && !aeo.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_VALIDATION_RECORD'))
-    ctx.edges.push(edge('validation_registry', recordIdentity(validation), 'session_registry', field(validation, 'session_id'), 'VALIDATION_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_VALIDATION_RECORD'))
-    ctx.edges.push(edge('validation_registry', recordIdentity(validation), 'invocation_registry', field(validation, 'invocation_nonce'), 'VALIDATION_NONCE', invocation.match && !invocation.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_INVOCATION_RECORD'))
-    if (!aeo.match || !session.match || !invocation.match || !field(validation, 'invocation_nonce')) addDrift(ctx, 'ORPHANED_VALIDATION_RECORD', 'validation_registry', validation, 'validation requires AEO, session, and nonce')
-    if (aeo.ambiguous || session.ambiguous || invocation.ambiguous) addDrift(ctx, 'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY', 'validation_registry', validation, 'validation lineage resolves ambiguously')
+    ctx.edges.push(edge('validation_registry', recordIdentity(validation), 'aeo_registry', recordIdentity(aeo.match), 'VALIDATION_AEO', aeo.match && !aeo.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'VALIDATION_DRIFT'))
+    ctx.edges.push(edge('validation_registry', recordIdentity(validation), 'session_registry', field(validation, 'session_id'), 'VALIDATION_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'VALIDATION_DRIFT'))
+    ctx.edges.push(edge('validation_registry', recordIdentity(validation), 'invocation_registry', field(validation, 'invocation_nonce'), 'VALIDATION_NONCE', invocation.match && !invocation.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'REPLAY_DRIFT'))
+    if (!aeo.match || !session.match || !invocation.match || !field(validation, 'invocation_nonce')) addDrift(ctx, 'VALIDATION_DRIFT', 'validation_registry', validation, 'validation requires AEO, session, and nonce')
+    if (aeo.ambiguous || session.ambiguous || invocation.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'validation_registry', validation, 'validation lineage resolves ambiguously')
     if (aeo.match) {
       const objectHash = canonicalObjectHash(aeo.match)
-      if (!objectHash || objectHash !== field(validation, 'validated_object_hash') || objectHash !== field(aeo.match, 'validated_object_hash')) addDrift(ctx, 'CANONICAL_OBJECT_HASH_MISMATCH', 'validation_registry', validation, 'validation hash must equal the canonical serialized object hash')
-      if (canonicalize(parseCanonicalObject(aeo.match.canonical_aeo)) !== String(aeo.match.canonical_aeo || '')) addDrift(ctx, 'CANONICAL_OBJECT_HASH_MISMATCH', 'aeo_registry', aeo.match, 'canonical object serialization is not stable')
+      if (!objectHash || objectHash !== field(validation, 'validated_object_hash') || objectHash !== field(aeo.match, 'validated_object_hash')) addDrift(ctx, 'LINEAGE_DRIFT', 'validation_registry', validation, 'validation hash must equal the canonical serialized object hash')
+      if (canonicalize(parseCanonicalObject(aeo.match.canonical_aeo)) !== String(aeo.match.canonical_aeo || '')) addDrift(ctx, 'LINEAGE_DRIFT', 'aeo_registry', aeo.match, 'canonical object serialization is not stable')
     }
   }
 
@@ -161,29 +150,30 @@ export function traverseCrossRegistries(state = {}, options = {}) {
     const validation = one(validations, (row) => field(row, 'decision_id') === field(execution, 'decision_id') && field(row, 'validated_object_hash') === field(execution, 'validated_object_hash') && field(row, 'invocation_nonce') === field(execution, 'invocation_nonce'))
     const session = one(sessions, (row) => field(row, 'session_id') === field(execution, 'session_id'))
     const continuity = one(continuities, (row) => field(row, 'continuity_id') === field(execution, 'continuity_id'))
-    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'validation_registry', recordIdentity(validation.match), 'EXECUTION_VALIDATION', validation.match && !validation.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_EXECUTION_RECORD'))
-    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'session_registry', field(execution, 'session_id'), 'EXECUTION_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_EXECUTION_RECORD'))
-    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'continuity_registry', field(execution, 'continuity_id'), 'EXECUTION_CONTINUITY', continuity.match && !continuity.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_EXECUTION_RECORD'))
+    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'validation_registry', recordIdentity(validation.match), 'EXECUTION_VALIDATION', validation.match && !validation.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_EXECUTION'))
+    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'session_registry', field(execution, 'session_id'), 'EXECUTION_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_EXECUTION'))
+    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'continuity_registry', field(execution, 'continuity_id'), 'EXECUTION_CONTINUITY', continuity.match && !continuity.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_EXECUTION'))
     const proof = one(proofs, (row) => field(row, 'execution_id') === field(execution, 'execution_id') && field(row, 'decision_id') === field(execution, 'decision_id') && field(row, 'validated_object_hash') === field(execution, 'validated_object_hash'))
     const authority = one(authorities, (row) => field(row, 'decision_id') === field(execution, 'decision_id'))
-    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'proof_registry', proof.match ? recordIdentity(proof.match) : '', 'EXECUTION_PROOF', proof.match && !proof.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'MISSING_PROOF_LINEAGE'))
-    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'authority_registry', authority.match ? recordIdentity(authority.match) : '', 'EXECUTION_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'AUTHORITY_LINEAGE_INVALID'))
-    if (!validation.match || !session.match || !continuity.match) addDrift(ctx, 'ORPHANED_EXECUTION_RECORD', 'execution_registry', execution, 'execution requires validation, session, and continuity')
-    if (!proof.match) addDrift(ctx, 'MISSING_PROOF_LINEAGE', 'execution_registry', execution, 'execution requires canonical proof lineage')
-    if (!authority.match || !isHistoricallyValidAuthority(field(authority.match, 'status')) || field(authority.match, 'session_id') !== field(execution, 'session_id')) addDrift(ctx, 'AUTHORITY_LINEAGE_INVALID', 'execution_registry', execution, 'execution authority must exist and be historically valid for the execution session')
-    if (validation.ambiguous || session.ambiguous || continuity.ambiguous || proof.ambiguous || authority.ambiguous) addDrift(ctx, 'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY', 'execution_registry', execution, 'execution lineage resolves ambiguously')
-    if (validation.match && (field(validation.match, 'validated_object_hash') !== field(execution, 'validated_object_hash') || field(validation.match, 'status') !== 'VALID' || field(validation.match, 'result') !== 'VALID')) addDrift(ctx, 'VALIDATED_HASH_DISCONTINUITY', 'execution_registry', execution, 'execution requires matching VALID validation result')
+    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'proof_registry', proof.match ? recordIdentity(proof.match) : '', 'EXECUTION_PROOF', proof.match && !proof.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'PROOF_DRIFT'))
+    ctx.edges.push(edge('execution_registry', recordIdentity(execution), 'authority_registry', authority.match ? recordIdentity(authority.match) : '', 'EXECUTION_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'LINEAGE_DRIFT'))
+    if (!validation.match || !session.match || !continuity.match) addDrift(ctx, 'ORPHAN_EXECUTION', 'execution_registry', execution, 'execution requires validation, session, and continuity')
+    if (!proof.match) addDrift(ctx, 'PROOF_DRIFT', 'execution_registry', execution, 'execution requires canonical proof lineage')
+    if (!authority.match || !isHistoricallyValidAuthority(field(authority.match, 'status')) || field(authority.match, 'session_id') !== field(execution, 'session_id')) addDrift(ctx, 'LINEAGE_DRIFT', 'execution_registry', execution, 'execution authority must exist and be historically valid for the execution session')
+    if (validation.ambiguous || session.ambiguous || continuity.ambiguous || proof.ambiguous || authority.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'execution_registry', execution, 'execution lineage resolves ambiguously')
+    if (validation.match && (field(validation.match, 'validated_object_hash') !== field(execution, 'validated_object_hash') || field(validation.match, 'status') !== 'VALID' || field(validation.match, 'result') !== 'VALID')) addDrift(ctx, 'VALIDATION_DRIFT', 'execution_registry', execution, 'execution requires matching VALID validation result')
+    if (field(execution, 'status') && field(execution, 'status') !== 'EXECUTED') addDrift(ctx, 'EXECUTION_DRIFT', 'execution_registry', execution, 'execution status must remain EXECUTED within reconciled lineage')
   }
 
   for (const proof of proofs) {
     const execution = one(executions, (row) => field(row, 'execution_id') === field(proof, 'execution_id'))
     const authority = one(authorities, (row) => field(row, 'decision_id') === field(proof, 'decision_id'))
-    ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'execution_registry', field(proof, 'execution_id'), 'PROOF_EXECUTION', execution.match && !execution.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_PROOF_RECORD'))
-    ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'authority_registry', recordIdentity(authority.match), 'PROOF_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHANED_PROOF_RECORD'))
-    if (!execution.match || !authority.match || !field(proof, 'validated_object_hash')) addDrift(ctx, 'ORPHANED_PROOF_RECORD', 'proof_registry', proof, 'proof requires execution, authority, and validated object hash')
-    if (authority.match && (!isHistoricallyValidAuthority(field(authority.match, 'status')) || field(authority.match, 'session_id') !== field(proof, 'session_id'))) addDrift(ctx, 'AUTHORITY_LINEAGE_INVALID', 'proof_registry', proof, 'proof authority must exist and be historically valid for the proof session')
-    if (execution.ambiguous || authority.ambiguous) addDrift(ctx, 'CROSS_REGISTRY_RECONCILIATION_AMBIGUITY', 'proof_registry', proof, 'proof lineage resolves ambiguously')
-    if (execution.match && field(execution.match, 'validated_object_hash') !== field(proof, 'validated_object_hash')) addDrift(ctx, 'EXECUTION_PROOF_HASH_MISMATCH', 'proof_registry', proof, 'proof hash differs from execution hash')
+    ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'execution_registry', field(proof, 'execution_id'), 'PROOF_EXECUTION', execution.match && !execution.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_PROOF'))
+    ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'authority_registry', recordIdentity(authority.match), 'PROOF_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_PROOF'))
+    if (!execution.match || !authority.match || !field(proof, 'validated_object_hash')) addDrift(ctx, 'ORPHAN_PROOF', 'proof_registry', proof, 'proof requires execution, authority, and validated object hash')
+    if (authority.match && (!isHistoricallyValidAuthority(field(authority.match, 'status')) || field(authority.match, 'session_id') !== field(proof, 'session_id'))) addDrift(ctx, 'LINEAGE_DRIFT', 'proof_registry', proof, 'proof authority must exist and be historically valid for the proof session')
+    if (execution.ambiguous || authority.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'proof_registry', proof, 'proof lineage resolves ambiguously')
+    if (execution.match && field(execution.match, 'validated_object_hash') !== field(proof, 'validated_object_hash')) addDrift(ctx, 'PROOF_DRIFT', 'proof_registry', proof, 'proof hash differs from execution hash')
   }
 
   const proofTruth = new Map()
@@ -196,7 +186,7 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   }
   for (const duplicateSet of proofTruth.values()) {
     if (duplicateSet.length > 1) {
-      for (const proof of duplicateSet) addDrift(ctx, 'DUPLICATE_PROOF_QUARANTINED', 'proof_registry', proof, 'duplicate proof cannot become canonical truth')
+      for (const proof of duplicateSet) addDrift(ctx, 'PROOF_DRIFT', 'proof_registry', proof, 'duplicate proof cannot become canonical truth')
     }
   }
   const executionByAuthority = new Map()
@@ -208,8 +198,8 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   }
   for (const authority of authorities) {
     const executionsForAuthority = executionByAuthority.get(field(authority, 'decision_id')) ?? []
-    if ((field(authority, 'status') === 'REVOKED' && executionsForAuthority.length > 0) || executionsForAuthority.length > 1) addDrift(ctx, 'AUTHORITY_REUSE_BLOCKED', 'authority_registry', authority, 'revoked or already consumed authority cannot be reused for execution')
-    if (field(authority, 'status') === 'CONSUMED' && executionsForAuthority.length > 1) addDrift(ctx, 'AUTHORITY_REUSE_BLOCKED', 'authority_registry', authority, 'consumed authority cannot authorize multiple executions')
+    if ((field(authority, 'status') === 'REVOKED' && executionsForAuthority.length > 0) || executionsForAuthority.length > 1) addDrift(ctx, 'REPLAY_DRIFT', 'authority_registry', authority, 'revoked or already consumed authority cannot be reused for execution')
+    if (field(authority, 'status') === 'CONSUMED' && executionsForAuthority.length > 1) addDrift(ctx, 'REPLAY_DRIFT', 'authority_registry', authority, 'consumed authority cannot authorize multiple executions')
   }
 
   const nonceToObjects = new Map()
@@ -224,23 +214,23 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   for (const invocation of invocations) {
     const nonce = field(invocation, 'invocation_nonce')
     const objects = nonceToObjects.get(nonce) ?? new Set()
-    if (objects.size !== 1) addDrift(ctx, objects.size === 0 ? 'ORPHANED_INVOCATION_RECORD' : 'REPLAY_GRAPH_FRAGMENTATION', 'invocation_registry', invocation, 'invocation nonce must map to exactly one validated/executed object')
+    if (objects.size !== 1) addDrift(ctx, objects.size === 0 ? 'REPLAY_DRIFT' : 'REPLAY_DRIFT', 'invocation_registry', invocation, 'invocation nonce must map to exactly one validated/executed object')
   }
 
   for (const preo of limited.preo_registry) {
-    if (truthy(preo.executable) || truthy(preo.creates_authority) || truthy(preo.proof_generating)) addDrift(ctx, 'OBSERVABILITY_RECORD_AUTHORITY_ESCALATION', 'preo_registry', preo, 'PREO must bind governed merge legitimacy only')
+    if (truthy(preo.executable) || truthy(preo.creates_authority) || truthy(preo.proof_generating)) addDrift(ctx, 'REGISTRY_DRIFT', 'preo_registry', preo, 'PREO must bind governed merge legitimacy only')
   }
   for (const topology of limited.runtime_topology_registry) {
-    if (truthy(topology.executable) || truthy(topology.deployment_capable) || truthy(topology.creates_authority) || topology.evidence_only === 'false') addDrift(ctx, 'TOPOLOGY_BINDING_DIVERGENCE', 'runtime_topology_registry', topology, 'topology evidence became authoritative or executable')
+    if (truthy(topology.executable) || truthy(topology.deployment_capable) || truthy(topology.creates_authority) || topology.evidence_only === 'false') addDrift(ctx, 'TOPOLOGY_DRIFT', 'runtime_topology_registry', topology, 'topology evidence became authoritative or executable')
   }
   for (const governance of limited.recursive_governance_containment_registry) {
-    if (truthy(governance.executable) || truthy(governance.deployment_capable) || truthy(governance.creates_authority) || governance.evidence_only === 'false') addDrift(ctx, 'GOVERNANCE_BINDING_DIVERGENCE', 'recursive_governance_containment_registry', governance, 'recursive governance containment must remain evidence-only')
+    if (truthy(governance.executable) || truthy(governance.deployment_capable) || truthy(governance.creates_authority) || governance.evidence_only === 'false') addDrift(ctx, 'TOPOLOGY_DRIFT', 'recursive_governance_containment_registry', governance, 'recursive governance containment must remain evidence-only')
   }
   for (const root of limited.root_authority_observability_registry) {
-    if (truthy(root.executable) || truthy(root.deployment_capable) || truthy(root.creates_authority) || root.non_authoritative === 'false') addDrift(ctx, 'ROOT_AUTHORITY_EVIDENCE_ESCALATION', 'root_authority_observability_registry', root, 'root authority evidence cannot grant authority')
+    if (truthy(root.executable) || truthy(root.deployment_capable) || truthy(root.creates_authority) || root.non_authoritative === 'false') addDrift(ctx, 'REGISTRY_DRIFT', 'root_authority_observability_registry', root, 'root authority evidence cannot grant authority')
   }
   for (const closure of limited.unauthorized_mutation_closure_registry) {
-    if (truthy(closure.executable) || truthy(closure.creates_authority) || truthy(closure.proof_generating)) addDrift(ctx, 'OBSERVABILITY_RECORD_AUTHORITY_ESCALATION', 'unauthorized_mutation_closure_registry', closure, 'observability evidence cannot become proof or authority')
+    if (truthy(closure.executable) || truthy(closure.creates_authority) || truthy(closure.proof_generating)) addDrift(ctx, 'REGISTRY_DRIFT', 'unauthorized_mutation_closure_registry', closure, 'observability evidence cannot become proof or authority')
   }
 
   const unresolved_edges = ctx.edges.filter((item) => item.status !== 'RESOLVED').sort((a, b) => hashCanonical(a).localeCompare(hashCanonical(b)))
