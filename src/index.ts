@@ -2380,16 +2380,7 @@ async function cascadeSessionRevocation(env: Env, session_id: string) {
 
 
 
-async function continuityIsRevokedOrAmbiguous(env: Env, continuity_id: string): Promise<boolean> {
-  if (!continuity_id) return true
-  const rows = await env.DB.prepare(`SELECT status, revoked_at FROM continuity_registry WHERE continuity_id=?1 LIMIT 2`).bind(continuity_id).all<any>()
-  const results = Array.isArray(rows.results) ? rows.results : []
-  if (results.length !== 1) return true
-  const continuity = results[0] || {}
-  return String(continuity.status || "") !== "ACTIVE" || Boolean(String(continuity.revoked_at || ""))
-}
-
-async function activeContinuity(env: Env, continuity_id: string, session: any, decision_id?: string): Promise<any | null> {
+async function resolveContinuityLineage(env: Env, continuity_id: string, session: any, decision_id?: string): Promise<{requestedContinuity: any, requestedCanonical: any, ancestry: any[]} | null> {
   if (!continuity_id || !session) return null
   const now = new Date().toISOString()
   const visited = new Set<string>()
@@ -2412,6 +2403,17 @@ async function activeContinuity(env: Env, continuity_id: string, session: any, d
     }
     if (String(continuity.status || "") !== "ACTIVE") {
       await cascadeRevocation(env, current_id)
+      return null
+    }
+    const continuitySession = await env.DB.prepare(`SELECT session_id, identity_id, expires_at, continuity_status FROM session_registry WHERE session_id=?1 LIMIT 2`).bind(String(continuity.session_id || "")).all<any>()
+    const continuitySessionRows = Array.isArray(continuitySession.results) ? continuitySession.results : []
+    if (continuitySessionRows.length !== 1) {
+      await cascadeRevocation(env, current_id)
+      return null
+    }
+    const ancestorSession = continuitySessionRows[0] || {}
+    if (String(ancestorSession.continuity_status || "") !== "ACTIVE" || isExpired(String(ancestorSession.expires_at || ""))) {
+      await cascadeExpiration(env, current_id, now)
       return null
     }
     if (isExpired(String(continuity.expires_at || ""))) {
@@ -2462,7 +2464,23 @@ async function activeContinuity(env: Env, continuity_id: string, session: any, d
 
   const root = ancestry[ancestry.length - 1]
   if (!root || root.parent_continuity_id || !requestedContinuity || !requestedCanonical) return null
-  return { ...requestedContinuity, canonical: requestedCanonical, ancestry }
+  return { requestedContinuity, requestedCanonical, ancestry }
+}
+
+async function continuityIsRevokedOrAmbiguous(env: Env, continuity_id: string): Promise<boolean> {
+  if (!continuity_id) return true
+  const row = await env.DB.prepare(`SELECT session_id, identity_id FROM continuity_registry WHERE continuity_id=?1 LIMIT 1`).bind(continuity_id).first<any>()
+  if (!row) return true
+  const session = await env.DB.prepare(`SELECT session_id, identity_id, expires_at, continuity_status FROM session_registry WHERE session_id=?1 LIMIT 1`).bind(String(row.session_id || "")).first<any>()
+  if (!session || String(session.identity_id || "") !== String(row.identity_id || "") || String(session.continuity_status || "") !== "ACTIVE" || isExpired(String(session.expires_at || ""))) return true
+  const lineage = await resolveContinuityLineage(env, continuity_id, session)
+  return !lineage
+}
+
+async function activeContinuity(env: Env, continuity_id: string, session: any, decision_id?: string): Promise<any | null> {
+  const lineage = await resolveContinuityLineage(env, continuity_id, session, decision_id)
+  if (!lineage) return null
+  return { ...lineage.requestedContinuity, canonical: lineage.requestedCanonical, ancestry: lineage.ancestry }
 }
 
 function parseCanonicalRecordJson(value: unknown): Record<string, unknown> {

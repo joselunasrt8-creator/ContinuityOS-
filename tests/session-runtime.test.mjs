@@ -25,7 +25,10 @@ function createD1Mock({ failRunWhen, firstResult = null } = {}) {
             writes += 1
             return Promise.resolve({ meta: { changes: 1 } })
           },
-          all() { return Promise.resolve({ results: [] }) },
+          all() {
+            if (sql.includes('SELECT session_id, identity_id, expires_at, continuity_status FROM session_registry WHERE session_id=?1 LIMIT 2')) return Promise.resolve({ results: [{ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' }] })
+            return Promise.resolve({ results: [] })
+          },
           first() { return Promise.resolve(firstResult) }
         }
       }
@@ -177,7 +180,12 @@ test('/authority succeeds only after schema bootstrap with active session and co
         return {
           bind() { return this },
           run() { writes += 1; return Promise.resolve({ meta: { changes: 1 } }) },
-          all() { return Promise.resolve({ results: [] }) },
+          all() {
+            if (sql.includes('SELECT session_id, identity_id, expires_at, continuity_status FROM session_registry WHERE session_id=?1 LIMIT 2')) {
+              return Promise.resolve({ results: [{ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' }] })
+            }
+            return Promise.resolve({ results: [] })
+          },
           first() {
             if (sql.includes('FROM session_registry')) return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' })
             if (sql.includes('FROM continuity_registry')) return Promise.resolve({
@@ -203,4 +211,25 @@ test('/authority succeeds only after schema bootstrap with active session and co
   assert.equal(payload.status, 'ACTIVE')
   assert.equal(payload.decision_id, 'decision-1')
   assert.ok(writes > 0)
+})
+
+test('/authority fails closed when continuity ancestry is orphaned', async () => {
+  const worker = await loadWorker()
+  const continuityRows = {
+    'continuity-child': {
+      continuity_id: 'continuity-child',
+      identity_id: 'identity-1',
+      session_id: 'session-1',
+      status: 'ACTIVE',
+      expires_at: '2999-01-01T00:00:00.000Z',
+      continuity_hash: 'bcb0d5b6f7dbe0b7728e87bc04568f2867f2bfcd37f6238f80c4af17424a534f',
+      parent_continuity_id: 'continuity-missing',
+      canonical_continuity: JSON.stringify({ continuity_id: 'continuity-child', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: 'continuity-missing', authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z', continuity_hash: 'bcb0d5b6f7dbe0b7728e87bc04568f2867f2bfcd37f6238f80c4af17424a534f' })
+    }
+  }
+  const env = { API_KEY: 'test-key', DB: { prepare(sql) { return { bind(v){ this.v=v; return this }, run(){ return Promise.resolve({meta:{changes:1}}) }, all(){ if (sql.includes('FROM session_registry')) return Promise.resolve({ results: [{ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' }] }); return Promise.resolve({results:[]}) }, first(){ if (sql.includes('FROM continuity_registry')) return Promise.resolve(continuityRows[this.v] || null); if (sql.includes('FROM session_registry')) return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' }); return Promise.resolve(null) } } } } }
+  const response = await worker.fetch(post('/authority', { session_id: 'session-1', continuity_id: 'continuity-child', decision_id: 'decision-1' }), env)
+  const payload = await response.json()
+  assert.equal(payload.status, 'NULL')
+  assert.equal(payload.reason, 'invalid_continuity')
 })
