@@ -1283,6 +1283,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_execution_decision_hash_unique`).run()
     await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_decision_hash_unique`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_hash)`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash_unique ON proof_registry(execution_id, decision_id, validated_object_hash)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique ON proof_registry(workflow_run_id)`).run()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_UNIQUENESS_ENFORCED")
     await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_proof_registry_provenance ON proof_registry(repository, branch, pull_request_id, merge_commit_sha, workflow_run_id)`).run()
