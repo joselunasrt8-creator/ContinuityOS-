@@ -36,5 +36,7 @@ test('direct deploy bypass attempt remains blocked', () => {
 });
 
 test('cloudflare preview deploy risk remains a scoped sovereignty gap under issue #578', () => {
+  assert.match(governanceGapRegistry, /PR #582 triggered a Cloudflare Git Integration deployment from commit 77c2b95 outside \/session -> \/continuity -> \/authority -> \/compile -> \/validate -> \/execute -> \/proof\./);
+  assert.match(governanceGapRegistry, /Classified as preview\/non-production based on PR-linked Git Integration evidence/);
   assert.match(governanceGapRegistry, /sovereignty gap tracked under #578, not #577 production deploy blocker unless production-capable\./);
 });
