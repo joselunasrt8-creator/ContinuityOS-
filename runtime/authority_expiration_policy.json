@@ -1,0 +1,11 @@
+{
+  "surface": "authority_expiration_policy",
+  "rules": {
+    "expired_authority": "NULL",
+    "stale_authority_continuation": "NULL",
+    "post_expiry_orchestration_continuation": "NULL",
+    "frozen_proof_resurrection": "NULL"
+  },
+  "deterministic": true,
+  "fail_closed": true
+}

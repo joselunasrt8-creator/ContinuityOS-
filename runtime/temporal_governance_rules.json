@@ -1,0 +1,21 @@
+{
+  "surface": "temporal_governance_closure",
+  "objective": "prevent_legitimacy_persistence_beyond_authorized_temporal_boundaries",
+  "required_execution_gate": "VALID && AUTHORIZED && UNUSED && POLICY_VALID && CANONICAL_LINEAGE_CONTINUITY && TEMPORALLY_VALID",
+  "canonical_temporal_gate": "only_temporally_valid_canonical_lineage_may_reach_VALID",
+  "else_result": "NULL",
+  "deterministic": true,
+  "additive_only": true,
+  "runtime_mutation": "forbidden",
+  "deployment_mutation": "forbidden",
+  "invariants": {
+    "previously_valid_not_currently_valid": "previously_valid != currently_valid",
+    "expired_authority": "NULL",
+    "expired_lineage": "NULL",
+    "expired_proof": "NULL",
+    "stale_delegation": "NULL",
+    "clock_skew_beyond_policy": "NULL",
+    "delayed_replay": "NULL",
+    "expired_continuity": "NULL"
+  }
+}

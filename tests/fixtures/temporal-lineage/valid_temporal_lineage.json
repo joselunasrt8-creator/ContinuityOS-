@@ -1,0 +1,6 @@
+{
+  "fixture": "valid_temporal_lineage",
+  "temporally_valid": true,
+  "canonical_lineage_continuity": true,
+  "expected_result": "VALID"
+}

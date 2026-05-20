@@ -1,0 +1,16 @@
+{
+  "surface": "temporal_bypass_paths",
+  "bypass_paths": [
+    { "bypass_id": "stale_authority_continuation", "response": "NULL" },
+    { "bypass_id": "expired_execution_continuation", "response": "NULL" },
+    { "bypass_id": "delayed_replay_execution", "response": "NULL" },
+    { "bypass_id": "frozen_proof_resurrection", "response": "NULL" },
+    { "bypass_id": "asynchronous_temporal_drift", "response": "NULL" },
+    { "bypass_id": "clock_skew_legitimacy_divergence", "response": "NULL" },
+    { "bypass_id": "replay_after_continuity_expiration", "response": "NULL" },
+    { "bypass_id": "indefinite_delegation_persistence", "response": "NULL" },
+    { "bypass_id": "post_expiry_orchestration_continuation", "response": "NULL" },
+    { "bypass_id": "time_partitioned_execution_synthesis", "response": "NULL" }
+  ],
+  "fail_closed_response": "NULL"
+}

@@ -1,0 +1,12 @@
+{
+  "surface": "clock_skew_failure_modes",
+  "policy": {
+    "max_allowed_skew_ms": 300000,
+    "clock_skew_beyond_policy": "NULL",
+    "asynchronous_temporal_drift": "NULL",
+    "clock_skew_legitimacy_divergence": "NULL"
+  },
+  "active_time_synchronization": "forbidden",
+  "deterministic": true,
+  "fail_closed": true
+}

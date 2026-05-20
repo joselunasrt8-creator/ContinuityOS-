@@ -1,0 +1,12 @@
+{
+  "surface": "continuity_ttl_rules",
+  "rules": {
+    "expired_continuity": "NULL",
+    "replay_after_continuity_expiration": "NULL",
+    "continuity_timeout": "NULL",
+    "indefinite_delegation_persistence": "NULL"
+  },
+  "ttl_enforcement": "strict",
+  "deterministic": true,
+  "fail_closed": true
+}

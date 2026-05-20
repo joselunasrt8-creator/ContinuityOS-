@@ -1,0 +1,12 @@
+{
+  "surface": "proof_temporal_constraints",
+  "rules": {
+    "expired_proof": "NULL",
+    "delayed_replay": "NULL",
+    "resurrected_execution": "NULL",
+    "time_partitioned_execution_synthesis": "NULL"
+  },
+  "proof_replay_closure": true,
+  "deterministic": true,
+  "fail_closed": true
+}
