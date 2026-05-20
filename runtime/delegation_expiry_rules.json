@@ -1,0 +1,12 @@
+{
+  "surface": "delegation_expiry_rules",
+  "rules": {
+    "expired_delegation": "NULL",
+    "stale_authority_continuation": "NULL",
+    "used_delegation_replay": "NULL",
+    "delegation_token_reuse": "NULL"
+  },
+  "deterministic": true,
+  "runtime_mutation": "forbidden",
+  "deployment_mutation": "forbidden"
+}

@@ -1,0 +1,25 @@
+{
+  "surface": "distributed_delegation_governance_closure",
+  "delegation_execution_separation": "delegated_authority != execution_authority",
+  "quorum_legitimacy_separation": "quorum != legitimacy",
+  "event_authorization_separation": "event_received != execution_authorized",
+  "required_execution_gate": "VALID && AUTHORIZED && UNUSED && POLICY_VALID && CANONICAL_LINEAGE_CONTINUITY",
+  "else_result": "NULL",
+  "canonical_delegation_path": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "delegation_boundary",
+    "/execute",
+    "/proof"
+  ],
+  "invariants": {
+    "delegated_authority_non_executing": true,
+    "quorum_non_legitimizing": true,
+    "event_non_authorizing": true,
+    "detached_worker_execution_fails_closed": true,
+    "canonical_lineage_required": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "surface": "delegation_bypass_paths",
+  "fail_closed_response": "NULL",
+  "bypass_paths": [
+    {
+      "bypass_id": "delegated_authority_replay",
+      "result": "NULL"
+    },
+    {
+      "bypass_id": "stale_authority_continuation",
+      "result": "NULL"
+    },
+    {
+      "bypass_id": "quorum_emergent_legitimacy",
+      "result": "NULL"
+    },
+    {
+      "bypass_id": "detached_worker_execution",
+      "result": "NULL"
+    },
+    {
+      "bypass_id": "chained_delegation_escalation",
+      "result": "NULL"
+    },
+    {
+      "bypass_id": "multi_agent_authority_synthesis",
+      "result": "NULL"
+    },
+    {
+      "bypass_id": "orphan_orchestration_continuation",
+      "result": "NULL"
+    }
+  ]
+}
