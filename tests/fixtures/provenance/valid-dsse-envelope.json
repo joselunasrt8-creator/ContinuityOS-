@@ -1,0 +1,10 @@
+{
+  "payloadType": "application/vnd.mindshift.cryptographic-provenance.v1+json",
+  "payload": "eyJjYW5vbmljYWxfYWVvX2hhc2giOiIzZDhjNDkxOWM5MGRjOWU4NmMwMjExZmU3MmVmYmJmYzk4ZjliNTI4MTc3ZDk2ZDhiMjBiMDExOTZkMmY1NzJjIiwiZGVjaXNpb25faWQiOiJkZWNpc2lvbi1maXh0dXJlLXZhbGlkIiwiZmVkZXJhdGlvbiI6bnVsbCwic2lnbmVyX2lkZW50aXR5IjoiZml4dHVyZS1zaWduZXItaWRlbnRpdHkiLCJ0cmFuc3BhcmVuY3lfaW50ZWdyYXRlZF90aW1lIjoiMjAyNi0wNS0yMFQxMToxMDowMC4wMDBaIiwidHJhbnNwYXJlbmN5X2xvZ19pZCI6ImZpeHR1cmUtbG9nLXZhbGlkIiwidmFsaWRhdGVkX29iamVjdF9oYXNoIjoiM2Q4YzQ5MTljOTBkYzllODZjMDIxMWZlNzJlZmJiZmM5OGY5YjUyODE3N2Q5NmQ4YjIwYjAxMTk2ZDJmNTcyYyIsIndvcmtmbG93X3J1bl9pZCI6InJ1bi1kZWNpc2lvbi1maXh0dXJlLXZhbGlkIiwid29ya2Zsb3dfc2hhIjoibWVyZ2UtZGVjaXNpb24tZml4dHVyZS12YWxpZCJ9",
+  "signatures": [
+    {
+      "keyid": "fixture-signer-identity",
+      "sig": "ehV5D8Qcda6Rbk9M+NRudcrl971kl3bSw/3mzGG0fyQ="
+    }
+  ]
+}

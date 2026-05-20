@@ -1,12 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { canonicalize } from '../../src/canonical.js'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const schema = readFileSync(new URL('../../schema.sql', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0015_cryptographic_provenance_attestations.sql', import.meta.url), 'utf8')
 const spec = JSON.parse(readFileSync(new URL('../../governance/runtime/CRYPTOGRAPHIC_PROVENANCE_SPEC.json', import.meta.url), 'utf8'))
 const doc = readFileSync(new URL('../../docs/cryptographic-provenance-hardening.md', import.meta.url), 'utf8')
+const fixtureRoot = new URL('../fixtures/provenance/', import.meta.url)
+const validPayload = JSON.parse(readFileSync(new URL('valid-provenance-payload.json', fixtureRoot), 'utf8'))
+const validEnvelope = JSON.parse(readFileSync(new URL('valid-dsse-envelope.json', fixtureRoot), 'utf8'))
+const apiKeySignedEnvelope = JSON.parse(readFileSync(new URL('api-key-signed-dsse-envelope.json', fixtureRoot), 'utf8'))
+const mutatedPayloadEnvelope = JSON.parse(readFileSync(new URL('mutated-payload-dsse-envelope.json', fixtureRoot), 'utf8'))
+const provenanceFixtureSecret = 'fixture-provenance-secret'
+const requestApiKey = 'test-key'
 
 const expandedDrifts = [
   'attestation_drift',
@@ -29,6 +38,35 @@ const fateCases = [
   'reconciliation_compatibility'
 ]
 
+function dsseLengthPrefixed(bytes) {
+  return Buffer.concat([Buffer.from(String(bytes.length)), Buffer.from(' '), bytes])
+}
+
+function dssePreAuthenticationEncoding(payloadType, payloadBytes) {
+  return Buffer.concat([Buffer.from('DSSEv1 '), dsseLengthPrefixed(Buffer.from(payloadType)), dsseLengthPrefixed(payloadBytes)])
+}
+
+function envelopeSignature(envelope) {
+  return String(envelope.signatures?.[0]?.sig || '')
+}
+
+function hmacForEnvelope(secret, envelope) {
+  const payloadBytes = Buffer.from(String(envelope.payload || ''), 'base64')
+  return createHmac('sha256', secret).update(dssePreAuthenticationEncoding(envelope.payloadType, payloadBytes)).digest('base64')
+}
+
+function fixtureVerifiesWith(secret, envelope) {
+  return Boolean(secret) && envelopeSignature(envelope) === hmacForEnvelope(secret, envelope)
+}
+
+function sourceFiles(dirUrl) {
+  return readdirSync(dirUrl, { withFileTypes: true }).flatMap((entry) => {
+    const entryUrl = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dirUrl)
+    if (entry.isDirectory()) return sourceFiles(entryUrl)
+    return statSync(entryUrl).isFile() && /\.(?:ts|js)$/.test(entry.name) ? [entryUrl] : []
+  })
+}
+
 test('DSSE provenance verification is exact-object HMAC evidence only', () => {
   assert.match(source, /const PROVENANCE_PAYLOAD_TYPE = "application\/vnd\.mindshift\.cryptographic-provenance\.v1\+json"/)
   assert.match(source, /function canonicalProvenancePayload/)
@@ -49,6 +87,29 @@ test('provenance HMAC verification does not fall back to API authentication secr
   assert.doesNotMatch(executeBlock, /hmac_secret:[\s\S]*env\.API_KEY/)
   assert.doesNotMatch(proofBlock, /hmac_secret:[\s\S]*env\.API_KEY/)
   assert.match(source, /if \(!context\.hmac_secret\) return null/)
+})
+
+test('fixture DSSE envelope verifies only with PROVENANCE_HMAC_SECRET material', () => {
+  assert.equal(Buffer.from(validEnvelope.payload, 'base64').toString('utf8'), canonicalize(validPayload))
+  assert.equal(fixtureVerifiesWith(provenanceFixtureSecret, validEnvelope), true)
+  assert.equal(fixtureVerifiesWith(requestApiKey, validEnvelope), false)
+  assert.equal(fixtureVerifiesWith(provenanceFixtureSecret, apiKeySignedEnvelope), false)
+  assert.equal(fixtureVerifiesWith(requestApiKey, apiKeySignedEnvelope), true)
+  assert.equal(fixtureVerifiesWith('', validEnvelope), false)
+})
+
+test('fixture payload mutation after signing fails DSSE verification', () => {
+  assert.notEqual(Buffer.from(mutatedPayloadEnvelope.payload, 'base64').toString('utf8'), canonicalize(validPayload))
+  assert.equal(envelopeSignature(mutatedPayloadEnvelope), envelopeSignature(validEnvelope))
+  assert.equal(fixtureVerifiesWith(provenanceFixtureSecret, mutatedPayloadEnvelope), false)
+})
+
+test('no source path contains PROVENANCE_HMAC_SECRET API_KEY fallback expression', () => {
+  for (const path of sourceFiles(new URL('../../src/', import.meta.url))) {
+    const text = readFileSync(path, 'utf8')
+    assert.doesNotMatch(text, /PROVENANCE_HMAC_SECRET\s*\|\|\s*env\.API_KEY/)
+    assert.doesNotMatch(text, /env\.PROVENANCE_HMAC_SECRET\s*\|\|\s*env\.API_KEY/)
+  }
 })
 
 test('attestation registry preserves replay uniqueness without authority expansion', () => {
