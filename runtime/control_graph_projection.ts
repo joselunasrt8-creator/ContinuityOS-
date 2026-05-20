@@ -24,6 +24,29 @@ export interface ControlGraphProjection {
   edges: ProjectionEdge[]
 }
 
+export type ProjectionDriftClass =
+  | "orphan-induced"
+  | "stale-state-induced"
+  | "replay-induced"
+  | "temporal-induced"
+  | "regeneration-induced"
+  | "ordering-induced"
+
+export interface ProjectionInspectionIssue {
+  class: ProjectionDriftClass
+  code: string
+  message: string
+  details: string
+}
+
+export interface ProjectionInspectionResult {
+  ok: boolean
+  deterministic_regeneration: boolean
+  complete_projection: boolean
+  fail_closed: boolean
+  issues: ProjectionInspectionIssue[]
+}
+
 export interface FederatedProjectionEnvelope {
   envelope_id: string
   projection_hash: string
@@ -47,11 +70,103 @@ export function deterministicProjectionId(
 export function deterministicProjectionHash(
   projection: ControlGraphProjection,
 ): string {
+  const orderedNodes = [...projection.nodes].sort((a, b) => {
+    if (a.type !== b.type) return a.type.localeCompare(b.type)
+    if (a.id !== b.id) return a.id.localeCompare(b.id)
+    return a.legitimacy_state.localeCompare(b.legitimacy_state)
+  })
+  const orderedEdges = [...projection.edges].sort((a, b) => {
+    if (a.relation !== b.relation) return a.relation.localeCompare(b.relation)
+    if (a.from !== b.from) return a.from.localeCompare(b.from)
+    return a.to.localeCompare(b.to)
+  })
   return [
     projection.projection_id,
-    projection.nodes.length,
-    projection.edges.length,
+    JSON.stringify(orderedNodes),
+    JSON.stringify(orderedEdges),
   ].join(":")
+}
+
+export function verifyDeterministicRegeneration(
+  projectionA: ControlGraphProjection,
+  projectionB: ControlGraphProjection,
+): boolean {
+  return deterministicProjectionHash(projectionA) === deterministicProjectionHash(projectionB)
+}
+
+export function verifyProjectionCompleteness(
+  projection: ControlGraphProjection,
+): ProjectionInspectionIssue[] {
+  const issues: ProjectionInspectionIssue[] = []
+  const nodeIds = new Set(projection.nodes.map((node) => node.id))
+
+  for (const edge of projection.edges) {
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+      issues.push({
+        class: "orphan-induced",
+        code: "orphan_lineage_detected",
+        message: "edge references disconnected lineage node",
+        details: `${edge.from} -> ${edge.to} (${edge.relation})`,
+      })
+    }
+  }
+
+  const staleNodes = projection.nodes.filter((node) => node.legitimacy_state === "STALE")
+  for (const staleNode of staleNodes) {
+    issues.push({
+      class: "stale-state-induced",
+      code: "stale_evidence_detected",
+      message: "stale evidence survived into graph projection",
+      details: staleNode.id,
+    })
+  }
+
+  return issues
+}
+
+export function inspectProjectionContinuity(
+  projection: ControlGraphProjection,
+  expectedNodeOrder: string[],
+): ProjectionInspectionIssue[] {
+  const issues: ProjectionInspectionIssue[] = []
+  const seen = projection.nodes.map((node) => node.id)
+  if (expectedNodeOrder.join("|") !== seen.join("|")) {
+    issues.push({
+      class: "ordering-induced",
+      code: "deterministic_ordering_mismatch",
+      message: "projection node ordering diverges from canonical deterministic traversal",
+      details: `expected=${expectedNodeOrder.join(",")} actual=${seen.join(",")}`,
+    })
+  }
+  return issues
+}
+
+export function inspectProjection(
+  projection: ControlGraphProjection,
+  regenerated: ControlGraphProjection,
+  expectedNodeOrder: string[],
+): ProjectionInspectionResult {
+  const issues = [
+    ...verifyProjectionCompleteness(projection),
+    ...inspectProjectionContinuity(projection, expectedNodeOrder),
+  ]
+
+  if (!verifyDeterministicRegeneration(projection, regenerated)) {
+    issues.push({
+      class: "regeneration-induced",
+      code: "projection_regeneration_mismatch",
+      message: "regenerated graph diverges from current graph evidence",
+      details: "deterministic graph regeneration verification failed",
+    })
+  }
+
+  return {
+    ok: issues.length === 0,
+    deterministic_regeneration: !issues.some((issue) => issue.class === "regeneration-induced"),
+    complete_projection: !issues.some((issue) => issue.class === "orphan-induced"),
+    fail_closed: issues.length === 0,
+    issues,
+  }
 }
 
 export function createProjection(
