@@ -1,0 +1,45 @@
+{
+  "schema_version": "SKILL_SURFACES_REGISTRY_V1",
+  "registry_semantics": {
+    "append_only": true,
+    "observability_only": true,
+    "grants_execution_permission": false,
+    "runtime_route_expansion": false,
+    "execution_path_creation": false,
+    "authority_creation": false,
+    "validator_bypass": false,
+    "fail_closed": true
+  },
+  "entries": [
+    {
+      "skill_id": "local.readonly.analysis",
+      "surface_type": "observability",
+      "risk_class": "P0",
+      "mutation_capable": false,
+      "allowed_targets": ["repository_readonly"],
+      "required_validator_layers": [],
+      "proof_requirements": ["execution_receipt"],
+      "replay_domain": "local_readonly_analysis"
+    },
+    {
+      "skill_id": "repository.change.workflow",
+      "surface_type": "repository_mutation",
+      "risk_class": "P2",
+      "mutation_capable": true,
+      "allowed_targets": ["local_workspace", "github_pull_request"],
+      "required_validator_layers": ["compile", "validate", "execute", "proof"],
+      "proof_requirements": ["execution_receipt", "lineage_binding", "policy_attestation"],
+      "replay_domain": "repository_mutation_pr"
+    },
+    {
+      "skill_id": "production.deploy.workflow",
+      "surface_type": "deploy_capable",
+      "risk_class": "P3",
+      "mutation_capable": true,
+      "allowed_targets": ["github_actions", "cloudflare_workers"],
+      "required_validator_layers": ["authority", "compile", "validate", "execute", "proof"],
+      "proof_requirements": ["execution_receipt", "lineage_binding", "policy_attestation", "dsse"],
+      "replay_domain": "production_deploy"
+    }
+  ]
+}
