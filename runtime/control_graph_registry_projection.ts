@@ -31,6 +31,59 @@ export interface RegistryProjectionState {
 export const CONTROL_GRAPH_REGISTRY_PROJECTION_MODE =
   "observability_only"
 
+export type LegitimacyGraphEntityType =
+  | "AEO"
+  | "Execution"
+  | "Proof"
+  | "Replay"
+  | "PREO"
+  | "Registry"
+  | "Reconciliation"
+  | "TopologyEvidence"
+
+export type LegitimacyGraphEdgeType =
+  | "VALIDATES"
+  | "EXECUTES"
+  | "PROVES"
+  | "CONTINUES"
+  | "REPLAYS"
+  | "RECONCILES"
+  | "DERIVES_FROM"
+  | "ANCESTOR_OF"
+
+export interface LegitimacyGraphEntity {
+  id: string
+  type: LegitimacyGraphEntityType
+  lineage_hash: string
+  created_at: string
+}
+
+export interface LegitimacyGraphEdge {
+  from: string
+  to: string
+  type: LegitimacyGraphEdgeType
+}
+
+export interface CanonicalLegitimacyGraphProjection {
+  projection_id: string
+  registry_hash: string
+  lineage_root: string
+  entities: LegitimacyGraphEntity[]
+  edges: LegitimacyGraphEdge[]
+  replay_neutral: true
+  evidence_only: true
+  reconstructable: true
+  non_authoritative: true
+  fail_closed: true
+}
+
+export interface CanonicalRegistrySnapshot {
+  registry_hash: string
+  lineage_root: string
+  entities: LegitimacyGraphEntity[]
+  edges: LegitimacyGraphEdge[]
+}
+
 export function deterministicProjectionId(
   topologyHash: string,
   registryHash: string,
@@ -192,4 +245,77 @@ export function exportRegistryProjection(
     replay_neutral: true,
     append_only: true,
   }
+}
+
+function stableSortEntities(
+  entities: LegitimacyGraphEntity[],
+): LegitimacyGraphEntity[] {
+  return [...entities].sort((a, b) =>
+    `${a.type}:${a.id}`.localeCompare(
+      `${b.type}:${b.id}`,
+    ),
+  )
+}
+
+function stableSortEdges(
+  edges: LegitimacyGraphEdge[],
+): LegitimacyGraphEdge[] {
+  return [...edges].sort((a, b) =>
+    `${a.type}:${a.from}:${a.to}`.localeCompare(
+      `${b.type}:${b.from}:${b.to}`,
+    ),
+  )
+}
+
+export function serializeProjectionDeterministically(
+  projection: CanonicalLegitimacyGraphProjection,
+): string {
+  const stable = {
+    ...projection,
+    entities: stableSortEntities(
+      projection.entities,
+    ),
+    edges: stableSortEdges(
+      projection.edges,
+    ),
+  }
+  return JSON.stringify(stable)
+}
+
+export function buildCanonicalLegitimacyGraphProjection(
+  snapshot: CanonicalRegistrySnapshot,
+): CanonicalLegitimacyGraphProjection {
+  return {
+    projection_id: deterministicProjectionId(
+      snapshot.lineage_root,
+      snapshot.registry_hash,
+    ),
+    registry_hash: snapshot.registry_hash,
+    lineage_root: snapshot.lineage_root,
+    entities: stableSortEntities(
+      snapshot.entities,
+    ),
+    edges: stableSortEdges(snapshot.edges),
+    replay_neutral: true,
+    evidence_only: true,
+    reconstructable: true,
+    non_authoritative: true,
+    fail_closed: true,
+  }
+}
+
+export function verifyLineageAgreementOrReject(
+  expectedLineageRoot: string,
+  projection: CanonicalLegitimacyGraphProjection,
+): { ok: true } | { ok: false, reason: "LINEAGE_DISAGREEMENT" } {
+  if (
+    projection.lineage_root !==
+    expectedLineageRoot
+  ) {
+    return {
+      ok: false,
+      reason: "LINEAGE_DISAGREEMENT",
+    }
+  }
+  return { ok: true }
 }
