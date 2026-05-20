@@ -116,6 +116,24 @@ test('proof_rejects_missing_execution_id', () => {
   )
 })
 
+test('proof_rejects_missing_invocation_nonce_before_lineage_mutation', () => {
+  assert.match(
+    source,
+    /if \(!invocation_nonce\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" \}/,
+    'proof must fail closed when invocation_nonce is missing',
+  )
+
+  const proofStart = source.indexOf('if (url.pathname === "/proof" && request.method === "POST") {')
+  const missingNonceReject = source.indexOf('reason:"missing_invocation_nonce"', proofStart)
+  const proofRead = source.indexOf('const proofReads = await env.DB.batch', proofStart)
+  const proofInsert = source.indexOf('INSERT OR IGNORE INTO proof_registry', proofStart)
+  const authorityConsume = source.indexOf("UPDATE authority_registry SET status='CONSUMED'", proofStart)
+  assert.ok(proofStart >= 0 && missingNonceReject > proofStart, 'expected missing nonce rejection inside /proof')
+  assert.ok(proofRead > missingNonceReject, 'missing nonce must fail before proof lineage reads')
+  assert.ok(proofInsert > missingNonceReject, 'missing nonce must fail before proof_registry append')
+  assert.ok(authorityConsume > missingNonceReject, 'missing nonce must fail before authority consumption')
+})
+
 test('proof_rejects_hash_mismatch', () => {
   assert.match(
     source,

@@ -8,9 +8,47 @@ const governanceGapRegistry = readFileSync('GOVERNANCE_GAP_REGISTRY.md', 'utf8')
 
 const routeOrderPattern = /"\$CLEAN_WORKER_URL\/session"[\s\S]*"\$CLEAN_WORKER_URL\/continuity"[\s\S]*"\$CLEAN_WORKER_URL\/authority"[\s\S]*"\$CLEAN_WORKER_URL\/compile"[\s\S]*"\$CLEAN_WORKER_URL\/validate"[\s\S]*"\$CLEAN_WORKER_URL\/execute"[\s\S]*"\$CLEAN_WORKER_URL\/proof"/;
 
+function workflowStep(name) {
+  const start = governedDeployWorkflow.indexOf(`- name: ${name}`);
+  assert.notEqual(start, -1, `${name} step must exist`);
+  const next = governedDeployWorkflow.indexOf('\n      - name:', start + 1);
+  return governedDeployWorkflow.slice(start, next === -1 ? undefined : next);
+}
+
 test('valid governed deploy path preserves canonical chain and ends PROVEN', () => {
   assert.match(governedDeployWorkflow, routeOrderPattern);
   assert.match(governedDeployWorkflow, /\[ "\$PROOF_STATUS" = "NULL" \] \|\| \[ "\$PROOF_STATUS" != "PROVEN" \]/);
+});
+
+test('governed deploy carries one invocation nonce through validate, execute, and proof', () => {
+  assert.match(governedDeployWorkflow, /invocation_nonce:\s*\n\s*required: true/);
+  assert.match(governedDeployWorkflow, /INVOCATION_NONCE: \$\{\{ github\.event\.inputs\.invocation_nonce \}\}/);
+  assert.match(governedDeployWorkflow, /for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE WORKER_URL API_KEY/);
+
+  for (const name of ['Save validate response', 'Save execute response', 'Save proof response']) {
+    const step = workflowStep(name);
+    assert.match(step, /--arg invocation_nonce "\$INVOCATION_NONCE"/);
+    assert.match(step, /invocation_nonce: \$invocation_nonce/);
+  }
+});
+
+test('governed deploy proof request includes required lineage', () => {
+  const proofStep = workflowStep('Save proof response');
+
+  for (const field of [
+    /--arg session_id "\$SESSION_ID"/,
+    /--arg continuity_id "\$CONTINUITY_ID"/,
+    /--arg decision_id "\$DECISION_ID"/,
+    /--arg validated_object_hash "\$VALIDATED_OBJECT_HASH"/,
+    /--arg invocation_nonce "\$INVOCATION_NONCE"/,
+    /session_id: \$session_id/,
+    /continuity_id: \$continuity_id/,
+    /decision_id: \$decision_id/,
+    /validated_object_hash: \$validated_object_hash/,
+    /invocation_nonce: \$invocation_nonce/,
+  ]) {
+    assert.match(proofStep, field);
+  }
 });
 
 test('missing authority is fail-closed NULL', () => {
