@@ -19,15 +19,19 @@ function hashTarget(target) {
 }
 
 function validArtifact() {
+  const nonce = Math.random().toString(36).slice(2);
   const deployment_target = { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml', commit: 'abc123' };
   const hash = hashTarget(deployment_target);
   return {
+    session_id: `session-${nonce}`,
+    decision_id: `decision-${nonce}`,
+    invocation_nonce: `nonce-${nonce}`,
     preo: { id: 'preo-1', status: 'VALID' },
     continuity: { status: 'VALID', orphaned: false },
     validator: { status: 'APPROVED', approved: true },
     replay: { status: 'INVALID', reused: false },
     authority: { status: 'ACTIVE', expires_at: '2999-01-01T00:00:00.000Z' },
-    proof: { status: 'VALID', binding_hash: hash },
+    proof: { status: 'VALID', binding_hash: hash, proof_id: `proof-${nonce}` },
     validated_object_hash: hash,
     deployment_hash: hash,
     deployment_target
@@ -194,5 +198,31 @@ test('registry append-only semantics do not rewrite history and reject duplicate
   const after = JSON.parse(readFileSync(registry, 'utf8'));
   assert.equal(JSON.stringify(after.entries[0]), firstEvent);
   assert.equal(after.entries.at(-1).event_type, 'replay_rejection');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+
+test('deploy denied when canonical lineage fields are missing', () => {
+  const artifact = validArtifact();
+  delete artifact.invocation_nonce;
+  const { res } = runWithArtifact(artifact);
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /missing canonical lineage fields/);
+});
+
+test('duplicate proof tuple is rejected deterministically', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'issue-610-tuple-'));
+  const file = join(dir, 'artifact.json');
+  const registry = join(dir, 'deploy_audit_registry.json');
+  const artifact = validArtifact();
+  writeFileSync(file, JSON.stringify(artifact), 'utf8');
+
+  const env = { ...process.env, MINDSHIFT_GOVERNED_DEPLOY_CONTEXT: 'github_actions_governed', MINDSHIFT_DEPLOY_AUDIT_REGISTRY: registry };
+  const first = spawnSync('npx', ['tsx', 'scripts/governed-deploy.ts', file, 'node', '-e', 'process.exit(0)'], { encoding: 'utf8', env });
+  assert.equal(first.status, 0);
+
+  const second = spawnSync('npx', ['tsx', 'scripts/governed-deploy.ts', file, 'node', '-e', 'process.exit(0)'], { encoding: 'utf8', env });
+  assert.notEqual(second.status, 0);
+  assert.match(second.stderr, /duplicate proof tuple rejected/);
   rmSync(dir, { recursive: true, force: true });
 });

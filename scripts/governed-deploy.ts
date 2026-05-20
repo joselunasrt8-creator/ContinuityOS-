@@ -15,18 +15,24 @@ type DeployEventType =
   | 'break_glass_deploy_invocation';
 
 type LegitimacyArtifact = {
+  session_id?: string;
+  decision_id?: string;
+  invocation_nonce?: string;
   preo?: { id?: string; status?: Status };
   continuity?: { status?: Status; orphaned?: boolean };
   validator?: { status?: Status; approved?: boolean };
   replay?: { status?: Status; reused?: boolean };
   authority?: { status?: Status; expires_at?: string };
-  proof?: { status?: Status; binding_hash?: string };
+  proof?: { status?: Status; binding_hash?: string; proof_id?: string };
   validated_object_hash?: string;
   deployment_hash?: string;
   deployment_target?: Record<string, unknown>;
 };
 
 type DeployAuditEntry = {
+  session_id: string | null;
+  decision_id: string | null;
+  invocation_nonce: string | null;
   timestamp: string;
   event_type: DeployEventType;
   deployment_target: Record<string, unknown> | null;
@@ -37,6 +43,7 @@ type DeployAuditEntry = {
   governed_context: string;
   break_glass_invoked: boolean;
   proof_binding_hash: string | null;
+  proof_id: string | null;
 };
 
 type DeployAuditRegistry = {
@@ -95,6 +102,22 @@ function persistEvent(event: DeployAuditEntry): void {
   const duplicated = registry.entries.some((entry) => createHash('sha256').update(canonicalize(entry)).digest('hex') === replayKey);
   if (duplicated) return;
 
+  const tupleCollision = event.event_type === 'governed_deploy_success' && registry.entries.some((entry) =>
+    entry.event_type === 'governed_deploy_success' &&
+    entry.decision_id &&
+    entry.invocation_nonce &&
+    entry.validated_object_hash &&
+    entry.proof_id &&
+    entry.decision_id === event.decision_id &&
+    entry.invocation_nonce === event.invocation_nonce &&
+    entry.validated_object_hash === event.validated_object_hash &&
+    entry.proof_id === event.proof_id
+  );
+  if (tupleCollision) {
+    console.error('NULL — duplicate proof tuple rejected');
+    process.exit(1);
+  }
+
   const next: DeployAuditRegistry = {
     schema_version: 1,
     registry: 'deploy_audit_registry',
@@ -106,6 +129,9 @@ function persistEvent(event: DeployAuditEntry): void {
 
 function buildEvent(type: DeployEventType, artifact: LegitimacyArtifact | null, reason: string | null): DeployAuditEntry {
   return {
+    session_id: artifact?.session_id ?? null,
+    decision_id: artifact?.decision_id ?? null,
+    invocation_nonce: artifact?.invocation_nonce ?? null,
     timestamp: new Date().toISOString(),
     event_type: type,
     deployment_target: artifact?.deployment_target ?? null,
@@ -115,7 +141,8 @@ function buildEvent(type: DeployEventType, artifact: LegitimacyArtifact | null, 
     execution_surface: 'github_governed_production_deploy',
     governed_context: process.env.MINDSHIFT_GOVERNED_DEPLOY_CONTEXT ?? 'unset',
     break_glass_invoked: process.env.MINDSHIFT_BREAK_GLASS_DEPLOY === 'true',
-    proof_binding_hash: artifact?.proof?.binding_hash ?? null
+    proof_binding_hash: artifact?.proof?.binding_hash ?? null,
+    proof_id: artifact?.proof?.proof_id ?? null
   };
 }
 
@@ -132,7 +159,8 @@ export function validateArtifact(artifact: LegitimacyArtifact): { targetHash: st
   if (!artifact.replay || artifact.replay.status !== 'INVALID' || artifact.replay.reused) failClosed('replayed legitimacy artifacts rejected', artifact, 'replay_rejection');
   if (!artifact.authority || artifact.authority.status !== 'ACTIVE' || !artifact.authority.expires_at) failClosed('expired authority rejected', artifact);
   if (Date.parse(artifact.authority.expires_at) <= Date.now()) failClosed('expired authority rejected', artifact);
-  if (!artifact.proof || artifact.proof.status !== 'VALID' || !artifact.proof.binding_hash) failClosed('proof mismatch rejected', artifact);
+  if (!artifact.proof || artifact.proof.status !== 'VALID' || !artifact.proof.binding_hash || !artifact.proof.proof_id) failClosed('proof mismatch rejected', artifact);
+  if (!artifact.session_id || !artifact.decision_id || !artifact.invocation_nonce) failClosed('missing canonical lineage fields', artifact);
   if (!artifact.deployment_target || !artifact.validated_object_hash || !artifact.deployment_hash) failClosed('NO_VALIDATED_OBJECT', artifact);
 
   const targetHash = hashTarget(artifact.deployment_target);
