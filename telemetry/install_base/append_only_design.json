@@ -1,0 +1,16 @@
+{
+  "artifact_type": "install_base.telemetry.append_only.log",
+  "storage_mode": "append_only",
+  "entry_shape": {
+    "timestamp": "RFC3339",
+    "report_hash": "sha256",
+    "metrics_snapshot": "object",
+    "evidence_refs": ["path"],
+    "mutation_allowed": false
+  },
+  "constraints": {
+    "authoritative_effect": false,
+    "proof_effect": false,
+    "execution_effect": false
+  }
+}

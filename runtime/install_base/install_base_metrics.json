@@ -1,6 +1,5 @@
 {
   "artifact": "INSTALL_BASE_TELEMETRY_REPORT",
-  "generated_from": "reconciliation+proof+NULL+sovereignty+governed-deploy artifacts",
   "canonical_chain": [
     "/session",
     "/continuity",
@@ -10,26 +9,77 @@
     "/execute",
     "/proof"
   ],
-  "read_only": true,
-  "non_authoritative": true,
+  "categories": {
+    "ecosystem_dependency": {
+      "evidence_only_federation_count": 0,
+      "external_schema_consumer_count": 0,
+      "federation_node_count": 0,
+      "governance_graph_dependency_count": 7,
+      "mcp_integration_count": 0
+    },
+    "runtime_dependency": {
+      "continuity_revocation_count": 0,
+      "deterministic_quarantine_count": 0,
+      "governed_execution_count": 1,
+      "proof_persistence_count": 12,
+      "reconciliation_drift_count": 0,
+      "replay_rejection_count": 4,
+      "validation_failure_count": 13,
+      "validation_success_count": 1
+    },
+    "workflow_dependency": {
+      "bypass_rejection_count": 0,
+      "execution_boundary_enforcement_count": 1,
+      "fate_verification_coverage_count": 8,
+      "preo_governed_merge_count": 0,
+      "validator_routed_execution_count": 1
+    }
+  },
+  "classifications": {
+    "CONTINUITY_DEPENDENCY": 0,
+    "FEDERATION_EVIDENCE_DEPENDENCY": 0,
+    "GOVERNED_EXECUTION_DEPENDENCY": 1,
+    "PROOF_DEPENDENCY": 12,
+    "RECONCILIATION_DEPENDENCY": 0,
+    "VALIDATION_DEPENDENCY": 14,
+    "WORKFLOW_GOVERNANCE_DEPENDENCY": 1
+  },
+  "constraints": {
+    "append_only_when_persisted": true,
+    "exact_object_enforcement_preserved": true,
+    "fail_closed_semantics_preserved": true,
+    "no_execution_route_expansion": true,
+    "no_replay_state_mutation": true,
+    "no_validated_object_mutation": true,
+    "telemetry_cannot_authorize_execution": true,
+    "telemetry_cannot_become_proof": true
+  },
   "creates_authority": false,
   "creates_proof": false,
-  "metrics": {
-    "governed_execution_count": 1,
-    "governed_deploy_count": 1,
-    "proof_persisted_count": 12,
-    "validation_success_count": 1,
-    "validation_null_count": 12,
-    "replay_rejection_count": 4,
-    "hash_mismatch_rejection_count": 4,
-    "boundary_bypass_rejection_count": 3,
-    "orphan_proof_detection_count": 1,
-    "governed_surface_count": 13,
-    "ungoverned_surface_count": 15,
-    "open_sovereignty_gap_count": 13,
-    "contained_sovereignty_gap_count": 9,
-    "install_base_artifacts_present": true,
-    "graph_projection_present": true
+  "graph_projection": {
+    "edge_sets": [
+      "canonical_chain_edges",
+      "governance_dependency_edges",
+      "evidence_federation_edges"
+    ],
+    "install_base_signal": "sum(classifications[*])",
+    "node_sets": [
+      "runtime_nodes",
+      "governance_nodes",
+      "federation_nodes"
+    ]
   },
-  "report_hash": "6e2f8cfa1340b3967f214e1f211a1dd998a9114d056dd38058d63d89e6135e8b"
+  "install_base_semantics": "governed_execution_dependency",
+  "metrics": {
+    "contained_sovereignty_gap_count": 9,
+    "governed_surface_count": 13,
+    "graph_projection_present": true,
+    "install_base_artifacts_present": true,
+    "open_sovereignty_gap_count": 13,
+    "ungoverned_surface_count": 15
+  },
+  "non_authoritative": true,
+  "read_only": true,
+  "telemetry_boundary": "observability_only_evidence_only_non_executable",
+  "report_hash": "5ab0e442060f33862da1fb1c14956b8e57ab84009b08f2dbdb4b9d4ecf32d153"
 }

@@ -25,18 +25,28 @@ test('install-base telemetry snapshot is stable and read-only', () => {
   assert.equal(derived.creates_proof, false)
 })
 
-test('install-base telemetry cannot satisfy proof or authority requirements', () => {
+test('telemetry boundary invariants remain fail-closed and non-authoritative', () => {
   const report = deriveInstallBaseTelemetry()
-  assert.equal(report.metrics.proof_persisted_count > 0, true)
-  assert.equal(report.non_authoritative, true)
-  assert.equal(report.creates_authority, false)
-  assert.equal(report.creates_proof, false)
+  assert.equal(report.constraints.telemetry_cannot_authorize_execution, true)
+  assert.equal(report.constraints.telemetry_cannot_become_proof, true)
+  assert.equal(report.constraints.fail_closed_semantics_preserved, true)
+  assert.equal(report.constraints.exact_object_enforcement_preserved, true)
+})
+
+test('required install-base categories and classifications are present', () => {
+  const report = deriveInstallBaseTelemetry()
+  assert.ok(report.categories.runtime_dependency)
+  assert.ok(report.categories.workflow_dependency)
+  assert.ok(report.categories.ecosystem_dependency)
+  assert.ok(report.classifications.GOVERNED_EXECUTION_DEPENDENCY >= 0)
+  assert.ok(report.classifications.WORKFLOW_GOVERNANCE_DEPENDENCY >= 0)
+  assert.ok(report.classifications.FEDERATION_EVIDENCE_DEPENDENCY >= 0)
 })
 
 test('missing artifacts remain NULL-safe/UNKNOWN and do not mutate source state', () => {
   const before = readFileSync(join(process.cwd(), 'runtime/sovereignty_map.json'), 'utf8')
   const report = deriveInstallBaseTelemetry(join(process.cwd(), 'runtime'))
-  assert.ok(report.metrics.install_base_artifacts_present === false || report.metrics.install_base_artifacts_present === 'UNKNOWN')
+  assert.equal(report.metrics.install_base_artifacts_present, false)
   const after = readFileSync(join(process.cwd(), 'runtime/sovereignty_map.json'), 'utf8')
   assert.equal(before, after)
 })
