@@ -38,6 +38,8 @@ test('governed-deploy workflow requires canonical governance fields', () => {
   );
 
   const requiredFields = [
+    'scripts/governed-deploy.ts',
+    'MINDSHIFT_GOVERNED_DEPLOY_CONTEXT',
     'decision_id',
     'validated_object_hash',
     'invocation_nonce',

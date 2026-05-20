@@ -50,6 +50,15 @@ export function validateArtifact(artifact: LegitimacyArtifact): { targetHash: st
   return { targetHash };
 }
 
+function enforceGovernedDeployCommand(deployCommand: string[]): void {
+  if (deployCommand.length === 0) return;
+  if (process.env.MINDSHIFT_GOVERNED_DEPLOY_CONTEXT !== 'github_actions_governed') failClosed('workflow bypasses governed deploy wrapper');
+
+  const [cmd, ...args] = deployCommand;
+  const normalized = [cmd, ...args].join(' ').toLowerCase();
+  if (normalized.includes('wrangler deploy') && cmd === 'wrangler') failClosed('direct wrangler invocation rejected');
+}
+
 function main(): void {
   const [, , artifactPath, ...deployCommand] = process.argv;
   if (!artifactPath) failClosed('missing legitimacy artifact path');
@@ -61,6 +70,7 @@ function main(): void {
   }
 
   validateArtifact(artifact);
+  enforceGovernedDeployCommand(deployCommand);
 
   if (deployCommand.length === 0) {
     console.log('VALID — governance checks passed; no deployment command provided');
