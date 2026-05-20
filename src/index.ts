@@ -7447,22 +7447,6 @@ export default {
       return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, identity_id: String(authority.identity_id || ""), session_id, continuity_id: String(authority.continuity_id || ""), execution_id, decision_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, pull_request_id: provenance.pull_request_id, merge_commit_sha: provenance.merge_commit_sha, source_tree_hash: provenance.source_tree_hash, workflow_run_id: provenance.workflow_run_id, workflow_sha: provenance.workflow_sha } })
     }
 
-    if (url.pathname === "/proof/propagate" && request.method === "POST") {
-      const body = await request.json().catch(() => ({})) as Record<string, unknown>
-      const outbox_id = String(body.outbox_id || "")
-      if (!outbox_id) return json({ status:"NULL", result:"INVALID", reason:"missing_outbox_id" }, 400)
-      const outbox = await env.DB.prepare(`SELECT * FROM proof_propagation_outbox WHERE outbox_id=?1 LIMIT 1`).bind(outbox_id).first<any>()
-      if (!outbox || String(outbox.status || "") !== "PENDING") return json({ status:"NULL", result:"INVALID", reason:"replayed_propagation" })
-      const proof = await env.DB.prepare(`SELECT proof_id, decision_id, execution_id, validated_object_hash FROM proof_registry WHERE proof_id=?1 LIMIT 1`).bind(String(outbox.proof_id || "")).first<any>()
-      if (!proof) return json({ status:"NULL", result:"INVALID", reason:"orphan_propagation" })
-      if (String(proof.decision_id || "") !== String(outbox.decision_id || "") || String(proof.execution_id || "") !== String(outbox.execution_id || "") || String(proof.validated_object_hash || "") !== String(outbox.validated_object_hash || "")) return json({ status:"NULL", result:"INVALID", reason:"orphan_propagation" })
-      const duplicate = await env.DB.prepare(`SELECT outbox_id FROM proof_propagation_outbox WHERE proof_id=?1 AND status='PUBLISHED' LIMIT 1`).bind(String(outbox.proof_id || "")).first<any>()
-      if (duplicate) return json({ status:"NULL", result:"INVALID", reason:"duplicate_propagation" })
-      const publish = await env.DB.prepare(`UPDATE proof_propagation_outbox SET status='PUBLISHED', publish_attempts=publish_attempts+1, published_at=?2, last_error=NULL WHERE outbox_id=?1 AND status='PENDING'`).bind(outbox_id, new Date().toISOString()).run()
-      if ((publish.meta?.changes || 0) !== 1) return json({ status:"NULL", result:"INVALID", reason:"replayed_propagation" })
-      return json({ status:"PUBLISHED", result:"OK", outbox_id, proof_id: String(outbox.proof_id || "") })
-    }
-
     return json({ status: "NULL", reason: "not_found" }, 404)
     } catch {
       return json({ status: "NULL", reason: "runtime_exception" }, 500)

@@ -146,6 +146,7 @@ test('no canonical execution route expansion occurs', () => {
   const routes = [...source.matchAll(/url\.pathname === "([^"]+)" && request\.method === "POST"/g)].map((match) => match[1])
   assert.deepEqual(new Set(routes), canonicalPostRoutes)
   assert.equal(routes.length, canonicalPostRoutes.size)
+  assert.doesNotMatch(source, /url\.pathname === "\/proof\/propagate" && request\.method === "POST"/)
 })
 
 test('no deploy workflow bypass is introduced by topology evidence', () => {

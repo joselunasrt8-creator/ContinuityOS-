@@ -118,6 +118,30 @@ function databaseSurface(table, existing) {
       non_authoritative: true,
     }
   }
+  if (table === 'proof_propagation_outbox') {
+    return {
+      surface_id: 'db_write:proof_propagation_outbox',
+      surface_type: 'database_write_surface',
+      source_file: SRC_PATH,
+      entrypoint: 'proof_propagation_outbox',
+      mutation_capability: true,
+      execution_capability: false,
+      deployment_capability: false,
+      authority_required: 'append_only_proof_outbox',
+      aeo_required: false,
+      validation_required: true,
+      proof_required: true,
+      replay_semantics: 'replay_neutral_proof_publication_marker',
+      drift_observable: true,
+      proof_bound: true,
+      governance_addressable: true,
+      canonical_boundary_status: 'PROOF_EVIDENCE_OUTBOX',
+      bypass_risk: 'raw_database_write',
+      containment_status: 'EVIDENCE_ONLY_PROOF_LINEAGE_BOUND',
+      evidence_only: true,
+      non_authoritative: true,
+    }
+  }
   const proofBound = table === 'proof_registry'
   const canonicalRegistry = ['session_registry', 'continuity_registry', 'authority_registry', 'aeo_registry', 'validation_registry', 'execution_registry', 'proof_registry', 'invocation_registry'].includes(table)
   return {

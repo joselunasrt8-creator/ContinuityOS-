@@ -42,6 +42,7 @@ test('closure inventory is machine-readable and every surface carries required c
 
 test('every executable and mutation-capable runtime route is inventoried and canonical routes are unchanged', () => {
   assert.match(source, /const CANONICAL_RUNTIME_ROUTES = \["\/session", "\/continuity", "\/authority", "\/compile", "\/validate", "\/execute", "\/proof"\] as const/)
+  assert.doesNotMatch(source, /url\.pathname === "\/proof\/propagate" && request\.method === "POST"/)
   for (const route of canonicalRoutes) {
     const surface = byId.get(`route:${route}`)
     assert.ok(surface, `${route} missing from closure inventory`)
@@ -49,6 +50,23 @@ test('every executable and mutation-capable runtime route is inventoried and can
     assert.equal(surface.validation_required, !['/session', '/continuity', '/authority', '/compile'].includes(route))
   }
   for (const route of executableRoutes) assert.ok(byId.get(`route:${route}`), `${route} executable route is undeclared`)
+})
+
+test('proof propagation outbox write is classified as evidence-only and non-authoritative', () => {
+  const outbox = byId.get('db_write:proof_propagation_outbox')
+  assert.ok(outbox, 'proof_propagation_outbox DB write missing from closure inventory')
+  assert.equal(outbox.surface_type, 'database_write_surface')
+  assert.equal(outbox.mutation_capability, true)
+  assert.equal(outbox.execution_capability, false)
+  assert.equal(outbox.deployment_capability, false)
+  assert.equal(outbox.authority_required, 'append_only_proof_outbox')
+  assert.equal(outbox.proof_required, true)
+  assert.equal(outbox.proof_bound, true)
+  assert.equal(outbox.replay_semantics, 'replay_neutral_proof_publication_marker')
+  assert.equal(outbox.canonical_boundary_status, 'PROOF_EVIDENCE_OUTBOX')
+  assert.equal(outbox.containment_status, 'EVIDENCE_ONLY_PROOF_LINEAGE_BOUND')
+  assert.equal(outbox.evidence_only, true)
+  assert.equal(outbox.non_authoritative, true)
 })
 
 test('every DB write surface in src/index.ts is classified', () => {
