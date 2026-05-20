@@ -22,7 +22,7 @@ function runWithArtifact(artifact) {
   const dir = mkdtempSync(join(tmpdir(), 'issue-610-'));
   const file = join(dir, 'artifact.json');
   writeFileSync(file, JSON.stringify(artifact), 'utf8');
-  const res = spawnSync('npx', ['tsx', 'scripts/governed-deploy.ts', file, 'node', '-e', 'process.exit(0)'], { encoding: 'utf8' });
+  const res = spawnSync('npx', ['tsx', 'scripts/governed-deploy.ts', file, 'node', '-e', 'process.exit(0)'], { encoding: 'utf8', env: { ...process.env, MINDSHIFT_GOVERNED_DEPLOY_CONTEXT: 'github_actions_governed' } });
   rmSync(dir, { recursive: true, force: true });
   return res;
 }
@@ -104,4 +104,26 @@ test('deploy allowed only when legitimacy chain is complete', () => {
   const artifact = validArtifact();
   const res = runWithArtifact(artifact);
   assert.equal(res.status, 0);
+});
+
+test('direct wrangler invocation rejected', () => {
+  const artifact = validArtifact();
+  const dir = mkdtempSync(join(tmpdir(), 'issue-610-direct-'));
+  const file = join(dir, 'artifact.json');
+  writeFileSync(file, JSON.stringify(artifact), 'utf8');
+  const res = spawnSync('npx', ['tsx', 'scripts/governed-deploy.ts', file, 'wrangler', 'deploy'], { encoding: 'utf8' });
+  rmSync(dir, { recursive: true, force: true });
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /workflow bypasses governed deploy wrapper|direct wrangler invocation rejected/);
+});
+
+test('workflow deploy bypass rejected without governed context', () => {
+  const artifact = validArtifact();
+  const dir = mkdtempSync(join(tmpdir(), 'issue-610-bypass-'));
+  const file = join(dir, 'artifact.json');
+  writeFileSync(file, JSON.stringify(artifact), 'utf8');
+  const res = spawnSync('npx', ['tsx', 'scripts/governed-deploy.ts', file, 'node', '-e', 'process.exit(0)'], { encoding: 'utf8', env: { ...process.env, MINDSHIFT_GOVERNED_DEPLOY_CONTEXT: '' } });
+  rmSync(dir, { recursive: true, force: true });
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /workflow bypasses governed deploy wrapper/);
 });
