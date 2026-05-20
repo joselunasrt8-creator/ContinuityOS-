@@ -1,0 +1,17 @@
+{
+  "artifact": "DISTRIBUTED_BYPASS_PATHS",
+  "version": "2026-05-20.issue-680.v1",
+  "fail_closed_response": "NULL",
+  "required_invariant": "event_received != execution_authorized",
+  "bypass_paths": [
+    {"bypass_id": "duplicate_queue_delivery", "required_response": "NULL/replay_detected"},
+    {"bypass_id": "workflow_replay", "required_response": "NULL/replay_detected"},
+    {"bypass_id": "fanout_divergence", "required_response": "NULL/lineage_mismatch"},
+    {"bypass_id": "orphan_retry_execution", "required_response": "NULL/no_canonical_lineage"},
+    {"bypass_id": "stale_authority_reuse", "required_response": "NULL/authority_not_active"},
+    {"bypass_id": "webhook_without_continuity", "required_response": "NULL/invalid_continuity"},
+    {"bypass_id": "cross_agent_lineage_drift", "required_response": "NULL/lineage_mismatch"},
+    {"bypass_id": "asynchronous_validator_escape", "required_response": "NULL/no_validation"},
+    {"bypass_id": "choreography_only_execution", "required_response": "NULL/no_orchestration_authority"}
+  ]
+}

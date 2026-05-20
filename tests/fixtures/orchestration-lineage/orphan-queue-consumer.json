@@ -1,0 +1,7 @@
+{
+  "fixture_id": "orphan_queue_consumer",
+  "status": "INVALID",
+  "topology": ["queue_consumer", "/execute", "/proof"],
+  "reason": "detached_queue_consumer",
+  "expected_result": "NULL"
+}

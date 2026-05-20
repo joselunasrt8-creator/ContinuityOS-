@@ -1,0 +1,36 @@
+{
+  "artifact": "ORCHESTRATION_SURFACES",
+  "version": "2026-05-20.issue-680.v1",
+  "fail_closed_response": "NULL",
+  "canonical_distributed_topology": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "orchestration_boundary",
+    "/execute",
+    "/proof"
+  ],
+  "surfaces": [
+    {
+      "surface_id": "governed_workflow_orchestrator",
+      "surface_type": "workflow",
+      "authorization_source": "canonical_lineage",
+      "lineage_required": true
+    },
+    {
+      "surface_id": "queue_consumer_execution_boundary",
+      "surface_type": "queue_consumer",
+      "authorization_source": "validated_object_and_reserved_authority",
+      "lineage_required": true
+    },
+    {
+      "surface_id": "webhook_ingress_adapter",
+      "surface_type": "webhook",
+      "authorization_source": "none",
+      "lineage_required": false,
+      "note": "event_received is evidence only and cannot authorize execution"
+    }
+  ]
+}

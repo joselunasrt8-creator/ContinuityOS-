@@ -1,0 +1,15 @@
+{
+  "artifact": "ORCHESTRATION_AUTHORITY_RULES",
+  "version": "2026-05-20.issue-680.v1",
+  "execution_gate": "VALID && AUTHORIZED && UNUSED && POLICY_VALID && CANONICAL_LINEAGE_CONTINUITY",
+  "else_result": "NULL",
+  "rules": {
+    "orchestration_authority_required": true,
+    "execution_authority_non_transferable": true,
+    "lineage_replay_invalidates_execution": true,
+    "execution_hash_equals_validated_hash": true,
+    "undeclared_orchestration_surfaces_fail_closed": true,
+    "choreography_is_not_authority": true,
+    "event_arrival_is_not_authority": true
+  }
+}

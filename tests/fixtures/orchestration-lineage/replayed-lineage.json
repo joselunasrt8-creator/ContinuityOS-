@@ -1,0 +1,7 @@
+{
+  "fixture_id": "replayed_lineage",
+  "status": "INVALID",
+  "topology": ["/session", "/continuity", "/authority", "/compile", "/validate", "orchestration_boundary", "/execute"],
+  "lineage_state": "REPLAYED",
+  "expected_result": "NULL"
+}

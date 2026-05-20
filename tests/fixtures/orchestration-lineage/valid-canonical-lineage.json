@@ -1,0 +1,6 @@
+{
+  "fixture_id": "valid_canonical_lineage",
+  "status": "VALID",
+  "topology": ["/session", "/continuity", "/authority", "/compile", "/validate", "orchestration_boundary", "/execute", "/proof"],
+  "expected_result": "VALID"
+}
