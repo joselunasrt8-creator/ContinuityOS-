@@ -1,0 +1,8 @@
+{
+  "fixture_id": "quorum_without_authority",
+  "lineage_state": "CANONICAL",
+  "quorum_state": "QUORUM_REACHED",
+  "authority_binding": "MISSING",
+  "expected_result": "NULL",
+  "reason": "quorum_without_legitimacy"
+}

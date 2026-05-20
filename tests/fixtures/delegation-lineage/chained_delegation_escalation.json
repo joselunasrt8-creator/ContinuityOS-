@@ -1,0 +1,7 @@
+{
+  "fixture_id": "chained_delegation_escalation",
+  "lineage_state": "CHAINED_DELEGATION",
+  "delegation_depth": 2,
+  "expected_result": "NULL",
+  "reason": "chained_delegation_escalation"
+}

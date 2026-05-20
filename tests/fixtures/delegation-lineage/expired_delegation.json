@@ -1,0 +1,7 @@
+{
+  "fixture_id": "expired_delegation",
+  "lineage_state": "CANONICAL",
+  "delegation_state": "EXPIRED",
+  "expected_result": "NULL",
+  "reason": "expired_delegation"
+}

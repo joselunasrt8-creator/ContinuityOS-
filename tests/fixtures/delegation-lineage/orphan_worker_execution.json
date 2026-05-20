@@ -1,0 +1,7 @@
+{
+  "fixture_id": "orphan_worker_execution",
+  "lineage_state": "DETACHED",
+  "worker_binding": "UNBOUND",
+  "expected_result": "NULL",
+  "reason": "detached_worker_execution"
+}

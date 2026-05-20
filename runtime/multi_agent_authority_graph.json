@@ -1,0 +1,17 @@
+{
+  "surface": "multi_agent_authority_governance",
+  "forbidden": {
+    "cross_agent_authority_aggregation_without_binding": "NULL",
+    "multi_agent_authority_synthesis": "NULL",
+    "chained_delegation_escalation": "NULL",
+    "orphan_orchestration_continuation": "NULL"
+  },
+  "allowed": {
+    "single_bounded_canonical_delegation": "VALID"
+  },
+  "lineage_requirements": {
+    "canonical_lineage_continuity_required": true,
+    "detached_worker_execution": "NULL",
+    "canonical_lineage_break": "NULL"
+  }
+}

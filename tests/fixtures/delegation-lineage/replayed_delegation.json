@@ -1,0 +1,7 @@
+{
+  "fixture_id": "replayed_delegation",
+  "lineage_state": "REPLAYED",
+  "delegation_state": "USED",
+  "expected_result": "NULL",
+  "reason": "delegated_authority_replay"
+}

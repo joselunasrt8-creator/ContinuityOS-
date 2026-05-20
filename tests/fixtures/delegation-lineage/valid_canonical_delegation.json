@@ -1,0 +1,7 @@
+{
+  "fixture_id": "valid_canonical_delegation",
+  "lineage_state": "CANONICAL",
+  "delegation_state": "ACTIVE",
+  "execution_authority_binding": "BOUND",
+  "expected_result": "VALID"
+}
