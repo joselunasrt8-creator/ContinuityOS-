@@ -1,0 +1,11 @@
+{
+  "canonical_aeo_hash": "3d8c4919c90dc9e86c0211fe72efbbfc98f9b528177d96d8b20b01196d2f572c",
+  "decision_id": "decision-fixture-valid",
+  "federation": null,
+  "signer_identity": "fixture-signer-identity",
+  "transparency_integrated_time": "2026-05-20T11:10:00.000Z",
+  "transparency_log_id": "fixture-log-valid",
+  "validated_object_hash": "3d8c4919c90dc9e86c0211fe72efbbfc98f9b528177d96d8b20b01196d2f572c",
+  "workflow_run_id": "run-decision-fixture-valid",
+  "workflow_sha": "merge-decision-fixture-valid"
+}
