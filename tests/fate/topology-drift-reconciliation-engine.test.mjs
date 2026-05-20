@@ -107,6 +107,13 @@ test('append-only reconciliation evidence registry is persisted without mutation
   assert.match(source, /mutation_capable TEXT NOT NULL CHECK \(mutation_capable='false'\)/)
 })
 
+test('drift propagation uses regenerated topology evidence instead of stale append-only ordering', () => {
+  const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /ORDER BY reconciliation_hash ASC LIMIT 1/)
+  assert.match(source, /latestTopologyReconciliationEvidence[\s\S]*buildRuntimeTopologyReconciliationEnvelope\(new Date\(0\)\.toISOString\(\)\)/)
+  assert.match(source, /regenerated_topology_reconciliation_dominates_stale_registry_evidence/)
+})
+
 test('bounded reconciliation traversal truncates evidence without executing or mutating', () => {
   const topology = validTopology()
   topology.schema_maps = Array.from({ length: 300 }, (_, index) => ({ source_id: `schema_${index.toString().padStart(3, '0')}`, route: '/proof', declared: true }))

@@ -45,6 +45,46 @@ function asArray(value) { return Array.isArray(value) ? value : [] }
 function truthy(value) { return value === true || value === 'true' || value === 1 || value === '1' }
 function field(record, name) { return String(record?.[name] ?? '') }
 function nonEmpty(value) { return typeof value === 'string' && value.length > 0 }
+function lineageObject(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return normalize(value)
+  if (typeof value !== 'string' || value.length === 0) return null
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? normalize(parsed) : null
+  } catch {
+    return null
+  }
+}
+function continuityHashMaterial(input = {}) {
+  const revocation = input?.revocation && typeof input.revocation === 'object' && !Array.isArray(input.revocation) ? input.revocation : {}
+  return {
+    actor_chain: Array.isArray(input?.actor_chain) ? input.actor_chain.map(String) : [],
+    authority_chain: Array.isArray(input?.authority_chain) ? input.authority_chain.map(String) : [],
+    constraints: normalize(input?.constraints ?? {}),
+    continuity_id: String(input?.continuity_id || ''),
+    expires_at: String(input?.expires_at || ''),
+    identity_id: String(input?.identity_id || ''),
+    issued_at: String(input?.issued_at || ''),
+    parent_continuity_id: input?.parent_continuity_id ? String(input.parent_continuity_id) : null,
+    revocation: { revoked_at: revocation.revoked_at ?? null, status: String(revocation.status || 'ACTIVE') },
+    scope: normalize(input?.scope ?? {}),
+    session_id: String(input?.session_id || ''),
+  }
+}
+function continuityDrift(continuity, session, continuities) {
+  if (!session) return 'continuity requires canonical session lineage'
+  if (field(continuity, 'session_id') !== field(session, 'session_id')) return 'continuity session differs from session registry'
+  if (field(continuity, 'identity_id') !== field(session, 'identity_id')) return 'continuity identity differs from session registry'
+  if (field(continuity, 'status') !== 'ACTIVE' || field(continuity, 'revoked_at')) return 'continuity must remain ACTIVE and unrevoked'
+  const canonical = lineageObject(continuity.canonical_continuity)
+  if (!canonical) return 'continuity canonical lineage is missing or malformed'
+  const actualHash = hashCanonical(continuityHashMaterial(canonical))
+  if (actualHash !== field(continuity, 'continuity_hash') || actualHash !== String(canonical.continuity_hash || '')) return 'continuity hash must match canonical continuity lineage'
+  const canonicalParent = canonical.parent_continuity_id ? String(canonical.parent_continuity_id) : ''
+  if (canonicalParent !== field(continuity, 'parent_continuity_id')) return 'continuity parent differs from canonical continuity lineage'
+  if (canonicalParent && !continuities.some((row) => field(row, 'continuity_id') === canonicalParent)) return 'continuity parent must resolve in continuity registry'
+  return ''
+}
 function parseCanonicalObject(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return normalize(value)
   if (typeof value !== 'string' || value.length === 0) return null
@@ -112,6 +152,14 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   const proofs = limited.proof_registry
   const invocations = limited.invocation_registry
 
+  for (const continuity of continuities) {
+    const session = one(sessions, (row) => field(row, 'session_id') === field(continuity, 'session_id'))
+    ctx.edges.push(edge('continuity_registry', recordIdentity(continuity), 'session_registry', field(continuity, 'session_id'), 'CONTINUITY_SESSION', session.match && !session.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'CONTINUITY_DRIFT'))
+    if (session.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'continuity_registry', continuity, 'continuity session resolves ambiguously')
+    const reason = continuityDrift(continuity, session.match, continuities)
+    if (reason) addDrift(ctx, 'CONTINUITY_DRIFT', 'continuity_registry', continuity, reason)
+  }
+
   for (const authority of authorities) {
     const session = one(sessions, (row) => field(row, 'session_id') === field(authority, 'session_id'))
     const continuity = one(continuities, (row) => field(row, 'continuity_id') === field(authority, 'continuity_id'))
@@ -168,12 +216,20 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   for (const proof of proofs) {
     const execution = one(executions, (row) => field(row, 'execution_id') === field(proof, 'execution_id'))
     const authority = one(authorities, (row) => field(row, 'decision_id') === field(proof, 'decision_id'))
+    const continuity = one(continuities, (row) => field(row, 'continuity_id') === field(proof, 'continuity_id'))
     ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'execution_registry', field(proof, 'execution_id'), 'PROOF_EXECUTION', execution.match && !execution.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_PROOF'))
     ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'authority_registry', recordIdentity(authority.match), 'PROOF_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_PROOF'))
+    ctx.edges.push(edge('proof_registry', recordIdentity(proof), 'continuity_registry', field(proof, 'continuity_id'), 'PROOF_CONTINUITY', continuity.match && !continuity.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'ORPHAN_PROOF'))
+    if (!execution.match) addDrift(ctx, 'ORPHAN_EXECUTION', 'proof_registry', proof, 'proof references missing execution lineage')
     if (!execution.match || !authority.match || !field(proof, 'validated_object_hash')) addDrift(ctx, 'ORPHAN_PROOF', 'proof_registry', proof, 'proof requires execution, authority, and validated object hash')
     if (authority.match && (!isHistoricallyValidAuthority(field(authority.match, 'status')) || field(authority.match, 'session_id') !== field(proof, 'session_id'))) addDrift(ctx, 'LINEAGE_DRIFT', 'proof_registry', proof, 'proof authority must exist and be historically valid for the proof session')
-    if (execution.ambiguous || authority.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'proof_registry', proof, 'proof lineage resolves ambiguously')
+    if (!continuity.match) addDrift(ctx, 'ORPHAN_PROOF', 'proof_registry', proof, 'proof requires continuity lineage')
+    if (execution.ambiguous || authority.ambiguous || continuity.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'proof_registry', proof, 'proof lineage resolves ambiguously')
     if (execution.match && field(execution.match, 'validated_object_hash') !== field(proof, 'validated_object_hash')) addDrift(ctx, 'PROOF_DRIFT', 'proof_registry', proof, 'proof hash differs from execution hash')
+    if (continuity.match && field(proof, 'continuity_hash') !== field(continuity.match, 'continuity_hash')) addDrift(ctx, 'PROOF_DRIFT', 'proof_registry', proof, 'proof continuity hash differs from continuity registry')
+    const authorityLineage = lineageObject(proof.authority_lineage)
+    const executionLineage = lineageObject(proof.execution_lineage)
+    if (!authorityLineage || !executionLineage || (authority.match && String(authorityLineage.authority_id || '') !== field(authority.match, 'authority_id')) || (execution.match && String(executionLineage.execution_id || '') !== field(execution.match, 'execution_id'))) addDrift(ctx, 'PROOF_DRIFT', 'proof_registry', proof, 'proof authority and execution lineage references must resolve deterministically')
   }
 
   const proofTruth = new Map()
@@ -215,9 +271,23 @@ export function traverseCrossRegistries(state = {}, options = {}) {
     const nonce = field(invocation, 'invocation_nonce')
     const objects = nonceToObjects.get(nonce) ?? new Set()
     if (objects.size !== 1) addDrift(ctx, objects.size === 0 ? 'REPLAY_DRIFT' : 'REPLAY_DRIFT', 'invocation_registry', invocation, 'invocation nonce must map to exactly one validated/executed object')
+    const validation = one(validations, (row) => field(row, 'decision_id') === field(invocation, 'decision_id') && field(row, 'validated_object_hash') === field(invocation, 'validated_object_hash') && field(row, 'invocation_nonce') === field(invocation, 'invocation_nonce'))
+    const execution = one(executions, (row) => field(row, 'decision_id') === field(invocation, 'decision_id') && field(row, 'validated_object_hash') === field(invocation, 'validated_object_hash') && field(row, 'invocation_nonce') === field(invocation, 'invocation_nonce'))
+    if (!validation.match || !execution.match) addDrift(ctx, 'REPLAY_DRIFT', 'invocation_registry', invocation, 'invocation requires validation and execution lineage')
+    if (validation.ambiguous || execution.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'invocation_registry', invocation, 'invocation lineage resolves ambiguously')
+    if (field(invocation, 'status') !== 'EXECUTED') addDrift(ctx, 'REPLAY_DRIFT', 'invocation_registry', invocation, 'invocation status must remain EXECUTED')
+    if ((validation.match && field(invocation, 'continuity_id') !== field(validation.match, 'continuity_id')) || (execution.match && field(invocation, 'continuity_id') !== field(execution.match, 'continuity_id'))) addDrift(ctx, 'REPLAY_DRIFT', 'invocation_registry', invocation, 'invocation continuity must match validation and execution lineage')
   }
 
   for (const preo of limited.preo_registry) {
+    const authority = one(authorities, (row) => field(row, 'decision_id') === field(preo, 'decision_id') && field(row, 'authority_id') === field(preo, 'authority_id'))
+    const aeo = one(aeos, (row) => field(row, 'decision_id') === field(preo, 'decision_id') && field(row, 'validated_object_hash') === field(preo, 'reviewed_hash'))
+    ctx.edges.push(edge('preo_registry', recordIdentity(preo), 'authority_registry', field(preo, 'authority_id'), 'PREO_AUTHORITY', authority.match && !authority.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'REGISTRY_DRIFT'))
+    ctx.edges.push(edge('preo_registry', recordIdentity(preo), 'aeo_registry', field(preo, 'reviewed_hash'), 'PREO_AEO_REVIEWED_HASH', aeo.match && !aeo.ambiguous ? 'RESOLVED' : 'UNRESOLVED', 'REGISTRY_DRIFT'))
+    if (!authority.match || !aeo.match) addDrift(ctx, 'REGISTRY_DRIFT', 'preo_registry', preo, 'PREO requires authority and reviewed AEO hash lineage')
+    if (authority.ambiguous || aeo.ambiguous) addDrift(ctx, 'RECONCILIATION_DRIFT', 'preo_registry', preo, 'PREO lineage resolves ambiguously')
+    if (authority.match && field(preo, 'continuity_id') !== field(authority.match, 'continuity_id')) addDrift(ctx, 'REGISTRY_DRIFT', 'preo_registry', preo, 'PREO continuity differs from authority lineage')
+    if (field(preo, 'status') !== 'PREO_VALID') addDrift(ctx, 'REGISTRY_DRIFT', 'preo_registry', preo, 'PREO status must remain PREO_VALID')
     if (truthy(preo.executable) || truthy(preo.creates_authority) || truthy(preo.proof_generating)) addDrift(ctx, 'REGISTRY_DRIFT', 'preo_registry', preo, 'PREO must bind governed merge legitimacy only')
   }
   for (const topology of limited.runtime_topology_registry) {

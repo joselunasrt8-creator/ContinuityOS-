@@ -2165,20 +2165,22 @@ async function ensureLegitimacyDriftPropagationRegistry(env: Env) {
 }
 
 async function latestTopologyReconciliationEvidence(env: Env): Promise<Record<string, unknown>> {
-  const selectedHash = ""
-  const result = await env.DB.prepare(`SELECT * FROM topology_reconciliation_registry ORDER BY reconciliation_hash ASC LIMIT 1`).all<any>()
-  const row = Array.isArray(result?.results) ? result.results[0] : null
-  if (!row) return { classification: "TOPOLOGY_VALID", topology_hash: await sha256Hex(canonicalize({ empty_topology_reconciliation_registry: true })), topology_ancestry: [], drift_summary: [], selected_reconciliation_hash: selectedHash }
+  const regenerated = await buildRuntimeTopologyReconciliationEnvelope(new Date(0).toISOString())
+  const drift_summary = regenerated.drift.classification === "TOPOLOGY_VALID"
+    ? []
+    : regenerated.drift.drift_classes.map((classification) => ({ classification, identity: "regenerated_runtime_topology", reason: "regenerated_topology_reconciliation_dominates_stale_registry_evidence" }))
   return {
-    classification: String(row.classification || "NULL"),
-    topology_hash: String(row.topology_hash || ""),
-    governance_hash: String(row.governance_hash || ""),
-    workflow_hash: String(row.workflow_hash || ""),
-    schema_hash: String(row.schema_hash || ""),
-    reconciliation_hash: String(row.reconciliation_hash || ""),
-    traversal_hash: String(row.traversal_hash || ""),
-    drift_summary: parseJsonArray(row.drift_summary),
-    topology_ancestry: parseJsonArray(row.topology_ancestry),
+    classification: regenerated.drift.classification,
+    topology_hash: regenerated.fingerprint.topology_hash,
+    governance_hash: regenerated.fingerprint.topology_semantic_hash,
+    workflow_hash: regenerated.fingerprint.topology_boundary_hash,
+    schema_hash: regenerated.fingerprint.topology_lineage_hash,
+    reconciliation_hash: regenerated.reconciliation_id,
+    traversal_hash: regenerated.fingerprint.topology_equivalence_hash,
+    drift_summary,
+    topology_ancestry: [{ reconciliation_id: regenerated.reconciliation_id, topology_equivalence_hash: regenerated.fingerprint.topology_equivalence_hash, source: "regenerated_runtime_topology" }],
+    selected_reconciliation_hash: regenerated.reconciliation_id,
+    regenerated: true,
   }
 }
 
@@ -6028,6 +6030,31 @@ async function crossRegistryCanonicalObjectHash(record: Record<string, unknown>)
   return object ? sha256Hex(canonicalize(object)) : ""
 }
 function crossRegistryAuthorityHistoricallyValid(status: unknown): boolean { return ["ACTIVE", "VALIDATED", "RESERVED", "EXECUTED", "CONSUMED"].includes(String(status || "")) }
+function crossRegistryLineageObject(value: unknown): Record<string, unknown> | null {
+  if (isPlainRecord(value)) return canonicalRecord(value)
+  if (typeof value !== "string" || value.length === 0) return null
+  try {
+    const parsed = JSON.parse(value)
+    return isPlainRecord(parsed) ? canonicalRecord(parsed) : null
+  } catch {
+    return null
+  }
+}
+async function crossRegistryContinuityDrift(continuity: Record<string, unknown>, session: Record<string, unknown> | null, continuities: Record<string, unknown>[]): Promise<string | null> {
+  if (!session) return "continuity requires canonical session lineage"
+  if (crossRegistryField(continuity, "session_id") !== crossRegistryField(session, "session_id")) return "continuity session differs from session registry"
+  if (crossRegistryField(continuity, "identity_id") !== crossRegistryField(session, "identity_id")) return "continuity identity differs from session registry"
+  if (crossRegistryField(continuity, "status") !== "ACTIVE" || continuity.revoked_at || isExpired(crossRegistryField(continuity, "expires_at"))) return "continuity must remain ACTIVE and unexpired"
+  const canonical = crossRegistryLineageObject(continuity.canonical_continuity)
+  if (!canonical) return "continuity canonical lineage is missing or malformed"
+  const actualHash = await continuityHash(canonical)
+  if (actualHash !== crossRegistryField(continuity, "continuity_hash") || actualHash !== String(canonical.continuity_hash || "")) return "continuity hash must match canonical continuity lineage"
+  const canonicalParent = canonical.parent_continuity_id ? String(canonical.parent_continuity_id) : ""
+  const storedParent = crossRegistryField(continuity, "parent_continuity_id")
+  if (canonicalParent !== storedParent) return "continuity parent differs from canonical continuity lineage"
+  if (canonicalParent && !continuities.some((row) => crossRegistryField(row, "continuity_id") === canonicalParent)) return "continuity parent must resolve in continuity registry"
+  return null
+}
 async function buildCrossRegistryReconciliationSnapshot(state: Record<string, Record<string, unknown>[]>, generated_at = new Date().toISOString()): Promise<CrossRegistryReconciliationSnapshot> {
   const canonicalState = Object.fromEntries((CANONICAL_RECONCILIATION_REGISTRY_ORDER as readonly string[]).map((registry) => [registry, sortCrossRegistryRecords(state[registry] || [])])) as Record<string, Record<string, unknown>[]>
   const edges: CrossRegistryLineageEdge[] = []
@@ -6035,6 +6062,13 @@ async function buildCrossRegistryReconciliationSnapshot(state: Record<string, Re
   const orphaned_records: Record<string, unknown>[] = []
   const addDrift = (drift_class: CrossRegistryDriftClass, registry: string, record: Record<string, unknown>, reason: string) => { drift.push({ object_type: "CrossRegistryDrift", drift_class, registry, record_id: crossRegistryRecordId(record), reason, legitimacy_status: "NULL" }); orphaned_records.push({ registry, record_id: crossRegistryRecordId(record), drift_class, reason }) }
   const sessions = canonicalState.session_registry || [], continuities = canonicalState.continuity_registry || [], authorities = canonicalState.authority_registry || [], aeos = canonicalState.aeo_registry || [], validations = canonicalState.validation_registry || [], executions = canonicalState.execution_registry || [], proofs = canonicalState.proof_registry || [], invocations = canonicalState.invocation_registry || []
+  for (const continuity of continuities) {
+    const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(continuity, "session_id"))
+    edges.push(crossRegistryEdge("continuity_registry", crossRegistryRecordId(continuity), "session_registry", crossRegistryField(continuity, "session_id"), "CONTINUITY_SESSION", Boolean(session.match) && !session.ambiguous, "REGISTRY_LINEAGE_MISMATCH"))
+    if (session.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "continuity_registry", continuity, "continuity session resolves ambiguously")
+    const continuityDrift = await crossRegistryContinuityDrift(continuity, session.match, continuities)
+    if (continuityDrift) addDrift("REGISTRY_LINEAGE_MISMATCH", "continuity_registry", continuity, continuityDrift)
+  }
   for (const authority of authorities) {
     const session = oneCrossRegistry(sessions, (row) => crossRegistryField(row, "session_id") === crossRegistryField(authority, "session_id"))
     const continuity = oneCrossRegistry(continuities, (row) => crossRegistryField(row, "continuity_id") === crossRegistryField(authority, "continuity_id"))
@@ -6082,16 +6116,24 @@ async function buildCrossRegistryReconciliationSnapshot(state: Record<string, Re
     if (!authority.match || !crossRegistryAuthorityHistoricallyValid(crossRegistryField(authority.match, "status")) || crossRegistryField(authority.match, "session_id") !== crossRegistryField(execution, "session_id")) addDrift("AUTHORITY_LINEAGE_INVALID", "execution_registry", execution, "execution authority must exist and be historically valid for the execution session")
     if (validation.ambiguous || session.ambiguous || continuity.ambiguous || proof.ambiguous || authority.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "execution_registry", execution, "execution lineage resolves ambiguously")
     if (validation.match && (crossRegistryField(validation.match, "validated_object_hash") !== crossRegistryField(execution, "validated_object_hash") || crossRegistryField(validation.match, "status") !== "VALID" || crossRegistryField(validation.match, "result") !== "VALID")) addDrift("VALIDATED_HASH_DISCONTINUITY", "execution_registry", execution, "execution requires matching VALID validation result")
+    if (crossRegistryField(execution, "status") !== "EXECUTED") addDrift("REGISTRY_LINEAGE_MISMATCH", "execution_registry", execution, "execution status must remain EXECUTED within reconciled lineage")
   }
   for (const proof of proofs) {
     const execution = oneCrossRegistry(executions, (row) => crossRegistryField(row, "execution_id") === crossRegistryField(proof, "execution_id"))
     const authority = oneCrossRegistry(authorities, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(proof, "decision_id"))
+    const continuity = oneCrossRegistry(continuities, (row) => crossRegistryField(row, "continuity_id") === crossRegistryField(proof, "continuity_id"))
     edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "execution_registry", crossRegistryField(proof, "execution_id"), "PROOF_EXECUTION", Boolean(execution.match) && !execution.ambiguous, "ORPHANED_PROOF_RECORD"))
     edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "authority_registry", authority.match ? crossRegistryRecordId(authority.match) : "", "PROOF_AUTHORITY", Boolean(authority.match) && !authority.ambiguous, "ORPHANED_PROOF_RECORD"))
+    edges.push(crossRegistryEdge("proof_registry", crossRegistryRecordId(proof), "continuity_registry", crossRegistryField(proof, "continuity_id"), "PROOF_CONTINUITY", Boolean(continuity.match) && !continuity.ambiguous, "ORPHANED_PROOF_RECORD"))
     if (!execution.match || !authority.match || !crossRegistryField(proof, "validated_object_hash")) addDrift("ORPHANED_PROOF_RECORD", "proof_registry", proof, "proof requires execution, authority, and validated object hash")
     if (authority.match && (!crossRegistryAuthorityHistoricallyValid(crossRegistryField(authority.match, "status")) || crossRegistryField(authority.match, "session_id") !== crossRegistryField(proof, "session_id"))) addDrift("AUTHORITY_LINEAGE_INVALID", "proof_registry", proof, "proof authority must exist and be historically valid for the proof session")
-    if (execution.ambiguous || authority.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "proof_registry", proof, "proof lineage resolves ambiguously")
+    if (!continuity.match) addDrift("ORPHANED_PROOF_RECORD", "proof_registry", proof, "proof requires continuity lineage")
+    if (execution.ambiguous || authority.ambiguous || continuity.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "proof_registry", proof, "proof lineage resolves ambiguously")
     if (execution.match && crossRegistryField(execution.match, "validated_object_hash") !== crossRegistryField(proof, "validated_object_hash")) addDrift("EXECUTION_PROOF_HASH_MISMATCH", "proof_registry", proof, "proof hash differs from execution hash")
+    if (continuity.match && crossRegistryField(proof, "continuity_hash") !== crossRegistryField(continuity.match, "continuity_hash")) addDrift("EXECUTION_PROOF_HASH_MISMATCH", "proof_registry", proof, "proof continuity hash differs from continuity registry")
+    const authorityLineage = crossRegistryLineageObject(proof.authority_lineage)
+    const executionLineage = crossRegistryLineageObject(proof.execution_lineage)
+    if (!authorityLineage || !executionLineage || (authority.match && String(authorityLineage.authority_id || "") !== crossRegistryField(authority.match, "authority_id")) || (execution.match && String(executionLineage.execution_id || "") !== crossRegistryField(execution.match, "execution_id"))) addDrift("EXECUTION_PROOF_HASH_MISMATCH", "proof_registry", proof, "proof authority and execution lineage references must resolve deterministically")
   }
   const proofTruth = new Map<string, Record<string, unknown>[]>()
   for (const proof of proofs) {
@@ -6125,6 +6167,22 @@ async function buildCrossRegistryReconciliationSnapshot(state: Record<string, Re
   for (const invocation of invocations) {
     const objects = nonceToObjects.get(crossRegistryField(invocation, "invocation_nonce")) || new Set<string>()
     if (objects.size !== 1) addDrift(objects.size === 0 ? "ORPHANED_INVOCATION_RECORD" : "REPLAY_GRAPH_FRAGMENTATION", "invocation_registry", invocation, "invocation nonce must map to exactly one validated/executed object")
+    const validation = oneCrossRegistry(validations, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(invocation, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(invocation, "validated_object_hash") && crossRegistryField(row, "invocation_nonce") === crossRegistryField(invocation, "invocation_nonce"))
+    const execution = oneCrossRegistry(executions, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(invocation, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(invocation, "validated_object_hash") && crossRegistryField(row, "invocation_nonce") === crossRegistryField(invocation, "invocation_nonce"))
+    if (!validation.match || !execution.match) addDrift("ORPHANED_INVOCATION_RECORD", "invocation_registry", invocation, "invocation requires validation and execution lineage")
+    if (validation.ambiguous || execution.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "invocation_registry", invocation, "invocation lineage resolves ambiguously")
+    if (crossRegistryField(invocation, "status") !== "EXECUTED") addDrift("REPLAY_GRAPH_FRAGMENTATION", "invocation_registry", invocation, "invocation status must remain EXECUTED")
+    if ((validation.match && crossRegistryField(invocation, "continuity_id") !== crossRegistryField(validation.match, "continuity_id")) || (execution.match && crossRegistryField(invocation, "continuity_id") !== crossRegistryField(execution.match, "continuity_id"))) addDrift("REPLAY_GRAPH_FRAGMENTATION", "invocation_registry", invocation, "invocation continuity must match validation and execution lineage")
+  }
+  for (const preo of canonicalState.preo_registry || []) {
+    const authority = oneCrossRegistry(authorities, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(preo, "decision_id") && crossRegistryField(row, "authority_id") === crossRegistryField(preo, "authority_id"))
+    const aeo = oneCrossRegistry(aeos, (row) => crossRegistryField(row, "decision_id") === crossRegistryField(preo, "decision_id") && crossRegistryField(row, "validated_object_hash") === crossRegistryField(preo, "reviewed_hash"))
+    edges.push(crossRegistryEdge("preo_registry", crossRegistryRecordId(preo), "authority_registry", crossRegistryField(preo, "authority_id"), "PREO_AUTHORITY", Boolean(authority.match) && !authority.ambiguous, "GOVERNANCE_BINDING_DIVERGENCE"))
+    edges.push(crossRegistryEdge("preo_registry", crossRegistryRecordId(preo), "aeo_registry", crossRegistryField(preo, "reviewed_hash"), "PREO_AEO_REVIEWED_HASH", Boolean(aeo.match) && !aeo.ambiguous, "GOVERNANCE_BINDING_DIVERGENCE"))
+    if (!authority.match || !aeo.match) addDrift("GOVERNANCE_BINDING_DIVERGENCE", "preo_registry", preo, "PREO requires authority and reviewed AEO hash lineage")
+    if (authority.ambiguous || aeo.ambiguous) addDrift("CROSS_REGISTRY_RECONCILIATION_AMBIGUITY", "preo_registry", preo, "PREO lineage resolves ambiguously")
+    if (authority.match && crossRegistryField(preo, "continuity_id") !== crossRegistryField(authority.match, "continuity_id")) addDrift("GOVERNANCE_BINDING_DIVERGENCE", "preo_registry", preo, "PREO continuity differs from authority lineage")
+    if (crossRegistryField(preo, "status") !== "PREO_VALID") addDrift("GOVERNANCE_BINDING_DIVERGENCE", "preo_registry", preo, "PREO status must remain PREO_VALID")
   }
   for (const topology of canonicalState.runtime_topology_registry || []) if (truthyEvidenceEscalation(topology.executable) || truthyEvidenceEscalation(topology.deployment_capable) || truthyEvidenceEscalation(topology.creates_authority) || topology.evidence_only === "false") addDrift("TOPOLOGY_BINDING_DIVERGENCE", "runtime_topology_registry", topology, "topology evidence became authoritative or executable")
   for (const governance of canonicalState.recursive_governance_containment_registry || []) if (truthyEvidenceEscalation(governance.executable) || truthyEvidenceEscalation(governance.deployment_capable) || truthyEvidenceEscalation(governance.creates_authority) || governance.evidence_only === "false") addDrift("GOVERNANCE_BINDING_DIVERGENCE", "recursive_governance_containment_registry", governance, "recursive governance containment must remain evidence-only")
@@ -6615,6 +6673,8 @@ export default {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...reconciliationClosureFlags() })
         const closure = await buildRecursiveReconciliationClosureObject(env, url)
+        await ensureReconciliationClosureRegistry(env)
+        await appendReconciliationClosureObservation(env, closure)
         const status = closure.drift_classes.length > 0 ? "RECONCILIATION_CLOSURE_DRIFT" : "RECONCILIATION_CLOSURE_VERIFIED"
         if (url.pathname === RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, reason: "observability_only", checkpoint: { closure_id: closure.closure_id, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, graph_checkpoint_hash: closure.graph_checkpoint_hash, bootstrap_checkpoint_hash: closure.bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash: closure.runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash: closure.federation_conformance_checkpoint_hash, lineage_depth: closure.lineage_depth, bounded_window: closure.bounded_window, generated_at: closure.generated_at }, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
         if (url.pathname === RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, reason: "observability_only", reconciliation_equivalence_state: closure.reconciliation_equivalence_state, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
