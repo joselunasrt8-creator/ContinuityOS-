@@ -14,6 +14,11 @@ test('duplicate or concurrent proof persistence cannot consume authority', () =>
   assert.match(source, /if \(proofInserted !== 1 \|\| authorityConsumed !== 1\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"authority_consumption_failed" \}/)
 })
 
+test('proof boundary keeps batch result available for post-batch guards', () => {
+  assert.match(source, /let proofBoundary: any\[] = \[]/)
+  assert.match(source, /proofBoundary = await env\.DB\.batch<any>\(proofStatements\)[\s\S]*const outboxQueued = proofBoundary\[2\]\?\.meta\?\.changes \|\| 0/)
+})
+
 test('executed object hash must exactly match validated object hash before proof insertion', () => {
   assert.match(source, /String\(execution\.validated_object_hash \|\| ""\) !== validated_object_hash \|\| String\(validation\?\.validated_object_hash \|\| ""\) !== validated_object_hash/)
   assert.match(source, /indicator: "validated_object_execution_mismatch"/)
