@@ -1,0 +1,47 @@
+{
+  "schema_version": "CAPABILITY_RISK_CLASSIFICATION_V1",
+  "determinism": {
+    "risk_classes": ["P0", "P1", "P2", "P3"],
+    "unknown_class_behavior": "NULL",
+    "capability_metadata_is_not_authority": true,
+    "runtime_route_expansion": false,
+    "execution_path_creation": false,
+    "authority_creation": false,
+    "validator_bypass": false,
+    "fail_closed": true
+  },
+  "classifications": {
+    "P0": {
+      "required_authority_depth": 0,
+      "proof_requirements": ["execution_receipt"],
+      "review_depth": "self",
+      "replay_expectation": "replay_neutral",
+      "creates_authority": false,
+      "grants_execution_permission": false
+    },
+    "P1": {
+      "required_authority_depth": 1,
+      "proof_requirements": ["execution_receipt", "lineage_binding"],
+      "review_depth": "peer",
+      "replay_expectation": "single_use_guarded",
+      "creates_authority": false,
+      "grants_execution_permission": false
+    },
+    "P2": {
+      "required_authority_depth": 2,
+      "proof_requirements": ["execution_receipt", "lineage_binding", "policy_attestation"],
+      "review_depth": "maintainer",
+      "replay_expectation": "nonce_enforced",
+      "creates_authority": false,
+      "grants_execution_permission": false
+    },
+    "P3": {
+      "required_authority_depth": 3,
+      "proof_requirements": ["execution_receipt", "lineage_binding", "policy_attestation", "dsse"],
+      "review_depth": "constitutional",
+      "replay_expectation": "strict_single_use",
+      "creates_authority": false,
+      "grants_execution_permission": false
+    }
+  }
+}
