@@ -1341,7 +1341,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS trg_proof_registry_decision_hash_guard BEFORE INSERT ON proof_registry WHEN NEW.decision_hash IS NULL OR NEW.decision_hash = '' OR NEW.decision_hash != NEW.decision_id || char(31) || NEW.validated_object_hash BEGIN SELECT RAISE(ABORT, 'proof_registry decision_hash mismatch'); END`).run()
     await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_execution_decision_hash_unique`).run()
     await env.DB.prepare(`DROP INDEX IF EXISTS idx_proof_registry_decision_hash_unique`).run()
-    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_hash)`).run()
+    await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique ON proof_registry(decision_id, validated_object_hash)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash_unique ON proof_registry(execution_id, decision_id, validated_object_hash)`).run()
     await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_workflow_run_unique ON proof_registry(workflow_run_id)`).run()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_UNIQUENESS_ENFORCED")
@@ -6584,7 +6584,6 @@ export default {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", ...reconciliationClosureFlags() })
         const closure = await buildRecursiveReconciliationClosureObject(env, url)
-        await appendReconciliationClosureObservation(env, closure)
         const status = closure.drift_classes.length > 0 ? "RECONCILIATION_CLOSURE_DRIFT" : "RECONCILIATION_CLOSURE_VERIFIED"
         if (url.pathname === RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_CHECKPOINT_ROUTE, reason: "observability_only", checkpoint: { closure_id: closure.closure_id, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, graph_checkpoint_hash: closure.graph_checkpoint_hash, bootstrap_checkpoint_hash: closure.bootstrap_checkpoint_hash, runtime_sovereignty_checkpoint_hash: closure.runtime_sovereignty_checkpoint_hash, federation_conformance_checkpoint_hash: closure.federation_conformance_checkpoint_hash, lineage_depth: closure.lineage_depth, bounded_window: closure.bounded_window, generated_at: closure.generated_at }, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
         if (url.pathname === RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, reason: "observability_only", reconciliation_equivalence_state: closure.reconciliation_equivalence_state, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
@@ -6720,7 +6719,6 @@ export default {
         if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", drift_classes: ["GOVERNANCE_CONSENSUS_FRAGMENTATION"], legitimacy_status: null, ...consensusRouteFlags() }, 500)
         await assertSchemaAvailableReadOnly(env)
         const envelope = await buildGovernanceConsensusEnvelope(url)
-        await appendGovernanceConsensusEvidence(env, envelope, new Date().toISOString())
         const status = envelope.observer.legitimacy_status ? "CONSENSUS_EVIDENCE_OBSERVED" : "NULL"
         if (url.pathname === OBSERVER_CONSENSUS_EQUIVALENCE_ROUTE || url.pathname === OBSERVER_CONSENSUS_EQUIVALENCE_ALIAS_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence_hash: envelope.observer.equivalence_hash, semantic_hash: envelope.observer.semantic_hash, topology_hash: envelope.observer.topology_hash, reconciliation_hash: envelope.observer.reconciliation_hash, sovereignty_hash: envelope.observer.sovereignty_hash, legitimacy_status: envelope.observer.legitimacy_status, drift_classes: envelope.observer.drift_classes, append_only: true, ...consensusRouteFlags() })
         if (url.pathname === OBSERVER_CONSENSUS_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: envelope.observer.drift_classes, drift_taxonomy: CONSENSUS_DRIFT_TAXONOMY, legitimacy_status: envelope.observer.legitimacy_status, observer_divergence_authorizes_execution: false, ambiguity_result: envelope.observer.drift_classes.length > 0 ? "NULL" : "LEGITIMATE", append_only: true, ...consensusRouteFlags() })
