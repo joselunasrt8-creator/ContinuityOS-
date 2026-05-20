@@ -91,6 +91,15 @@ test('deploy denied with proof mismatch', () => {
   assert.match(res.stderr, /proof mismatch rejected/);
 });
 
+test('deploy denied when deployment target differs from validated object', () => {
+  const artifact = validArtifact();
+  artifact.deployment_target = { ...artifact.deployment_target, commit: 'def456' };
+  const res = runWithArtifact(artifact);
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /exact deployment hash parity failed/);
+});
+
+
 test('deploy allowed only when legitimacy chain is complete', () => {
   const artifact = validArtifact();
   const res = runWithArtifact(artifact);
