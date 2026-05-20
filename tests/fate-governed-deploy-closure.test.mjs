@@ -30,6 +30,11 @@ test('missing proof fails closed', () => {
   assert.match(governedDeployWorkflow, /echo "NULL — Missing required proof or response is non-canonical"/);
 });
 
+test('proof payload binds invocation nonce used by validate and execute', () => {
+  assert.match(governedDeployWorkflow, /--arg invocation_nonce "\$INVOCATION_NONCE"/);
+  assert.match(governedDeployWorkflow, /\{session_id: \$session_id, execution_id: \$execution_id, decision_id: \$decision_id, validated_object_hash: \$validated_object_hash, invocation_nonce: \$invocation_nonce,/);
+});
+
 test('direct deploy bypass attempt remains blocked', () => {
   assert.doesNotMatch(prepareGovernedDeployWorkflow, /\/execute|\/proof|wrangler deploy/);
   assert.doesNotMatch(governedDeployWorkflow, /npm run deploy|wrangler deploy/);
