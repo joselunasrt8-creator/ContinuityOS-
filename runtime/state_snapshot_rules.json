@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "domain": "state_snapshot_governance",
+  "required_execution_gate": "VALID && AUTHORIZED && UNUSED && POLICY_VALID && CANONICAL_LINEAGE_CONTINUITY && TEMPORALLY_VALID && STATE_CONSISTENT",
+  "state_consistency_required": true,
+  "else_result": "NULL",
+  "invariants": {
+    "validated_state_not_current_state": "validated_state != current_state -> NULL",
+    "snapshot_hash_mismatch": "snapshot_hash_mismatch -> NULL",
+    "rollback_detected": "rollback_detected -> NULL",
+    "replica_divergence": "replica_divergence -> NULL",
+    "partitioned_registry": "partitioned_registry -> NULL",
+    "cached_authority_reuse": "cached_authority_reuse -> NULL",
+    "proof_state_mismatch": "proof_state_mismatch -> NULL",
+    "state_mutated_after_validation": "state_mutated_after_validation -> NULL",
+    "split_brain_snapshot": "split_brain_snapshot -> NULL"
+  },
+  "deterministic": true,
+  "additive_only": true,
+  "fail_closed": true
+}

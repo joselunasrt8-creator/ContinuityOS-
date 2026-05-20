@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "policy": "replica_divergence_closure",
+  "rules": {
+    "replica_hash_drift": "NULL",
+    "replica_lineage_divergence": "NULL",
+    "stale_registry_execution": "NULL",
+    "split_state_execution": "NULL"
+  },
+  "consensus_implementation": "out_of_scope",
+  "automatic_reconciliation": false,
+  "deterministic": true,
+  "fail_closed": true
+}

@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "bypass_paths": [
+    { "bypass_id": "stale_registry_execution", "response": "NULL" },
+    { "bypass_id": "replica_divergence_legitimacy", "response": "NULL" },
+    { "bypass_id": "rollback_resurrection", "response": "NULL" },
+    { "bypass_id": "cached_authority_continuation", "response": "NULL" },
+    { "bypass_id": "partition_induced_execution_synthesis", "response": "NULL" },
+    { "bypass_id": "validator_state_mismatch", "response": "NULL" },
+    { "bypass_id": "proof_state_inconsistency", "response": "NULL" },
+    { "bypass_id": "detached_snapshot_replay", "response": "NULL" },
+    { "bypass_id": "post_validation_snapshot_mutation", "response": "NULL" }
+  ],
+  "fail_closed_response": "NULL",
+  "deterministic": true
+}

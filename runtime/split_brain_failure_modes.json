@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "failure_modes": [
+    {
+      "id": "split_brain_snapshot",
+      "condition": "two or more active canonical snapshot heads",
+      "result": "NULL"
+    },
+    {
+      "id": "partition_induced_execution_synthesis",
+      "condition": "execution synthesized from partitioned registries",
+      "result": "NULL"
+    }
+  ],
+  "deterministic": true,
+  "fail_closed": true
+}

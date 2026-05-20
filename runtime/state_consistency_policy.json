@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "policy": "state_consistency_closure",
+  "rules": {
+    "validated_state_not_current_state": "NULL",
+    "proof_state_mismatch": "NULL",
+    "detached_snapshot_replay": "NULL",
+    "asynchronous_state_continuation": "NULL",
+    "federated_registry_drift": "NULL",
+    "validator_state_mismatch": "NULL"
+  },
+  "execution_authority_on_inconsistency": "BLOCKED",
+  "deterministic": true,
+  "fail_closed": true
+}

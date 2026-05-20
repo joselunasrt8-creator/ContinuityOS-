@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "policy": "registry_partition_closure",
+  "rules": {
+    "partitioned_registry": "NULL",
+    "federated_registry_drift": "NULL",
+    "asynchronous_state_continuation": "NULL",
+    "snapshot_view_inconsistency": "NULL"
+  },
+  "active_reconciliation": false,
+  "deterministic": true,
+  "fail_closed": true
+}

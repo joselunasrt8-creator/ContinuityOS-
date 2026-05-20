@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "constraints": {
+    "snapshot_hash_mismatch": "NULL",
+    "rollback_resurrection": "NULL",
+    "post_validation_mutation": "NULL",
+    "detached_snapshot_replay": "NULL",
+    "snapshot_mutation_after_validation": "NULL"
+  },
+  "validated_object_must_equal_executed_object": true,
+  "cache_authority_continuation": "NULL",
+  "deterministic": true,
+  "fail_closed": true
+}
