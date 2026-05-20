@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createHmac } from 'node:crypto'
 
 function runSqlite(args, options = {}) {
   const result = spawnSync('sqlite3', args, { encoding: 'utf8', ...options })
@@ -242,6 +243,47 @@ function provenanceFor(decision_id, overrides = {}) {
   }
 }
 
+const PROVENANCE_PAYLOAD_TYPE = 'application/vnd.mindshift.cryptographic-provenance.v1+json'
+
+function normalizeCanonicalValue(value) {
+  if (value === undefined) return null
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (Array.isArray(value)) return value.map(normalizeCanonicalValue)
+  if (value && typeof value === 'object') {
+    return Object.freeze(Object.keys(value).sort().reduce((normalized, key) => {
+      normalized[key] = normalizeCanonicalValue(value[key])
+      return normalized
+    }, {}))
+  }
+  return null
+}
+
+function canonicalize(value) {
+  const normalized = normalizeCanonicalValue(value)
+  if (Array.isArray(normalized)) return `[${normalized.map(canonicalize).join(',')}]`
+  if (normalized && typeof normalized === 'object') return `{${Object.keys(normalized).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(normalized[key])}`).join(',')}}`
+  return JSON.stringify(normalized)
+}
+
+function dsseLengthPrefixed(bytes) {
+  return Buffer.concat([Buffer.from(String(bytes.length)), Buffer.from(' '), bytes])
+}
+
+function dssePreAuthenticationEncoding(payloadType, payloadBytes) {
+  return Buffer.concat([Buffer.from('DSSEv1 '), dsseLengthPrefixed(Buffer.from(payloadType)), dsseLengthPrefixed(payloadBytes)])
+}
+
+function provenanceEnvelope(secret, payload, signer_identity) {
+  const payloadBytes = Buffer.from(canonicalize(payload))
+  const pae = dssePreAuthenticationEncoding(PROVENANCE_PAYLOAD_TYPE, payloadBytes)
+  return {
+    payloadType: PROVENANCE_PAYLOAD_TYPE,
+    payload: payloadBytes.toString('base64'),
+    signatures: [{ keyid: signer_identity, sig: createHmac('sha256', secret).update(pae).digest('base64') }]
+  }
+}
+
 async function persistPreo(post, decision_id, validated_object_hash, provenance) {
   const preo = await post('/preo', {
     decision_id,
@@ -253,6 +295,83 @@ async function persistPreo(post, decision_id, validated_object_hash, provenance)
   assert.equal(preo.status, 'PREO_VALID')
   return preo
 }
+
+test('runtime provenance attestations never use API key as HMAC fallback', async () => {
+  const { transformSync } = await import('esbuild')
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-hmac-fallback-'))
+  const dbPath = join(dir, 'hmac-fallback.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-hmac-fallback'
+  const signer_identity = 'hmac-fallback-identity'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const session = await post('/session', { identity_id: signer_identity })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    await post('/authority', {
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id,
+      owner: 'hmac-fallback-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+    })
+
+    const compiled = await post('/compile', { decision_id })
+    const provenance = provenanceFor(decision_id)
+    await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
+    await post('/validate', {
+      session_id: session.session_id,
+      decision_id,
+      validated_object_hash: compiled.validated_object_hash,
+      invocation_nonce: 'nonce-hmac-fallback',
+      environment: 'production'
+    })
+
+    const dsse_envelope = provenanceEnvelope('test-key', {
+      canonical_aeo_hash: compiled.validated_object_hash,
+      decision_id,
+      federation: null,
+      signer_identity,
+      transparency_integrated_time: '2026-05-20T10:34:00.000Z',
+      transparency_log_id: 'log-hmac-fallback',
+      validated_object_hash: compiled.validated_object_hash,
+      workflow_run_id: provenance.workflow_run_id,
+      workflow_sha: provenance.workflow_sha
+    }, signer_identity)
+
+    const execution = await post('/execute', {
+      session_id: session.session_id,
+      decision_id,
+      validated_object_hash: compiled.validated_object_hash,
+      invocation_nonce: 'nonce-hmac-fallback',
+      dsse_envelope,
+      ...provenance
+    })
+
+    assert.equal(execution.status, 'NULL')
+    assert.equal(execution.reason, 'invalid_provenance_attestation')
+    assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM execution_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
+    assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${decision_id}'`]).trim(), 'attestation_drift')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 test('runtime lifecycle persists against migration-built canonical registries', async () => {
   const { transformSync } = await import('esbuild')

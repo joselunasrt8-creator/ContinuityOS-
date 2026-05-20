@@ -41,6 +41,16 @@ test('DSSE provenance verification is exact-object HMAC evidence only', () => {
   assert.equal(spec.canonical_position, 'attestation evidence is verification evidence, not authority')
 })
 
+test('provenance HMAC verification does not fall back to API authentication secret', () => {
+  const executeBlock = source.slice(source.indexOf('if (url.pathname === "/execute"'), source.indexOf('if (url.pathname === "/proof"'))
+  const proofBlock = source.slice(source.indexOf('if (url.pathname === "/proof"'), source.lastIndexOf('return json({ status: "NULL", reason: "not_found" }'))
+  assert.match(executeBlock, /hmac_secret: String\(env\.PROVENANCE_HMAC_SECRET \|\| ""\)/)
+  assert.match(proofBlock, /hmac_secret: String\(env\.PROVENANCE_HMAC_SECRET \|\| ""\)/)
+  assert.doesNotMatch(executeBlock, /hmac_secret:[\s\S]*env\.API_KEY/)
+  assert.doesNotMatch(proofBlock, /hmac_secret:[\s\S]*env\.API_KEY/)
+  assert.match(source, /if \(!context\.hmac_secret\) return null/)
+})
+
 test('attestation registry preserves replay uniqueness without authority expansion', () => {
   for (const field of ['attestation_id', 'envelope_hash', 'payload_hash', 'payload_type', 'signer_identity', 'decision_id', 'validated_object_hash', 'workflow_run_id', 'workflow_sha', 'canonical_aeo_hash', 'transparency_log_id', 'transparency_integrated_time', 'status', 'created_at']) {
     assert.match(schema, new RegExp(`${field} TEXT`), `schema must include ${field}`)

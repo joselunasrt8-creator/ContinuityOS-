@@ -90,6 +90,11 @@ test('federated verification fails closed without remote authority inheritance',
   for (const forbidden of spec.forbidden_semantics) assert.ok(doc.includes(forbidden) || source.includes(forbidden))
 })
 
+test('federated proof envelopes require configured HMAC secret', () => {
+  assert.match(source, /async function verifyFederatedProofEnvelope/)
+  assert.match(source, /if \(!hmac_secret\) return false/)
+})
+
 test('reconciliation merkle layer and checkpoint are deterministic', () => {
   assert.deepEqual(spec.reconciliation_merkle_layer.layers, ['session', 'continuity', 'authority', 'AEO', 'validation', 'execution', 'proof', 'attestation', 'PREO'])
   assert.match(source, /const RECONCILIATION_MERKLE_LAYERS/)

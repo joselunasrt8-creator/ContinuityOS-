@@ -4483,7 +4483,7 @@ async function verifyFederatedProofEnvelope(envelope: any, bundle: PortableLegit
   if (!payloadBytes) return false
   const payloadJson = new TextDecoder().decode(payloadBytes)
   if (payloadJson !== canonicalize(bundle)) return false
-  if (!hmac_secret) return true
+  if (!hmac_secret) return false
   const signatures = Array.isArray((envelope as any).signatures) ? (envelope as any).signatures : []
   const provided = signatures.find((signature: any) => isPlainRecord(signature) && String(signature.keyid || "") === bundle.runtime_id)
   const signatureBytes = base64ToBytes(String(provided?.sig || provided?.signature || ""))
@@ -7256,7 +7256,7 @@ export default {
         workflow_sha: provenance.workflow_sha,
         canonical_aeo_hash: execHash,
         expected_signer_identity: String(authority.identity_id || ""),
-        hmac_secret: String(env.PROVENANCE_HMAC_SECRET || env.API_KEY || "")
+        hmac_secret: String(env.PROVENANCE_HMAC_SECRET || "")
       })
       if (!attestationValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: attestationValidation.reason }, { event_type: attestationValidation.drift_class === "replay_drift" ? "REPLAY_BLOCKED" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", ...attestationValidation.payload, validated_object_hash }, drift_class: attestationValidation.drift_class })
       const execution_id = crypto.randomUUID()
@@ -7362,7 +7362,7 @@ export default {
         workflow_sha: provenance.workflow_sha,
         canonical_aeo_hash: proofHash,
         expected_signer_identity: String(authority.identity_id || ""),
-        hmac_secret: String(env.PROVENANCE_HMAC_SECRET || env.API_KEY || "")
+        hmac_secret: String(env.PROVENANCE_HMAC_SECRET || "")
       })
       if (!attestationValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: attestationValidation.reason }, { event_type: attestationValidation.drift_class === "replay_drift" ? "REPLAY_BLOCKED" : "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", ...attestationValidation.payload, validated_object_hash }, drift_class: attestationValidation.drift_class })
       const validatedAttestation = attestationValidation.attestation
