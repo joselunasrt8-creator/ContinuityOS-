@@ -443,6 +443,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
       execution_id: execution.execution_id,
       decision_id,
       validated_object_hash: compiled.validated_object_hash,
+      invocation_nonce,
       surface: 'github-actions',
       run_id: provenance.workflow_run_id,
       commit_sha: provenance.workflow_sha,
@@ -534,7 +535,7 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     const proofDecision = 'decision-proof-telemetry'
     const proofCompiled = await prepareDecision(proofDecision, 'nonce-proof')
     const execution = await post('/execute', { session_id: proofCompiled.session_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', ...proofCompiled.provenance })
-    const proof = await post('/proof', { session_id: proofCompiled.session_id, execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, workflow: 'governed-deploy.yml', ...proofCompiled.provenance })
+    const proof = await post('/proof', { session_id: proofCompiled.session_id, execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', workflow: 'governed-deploy.yml', ...proofCompiled.provenance })
     assert.equal(proof.status, 'PROVEN')
     assert.deepEqual(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${proofDecision}' AND event_type IN ('PROOF_PERSISTED','AUTHORITY_CONSUMED') ORDER BY created_at, rowid`]).trim().split('\n'), ['PROOF_PERSISTED', 'AUTHORITY_CONSUMED'])
 
@@ -655,7 +656,7 @@ test('proof transaction rolls back proof persistence when authority consumption 
     const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', ...provenance })
     runSqlite([dbPath, `CREATE TRIGGER block_authority_consume BEFORE UPDATE OF status ON authority_registry WHEN NEW.status='CONSUMED' AND OLD.decision_id='${decision_id}' BEGIN SELECT RAISE(ABORT, 'consume blocked'); END;`])
 
-    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml', ...provenance })
+    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', workflow: 'governed-deploy.yml', ...provenance })
 
     assert.equal(proof.status, 'NULL')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
@@ -693,7 +694,7 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
     await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
     const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', ...provenance })
-    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml', ...provenance }
+    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', workflow: 'governed-deploy.yml', ...provenance }
 
     const attempts = await Promise.all([post('/proof', payload), post('/proof', payload)])
     assert.equal(attempts.filter((attempt) => attempt.status === 'PROVEN').length, 1)

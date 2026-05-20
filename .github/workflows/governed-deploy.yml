@@ -459,6 +459,7 @@ jobs:
               --arg execution_id "$EXECUTION_ID" \
               --arg decision_id "$DECISION_ID" \
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
               --arg surface "github_actions" \
               --arg run_id "${{ github.run_id }}" \
               --arg commit_sha "${{ github.sha }}" \
@@ -466,7 +467,7 @@ jobs:
               --arg environment "$DEPLOY_ENVIRONMENT" \
               --arg repo "$DEPLOY_REPO" \
               --arg branch "$DEPLOY_BRANCH" \
-              '{session_id: $session_id, execution_id: $execution_id, decision_id: $decision_id, validated_object_hash: $validated_object_hash, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
+              '{session_id: $session_id, execution_id: $execution_id, decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
 
           echo "PROOF_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
 

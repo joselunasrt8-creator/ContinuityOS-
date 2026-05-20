@@ -13,6 +13,15 @@ test('valid governed deploy path preserves canonical chain and ends PROVEN', () 
   assert.match(governedDeployWorkflow, /\[ "\$PROOF_STATUS" = "NULL" \] \|\| \[ "\$PROOF_STATUS" != "PROVEN" \]/);
 });
 
+test('governed deploy proof request carries the reserved invocation nonce', () => {
+  const proofStep = governedDeployWorkflow.slice(
+    governedDeployWorkflow.indexOf('      - name: Save proof response'),
+    governedDeployWorkflow.indexOf('      - name: Upload proof artifact'),
+  );
+  assert.match(proofStep, /--arg invocation_nonce "\$INVOCATION_NONCE"/);
+  assert.match(proofStep, /invocation_nonce: \$invocation_nonce/);
+});
+
 test('missing authority is fail-closed NULL', () => {
   assert.match(governedDeployWorkflow, /if \[ "\$AUTHORITY_STATUS" = "NULL" \] \|\| \[ "\$AUTHORITY_STATUS" != "ACTIVE" \] \|\| \[ "\$AUTHORITY_DECISION_ID" != "\$DECISION_ID" \]; then[\s\S]*echo "NULL — Authority response is non-canonical"/);
 });
