@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "scope": "constitutional_governance_closure",
+  "mode": "additive_fail_closed",
+  "canonical_execution_gate": [
+    "VALID",
+    "AUTHORIZED",
+    "UNUSED",
+    "POLICY_VALID",
+    "CANONICAL_LINEAGE_CONTINUITY",
+    "TEMPORALLY_VALID",
+    "STATE_CONSISTENT",
+    "SOVEREIGNTY_VALID",
+    "CONSTITUTIONALLY_VALID"
+  ],
+  "invariants": {
+    "constitutional_mutation_without_lineage": "NULL",
+    "root_authority_escalation": "NULL",
+    "recursive_governance_override": "NULL",
+    "emergency_bypass_without_constitutional_proof": "NULL",
+    "governance_fork_sovereignty": "NULL",
+    "constitutional_replay_resurrection": "NULL",
+    "meta_policy_mutation_after_validation": "NULL",
+    "recursive_validator_takeover": "NULL",
+    "self_expanding_governance": "NULL",
+    "hidden_constitutional_capability": "NULL",
+    "constitutional_divergence": "NULL",
+    "constitutional_downgrade_detected": "NULL",
+    "meta_policy_replay": "NULL",
+    "detached_constitutional_continuation": "NULL",
+    "quorum_without_constitutional_authority": "NULL",
+    "constitutional_split_brain": "NULL"
+  }
+}

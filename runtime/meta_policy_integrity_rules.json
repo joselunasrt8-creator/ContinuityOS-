@@ -1,0 +1,6 @@
+{
+  "meta_policy_mutation_after_validation": "NULL",
+  "meta_policy_replay": "NULL",
+  "lineage_bound": true,
+  "replay_protected": true
+}

@@ -1,0 +1,6 @@
+{
+  "root_authority_escalation": "NULL",
+  "lineage_required": true,
+  "self_escalation_forbidden": true,
+  "post_validation_mutation": "NULL"
+}

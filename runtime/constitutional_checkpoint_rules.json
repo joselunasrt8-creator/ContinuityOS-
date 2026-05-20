@@ -1,0 +1,6 @@
+{
+  "constitutional_downgrade_detected": "NULL",
+  "constitutional_replay_resurrection": "NULL",
+  "checkpoint_lineage_required": true,
+  "checkpoint_replay": "NULL"
+}
