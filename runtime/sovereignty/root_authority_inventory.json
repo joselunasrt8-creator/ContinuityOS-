@@ -235,15 +235,16 @@
     {
       "surface_id": "wrangler_local_deploy_authority",
       "authority_origin": "local_wrangler_cli",
-      "declared_boundary": "local-deploy-denied-observability-only",
+      "declared_boundary": "break-glass-human-observable-production-capable",
       "classifications": [
         "ROOT_DEPLOY_AUTHORITY",
         "ROOT_LOCAL_EXECUTION_AUTHORITY",
-        "ROOT_AUTHORITY_BYPASS_RISK"
+        "ROOT_AUTHORITY_BYPASS_RISK",
+        "BREAK_GLASS_AUTHORITY"
       ],
       "secret_material": "NOT_INSPECTED",
       "executable": false,
-      "deployment_capable": false,
+      "deployment_capable": true,
       "creates_authority": false,
       "workflow_dispatch_semantics": "NOT_APPLICABLE",
       "deployment_token_observability": "NOT_APPLICABLE"
@@ -269,7 +270,7 @@
     "wrangler_local_deploy_authority"
   ],
   "undeclared_root_surfaces": [],
-  "containment_status": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
+  "containment_status": "BREAK_GLASS_CONTAINMENT_REQUIRED",
   "drift_classes": [
     "ROOT_AUTHORITY_BYPASS_RISK"
   ],
