@@ -1,0 +1,15 @@
+{
+  "projection": "install_base_governance_dependency.v1",
+  "nodes": {
+    "runtime": ["/authority", "/compile", "/validate", "/execute", "/proof"],
+    "workflow": ["PREO", "VALIDATOR_ROUTE", "BOUNDARY_ENFORCEMENT"],
+    "ecosystem": ["MCP", "FEDERATION_NODE", "EXTERNAL_SCHEMA_CONSUMER"]
+  },
+  "edges": [
+    ["/compile", "/validate", "VALIDATION_DEPENDENCY"],
+    ["/validate", "/execute", "WORKFLOW_GOVERNANCE_DEPENDENCY"],
+    ["/execute", "/proof", "PROOF_DEPENDENCY"],
+    ["FEDERATION_NODE", "MCP", "FEDERATION_EVIDENCE_DEPENDENCY"]
+  ],
+  "authoritative": false
+}

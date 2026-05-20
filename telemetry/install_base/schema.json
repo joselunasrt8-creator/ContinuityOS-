@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mindshift.install_base.telemetry.schema.v1",
+  "title": "MindShift Install Base Telemetry",
+  "type": "object",
+  "required": ["artifact", "install_base_semantics", "categories", "classifications", "constraints", "report_hash"],
+  "properties": {
+    "artifact": {"const": "INSTALL_BASE_TELEMETRY_REPORT"},
+    "install_base_semantics": {"const": "governed_execution_dependency"},
+    "read_only": {"const": true},
+    "non_authoritative": {"const": true},
+    "creates_authority": {"const": false},
+    "creates_proof": {"const": false},
+    "categories": {"type": "object"},
+    "classifications": {"type": "object"},
+    "constraints": {"type": "object"},
+    "report_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": true
+}

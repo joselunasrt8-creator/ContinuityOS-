@@ -1,0 +1,14 @@
+{
+  "model": "install_base_dependency_classification.v1",
+  "source": "telemetry/install_base/metrics_structure.json",
+  "classifications": {
+    "GOVERNED_EXECUTION_DEPENDENCY": "governed execution invocation dependency",
+    "VALIDATION_DEPENDENCY": "validator route dependency",
+    "PROOF_DEPENDENCY": "proof persistence dependency",
+    "CONTINUITY_DEPENDENCY": "lineage/continuity dependency",
+    "RECONCILIATION_DEPENDENCY": "deterministic reconciliation dependency",
+    "FEDERATION_EVIDENCE_DEPENDENCY": "evidence-only federation dependency",
+    "WORKFLOW_GOVERNANCE_DEPENDENCY": "PREO+boundary governance workflow dependency"
+  },
+  "non_authoritative": true
+}

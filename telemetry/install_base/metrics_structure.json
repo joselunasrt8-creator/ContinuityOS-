@@ -1,0 +1,18 @@
+{
+  "version": "v1",
+  "metric_family": "install_base",
+  "semantics": "governed_execution_dependency",
+  "categories": ["runtime_dependency", "workflow_dependency", "ecosystem_dependency"],
+  "classification_keys": [
+    "GOVERNED_EXECUTION_DEPENDENCY",
+    "VALIDATION_DEPENDENCY",
+    "PROOF_DEPENDENCY",
+    "CONTINUITY_DEPENDENCY",
+    "RECONCILIATION_DEPENDENCY",
+    "FEDERATION_EVIDENCE_DEPENDENCY",
+    "WORKFLOW_GOVERNANCE_DEPENDENCY"
+  ],
+  "append_only": true,
+  "non_authoritative": true,
+  "non_executable": true
+}
