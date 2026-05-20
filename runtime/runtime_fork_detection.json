@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "fork_legitimacy": "NULL",
+  "runtime_hash_divergence": "NULL",
+  "required_alignment": [
+    "runtime_hash",
+    "governance_hash",
+    "lineage_hash"
+  ]
+}

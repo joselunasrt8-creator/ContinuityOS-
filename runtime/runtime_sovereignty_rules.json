@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "domain": "runtime_sovereignty_governance",
+  "canonical_gate_extension": {
+    "required_signal": "SOVEREIGNTY_VALID",
+    "full_gate": [
+      "VALID",
+      "AUTHORIZED",
+      "UNUSED",
+      "POLICY_VALID",
+      "CANONICAL_LINEAGE_CONTINUITY",
+      "TEMPORALLY_VALID",
+      "STATE_CONSISTENT",
+      "SOVEREIGNTY_VALID"
+    ]
+  },
+  "invariants": {
+    "runtime_mutation_without_sovereign_lineage": "NULL",
+    "validator_self_authorization": "NULL",
+    "governance_fork_detected": "NULL",
+    "schema_evolution_without_proof": "NULL",
+    "recursive_authority_escalation": "NULL",
+    "policy_mutation_after_validation": "NULL",
+    "runtime_hash_divergence": "NULL",
+    "validator_downgrade_detected": "NULL",
+    "sovereignty_checkpoint_mismatch": "NULL",
+    "self_modifying_governance": "NULL"
+  }
+}

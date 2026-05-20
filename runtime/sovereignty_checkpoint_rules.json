@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "checkpoint_mismatch": "NULL",
+  "checkpoint_replay_resurrection": "NULL",
+  "checkpoint_requirements": [
+    "lineage_anchor",
+    "runtime_hash",
+    "validator_hash",
+    "policy_hash"
+  ]
+}

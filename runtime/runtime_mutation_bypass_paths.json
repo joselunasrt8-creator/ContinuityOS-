@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "fail_closed_response": "NULL",
+  "bypass_paths": [
+    { "id": "unauthorized_runtime_patch", "result": "NULL" },
+    { "id": "validator_self_mutation", "result": "NULL" },
+    { "id": "self_authorizing_runtime", "result": "NULL" },
+    { "id": "policy_mutation", "result": "NULL" }
+  ]
+}

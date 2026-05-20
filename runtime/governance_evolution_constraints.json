@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "mutation_policy": "append_only",
+  "post_validation_mutation": "NULL",
+  "self_authorizing_evolution": "NULL",
+  "authorized_evolution_requires": [
+    "sovereign_lineage_proof",
+    "checkpoint_match",
+    "validator_integrity_lock",
+    "schema_proof_closure"
+  ]
+}

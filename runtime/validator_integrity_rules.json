@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "validator_self_replacement": "NULL",
+  "validator_downgrade": "NULL",
+  "validator_integrity_requirements": [
+    "validator_hash_pinned",
+    "validator_lineage_verified",
+    "validator_signature_bound"
+  ]
+}

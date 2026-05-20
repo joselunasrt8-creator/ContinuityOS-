@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "recursive_authority_escalation": "NULL",
+  "recursive_bypass_insertion": "NULL",
+  "max_recursive_authority_depth": 0,
+  "requires_explicit_sovereign_delegation": true
+}
