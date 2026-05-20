@@ -108,3 +108,19 @@ CODEOWNERS defines authority
 
 branch protection enforces authority
 ```
+
+---
+
+## 6. AI-Generated Artifact Governance Checklist
+
+Reference spec: `docs/ai-generated-artifact-governance-spec.md`
+
+| Requirement | Required | Status |
+|---|---|---|
+| Proposal object treated as non-authoritative | yes | required for compliance |
+| SimReady label treated as non-proof | yes | required for compliance |
+| Canonical path enforced (`/authority -> /compile -> /validate -> /execute -> /proof`) | yes | required for compliance |
+| Deterministic exact-object validation before use | yes | required for compliance |
+| Proof persisted before registry acceptance | yes | required for compliance |
+| Replay/idempotency protections enforced | yes | required for compliance |
+| Missing authority/validation/proof/registry => fail-closed (`NULL`/`BLOCKED`/`QUARANTINED`) | yes | required for compliance |
