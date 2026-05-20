@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/skill_metadata_schema_v1.json",
+  "title": "SKILL_METADATA_SCHEMA_V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "skill_id",
+    "skill_version",
+    "capabilities",
+    "allowed_targets",
+    "risk_class",
+    "required_authority",
+    "proof_requirements",
+    "provenance",
+    "replay_semantics"
+  ],
+  "properties": {
+    "schema_version": { "const": "SKILL_METADATA_SCHEMA_V1" },
+    "skill_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "minLength": 3
+    },
+    "skill_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9._-]+)?$"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    },
+    "allowed_targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    },
+    "risk_class": {
+      "enum": ["P0", "P1", "P2", "P3"]
+    },
+    "required_authority": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    },
+    "proof_requirements": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "digest", "signature_required"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "signature_required": { "type": "boolean" }
+      }
+    },
+    "replay_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replay_domain", "max_executions"],
+      "properties": {
+        "replay_domain": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "max_executions": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
