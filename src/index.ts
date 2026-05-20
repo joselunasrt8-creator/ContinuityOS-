@@ -7302,13 +7302,11 @@ export default {
         const ambiguityReplay = proofAmbiguityReplayEvidence(proofCandidates.length, canonicalProofCandidates.length)
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous", replay: ambiguityReplay }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "duplicate_or_ambiguous_proof_lineage", classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED", drift_classes: ["replay_drift", "proof_lineage_drift"], candidate_count: proofCandidates.length, canonical_candidate_count: canonicalProofCandidates.length }, drift_class: "proof_lineage_drift" })
       }
-      const existingProof = canonicalProofResolution.canonical_proof
-      if (existingProof) {
-        return rejectWithTelemetry(env, {
-          status:"NULL",
-          result:"INVALID",
-          reason:"proof_replay",
-        })
+      const canonicalExistingProof = canonicalProofResolution.canonical_proof
+      if (canonicalExistingProof) {
+        const canonicalEvidenceReplay = proofReplayEvidence(canonicalExistingProof, proofCandidates.length)
+        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict", replay: canonicalEvidenceReplay }, drift_class: "replay_drift" })
+        return json({ status:"NULL", result:"INVALID", reason:"proof_replay", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay })
       }
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
@@ -7385,7 +7383,7 @@ export default {
       if (!proofLineageCheck.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: proofLineageCheck.reason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", indicator: proofLineageCheck.reason }, drift_class: "proof_drift" })
       try {
         const proofStatements = [
-          env.DB.prepare(`INSERT OR IGNORE INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,decision_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,delegated_authority_id,delegated_replay_chain_hash,delegation_lineage_hash,delegation_root_hash,parent_execution_hash,lineage_stage,lineage_origin_hash)
+          env.DB.prepare(`INSERT INTO proof_registry (proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id,decision_id,validated_object_hash,decision_hash,authority_lineage,execution_lineage,surface,run_id,commit_sha,workflow,environment,created_at,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,delegated_authority_id,delegated_replay_chain_hash,delegation_lineage_hash,delegation_root_hash,parent_execution_hash,lineage_stage,lineage_origin_hash)
             SELECT ?1, s.identity_id, ?2, a.continuity_id, c.continuity_hash, ?3, ?4, ?5, ?22, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?15, ?16, ?17, ?18, ?19, ?20, ?21, a.delegated_authority_id, a.delegated_replay_chain_hash, a.delegation_lineage_hash, a.delegation_root_hash, ?23, 'proof', ?24
             FROM authority_registry a JOIN session_registry s ON s.session_id=a.session_id JOIN continuity_registry c ON c.continuity_id=a.continuity_id
             WHERE a.decision_id=?4 AND a.session_id=?2 AND a.status='EXECUTED' AND c.status='ACTIVE' AND c.expires_at>?13

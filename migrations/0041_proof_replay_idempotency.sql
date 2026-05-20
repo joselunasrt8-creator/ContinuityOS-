@@ -82,7 +82,5 @@ END;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique
 ON proof_registry (
-  execution_id,
-  decision_id,
-  validated_object_hash
+  decision_hash
 );
