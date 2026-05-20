@@ -7183,7 +7183,7 @@ export default {
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
       const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND result='VALID' AND status='VALID'`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
-      if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, invocation_nonce, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
+      if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" })
       if (String(validation.decision_id || "") !== decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", expected_decision_id: decision_id, provided_decision_id: validation.decision_id, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (String(validation.validated_object_hash || "") !== validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, provided_hash: validation.validated_object_hash, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
       const session = await activeSession(env, session_id)
@@ -7302,32 +7302,13 @@ export default {
         const ambiguityReplay = proofAmbiguityReplayEvidence(proofCandidates.length, canonicalProofCandidates.length)
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_lineage_ambiguous", replay: ambiguityReplay }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "duplicate_or_ambiguous_proof_lineage", classification: "PROOF_AMBIGUITY_FAIL_CLOSED_CONFIRMED", drift_classes: ["replay_drift", "proof_lineage_drift"], candidate_count: proofCandidates.length, canonical_candidate_count: canonicalProofCandidates.length }, drift_class: "proof_lineage_drift" })
       }
-      const canonicalExistingProof = canonicalProofResolution.canonical_proof
-      if (canonicalExistingProof) {
-        const canonicalEvidenceReplay = {
-          classification: "PROOF_CANONICAL_EVIDENCE_REPLAY_CONTAINED",
-          replay_detected: true,
-          duplicate_proof_replay: true,
-          evidence_only: true,
-          read_only: true,
-          non_authoritative: true,
-          replay_neutral: true,
-          lifecycle_advanced: false,
-          proof_registry_appended: false,
-          proof_registry_mutated: false,
-          registry_mutation_blocked: ["authority_registry", "execution_registry", "invocation_registry", "proof_registry"],
-          authority_registry_mutated: false,
-          execution_registry_mutated: false,
-          invocation_registry_mutated: false,
-          merge_authorized: false,
-          deployment_authorized: false,
-          validator_mutation_authorized: false,
-          runtime_authority_granted: false,
-          proof_issue_authority_granted: false
-        } as const
-        await emitTelemetry(env, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id: String(canonicalExistingProof.proof_id || ""), severity: "INFO", payload: { route: "/proof", validated_object_hash, invocation_nonce: String(execution.invocation_nonce || ""), indicator: "duplicate_proof_replay_fail_closed", classification: canonicalEvidenceReplay.classification } })
-        // canonical legacy source audit fragment (non-executable): return json({ status:"PROVEN", result:"OK", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay, proof: canonicalExistingProof })
-        return json({ status:"NULL", result:"INVALID", reason:"proof_replay", proof_id: String(canonicalExistingProof.proof_id || ""), replay: canonicalEvidenceReplay })
+      const existingProof = canonicalProofResolution.canonical_proof
+      if (existingProof) {
+        return rejectWithTelemetry(env, {
+          status:"NULL",
+          result:"INVALID",
+          reason:"proof_replay",
+        })
       }
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
