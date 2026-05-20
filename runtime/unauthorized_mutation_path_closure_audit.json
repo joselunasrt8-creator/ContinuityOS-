@@ -15,7 +15,7 @@
   "replay_neutral": true,
   "reconciliation": {
     "execution_surfaces_hash": "3f12d8e9ca90dc45fa29a7010f9c0e6b30a0c01ab3cbecc7c6a2112b9d9678cf",
-    "root_authority_inventory_hash": "5c0e1550cbdf08da628791a393657f600b01645785c0ad2ba345e357368b7b71",
+    "root_authority_inventory_hash": "2885cf61cf352a1b832ee72b20559a3653c9f94ed1aaea4f649459e60b0e560d",
     "missing_mutation_surfaces_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
   },
   "surfaces": [
