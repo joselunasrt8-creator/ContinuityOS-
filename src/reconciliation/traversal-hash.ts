@@ -57,7 +57,8 @@ export interface TraversalHashRequest {
 }
 
 export function computeTraversalHash(request: TraversalHashRequest): TraversalHashObject {
-  const maxDepth = request.max_depth ?? CANONICAL_REGISTRY_ORDER.length + 2
+  const inferredDepthBudget = request.registries.length + CANONICAL_REGISTRY_ORDER.length
+  const maxDepth = request.max_depth ?? Math.max(CANONICAL_REGISTRY_ORDER.length + 2, inferredDepthBudget)
   const byKey = new Map<string, TraversalRegistryNode>(request.registries.map((node) => [`${node.registry}:${node.id}`, node]))
   const grouped = new Map<RegistryName, TraversalRegistryNode[]>()
 

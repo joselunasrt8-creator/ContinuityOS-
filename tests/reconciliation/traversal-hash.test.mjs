@@ -80,3 +80,22 @@ test('function performs no writes', () => {
   assert.equal(result.traversal_status, 'CANONICAL')
   assert.equal(before, after)
 })
+
+
+test('historical append-only lineage does not fail closed by default depth budget', () => {
+  const historical = [
+    ...baseNodes,
+    { ...baseNodes[0], id: 'sess-0', payload: { id: 'sess-0', epoch: 'historical' } },
+    { ...baseNodes[1], id: 'cont-0', parent_id: 'sess-0', payload: { id: 'cont-0', epoch: 'historical' } },
+    { ...baseNodes[2], id: 'auth-0', parent_id: 'cont-0', payload: { id: 'auth-0', epoch: 'historical' } },
+    { ...baseNodes[3], id: 'aeo-0', parent_id: 'auth-0', payload: { id: 'aeo-0', epoch: 'historical' } },
+    { ...baseNodes[4], id: 'val-0', parent_id: 'aeo-0', payload: { id: 'val-0', epoch: 'historical' } },
+    { ...baseNodes[5], id: 'exec-0', parent_id: 'val-0', payload: { id: 'exec-0', epoch: 'historical' } },
+    { ...baseNodes[6], id: 'proof-0', parent_id: 'exec-0', payload: { id: 'proof-0', epoch: 'historical' } }
+  ]
+
+  const result = computeTraversalHash(request(historical))
+  assert.equal(result.traversal_status, 'CANONICAL')
+  assert.equal(result.drift_classification, 'NONE')
+  assert.ok(result.canonical_traversal_hash)
+})
