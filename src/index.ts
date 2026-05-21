@@ -5777,6 +5777,7 @@ function containmentFlags(): { evidence_only: true, replay_neutral: true, mutati
 }
 
 const DECLARED_RUNTIME_ROUTE_CONSTANTS = Object.freeze([...CANONICAL_RUNTIME_ROUTES, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
+const DECLARED_NON_MUTATING_RUNTIME_ROUTES = Object.freeze(["/health", ...NON_EXECUTABLE_RUNTIME_ROUTES, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
 const DECLARED_EXECUTABLE_ROUTE_CONSTANTS = Object.freeze([...EXECUTABLE_RUNTIME_ROUTES].sort())
 const DECLARED_NON_EXECUTABLE_RUNTIME_ROUTE_CONSTANTS = Object.freeze([...NON_EXECUTABLE_RUNTIME_ROUTES].sort())
 const DECLARED_ROUTE_HANDLER_SURFACES = Object.freeze(["/health", ...CANONICAL_RUNTIME_ROUTES, ...GOVERNANCE_EVIDENCE_ROUTES, RECURSIVE_GOVERNANCE_ROUTE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
@@ -5803,7 +5804,7 @@ function hiddenSurfaceProbeFromUrl(url: URL): HiddenSurfaceProbe {
 function runtimeSurfaceInventory(probe: HiddenSurfaceProbe): ExecutableSurfaceInventory {
   const handlerSet = new Set<string>(DECLARED_ROUTE_HANDLER_SURFACES)
   if (probe.route) handlerSet.add(probe.route)
-  const declaredRouteSet = new Set<string>(DECLARED_RUNTIME_ROUTE_CONSTANTS)
+  const declaredRouteSet = new Set<string>([...DECLARED_RUNTIME_ROUTE_CONSTANTS, "/health"])
   const undeclared_route_handlers = [...handlerSet].filter((route) => !declaredRouteSet.has(route)).sort()
   const non_get_observability_handlers = probe.route && probe.method && probe.method.toUpperCase() !== "GET" && declaredRouteSet.has(probe.route) && (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(probe.route) ? [probe.route] : []
   return Object.freeze({
@@ -5846,6 +5847,13 @@ function classifyRuntimeSurfaceContainmentDrift(inventory: ExecutableSurfaceInve
     drift.add("runtime_route_containment_drift")
   }
   if (inventory.non_get_observability_handlers.length > 0) drift.add("observability_route_execution_upgrade")
+  if (probe.route && probe.method && probe.method.toUpperCase() !== "GET" && (DECLARED_NON_MUTATING_RUNTIME_ROUTES as readonly string[]).includes(probe.route) && probe.mutation_capable) {
+    drift.add("observability_route_execution_upgrade")
+    drift.add("runtime_route_containment_drift")
+  }
+  if (probe.route && probe.method && probe.method.toUpperCase() !== "POST" && (EXECUTABLE_RUNTIME_ROUTES as readonly string[]).includes(probe.route) && probe.mutation_capable) {
+    drift.add("runtime_route_containment_drift")
+  }
   if (probe.route && (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(probe.route) && probe.mutation_capable) drift.add("runtime_route_containment_drift")
   if (probe.workflow && probe.workflow !== ".github/workflows/governed-deploy.yml" && probe.deploy_capable) drift.add("workflow_dispatch_escape_detected")
   if (probe.package_command && /deploy|wrangler publish|wrangler deploy/.test(probe.package_command) && probe.deploy_capable) drift.add("deployment_surface_hash_drift")
