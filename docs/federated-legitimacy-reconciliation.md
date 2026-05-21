@@ -58,3 +58,14 @@ External federation evidence does not grant local authority and does not grant e
 ## Canonical runtime preservation
 Canonical runtime chain remains unchanged:
 `/session` → `/continuity` → `/authority` → `/compile` → `/validate` → `/execute` → `/proof`
+
+
+## Canonical federation literals (deterministic parity)
+- `runtime_id`
+- `portable_identifier == canonical_persisted_identifier`
+- `created_at is observational metadata only`
+
+Required deterministic identifiers:
+- `drift identifiers`
+- `FATE identifiers`
+- `revocation divergence identifiers`

@@ -3,43 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-
   "scripts": {
     "deploy": "echo \"Direct deploy disabled as a convenience guard. Production deploys must use .github/workflows/governed-deploy.yml.\" && exit 1",
-
     "deploy:dry-run": "npx wrangler deploy src/index.ts --name mindshift-demo --compatibility-date 2026-05-18 --dry-run",
-
     "dev": "wrangler dev --local",
-
     "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local",
-
-    "test": "node --test",
-
+    "test": "node --import tsx --test",
     "conformance": "node conformance/runner.mjs",
-
     "graph:load": "npx tsx graph/load_constitutional_graph.ts",
-
     "graph:runtime": "npx tsx graph/ingest_runtime_graph.ts",
-
     "graph:governance": "npx tsx graph/ingest_governance_graph.ts",
-
     "graph:extract": "python3 scripts/extract_repo_graph.py",
-
     "graph:ingest": "python3 scripts/ingest_neo4j.py",
-
     "graph:aeo": "npx tsx graph/aeo/ingest_aeo_instances.ts",
-
     "graph:full": "npm run graph:extract && npm run graph:load && npm run graph:runtime && npm run graph:governance",
-
     "governance:regenerate": "node scripts/regenerate-governance-artifacts.mjs"
   },
-
   "devDependencies": {
     "typescript": "^6.0.3",
     "wrangler": "^4.11.1",
     "tsx": "^4.19.4"
   },
-
   "dependencies": {
     "neo4j-driver": "^6.0.1"
   }
