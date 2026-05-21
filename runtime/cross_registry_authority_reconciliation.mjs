@@ -16,7 +16,8 @@ export function reconcileCrossRegistryAuthority({ registries, expectedContinuity
     byDecision.get(key).push(record)
   }
 
-  for (const [decisionId, records] of byDecision) {
+  const normalizedDecisions = [...byDecision.entries()].sort(([a], [b]) => a.localeCompare(b))
+  for (const [decisionId, records] of normalizedDecisions) {
     const statuses = new Set(records.map((r) => String(r.authority_status || 'UNKNOWN')))
     if (statuses.size > 1) issues.push({ class: AUTHORITY_DISAGREEMENT_CLASSES.STATE_DISAGREEMENT, decision_id: decisionId })
 
@@ -41,13 +42,25 @@ export function reconcileCrossRegistryAuthority({ registries, expectedContinuity
       issues.push({ class: AUTHORITY_DISAGREEMENT_CLASSES.STALE_REPLAY, decision_id: decisionId })
     }
 
+    const continuityStates = new Set(records.map((r) => String(r.continuity_status || 'ACTIVE')))
+    if (continuityStates.has('REVOKED')) {
+      issues.push({ class: AUTHORITY_DISAGREEMENT_CLASSES.CONTINUITY_MISMATCH, decision_id: decisionId })
+    }
+
     const lineageRoots = new Set(records.map((r) => String(r.lineage_root || '')))
     if (lineageRoots.size > 1) {
       issues.push({ class: AUTHORITY_DISAGREEMENT_CLASSES.AMBIGUOUS_LINEAGE, decision_id: decisionId })
     }
   }
 
-  const classification = issues.length === 0 ? 'PASS' : 'DRIFT'
+  const hasExecutableAuthority = normalizedDecisions.every(([, records]) =>
+    records.length > 0
+    && records.every((r) => String(r.authority_status) === 'AUTHORIZED')
+    && records.every((r) => String(r.replay_state || 'FRESH') !== 'REPLAYED')
+    && records.every((r) => String(r.continuity_status || 'ACTIVE') === 'ACTIVE')
+  )
+
+  const classification = issues.length === 0 && hasExecutableAuthority ? 'PASS' : 'DRIFT'
   return {
     status: classification,
     canonical_outcome: classification === 'PASS' ? 'REGISTRY_CONSENSUS' : 'NULL',

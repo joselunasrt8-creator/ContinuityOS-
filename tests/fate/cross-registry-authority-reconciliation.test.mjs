@@ -52,3 +52,16 @@ test('canonical replay reconstruction under agreement passes', () => {
   assert.equal(out.canonical_outcome, 'REGISTRY_CONSENSUS')
   assert.equal(out.executable_legitimacy, 'EXECUTABLE')
 })
+
+test('consensus without AUTHORIZED collapses fail-closed to NULL', () => {
+  const out = reconcileCrossRegistryAuthority({
+    registries: [
+      { ...base, authority_status: 'REVOKED', continuity_status: 'REVOKED' },
+      { ...base, registry_id: 'b', authority_status: 'REVOKED', continuity_status: 'REVOKED' }
+    ],
+    expectedContinuityId: 'c1'
+  })
+  assert.equal(out.status, 'DRIFT')
+  assert.equal(out.canonical_outcome, 'NULL')
+  assert.equal(out.executable_legitimacy, 'NULL')
+})
