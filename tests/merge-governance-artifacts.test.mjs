@@ -15,6 +15,10 @@ const requiredArtifacts = [
     requiredKeys: ['version', 'purpose', 'required_fields', 'rules', 'governed_paths'],
   },
   {
+    file: 'AGENT_EXECUTION_GOVERNANCE_MODEL.json',
+    requiredKeys: ['version', 'purpose', 'canonical_invariants', 'execution_gate', 'topology', 'pr_governance_object', 'registry_requirements', 'fail_closed_requirements', 'agent_surfaces', 'enforcement_routing'],
+  },
+  {
     file: 'MERGE_GOVERNANCE_RULES.json',
     requiredKeys: ['version', 'purpose', 'rules', 'required_proof_fields', 'bypass_paths'],
   },

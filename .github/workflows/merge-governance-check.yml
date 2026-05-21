@@ -191,6 +191,7 @@ jobs:
             governance/runtime/PREO_REQUIREMENTS.json \
             governance/runtime/SCO_REQUIREMENTS.json \
             governance/runtime/MERGE_GOVERNANCE_RULES.json \
+            governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json \
             governance/runtime/BRANCH_PROTECTION_POLICY.json \
             runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json
           do

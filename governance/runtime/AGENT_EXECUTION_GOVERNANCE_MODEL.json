@@ -1,0 +1,88 @@
+{
+  "version": "1.0.0",
+  "purpose": "GitHub-native governed execution layer for bounded multi-agent contribution and fail-closed merge/deploy legitimacy.",
+  "canonical_invariants": [
+    "cognition_not_execution",
+    "proposal_not_authority",
+    "capability_not_permission",
+    "ai_output_not_legitimacy",
+    "validated_object_equals_executed_object",
+    "post_validation_mutation_invalid",
+    "execution_requires_valid_authorized_unused_policy_valid"
+  ],
+  "execution_gate": {
+    "expression": "VALID && AUTHORIZED && UNUSED && POLICY_VALID",
+    "on_failure": "NULL"
+  },
+  "topology": [
+    "human_intent",
+    "input_shaping",
+    "authority_binding",
+    "atao",
+    "aeo",
+    "omega_validation",
+    "execution_boundary",
+    "proof_of_execution",
+    "registry_persistence",
+    "merge_governance",
+    "runtime_reality"
+  ],
+  "pr_governance_object": {
+    "required_bindings": [
+      "agent_identity",
+      "authority_id",
+      "validation_state",
+      "replay_nonce",
+      "proof_id",
+      "execution_lineage"
+    ],
+    "immutability_rule": "head_sha_used_for_validation_must_equal_head_sha_merged"
+  },
+  "registry_requirements": [
+    "who_proposed",
+    "who_validated",
+    "who_authorized",
+    "what_executed",
+    "validated_equals_executed"
+  ],
+  "fail_closed_requirements": [
+    "no_direct_merge_on_missing_proof",
+    "no_deploy_without_authority_chain",
+    "no_reuse_of_consumed_authority",
+    "no_execution_when_policy_invalid"
+  ],
+  "observability_constraints": [
+    "get_only",
+    "non_mutating",
+    "non_authoritative",
+    "replay_neutral"
+  ],
+  "agent_surfaces": [
+    "codex",
+    "cursor",
+    "claude_code",
+    "copilot",
+    "ci_cd",
+    "pull_request",
+    "merge_operation"
+  ],
+  "enforcement_routing": [
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "mcp_boundaries": {
+    "allowed": [
+      "read_pr_metadata",
+      "read_ci_status",
+      "submit_governed_artifacts"
+    ],
+    "forbidden": [
+      "direct_merge",
+      "direct_deploy",
+      "post_validation_mutation"
+    ]
+  }
+}
