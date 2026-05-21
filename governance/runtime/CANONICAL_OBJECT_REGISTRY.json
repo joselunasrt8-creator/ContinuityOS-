@@ -1,0 +1,242 @@
+{
+  "object_type": "CanonicalObjectRegistry",
+  "version": "1.0.0",
+  "generated_at": "2026-05-21T00:00:00.000Z",
+  "invariants": {
+    "fail_closed": true,
+    "replay_protection_preserved": true,
+    "validator_determinism_preserved": true,
+    "validated_object_equals_executed_object": true,
+    "implicit_authority_creation_forbidden": true,
+    "canonical_execution_path": [
+      "/authority",
+      "/compile",
+      "/validate",
+      "/execute",
+      "/proof"
+    ]
+  },
+  "runtime_registry_contract": {
+    "validator_must_read_single_registry": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json",
+    "unknown_object_response": "NULL",
+    "unknown_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "archive_authority": "ARCHIVED objects are non-authoritative and non-executable"
+  },
+  "artifact_inventory": [
+    {
+      "path": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json",
+      "class": "AUTHORITATIVE",
+      "domain": "registry_root",
+      "status": "active",
+      "notes": "Single validator-read registry root"
+    },
+    {
+      "path": "governance/runtime/EXECUTION_SURFACES.json",
+      "class": "DERIVED",
+      "domain": "execution_surfaces",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "runtime/surfaces/EXECUTION_SURFACES.json",
+      "class": "DERIVED",
+      "domain": "execution_surfaces",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "runtime/execution_surfaces.json",
+      "class": "INFORMATIONAL",
+      "domain": "execution_surfaces",
+      "status": "legacy_duplicate"
+    },
+    {
+      "path": "governance/execution_surfaces.json",
+      "class": "INFORMATIONAL",
+      "domain": "execution_surfaces",
+      "status": "legacy_duplicate"
+    },
+    {
+      "path": "EXECUTION_SURFACES.json",
+      "class": "INFORMATIONAL",
+      "domain": "execution_surfaces",
+      "status": "legacy_duplicate"
+    },
+    {
+      "path": "governance/runtime/BYPASS_PATHS.json",
+      "class": "DERIVED",
+      "domain": "bypass_surfaces",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "runtime/surfaces/BYPASS_PATHS.json",
+      "class": "DERIVED",
+      "domain": "bypass_surfaces",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "BYPASS_PATHS.json",
+      "class": "INFORMATIONAL",
+      "domain": "bypass_surfaces",
+      "status": "legacy_duplicate"
+    },
+    {
+      "path": "governance/runtime-topology-reconciliation.json",
+      "class": "DERIVED",
+      "domain": "topology",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "governance/runtime-topology-equivalence.json",
+      "class": "DERIVED",
+      "domain": "topology",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "governance/runtime-topology-drift-taxonomy.json",
+      "class": "DERIVED",
+      "domain": "topology",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "governance/cross-registry-reconciliation.json",
+      "class": "DERIVED",
+      "domain": "reconciliation",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "governance/cross_registry_reconciliation.json",
+      "class": "INFORMATIONAL",
+      "domain": "reconciliation",
+      "status": "duplicate_filename_variant"
+    },
+    {
+      "path": "governance/cross-registry-equivalence.json",
+      "class": "DERIVED",
+      "domain": "reconciliation",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "governance/cross-registry-drift-taxonomy.json",
+      "class": "DERIVED",
+      "domain": "reconciliation",
+      "status": "active",
+      "derives_from": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json"
+    },
+    {
+      "path": "governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json",
+      "class": "ARCHIVED",
+      "domain": "bundle",
+      "status": "generated_bundle"
+    },
+    {
+      "path": "governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json",
+      "class": "ARCHIVED",
+      "domain": "bundle",
+      "status": "generated_bundle"
+    },
+    {
+      "path": "governance/mindshift-validation-bundle/archive/MINDSHIFT_REPO_OBJECTS.zip",
+      "class": "ARCHIVED",
+      "domain": "bundle",
+      "status": "archive_only"
+    },
+    {
+      "path": "MINDSHIFT_REPO_OBJECTS.zip",
+      "class": "ARCHIVED",
+      "domain": "bundle",
+      "status": "archive_only"
+    }
+  ],
+  "duplicate_topology_declarations": [
+    "governance/runtime-topology-reconciliation.json",
+    "governance/runtime-topology-equivalence.json",
+    "governance/runtime-topology-drift-taxonomy.json",
+    "runtime/topology/topology_manifest.json",
+    "runtime/topology/runtime_graph.json"
+  ],
+  "mirrored_governance_inventories": [
+    "governance/runtime/EXECUTION_SURFACES.json",
+    "runtime/surfaces/EXECUTION_SURFACES.json",
+    "runtime/execution_surfaces.json",
+    "governance/execution_surfaces.json",
+    "EXECUTION_SURFACES.json"
+  ],
+  "repeated_execution_surface_definitions": [
+    "governance/runtime/BYPASS_PATHS.json",
+    "runtime/surfaces/BYPASS_PATHS.json",
+    "BYPASS_PATHS.json",
+    "runtime/bypass_paths.json",
+    "runtime/runtime_mutation_bypass_paths.json"
+  ],
+  "stale_generated_governance_bundles": [
+    "governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json",
+    "governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json",
+    "governance/mindshift-validation-bundle/output/VALIDATION_REPORT.json",
+    "governance/mindshift-validation-bundle/archive/MINDSHIFT_REPO_OBJECTS.zip"
+  ],
+  "overlapping_reconciliation_artifacts": [
+    "governance/cross-registry-reconciliation.json",
+    "governance/cross_registry_reconciliation.json",
+    "runtime/reconciliation/cross-registry-reconciliation-engine.js",
+    "runtime/cross_registry_authority_reconciliation.mjs"
+  ],
+  "archive_only_objects_still_referenced_by_runtime": [
+    {
+      "path": "governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json",
+      "risk": "bundle-shadowing of active execution surface inventory"
+    },
+    {
+      "path": "governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json",
+      "risk": "bundle-shadowing of active bypass taxonomy"
+    }
+  ],
+  "elimination_candidates": [
+    "EXECUTION_SURFACES.json",
+    "runtime/execution_surfaces.json",
+    "governance/execution_surfaces.json",
+    "BYPASS_PATHS.json",
+    "governance/cross_registry_reconciliation.json"
+  ],
+  "migration_plan": [
+    {
+      "phase": 1,
+      "action": "Bind validator reads exclusively to governance/runtime/CANONICAL_OBJECT_REGISTRY.json",
+      "guard": "Unknown object class -> NULL"
+    },
+    {
+      "phase": 2,
+      "action": "Regenerate derived inventories from canonical registry (execution, bypass, topology, reconciliation)",
+      "guard": "Deterministic hash + replay-neutral generation"
+    },
+    {
+      "phase": 3,
+      "action": "Deprecate duplicate informational files and mark archive-only bundles as non-runtime",
+      "guard": "No runtime import path may resolve to ARCHIVED"
+    },
+    {
+      "phase": 4,
+      "action": "Remove eliminated files after compatibility grace window",
+      "guard": "Fail-closed if stale path is requested"
+    }
+  ],
+  "canonical_registry_proposal": {
+    "registry_path": "governance/runtime/CANONICAL_OBJECT_REGISTRY.json",
+    "classification_enum": [
+      "AUTHORITATIVE",
+      "DERIVED",
+      "INFORMATIONAL",
+      "ARCHIVED"
+    ],
+    "append_only": true,
+    "deterministic_ordering": "lexicographic by artifact path",
+    "execution_authority_rule": "Only AUTHORITATIVE entries may define authority semantics; DERIVED entries mirror but cannot create authority"
+  }
+}
