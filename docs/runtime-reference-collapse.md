@@ -1,31 +1,30 @@
 # Runtime Reference Collapse
 
 ## Canonical ownership model
-Runtime governance references are collapsed into a single ownership registry at `governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json`.
-Each reference class has one authoritative owner.
+`governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json` is the sole ownership registry for runtime/governance semantic domains. Each semantic domain is assigned exactly one authoritative source.
 
-## Authoritative vs derived semantics
-Authoritative objects may define execution/governance/authority/topology/replay/proof semantics.
-Derived surfaces must retain lineage to canonical owner and are non-authoritative.
+## Elimination strategy
+Duplicate inventories and mirrored governance/runtime declarations are collapsed by:
+- selecting one authoritative source per domain,
+- marking former mirrors as deprecated duplicates,
+- converting non-authoritative copies into either generated artifacts or archive-only objects.
+
+## Duplicate collapse policy
+If more than one authoritative source is detected for the same semantic domain, reconciliation fails closed (`FAIL_CLOSED`) and no regeneration is performed.
 
 ## Archive segregation semantics
-Archive-classified objects are evidence-only and cannot define authority, topology, or execution semantics.
+Historical, evidentiary, generated, or non-authoritative files may be archived. Archive-only objects are explicitly blocked from authority escalation.
 
-## Duplicate collapse strategy
-Duplicate-prone classes (`BYPASS_PATHS`, `EXECUTION_SURFACES`, topology/reconciliation inventories) are normalized into class-based ownership with deterministic derived mappings.
+## Topology compression model
+Topology semantics are owned by one canonical topology source. Other topology expressions must be derived from that owner and never become canonical.
 
 ## Validator drift prevention
-Ownership rules separate semantic source objects from generated/derived mirrors to prevent validator drift and semantic divergence.
+The reconciler enforces one-way lineage from authoritative source to generated artifact so validators consume a single canonical semantic definition.
 
-## Deterministic reconciliation behavior
-`scripts/runtime_reference_reconciler.mjs` performs stable ordering, deterministic traversal, and fail-closed conflict detection.
-
-## Fail-closed ownership enforcement
-Conflict or ambiguity emits `FAIL_CLOSED` with deterministic evidence records; no hidden mutation is performed.
-
-## Topology singularity rules
-Topology ownership remains singular under `runtime/topology/topology_manifest.json`.
-All topology derivations must point to that owner.
-
-## Governance compression strategy
-Compression is achieved by consolidating ownership while preserving existing runtime behavior and route semantics.
+## Fail-closed reconciliation behavior
+`scripts/runtime_reference_reconciler.mjs`:
+1. validates singular ownership,
+2. rejects archive/canonical escalation,
+3. rejects derived/canonical escalation,
+4. regenerates declared artifacts deterministically,
+5. emits `governance/runtime/runtime_reference_reconciliation_report.json`.

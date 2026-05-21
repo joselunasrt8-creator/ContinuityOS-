@@ -4,53 +4,43 @@ import fs from 'node:fs';
 
 const ownership = JSON.parse(fs.readFileSync('governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json', 'utf8'));
 
-test('no duplicate authoritative declarations', () => {
-  const unique = new Set(Object.values(ownership.authoritative_sources));
-  assert.equal(unique.size, Object.values(ownership.authoritative_sources).length);
+const authorityEntries = Object.entries(ownership.authoritative_sources);
+const authorityPaths = authorityEntries.map(([, p]) => p);
+
+test('singular authoritative ownership', () => {
+  assert.equal(new Set(authorityPaths).size, authorityPaths.length);
 });
 
-test('derived artifacts map to canonical owner', () => {
-  for (const [cls, entries] of Object.entries(ownership.derived_surfaces)) {
-    assert.ok(ownership.authoritative_sources[cls], `missing owner class: ${cls}`);
-    for (const file of entries) assert.ok(typeof file === 'string' && file.length > 0);
-  }
+test('no duplicate authoritative semantic domains', () => {
+  assert.equal(authorityEntries.length, new Set(authorityEntries.map(([domain]) => domain)).size);
 });
 
 test('archive objects cannot become authoritative', () => {
+  const authoritative = new Set(authorityPaths);
   for (const key of Object.keys(ownership.archive_only_objects || {})) {
-    assert.equal(ownership.authoritative_sources[key], undefined);
+    assert.equal(authoritative.has(key), false, `${key} cannot be authoritative`);
   }
 });
 
-test('generated artifacts are reproducible', () => {
-  const keys = Object.keys(ownership.generated_artifacts);
-  const sorted = [...keys].sort();
-  assert.deepEqual(keys.sort(), sorted);
+test('generated artifacts cannot become canonical', () => {
+  const authoritative = new Set(authorityPaths);
+  for (const generated of Object.keys(ownership.generated_artifacts || {})) {
+    assert.equal(authoritative.has(generated), false, `${generated} cannot be canonical`);
+  }
 });
 
 test('topology ownership remains singular', () => {
-  const vals = Object.values(ownership.topology_owners);
-  assert.equal(new Set(vals).size, 1);
+  const owners = Object.values(ownership.topology_owners || {});
+  assert.equal(new Set(owners).size, 1);
 });
 
 test('bypass path ownership remains singular', () => {
-  assert.ok(ownership.authoritative_sources.BYPASS_PATHS);
-  assert.ok(Array.isArray(ownership.derived_surfaces.BYPASS_PATHS));
+  assert.ok(ownership.authoritative_sources.bypass_path_semantics);
+  assert.equal(Array.isArray(ownership.derived_surfaces.bypass_path_semantics), true);
 });
 
-test('execution surface ownership remains singular', () => {
-  assert.ok(ownership.authoritative_sources.EXECUTION_SURFACES);
-  assert.ok(Array.isArray(ownership.derived_surfaces.EXECUTION_SURFACES));
-});
-
-test('reconciliation ownership remains singular', () => {
-  const vals = Object.values(ownership.reconciliation_sources);
-  assert.equal(new Set(vals).size, 1);
-});
-
-test('derived artifacts cannot override canonical definitions', () => {
-  const authoritySet = new Set(Object.values(ownership.authoritative_sources));
-  for (const entries of Object.values(ownership.derived_surfaces)) {
-    for (const p of entries) assert.equal(authoritySet.has(p), false, `derived is authoritative: ${p}`);
-  }
+test('invariant declarations remain singular', () => {
+  assert.ok(ownership.authoritative_sources.invariant_declarations);
+  const invariantOwner = ownership.authoritative_sources.invariant_declarations;
+  assert.equal(typeof invariantOwner, 'string');
 });

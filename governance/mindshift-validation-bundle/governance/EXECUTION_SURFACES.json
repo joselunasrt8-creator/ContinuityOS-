@@ -1,111 +1,141 @@
 {
-  "schema_version": "1.0",
-  "status": "non_operative_governance_artifact",
+  "canonical_executable_routes": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "closure_verification": {
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "evidence_only": true,
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+    "issue": "342",
+    "non_authoritative": true,
+    "unclassified_mutation_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+  },
+  "governance_evidence_routes": [
+    {
+      "authoritative_for_execution": false,
+      "classification": "governance_evidence_only_non_executable",
+      "path": "/preo"
+    }
+  ],
+  "observability_only_routes": [
+    {
+      "authoritative_for_execution": false,
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "path": "/reconcile"
+    },
+    {
+      "authoritative_for_execution": false,
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "path": "/reconcile/schedule"
+    },
+    {
+      "authoritative_for_execution": false,
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "path": "/reconcile/report"
+    },
+    {
+      "authoritative_for_execution": false,
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "path": "/reconcile/drift"
+    }
+  ],
+  "purpose": "Inventory all state-changing execution surfaces",
   "surfaces": [
     {
-      "id": "cloudflare_worker_runtime",
-      "files": [
-        "src/index.ts"
+      "classification": "state_changing_execution_surface",
+      "mutation_type": "deployment",
+      "path": ".github/workflows/governed-deploy.yml",
+      "required_controls": [
+        "ACTIVE authority",
+        "VALID exact AEO",
+        "unused invocation_nonce",
+        "proof persistence"
       ],
-      "type": "runtime_boundary",
-      "canonical": true,
-      "allowed_state_change_path": [
+      "risk_class": "P3",
+      "surface_id": "github_production_deploy"
+    },
+    {
+      "classification": "execution_adjacent_mutation_surface",
+      "mutation_type": "authority_preparation",
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "rationale": "Workflow creates session, continuity, authority, compile output, and invocation nonce used by governed deployment.",
+      "required_controls": [
+        "explicit workflow_dispatch only",
+        "valid worker URL and API key",
+        "session creation must return SESSION_ACTIVE",
+        "continuity creation must return CONTINUITY_ACTIVE",
+        "authority creation must bind matching decision_id and continuity_id",
+        "compile must return validated_object_hash",
+        "generated invocation_nonce must be single-use downstream"
+      ],
+      "risk_class": "P2",
+      "surface_id": "prepare_governed_deploy"
+    },
+    {
+      "canonical_executable_routes": [
+        "/session",
+        "/continuity",
         "/authority",
         "/compile",
         "/validate",
         "/execute",
         "/proof"
       ],
-      "bundle_change": "none"
-    },
-    {
-      "id": "github_governed_production_deploy",
-      "files": [
-        ".github/workflows/prepare-governed-deploy.yml",
-        ".github/workflows/governed-deploy.yml"
+      "classification": "runtime_boundary_surface",
+      "excluded_non_executable_routes": [
+        "/preo",
+        "/reconcile",
+        "/reconcile/schedule",
+        "/reconcile/report",
+        "/reconcile/drift"
       ],
-      "type": "deployment_boundary",
-      "canonical": true,
-      "requires_validated_object": true,
-      "requires_invocation_nonce": true,
-      "requires_proof_persistence": true,
-      "bundle_change": "none"
-    },
-    {
-      "id": "package_scripts",
-      "files": [
-        "package.json"
+      "mutation_type": "runtime_execution",
+      "path": "src/index.ts",
+      "required_controls": [
+        "VALID exact AEO",
+        "replay protection",
+        "proof capture"
       ],
-      "type": "developer_command_surface",
-      "canonical": false,
-      "deploy_script_status": "disabled_guard",
-      "bundle_change": "none"
-    },
-    {
-      "id": "d1_migrations",
-      "files": [
-        "migrations/*.sql"
-      ],
-      "type": "registry_schema_surface",
-      "canonical": false,
-      "bundle_change": "none"
-    },
-    {
-      "surface_id": "github_production_deploy",
-      "type": "ci_cd",
-      "state_changing": true,
-      "required_path": "/authority -> /compile -> /validate -> /execute -> /proof",
-      "proof_type": "deployment_receipt",
       "risk_class": "P3",
-      "classification": "canonical_runtime_surface"
+      "surface_id": "runtime_execute_route"
     },
     {
-      "surface_id": "prepare_governed_deploy",
-      "type": "ci_cd_preparation",
-      "state_changing": true,
-      "required_path": "/session -> /continuity -> /authority -> /compile",
-      "proof_type": "preparation_artifact",
-      "risk_class": "P2",
-      "classification": "canonical_runtime_surface"
-    },
-    {
-      "surface_id": "runtime_execute_route",
-      "type": "cloudflare_worker_route",
-      "state_changing": true,
-      "required_path": "/validate -> /execute -> /proof",
-      "proof_type": "execution_receipt",
-      "risk_class": "P3",
-      "classification": "canonical_runtime_surface"
-    },
-    {
+      "evidence_only": true,
+      "non_authoritative": true,
+      "proof_type": "closure_audit_hash",
+      "required_path": "classification only; cannot authorize execution",
+      "risk_class": "P0",
+      "state_changing": false,
       "surface_id": "runtime_closure_inventory",
-      "type": "observability",
-      "state_changing": false,
-      "required_path": "classification only; cannot authorize execution",
-      "proof_type": "closure_audit_hash",
-      "risk_class": "P0",
-      "evidence_only": true,
-      "non_authoritative": true
+      "type": "observability"
     },
     {
+      "evidence_only": true,
+      "non_authoritative": true,
+      "proof_type": "closure_audit_hash",
+      "required_path": "classification only; cannot authorize execution",
+      "risk_class": "P0",
+      "state_changing": false,
       "surface_id": "database_write_surface_inventory",
-      "type": "database",
-      "state_changing": false,
-      "required_path": "classification only; cannot authorize execution",
-      "proof_type": "closure_audit_hash",
-      "risk_class": "P0",
-      "evidence_only": true,
-      "non_authoritative": true
+      "type": "database"
     },
     {
-      "surface_id": "workflow_package_deploy_inventory",
-      "type": "ci_cd",
-      "state_changing": false,
-      "required_path": "classification only; cannot authorize execution",
-      "proof_type": "closure_audit_hash",
-      "risk_class": "P0",
       "evidence_only": true,
-      "non_authoritative": true
+      "non_authoritative": true,
+      "proof_type": "closure_audit_hash",
+      "required_path": "classification only; cannot authorize execution",
+      "risk_class": "P0",
+      "state_changing": false,
+      "surface_id": "workflow_package_deploy_inventory",
+      "type": "ci_cd"
     }
-  ]
+  ],
+  "version": "1.0"
 }

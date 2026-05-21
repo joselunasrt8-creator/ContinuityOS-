@@ -1,73 +1,52 @@
 {
-  "version": "1.0.0",
-  "purpose": "Canonical ownership registry for runtime/governance reference collapse. Defines singular authoritative ownership and deterministic lineage for all duplicate-prone runtime declarations.",
+  "version": "2.0.0",
+  "purpose": "Singular authoritative ownership registry for runtime/governance semantic domains.",
   "authoritative_sources": {
-    "BYPASS_PATHS": "governance/runtime/BYPASS_PATHS.json",
-    "EXECUTION_SURFACES": "governance/runtime/EXECUTION_SURFACES.json",
-    "RECONCILIATION_DEFINITIONS": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json",
-    "RUNTIME_TOPOLOGY": "runtime/topology/topology_manifest.json",
-    "OBSERVABILITY_INVENTORY": "runtime/surfaces/OBSERVABILITY_SURFACES.json",
-    "SOVEREIGNTY_MAP": "runtime/sovereignty_map.json",
-    "SCHEMA_POLICY": "runtime/governance/SCHEMA_POLICY.json"
+    "execution_semantics": "governance/runtime/EXECUTION_SURFACES.json",
+    "governance_semantics": "governance/runtime/AEO_REQUIREMENTS.json",
+    "topology_semantics": "governance/runtime/RECURSIVE_GOVERNANCE_SPEC.json",
+    "authority_semantics": "governance/runtime/PREO_REQUIREMENTS.json",
+    "replay_semantics": "governance/runtime/REPLAY_TESTS.json",
+    "proof_semantics": "governance/runtime/PROOF_REQUIREMENTS.json",
+    "merge_governance_semantics": "governance/runtime/MERGE_GOVERNANCE_RULES.json",
+    "bypass_path_semantics": "governance/runtime/BYPASS_PATHS.json",
+    "invariant_declarations": "governance/minimal_civilization_invariants.json",
+    "reconciliation_semantics": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json"
   },
   "derived_surfaces": {
-    "BYPASS_PATHS": [
-      "runtime/bypass_paths.json",
-      "runtime/surfaces/BYPASS_PATHS.json",
-      "runtime/runtime_mutation_bypass_paths.json",
-      "runtime/distributed_bypass_paths.json",
-      "runtime/delegation_bypass_paths.json",
-      "runtime/constitutional_bypass_paths.json",
-      "runtime/federated_bypass_paths.json",
-      "runtime/state_bypass_paths.json",
-      "runtime/temporal_bypass_paths.json"
+    "execution_semantics": [
+      "governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json"
     ],
-    "EXECUTION_SURFACES": [
-      "runtime/execution_surfaces.json",
-      "runtime/surfaces/EXECUTION_SURFACES.json",
-      "runtime/external_execution_surfaces.json",
-      "runtime/federated_runtime_surfaces.json"
-    ],
-    "RUNTIME_TOPOLOGY": [
-      "runtime/topology/runtime_graph.json",
-      "runtime/topology/schema_source_map.json",
-      "runtime/topology/proof_schema_reconciliation.json",
-      "graph/output/runtime_nodes.json",
-      "graph/output/runtime_edges.json"
-    ],
-    "RECONCILIATION_DEFINITIONS": [
-      "runtime/reconciliation/cross-registry-reconciliation-engine.js",
-      "runtime/reconciliation/drift-propagation-engine.js",
-      "runtime/reconciliation/topology-reconciliation-engine.js",
-      "runtime/surface_inventory_reconciler.mjs"
+    "bypass_path_semantics": [
+      "governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json"
     ]
   },
   "generated_artifacts": {
-    "graph/output/runtime_nodes.json": "runtime/topology/runtime_graph.json",
-    "graph/output/runtime_edges.json": "runtime/topology/runtime_graph.json",
-    "runtime/topology/schema_source_map.json": "runtime/governance/SCHEMA_POLICY.json",
-    "runtime/topology/proof_schema_reconciliation.json": "runtime/governance/SCHEMA_POLICY.json"
+    "governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json": "governance/runtime/EXECUTION_SURFACES.json",
+    "governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json": "governance/runtime/BYPASS_PATHS.json"
   },
-  "archive_only_objects": {},
+  "archive_only_objects": {
+    "archive/runtime-reference-collapse/github_governed_deploy_spec.pdf": "historical runtime-adjacent PDF",
+    "archive/runtime-reference-collapse/mindshift_runtime_architecture_v2 2.pdf": "historical runtime-adjacent PDF",
+    "archive/runtime-reference-collapse/EXECUTION_SURFACES.json": "deprecated duplicate inventory",
+    "archive/runtime-reference-collapse/BYPASS_PATHS.json": "deprecated duplicate inventory",
+    "archive/runtime-reference-collapse/GOVERNANCE_REQUIREMENTS.json": "deprecated duplicate registry"
+  },
   "deprecated_duplicates": {
-    "runtime/governance/PREO_POLICY.json": "runtime/governance policy mirror; non-authoritative for ownership collapse",
-    "runtime/governance/SCO_POLICY.json": "runtime/governance policy mirror; non-authoritative for ownership collapse"
-  },
-  "reconciliation_sources": {
-    "runtime/surface_inventory_reconciler.mjs": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json",
-    "runtime/cross_registry_authority_reconciliation.mjs": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json"
-  },
-  "schema_owners": {
-    "schemas/authority.schema.json": "runtime/governance/SCHEMA_POLICY.json",
-    "schemas/proof.schema.json": "runtime/governance/SCHEMA_POLICY.json",
-    "schemas/aeo.schema.json": "runtime/governance/SCHEMA_POLICY.json",
-    "runtime/legitimacy/schemas/AEO.schema.json": "runtime/governance/SCHEMA_POLICY.json",
-    "runtime/legitimacy/schemas/AUTHORITY.schema.json": "runtime/governance/SCHEMA_POLICY.json"
+    "EXECUTION_SURFACES.json": "moved to archive; canonical source is governance/runtime/EXECUTION_SURFACES.json",
+    "BYPASS_PATHS.json": "moved to archive; canonical source is governance/runtime/BYPASS_PATHS.json",
+    "GOVERNANCE_REQUIREMENTS.json": "moved to archive; canonical source is governance/runtime/AEO_REQUIREMENTS.json"
   },
   "topology_owners": {
-    "runtime/topology/topology_manifest.json": "runtime/topology/topology_manifest.json",
-    "runtime/topology/runtime_graph.json": "runtime/topology/topology_manifest.json",
-    "graph/topology.cypher": "runtime/topology/topology_manifest.json",
-    "graph/runtime-topology.cypher": "runtime/topology/topology_manifest.json"
+    "governance/runtime/RECURSIVE_GOVERNANCE_SPEC.json": "governance/runtime/RECURSIVE_GOVERNANCE_SPEC.json"
+  },
+  "schema_owners": {
+    "schemas/aeo.schema.json": "governance/runtime/AEO_REQUIREMENTS.json",
+    "schemas/authority.schema.json": "governance/runtime/PREO_REQUIREMENTS.json",
+    "schemas/proof.schema.json": "governance/runtime/PROOF_REQUIREMENTS.json"
+  },
+  "reconciliation_sources": {
+    "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json",
+    "governance/runtime/FEDERATED_RECONCILIATION_SPEC.json": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json"
   }
 }

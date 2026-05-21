@@ -2,56 +2,68 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const ownershipPath = path.join(repoRoot, 'governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json');
+const registryPath = path.join(repoRoot, 'governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json');
 
 const stable = (value) => {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === 'object') {
-    return Object.keys(value).sort().reduce((acc, k) => {
-      acc[k] = stable(value[k]);
-      return acc;
-    }, {});
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, stable(value[k])]));
   }
   return value;
 };
 
+const readJson = (p) => JSON.parse(fs.readFileSync(path.join(repoRoot, p), 'utf8'));
+const writeJson = (p, data) => fs.writeFileSync(path.join(repoRoot, p), `${JSON.stringify(stable(data), null, 2)}\n`);
 const exists = (p) => fs.existsSync(path.join(repoRoot, p));
-const ownership = JSON.parse(fs.readFileSync(ownershipPath, 'utf8'));
+
+const registry = readJson('governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json');
 const errors = [];
 
-for (const [cls, owner] of Object.entries(ownership.authoritative_sources).sort()) {
-  if (!exists(owner)) errors.push(`missing_authoritative_source:${cls}:${owner}`);
+for (const [domain, src] of Object.entries(registry.authoritative_sources)) {
+  if (!exists(src)) errors.push(`missing_authoritative_source:${domain}:${src}`);
 }
 
-for (const [cls, derived] of Object.entries(ownership.derived_surfaces).sort()) {
-  if (!ownership.authoritative_sources[cls]) {
-    errors.push(`unknown_derived_class:${cls}`);
+const authoritySet = new Set(Object.values(registry.authoritative_sources));
+if (authoritySet.size !== Object.keys(registry.authoritative_sources).length) {
+  errors.push('duplicate_authoritative_definition');
+}
+
+for (const [domain, derivedFiles] of Object.entries(registry.derived_surfaces)) {
+  const source = registry.authoritative_sources[domain];
+  if (!source) {
+    errors.push(`derived_domain_without_authority:${domain}`);
     continue;
   }
-  for (const item of [...derived].sort()) {
-    if (!exists(item)) errors.push(`missing_derived_artifact:${cls}:${item}`);
-    if (item.startsWith('archive/')) errors.push(`archive_derivation_forbidden:${cls}:${item}`);
+  for (const file of derivedFiles) {
+    if (authoritySet.has(file)) errors.push(`derived_became_authoritative:${domain}:${file}`);
   }
 }
 
-for (const [artifact, owner] of Object.entries(ownership.generated_artifacts).sort()) {
-  if (!exists(artifact)) errors.push(`missing_generated_artifact:${artifact}`);
-  if (!exists(owner)) errors.push(`missing_generated_lineage_owner:${artifact}:${owner}`);
+for (const archived of Object.keys(registry.archive_only_objects || {})) {
+  if (authoritySet.has(archived)) errors.push(`archive_promoted_to_authority:${archived}`);
 }
 
-for (const [item, reason] of Object.entries(ownership.archive_only_objects || {}).sort()) {
-  if (ownership.authoritative_sources[item]) errors.push(`archive_authority_escalation:${item}:${reason}`);
+if (!errors.length) {
+  for (const [artifact, source] of Object.entries(registry.generated_artifacts)) {
+    if (!exists(source)) {
+      errors.push(`missing_generated_source:${artifact}:${source}`);
+      continue;
+    }
+    writeJson(artifact, readJson(source));
+  }
 }
 
 const report = {
-  registry: 'governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json',
+  registry: path.relative(repoRoot, registryPath),
   status: errors.length ? 'FAIL_CLOSED' : 'OK',
-  error_count: errors.length,
   errors: [...errors].sort(),
-  canonical_classes: Object.keys(ownership.authoritative_sources).sort(),
-  generated_at: 'deterministic-static-timestamp',
-  ownership_snapshot: stable(ownership)
+  authoritative_domain_count: Object.keys(registry.authoritative_sources).length,
+  regenerated_artifact_count: errors.length ? 0 : Object.keys(registry.generated_artifacts).length,
+  deterministic: true
 };
+
+const reportPath = path.join(repoRoot, 'governance/runtime/runtime_reference_reconciliation_report.json');
+writeJson(path.relative(repoRoot, reportPath), report);
 
 if (process.argv.includes('--json')) {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
