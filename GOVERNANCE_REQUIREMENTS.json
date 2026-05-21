@@ -1,0 +1,138 @@
+{
+  "artifact": "GOVERNANCE_REQUIREMENTS",
+  "version": "2026-05-11.runtime-governance-v1",
+  "status": "NON_OPERATIVE_GOVERNANCE_ARTIFACT",
+  "canonical_invariant": "If no valid object exists -> nothing happens.",
+  "canonical_execution_path": ["/authority", "/compile", "/validate", "/execute", "/proof"],
+  "surface_locked_first": "github_governed_deploy_workflow",
+  "requirements": {
+    "exact_object_discipline": [
+      "validated_object_hash must be produced by /compile before /validate returns VALID",
+      "/execute must require a VALID validation row matching decision_id, session_id, validated_object_hash, and invocation_nonce",
+      "/proof must require execution_id, decision_id, validated_object_hash, session_id, and workflow/run/commit lineage",
+      "Any mutation after validation must produce NULL/hash_mismatch before execution"
+    ],
+    "fail_closed_behavior": [
+      "Missing API key, DB binding, route, schema, authority, validation, execution, or proof lineage returns NULL or an explicit blocked status",
+      "Proposal/review workflows may generate artifacts only; they must not call /execute or /proof",
+      "Legacy/demo objects have no implicit authority"
+    ],
+    "replay_resistance": [
+      "invocation_nonce is single use for one decision_id and validated_object_hash",
+      "authority cannot be reused after RESERVED/EXECUTED/CONSUMED transitions",
+      "proof uniqueness must block duplicate proof for the same decision_id and validated_object_hash",
+      "continuity lineage reuse or revocation cascades to authority/validation/invocation state"
+    ],
+    "proof_persistence": [
+      "Every successful execution must be followed by proof persistence before authority becomes CONSUMED",
+      "Proof must persist session_id, continuity_id, continuity_hash, identity_id, execution_id, decision_id, validated_object_hash, workflow, environment, run_id, and commit_sha",
+      "Proof lineage must equal execution lineage"
+    ],
+    "non_bypassability": [
+      "No direct production deploy outside governed-deploy.yml",
+      "No direct production DB mutation outside governed migration process",
+      "No webhook mutation may execute from static demo objects",
+      "No hidden legacy entrypoint may become production-capable"
+    ],
+    "continuity_lineage": [
+      "session_id, identity_id, continuity_id, and continuity_hash must bind authority, validation, execution, and proof",
+      "Revoked or expired continuity returns NULL",
+      "Orphaned execution without active continuity returns NULL"
+    ]
+  },
+  "validation_tests": {
+    "exact_object": [
+      {
+        "test_id": "post_validation_mutation_rejected",
+        "given": "A VALID object hash exists for decision_id + invocation_nonce",
+        "when": "execute receives a different validated_object_hash or mutated target/scope",
+        "then": "return NULL with hash_mismatch/no_validation and do not insert execution/proof"
+      },
+      {
+        "test_id": "execute_requires_validated_object_row",
+        "given": "No VALID validation_registry row exists",
+        "when": "/execute is called",
+        "then": "return NULL/no_validation and do not mutate execution_registry"
+      },
+      {
+        "test_id": "proof_lineage_must_match_execution",
+        "given": "An execution exists",
+        "when": "/proof receives mismatched decision_id, session_id, execution_id, or validated_object_hash",
+        "then": "return NULL/lineage_mismatch and do not consume authority"
+      }
+    ],
+    "replay_resistance": [
+      {
+        "test_id": "reused_invocation_nonce_blocked",
+        "given": "An invocation_nonce is already EXECUTED",
+        "when": "/execute is called again with the same nonce",
+        "then": "return NULL/replay_detected or authority_not_reserved"
+      },
+      {
+        "test_id": "reused_authority_blocked",
+        "given": "Authority is CONSUMED after proof",
+        "when": "validate or execute attempts to reuse the authority",
+        "then": "return NULL/authority_not_active or replay_detected"
+      },
+      {
+        "test_id": "duplicate_proof_blocked",
+        "given": "Proof exists for decision_id + validated_object_hash",
+        "when": "/proof is called again for same object",
+        "then": "return NULL or archive duplicate without changing canonical proof"
+      }
+    ],
+    "continuity_lineage_scaffolding": [
+      {
+        "test_id": "revoked_continuity_blocks_execution",
+        "given": "continuity_registry.status is REVOKED",
+        "when": "authority/validate/execute is attempted",
+        "then": "return NULL and cascade revocation to dependent rows"
+      },
+      {
+        "test_id": "continuity_hash_rederived",
+        "given": "canonical continuity object exists",
+        "when": "stored continuity_hash differs from rederived hash",
+        "then": "return NULL/continuity_hash_mismatch"
+      },
+      {
+        "test_id": "proof_persists_continuity_lineage",
+        "given": "execution succeeds under active continuity",
+        "when": "/proof persists receipt",
+        "then": "proof contains continuity_id, continuity_hash, identity_id, authority_lineage, and execution_lineage"
+      }
+    ]
+  },
+  "runtime_integrity_findings": [
+    {
+      "finding_id": "RIF-001",
+      "severity": "medium",
+      "status": "open_risk",
+      "finding": "Production deploy command is not directly observed; governed-deploy currently proves runtime authorization but does not contain a direct wrangler deploy step. Preserve this unless a future deploy step is inserted strictly after /execute and before /proof with exact object binding."
+    },
+    {
+      "finding_id": "RIF-002",
+      "severity": "medium",
+      "status": "open_risk",
+      "finding": "D1 migrations and local migration scripts are raw state mutation surfaces and need separate production migration governance before production apply."
+    },
+    {
+      "finding_id": "RIF-003",
+      "severity": "medium",
+      "status": "open_risk",
+      "finding": "Legacy/demo files remain present; disabled entrypoints reduce risk, but registry.js/compile-decision.js/static demo objects must remain quarantined from production authority."
+    },
+    {
+      "finding_id": "RIF-004",
+      "severity": "low",
+      "status": "bounded_by_tests",
+      "finding": "Manual workflow dispatch remains available but is bounded by exact decision_id, validated_object_hash, invocation_nonce, worker API key, and runtime replay checks."
+    }
+  ],
+  "invariant_violations": [],
+  "unresolved_risks": [
+    "Credential/secret boundary cannot be fully verified from repository contents alone.",
+    "Cloudflare production D1 migration permissions cannot be verified from local files alone.",
+    "GitHub branch protection and environment protection settings cannot be fully verified from repository contents alone.",
+    "Legacy/demo scripts are present and require continued quarantine discipline."
+  ]
+}
