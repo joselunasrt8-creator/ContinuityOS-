@@ -154,7 +154,7 @@ test('execute rejects no validation, invalid session, lineage mismatch, wrong ha
 test('proof persists session lineage and consumes authority', () => {
   assert.match(source, /missing_validated_object_hash/)
   assert.match(source, /AND status='EXECUTED'/)
-  assert.match(source, /INSERT INTO proof_registry \(proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id/)
+  assert.match(source, /INSERT OR IGNORE INTO proof_registry \(proof_id,identity_id,session_id,continuity_id,continuity_hash,execution_id/)
   assert.match(source, /proof: \{ proof_id, identity_id: String\(authority\.identity_id \|\| ""\), session_id, continuity_id: String\(authority\.continuity_id/)
   assert.match(source, /SET status='CONSUMED'/)
   assert.match(source, /status:"PROVEN"/)

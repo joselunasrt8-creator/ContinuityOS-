@@ -1,7 +1,88 @@
 {
   "version": "1.0",
   "purpose": "Inventory all state-changing execution surfaces",
+  "canonical_runtime_route": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
   "surfaces": [
+    {
+      "surface_id": "github_governed_deploy_workflow",
+      "path": ".github/workflows/governed-deploy.yml",
+      "mutation_type": "deployment",
+      "risk_class": "P3",
+      "classification": "state_changing_execution_surface",
+      "capabilities": ["governed deploy", "proof persistence"],
+      "required_controls": ["ACTIVE authority", "VALID exact AEO", "unused invocation_nonce", "proof persistence"]
+    },
+    {
+      "surface_id": "github_prepare_governed_deploy_workflow",
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "mutation_type": "authority_preparation",
+      "risk_class": "P2",
+      "classification": "execution_adjacent_mutation_surface",
+      "capabilities": ["session creation", "authority creation", "compile"],
+      "required_controls": ["explicit workflow_dispatch only", "valid worker URL and API key"]
+    },
+    {
+      "surface_id": "cloudflare_worker_runtime_router",
+      "path": "src/index.ts",
+      "mutation_type": "runtime_execution",
+      "risk_class": "P3",
+      "classification": "runtime_boundary_surface",
+      "capabilities": ["D1 registry writes", "runtime lifecycle"],
+      "required_controls": ["VALID exact AEO", "replay protection", "proof capture"]
+    },
+    {
+      "surface_id": "d1_schema_and_migrations",
+      "path": "migrations/",
+      "mutation_type": "schema_migration",
+      "risk_class": "P2",
+      "classification": "database_mutation_surface",
+      "capabilities": ["D1 registry writes", "schema evolution"],
+      "required_controls": ["migration chain integrity", "canonical schema match"]
+    },
+    {
+      "surface_id": "package_manager_scripts",
+      "path": "package.json",
+      "mutation_type": "script_execution",
+      "risk_class": "P1",
+      "classification": "execution_adjacent_mutation_surface",
+      "capabilities": ["npm script execution"],
+      "required_controls": ["deploy script disabled", "governed workflow only"]
+    },
+    {
+      "surface_id": "wrangler_configuration",
+      "path": "wrangler.toml",
+      "mutation_type": "deploy_configuration",
+      "risk_class": "P2",
+      "classification": "execution_adjacent_mutation_surface",
+      "capabilities": ["wrangler deploy configuration"],
+      "required_controls": ["no direct wrangler deploy", "governed workflow only"]
+    },
+    {
+      "surface_id": "legacy_demo_entrypoints",
+      "path": "worker.js",
+      "mutation_type": "legacy_execution",
+      "risk_class": "P1",
+      "classification": "legacy_surface",
+      "capabilities": ["legacy runtime invocation"],
+      "required_controls": ["not production-capable", "demo only"]
+    },
+    {
+      "surface_id": "static_demo_webhook_objects",
+      "path": "gateway.js",
+      "mutation_type": "webhook_demo",
+      "risk_class": "P1",
+      "classification": "demo_surface",
+      "capabilities": ["transfer_webhook intent"],
+      "required_controls": ["demo only", "not production-capable"]
+    },
     {
       "surface_id": "github_production_deploy",
       "path": ".github/workflows/governed-deploy.yml",

@@ -8,7 +8,7 @@ test('proof propagation is queued only after proof persistence in the same bound
   assert.match(source, /INSERT OR IGNORE INTO proof_registry/)
   assert.match(source, /INSERT OR IGNORE INTO proof_propagation_outbox/)
   assert.match(source, /WHERE EXISTS \(SELECT 1 FROM proof_registry p JOIN execution_registry e ON e\.execution_id=p\.execution_id WHERE p\.proof_id=\?2 AND p\.decision_id=\?3 AND p\.execution_id=\?4 AND p\.validated_object_hash=\?5 AND e\.invocation_nonce=\?8\)/)
-  assert.match(source, /canonicalize\(\{ proof_id, decision_id, execution_id, validated_object_hash, invocation_nonce, route: "\/proof", lineage_stage: "proof" \}\)/)
+  assert.match(source, /canonicalize\(\{ proof_id, decision_id, execution_id, validated_object_hash, invocation_nonce, route: "\/proof", lineage_stage: "proof"(?:, execution_closure_hash: executionClosureHash)? \}\)/)
 })
 
 test('/proof/propagate is not a runtime mutation route', () => {

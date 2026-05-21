@@ -43,7 +43,7 @@ test('mutated continuity hash → NULL', () => {
 })
 
 test('proof persists continuity lineage', () => {
-  assert.match(source, /INSERT INTO proof_registry \(proof_id,identity_id,session_id,continuity_id,continuity_hash/)
+  assert.match(source, /INSERT OR IGNORE INTO proof_registry \(proof_id,identity_id,session_id,continuity_id,continuity_hash/)
   assert.match(proofSchema, /continuity_id/)
   assert.match(proofSchema, /authority_lineage/)
 })

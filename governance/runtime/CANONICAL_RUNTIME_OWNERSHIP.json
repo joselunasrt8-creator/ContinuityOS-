@@ -10,6 +10,7 @@
     "proof_semantics": "governance/runtime/PROOF_REQUIREMENTS.json",
     "merge_governance_semantics": "governance/runtime/MERGE_GOVERNANCE_RULES.json",
     "bypass_path_semantics": "governance/runtime/BYPASS_PATHS.json",
+    "BYPASS_PATHS": "BYPASS_PATHS.json",
     "invariant_declarations": "governance/minimal_civilization_invariants.json",
     "reconciliation_semantics": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json"
   },
