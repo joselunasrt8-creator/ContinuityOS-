@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "purpose": "Canonical ownership registry for runtime/governance reference collapse. Defines singular authoritative ownership and deterministic lineage for all duplicate-prone runtime declarations.",
+  "authoritative_sources": {
+    "BYPASS_PATHS": "governance/runtime/BYPASS_PATHS.json",
+    "EXECUTION_SURFACES": "governance/runtime/EXECUTION_SURFACES.json",
+    "RECONCILIATION_DEFINITIONS": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json",
+    "RUNTIME_TOPOLOGY": "runtime/topology/topology_manifest.json",
+    "OBSERVABILITY_INVENTORY": "runtime/surfaces/OBSERVABILITY_SURFACES.json",
+    "SOVEREIGNTY_MAP": "runtime/sovereignty_map.json",
+    "SCHEMA_POLICY": "runtime/governance/SCHEMA_POLICY.json"
+  },
+  "derived_surfaces": {
+    "BYPASS_PATHS": [
+      "runtime/bypass_paths.json",
+      "runtime/surfaces/BYPASS_PATHS.json",
+      "runtime/runtime_mutation_bypass_paths.json",
+      "runtime/distributed_bypass_paths.json",
+      "runtime/delegation_bypass_paths.json",
+      "runtime/constitutional_bypass_paths.json",
+      "runtime/federated_bypass_paths.json",
+      "runtime/state_bypass_paths.json",
+      "runtime/temporal_bypass_paths.json"
+    ],
+    "EXECUTION_SURFACES": [
+      "runtime/execution_surfaces.json",
+      "runtime/surfaces/EXECUTION_SURFACES.json",
+      "runtime/external_execution_surfaces.json",
+      "runtime/federated_runtime_surfaces.json"
+    ],
+    "RUNTIME_TOPOLOGY": [
+      "runtime/topology/runtime_graph.json",
+      "runtime/topology/schema_source_map.json",
+      "runtime/topology/proof_schema_reconciliation.json",
+      "graph/output/runtime_nodes.json",
+      "graph/output/runtime_edges.json"
+    ],
+    "RECONCILIATION_DEFINITIONS": [
+      "runtime/reconciliation/cross-registry-reconciliation-engine.js",
+      "runtime/reconciliation/drift-propagation-engine.js",
+      "runtime/reconciliation/topology-reconciliation-engine.js",
+      "runtime/surface_inventory_reconciler.mjs"
+    ]
+  },
+  "generated_artifacts": {
+    "graph/output/runtime_nodes.json": "runtime/topology/runtime_graph.json",
+    "graph/output/runtime_edges.json": "runtime/topology/runtime_graph.json",
+    "runtime/topology/schema_source_map.json": "runtime/governance/SCHEMA_POLICY.json",
+    "runtime/topology/proof_schema_reconciliation.json": "runtime/governance/SCHEMA_POLICY.json"
+  },
+  "archive_only_objects": {},
+  "deprecated_duplicates": {
+    "runtime/governance/PREO_POLICY.json": "runtime/governance policy mirror; non-authoritative for ownership collapse",
+    "runtime/governance/SCO_POLICY.json": "runtime/governance policy mirror; non-authoritative for ownership collapse"
+  },
+  "reconciliation_sources": {
+    "runtime/surface_inventory_reconciler.mjs": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json",
+    "runtime/cross_registry_authority_reconciliation.mjs": "governance/runtime/RECONCILIATION_VERIFICATION_SPEC.json"
+  },
+  "schema_owners": {
+    "schemas/authority.schema.json": "runtime/governance/SCHEMA_POLICY.json",
+    "schemas/proof.schema.json": "runtime/governance/SCHEMA_POLICY.json",
+    "schemas/aeo.schema.json": "runtime/governance/SCHEMA_POLICY.json",
+    "runtime/legitimacy/schemas/AEO.schema.json": "runtime/governance/SCHEMA_POLICY.json",
+    "runtime/legitimacy/schemas/AUTHORITY.schema.json": "runtime/governance/SCHEMA_POLICY.json"
+  },
+  "topology_owners": {
+    "runtime/topology/topology_manifest.json": "runtime/topology/topology_manifest.json",
+    "runtime/topology/runtime_graph.json": "runtime/topology/topology_manifest.json",
+    "graph/topology.cypher": "runtime/topology/topology_manifest.json",
+    "graph/runtime-topology.cypher": "runtime/topology/topology_manifest.json"
+  }
+}

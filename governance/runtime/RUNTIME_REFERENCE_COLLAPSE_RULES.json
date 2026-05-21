@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "ownership_constraints": [
+    "each_reference_class_has_exactly_one_authoritative_source",
+    "authoritative_source_must_exist",
+    "derived_surfaces_must_only_reference_known_authoritative_classes"
+  ],
+  "authoritative_resolution_rules": [
+    "first-class governance declarations resolve from governance/runtime canonical registry",
+    "runtime topology resolves from runtime/topology/topology_manifest.json",
+    "conflicting authoritative claims fail_closed"
+  ],
+  "derived_artifact_constraints": [
+    "derived_artifact_requires_canonical_owner",
+    "derived_artifact_cannot_redefine_semantics",
+    "derived_artifact_cannot_become_authoritative"
+  ],
+  "archive_constraints": [
+    "archive_objects_are_evidence_only",
+    "archive_objects_cannot_define_authority",
+    "archive_objects_cannot_define_topology_or_execution_semantics"
+  ],
+  "topology_singularity_rules": [
+    "runtime_topology_owner_is_singular",
+    "topology_derivations_require_lineage_to_owner",
+    "topology_ambiguity_fails_closed"
+  ],
+  "fail_closed_conditions": [
+    "conflicting_authoritative_definitions",
+    "missing_authoritative_source",
+    "derived_without_owner",
+    "archive_authority_escalation",
+    "bypass_path_owner_collision",
+    "execution_surface_owner_collision",
+    "reconciliation_owner_collision"
+  ]
+}
