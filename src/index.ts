@@ -166,7 +166,25 @@ const CONFORMANCE_RUNTIME_ROUTE = "/conformance/runtime" as const
 const CONFORMANCE_EXTERNAL_ROUTE = "/conformance/external" as const
 const CONFORMANCE_EQUIVALENCE_ROUTE = "/conformance/equivalence" as const
 const CONFORMANCE_CHECKPOINT_ROUTE = "/conformance/checkpoint" as const
+
 const INSTALL_BASE_METRICS_ROUTE = "/install-base/metrics" as const
+const GOVERNANCE_OBSERVABILITY_ROUTE = "/observability/governance" as const
+const GOVERNANCE_OBSERVABILITY_TELEMETRY_ROUTE = "/observability/governance/telemetry" as const
+const GOVERNANCE_OBSERVABILITY_METRICS_ROUTE = "/observability/governance/metrics" as const
+const GOVERNANCE_OBSERVABILITY_REPLAY_ROUTE = "/observability/governance/replay-rejections" as const
+const GOVERNANCE_OBSERVABILITY_CONTINUITY_ROUTE = "/observability/governance/continuity-rejections" as const
+const GOVERNANCE_OBSERVABILITY_WORKFLOW_DRIFT_ROUTE = "/observability/governance/workflow-integrity-drift" as const
+const GOVERNANCE_OBSERVABILITY_RECONCILIATION_FAILURE_ROUTE = "/observability/governance/reconciliation-failures" as const
+const GOVERNANCE_OBSERVABILITY_ROUTES = [
+  GOVERNANCE_OBSERVABILITY_ROUTE,
+  GOVERNANCE_OBSERVABILITY_TELEMETRY_ROUTE,
+  GOVERNANCE_OBSERVABILITY_METRICS_ROUTE,
+  GOVERNANCE_OBSERVABILITY_REPLAY_ROUTE,
+  GOVERNANCE_OBSERVABILITY_CONTINUITY_ROUTE,
+  GOVERNANCE_OBSERVABILITY_WORKFLOW_DRIFT_ROUTE,
+  GOVERNANCE_OBSERVABILITY_RECONCILIATION_FAILURE_ROUTE,
+] as const
+
 const EXTERNAL_CONFORMANCE_ROUTES = [CONFORMANCE_RUNTIME_ROUTE, CONFORMANCE_EXTERNAL_ROUTE, CONFORMANCE_EQUIVALENCE_ROUTE, CONFORMANCE_CHECKPOINT_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
@@ -209,6 +227,7 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     "/federation/conformance",
     "/federation/sovereignty/checkpoint",
     INSTALL_BASE_METRICS_ROUTE,
+    ...GOVERNANCE_OBSERVABILITY_ROUTES,
     EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE,
     BOOTSTRAP_VERIFY_ROUTE,
     BOOTSTRAP_TOPOLOGY_ROUTE,
@@ -5009,6 +5028,52 @@ async function installBaseGovernanceMetrics(env: Env) {
   }
 }
 
+
+
+function boundedObservabilityWindow(url: URL, fallback = 30): number {
+  const requested = Number(url.searchParams.get("window") || url.searchParams.get("limit") || String(fallback))
+  if (!Number.isFinite(requested) || requested < 1) return fallback
+  return Math.min(Math.floor(requested), 90)
+}
+
+async function installBaseEventTrend(env: Env, event_type: InstallBaseTelemetryEventType, window: number) {
+  const rows = await env.DB.prepare(`SELECT substr(created_at,1,10) AS day, COUNT(*) AS count FROM install_base_telemetry_registry WHERE event_type=?1 GROUP BY day ORDER BY day DESC LIMIT ?2`)
+    .bind(event_type, window)
+    .all<any>()
+  return (rows.results || []).map((row: any) => ({ day: String(row.day || ""), count: Number(row.count || 0) }))
+}
+
+async function governanceObservabilityEvidence(env: Env, window: number) {
+  const telemetrySummaryRows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM observability_registry GROUP BY event_type ORDER BY count DESC LIMIT 50`).all<any>()
+  const telemetry_event_summaries = (telemetrySummaryRows.results || []).map((row: any) => ({ event_type: String(row.event_type || ""), count: Number(row.count || 0) }))
+  const governance_dependency_metrics = await installBaseGovernanceMetrics(env)
+  const replay_rejection_trends = await installBaseEventTrend(env, "replay_rejected", window)
+  const continuity_rejection_trends = await installBaseEventTrend(env, "continuity_rejected", window)
+  const workflow_integrity_drift_trends = await installBaseEventTrend(env, "workflow_integrity_drift", window)
+  const reconciliation_failure_trends = await installBaseEventTrend(env, "reconciliation_failure_detected", window)
+  return {
+    classification: {
+      evidence_only: true,
+      read_only: true,
+      get_only: true,
+      non_authoritative: true,
+      mutation_capable: false,
+      creates_authority: false,
+      influences_validator_outcome: false,
+      influences_execution_eligibility: false,
+      creates_proof_legitimacy: false,
+      mutates_runtime_lineage: false,
+      append_only_telemetry_preserved: true,
+      deterministic_metrics_preserved: true,
+    },
+    telemetry_event_summaries,
+    governance_dependency_metrics,
+    replay_rejection_trends,
+    continuity_rejection_trends,
+    workflow_integrity_drift_trends,
+    reconciliation_failure_trends,
+  }
+}
 async function recordDrift(env: Env, drift: {
   drift_class: DriftClass
   severity?: string
@@ -6836,6 +6901,24 @@ export default {
         return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "observability_only", metrics, authority_issuance_influenced: false, validator_decisions_influenced: false, execution_eligibility_influenced: false, proof_legitimacy_influenced: false })
       } catch {
         return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false })
+      }
+    }
+
+    if (GOVERNANCE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", evidence_only: true, read_only: true, get_only: true, mutation_capable: false, non_authoritative: true, creates_authority: false, influences_validator_outcome: false, influences_execution_eligibility: false, creates_proof_legitimacy: false, mutates_runtime_lineage: false, append_only: true, deterministic: true }, 405)
+    if (GOVERNANCE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", evidence_only: true, read_only: true, get_only: true, mutation_capable: false, non_authoritative: true, creates_authority: false })
+        const window = boundedObservabilityWindow(url)
+        const evidence = await governanceObservabilityEvidence(env, window)
+        if (url.pathname === GOVERNANCE_OBSERVABILITY_TELEMETRY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", telemetry_event_summaries: evidence.telemetry_event_summaries, classification: evidence.classification })
+        if (url.pathname === GOVERNANCE_OBSERVABILITY_METRICS_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", governance_dependency_metrics: evidence.governance_dependency_metrics, classification: evidence.classification })
+        if (url.pathname === GOVERNANCE_OBSERVABILITY_REPLAY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", replay_rejection_trends: evidence.replay_rejection_trends, classification: evidence.classification })
+        if (url.pathname === GOVERNANCE_OBSERVABILITY_CONTINUITY_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", continuity_rejection_trends: evidence.continuity_rejection_trends, classification: evidence.classification })
+        if (url.pathname === GOVERNANCE_OBSERVABILITY_WORKFLOW_DRIFT_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", workflow_integrity_drift_trends: evidence.workflow_integrity_drift_trends, classification: evidence.classification })
+        if (url.pathname === GOVERNANCE_OBSERVABILITY_RECONCILIATION_FAILURE_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", reconciliation_failure_trends: evidence.reconciliation_failure_trends, classification: evidence.classification })
+        return json({ status: "NULL", route: url.pathname, reason: "observability_only", ...evidence })
+      } catch {
+        return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", evidence_only: true, read_only: true, get_only: true, mutation_capable: false, non_authoritative: true, creates_authority: false })
       }
     }
 
