@@ -96,7 +96,8 @@ CREATE TABLE IF NOT EXISTS validation_registry (
   result TEXT NOT NULL,
   reason TEXT,
   status TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  workflow_integrity_hash TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_validation_registry_decision_hash_nonce
@@ -118,6 +119,7 @@ CREATE TABLE IF NOT EXISTS execution_registry (
   source_tree_hash TEXT,
   workflow_run_id TEXT,
   workflow_sha TEXT,
+  workflow_integrity_hash TEXT,
   UNIQUE(execution_id, decision_id, validated_object_hash),
   UNIQUE(workflow_run_id)
 );
@@ -153,6 +155,7 @@ CREATE TABLE IF NOT EXISTS proof_registry (
   source_tree_hash TEXT,
   workflow_run_id TEXT,
   workflow_sha TEXT,
+  workflow_integrity_hash TEXT,
   UNIQUE(execution_id, decision_id, validated_object_hash),
   UNIQUE(workflow_run_id)
 );
