@@ -133,6 +133,8 @@ const VALIDATION_FRESHNESS_WINDOW_MS = 5 * 60_000
 const PROOF_FRESHNESS_WINDOW_MS = 10 * 60_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
+const EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/authority", "/compile", "/validate", "/execute", "/proof"] as const)
+const NON_EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/session", "/continuity"] as const)
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
@@ -647,7 +649,7 @@ type ContinuousFATEDriftClass = "continuous_fate_divergence" | "replay_mutation_
 type RuntimeSurfaceContainmentDriftClass = "hidden_execution_surface_detected" | "undeclared_mutation_surface_detected" | "runtime_route_containment_drift" | "deployment_surface_hash_drift" | "workflow_dispatch_escape_detected" | "adapter_authority_escape_detected" | "proofless_execution_surface_detected" | "canonical_route_boundary_drift" | "observability_route_execution_upgrade" | "sovereignty_containment_failure"
 type UnauthorizedMutationClosureDriftClass = "UNDECLARED_MUTATION_SURFACE" | "UNCLASSIFIED_EXECUTION_SURFACE" | "UNBOUND_DATABASE_WRITE" | "UNBOUND_DEPLOYMENT_SURFACE" | "OBSERVABILITY_MUTATION_ESCALATION" | "GOVERNANCE_MUTATION_WITHOUT_SCO" | "AGENT_TOOL_MUTATION_UNCLASSIFIED" | "EXTERNAL_API_MUTATION_UNCLASSIFIED" | "RECONCILIATION_MUTATION_ESCAPE" | "PROOFLESS_MUTATION_PATH" | "AUTHORITYLESS_MUTATION_PATH" | "CLOSURE_INCOMPLETE"
 type MutationSurfaceClassification = "canonical_runtime" | "governed_evidence" | "observability_only" | "external_adapter" | "webhook" | "package_script" | "workflow" | "hidden" | "NULL"
-type ExecutableSurfaceInventory = { declared_canonical_routes: readonly string[], declared_observability_routes: readonly string[], route_handlers: readonly string[], undeclared_route_handlers: readonly string[], non_get_observability_handlers: readonly string[], workflow_surfaces: readonly string[], package_surfaces: readonly string[], adapter_surfaces: readonly string[], webhook_surfaces: readonly string[] }
+type ExecutableSurfaceInventory = { declared_canonical_routes: readonly string[], declared_executable_routes: readonly string[], declared_non_executable_runtime_routes: readonly string[], declared_observability_routes: readonly string[], route_handlers: readonly string[], undeclared_route_handlers: readonly string[], non_get_observability_handlers: readonly string[], workflow_surfaces: readonly string[], package_surfaces: readonly string[], adapter_surfaces: readonly string[], webhook_surfaces: readonly string[] }
 type HiddenSurfaceProbe = { route?: string, method?: string, workflow?: string, package_command?: string, adapter?: string, webhook?: string, mutation_capable: boolean, deploy_capable: boolean, proof_bound: boolean }
 type DeploymentSurfaceHash = { workflow_surface_hash: string, package_surface_hash: string, deployment_surface_hash: string }
 type RouteContainmentCheckpoint = { checkpoint_hash: string, route_surface_hash: string, hidden_surface_count: number, drift_classes: RuntimeSurfaceContainmentDriftClass[] }
@@ -5775,6 +5777,8 @@ function containmentFlags(): { evidence_only: true, replay_neutral: true, mutati
 }
 
 const DECLARED_RUNTIME_ROUTE_CONSTANTS = Object.freeze([...CANONICAL_RUNTIME_ROUTES, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
+const DECLARED_EXECUTABLE_ROUTE_CONSTANTS = Object.freeze([...EXECUTABLE_RUNTIME_ROUTES].sort())
+const DECLARED_NON_EXECUTABLE_RUNTIME_ROUTE_CONSTANTS = Object.freeze([...NON_EXECUTABLE_RUNTIME_ROUTES].sort())
 const DECLARED_ROUTE_HANDLER_SURFACES = Object.freeze(["/health", ...CANONICAL_RUNTIME_ROUTES, ...GOVERNANCE_EVIDENCE_ROUTES, RECURSIVE_GOVERNANCE_ROUTE, RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE, ...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort())
 const GOVERNED_DEPLOY_WORKFLOW_SURFACES = Object.freeze([".github/workflows/governed-deploy.yml", ".github/workflows/prepare-governed-deploy.yml"])
 const NON_DEPLOY_WORKFLOW_SURFACES = Object.freeze([".github/workflows/merge-governance-check.yml", ".github/workflows/preo-candidate.yml", ".github/workflows/sco-candidate.yml"])
@@ -5804,6 +5808,8 @@ function runtimeSurfaceInventory(probe: HiddenSurfaceProbe): ExecutableSurfaceIn
   const non_get_observability_handlers = probe.route && probe.method && probe.method.toUpperCase() !== "GET" && declaredRouteSet.has(probe.route) && (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(probe.route) ? [probe.route] : []
   return Object.freeze({
     declared_canonical_routes: Object.freeze([...CANONICAL_RUNTIME_ROUTES].sort()),
+    declared_executable_routes: Object.freeze([...EXECUTABLE_RUNTIME_ROUTES].sort()),
+    declared_non_executable_runtime_routes: Object.freeze([...NON_EXECUTABLE_RUNTIME_ROUTES].sort()),
     declared_observability_routes: Object.freeze([...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort()),
     route_handlers: Object.freeze([...handlerSet].sort()),
     undeclared_route_handlers: Object.freeze(undeclared_route_handlers),
@@ -5835,7 +5841,10 @@ function classifyRuntimeSurfaceContainmentDrift(inventory: ExecutableSurfaceInve
   const canonicalUnchanged = canonicalize(CANONICAL_RUNTIME_ROUTES) === canonicalize(["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"])
   if (!canonicalUnchanged) drift.add("canonical_route_boundary_drift")
   if (inventory.undeclared_route_handlers.length > 0 || (probe.route && !(DECLARED_RUNTIME_ROUTE_CONSTANTS as readonly string[]).includes(probe.route))) drift.add("hidden_execution_surface_detected")
-  if (probe.mutation_capable && probe.route && !(CANONICAL_RUNTIME_ROUTES as readonly string[]).includes(probe.route) && !(GOVERNANCE_EVIDENCE_ROUTES as readonly string[]).includes(probe.route)) drift.add("undeclared_mutation_surface_detected")
+  if (probe.mutation_capable && probe.route && !(EXECUTABLE_RUNTIME_ROUTES as readonly string[]).includes(probe.route)) {
+    drift.add("undeclared_mutation_surface_detected")
+    drift.add("runtime_route_containment_drift")
+  }
   if (inventory.non_get_observability_handlers.length > 0) drift.add("observability_route_execution_upgrade")
   if (probe.route && (NON_EXECUTABLE_OBSERVABILITY_ROUTES as readonly string[]).includes(probe.route) && probe.mutation_capable) drift.add("runtime_route_containment_drift")
   if (probe.workflow && probe.workflow !== ".github/workflows/governed-deploy.yml" && probe.deploy_capable) drift.add("workflow_dispatch_escape_detected")
@@ -5858,11 +5867,14 @@ async function buildSovereigntyContainmentEnvelope(env: Env, url: URL, generated
   const inventory = runtimeSurfaceInventory(probe)
   const mutation_surface_classification = classifyContainmentSurfaces(inventory)
   const deployment_surface_hash = await deploymentSurfaceHash(inventory)
-  const route_surface_hash = await sha256Hex(canonicalize({ canonical: inventory.declared_canonical_routes, observability: inventory.declared_observability_routes, handlers: inventory.route_handlers }))
+  const executable_route_surface_hash = await sha256Hex(canonicalize(inventory.declared_executable_routes))
+  const non_executable_runtime_route_surface_hash = await sha256Hex(canonicalize(inventory.declared_non_executable_runtime_routes))
+  const observability_route_surface_hash = await sha256Hex(canonicalize(inventory.declared_observability_routes))
+  const route_surface_hash = await sha256Hex(canonicalize({ canonical: inventory.declared_canonical_routes, executable: inventory.declared_executable_routes, non_executable_runtime: inventory.declared_non_executable_runtime_routes, observability: inventory.declared_observability_routes, handlers: inventory.route_handlers, executable_route_surface_hash, non_executable_runtime_route_surface_hash, observability_route_surface_hash }))
   const runtime_sovereignty_hash = (await runtimeSovereigntyManifestReadOnly(env)).sovereignty_hash
   const drift_classes = classifyRuntimeSurfaceContainmentDrift(inventory, probe)
   const hidden_surface_count = inventory.undeclared_route_handlers.length
-  const objectMaterial = { object_type: "RuntimeSurfaceContainmentObject" as const, inventory, mutation_surface_classification, deployment_surface_hash, route_surface_hash, package_surface_hash: deployment_surface_hash.package_surface_hash, hidden_surface_count, drift_classes, runtime_sovereignty_hash }
+  const objectMaterial = { object_type: "RuntimeSurfaceContainmentObject" as const, inventory, mutation_surface_classification, deployment_surface_hash, route_surface_hash, executable_route_surface_hash, non_executable_runtime_route_surface_hash, observability_route_surface_hash, package_surface_hash: deployment_surface_hash.package_surface_hash, hidden_surface_count, drift_classes, runtime_sovereignty_hash }
   const containment_hash = await sha256Hex(canonicalize(objectMaterial))
   const checkpoint = Object.freeze({ checkpoint_hash: await sha256Hex(canonicalize({ containment_hash, route_surface_hash, deployment_surface_hash, drift_classes, hidden_surface_count })), route_surface_hash, hidden_surface_count, drift_classes })
   return Object.freeze({ ...objectMaterial, containment_hash, generated_at, envelope_type: "SovereigntyContainmentEnvelope" as const, checkpoint, ...containmentFlags() }) as SovereigntyContainmentEnvelope
