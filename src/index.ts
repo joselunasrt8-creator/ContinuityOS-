@@ -184,6 +184,10 @@ const GOVERNANCE_OBSERVABILITY_ROUTES = [
   GOVERNANCE_OBSERVABILITY_WORKFLOW_DRIFT_ROUTE,
   GOVERNANCE_OBSERVABILITY_RECONCILIATION_FAILURE_ROUTE,
 ] as const
+const RELEASE_PROVENANCE_ROUTE = "/release/provenance" as const
+const RELEASE_ATTESTATION_ROUTE = "/release/attestation" as const
+const RELEASE_LINEAGE_ROUTE = "/release/lineage" as const
+const RELEASE_PROVENANCE_ROUTES = [RELEASE_PROVENANCE_ROUTE, RELEASE_ATTESTATION_ROUTE] as const
 
 const EXTERNAL_CONFORMANCE_ROUTES = [CONFORMANCE_RUNTIME_ROUTE, CONFORMANCE_EXTERNAL_ROUTE, CONFORMANCE_EQUIVALENCE_ROUTE, CONFORMANCE_CHECKPOINT_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
@@ -239,6 +243,7 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     ...CROSS_REGISTRY_RECONCILIATION_ROUTES,
     ...OBSERVER_CONSENSUS_ROUTES,
     ...EXTERNAL_CONFORMANCE_ROUTES,
+    RELEASE_LINEAGE_ROUTE,
   ]),
 ] as const
 const REQUIRE_PREO_LINEAGE = "explicit_governed_deploy_policy" as const
@@ -1259,6 +1264,22 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_decision ON install_base_telemetry_registry(decision_id)`,
       `CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_update BEFORE UPDATE ON install_base_telemetry_registry BEGIN SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only'); END`,
       `CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_delete BEFORE DELETE ON install_base_telemetry_registry BEGIN SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only'); END`,
+      `CREATE TABLE IF NOT EXISTS release_provenance_registry (release_id TEXT PRIMARY KEY, release_tag TEXT NOT NULL, commit_sha TEXT NOT NULL, workflow_hash TEXT NOT NULL, artifact_hash TEXT NOT NULL, validation_proof_id TEXT NOT NULL, proof_references TEXT NOT NULL, release_lineage_hash TEXT NOT NULL, decision_id TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('PENDING','RELEASED','REJECTED','SUPERSEDED')), evidence_only TEXT NOT NULL CHECK (evidence_only='false'), append_only TEXT NOT NULL CHECK (append_only='true'), mutable TEXT NOT NULL CHECK (mutable='false'), created_at TEXT NOT NULL, CHECK (release_tag != ''), CHECK (commit_sha != ''), CHECK (workflow_hash != ''), CHECK (artifact_hash != ''), CHECK (validation_proof_id != ''), CHECK (release_lineage_hash != ''), CHECK (decision_id != ''), CHECK (invocation_nonce != ''))`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_release_provenance_registry_tag_unique ON release_provenance_registry(release_tag)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_release_provenance_registry_lineage_unique ON release_provenance_registry(release_lineage_hash)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_release_provenance_registry_nonce_unique ON release_provenance_registry(invocation_nonce)`,
+      `CREATE INDEX IF NOT EXISTS idx_release_provenance_registry_commit ON release_provenance_registry(commit_sha, status)`,
+      `CREATE INDEX IF NOT EXISTS idx_release_provenance_registry_proof ON release_provenance_registry(validation_proof_id, decision_id)`,
+      `CREATE TRIGGER IF NOT EXISTS trg_release_provenance_registry_no_update BEFORE UPDATE ON release_provenance_registry BEGIN SELECT RAISE(ABORT, 'release_provenance_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_release_provenance_registry_no_delete BEFORE DELETE ON release_provenance_registry BEGIN SELECT RAISE(ABORT, 'release_provenance_registry is append-only'); END`,
+      `CREATE TABLE IF NOT EXISTS release_artifact_attestation_registry (attestation_id TEXT PRIMARY KEY, release_id TEXT NOT NULL, artifact_name TEXT NOT NULL, artifact_hash TEXT NOT NULL, artifact_media_type TEXT NOT NULL, commit_sha TEXT NOT NULL, workflow_hash TEXT NOT NULL, release_lineage_hash TEXT NOT NULL, attestation_hash TEXT NOT NULL, validation_proof_id TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('ATTESTED','REJECTED','REVOKED')), evidence_only TEXT NOT NULL CHECK (evidence_only='false'), append_only TEXT NOT NULL CHECK (append_only='true'), mutable TEXT NOT NULL CHECK (mutable='false'), created_at TEXT NOT NULL, CHECK (attestation_hash != ''), CHECK (artifact_hash != ''), CHECK (commit_sha != ''), CHECK (release_id != ''), CHECK (validation_proof_id != ''))`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_release_artifact_attestation_hash_unique ON release_artifact_attestation_registry(attestation_hash)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_release_artifact_release_artifact_unique ON release_artifact_attestation_registry(release_id, artifact_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_release_artifact_attestation_release ON release_artifact_attestation_registry(release_id, status)`,
+      `CREATE INDEX IF NOT EXISTS idx_release_artifact_attestation_commit ON release_artifact_attestation_registry(commit_sha, artifact_hash)`,
+      `CREATE TRIGGER IF NOT EXISTS trg_release_artifact_attestation_registry_no_update BEFORE UPDATE ON release_artifact_attestation_registry BEGIN SELECT RAISE(ABORT, 'release_artifact_attestation_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_release_artifact_attestation_registry_no_delete BEFORE DELETE ON release_artifact_attestation_registry BEGIN SELECT RAISE(ABORT, 'release_artifact_attestation_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_release_artifact_attestation_requires_provenance BEFORE INSERT ON release_artifact_attestation_registry WHEN NOT EXISTS (SELECT 1 FROM release_provenance_registry r WHERE r.release_id=NEW.release_id AND r.commit_sha=NEW.commit_sha AND r.artifact_hash=NEW.artifact_hash AND r.release_lineage_hash=NEW.release_lineage_hash AND r.validation_proof_id=NEW.validation_proof_id AND r.status IN ('PENDING','RELEASED')) BEGIN SELECT RAISE(ABORT, 'release_artifact_attestation requires matching release provenance'); END`,
       `CREATE INDEX IF NOT EXISTS idx_observability_decision ON observability_registry(decision_id)`,
       `CREATE INDEX IF NOT EXISTS idx_observability_execution ON observability_registry(execution_id)`,
       `CREATE INDEX IF NOT EXISTS idx_observability_type ON observability_registry(event_type)`,
@@ -7880,6 +7901,98 @@ export default {
       await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, workflow_run_id: provenance.workflow_run_id } })
       await emitTelemetry(env, { event_type: "AUTHORITY_CONSUMED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", authority_status: "CONSUMED" } })
       return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, identity_id: String(authority.identity_id || ""), session_id, continuity_id: String(authority.continuity_id || ""), execution_id, decision_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, pull_request_id: provenance.pull_request_id, merge_commit_sha: provenance.merge_commit_sha, source_tree_hash: provenance.source_tree_hash, workflow_run_id: provenance.workflow_run_id, workflow_sha: provenance.workflow_sha } })
+    }
+
+    if (url.pathname === RELEASE_PROVENANCE_ROUTE && request.method === "POST") {
+      if (!authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
+      let body: Record<string, unknown>
+      try { body = await request.json() as Record<string, unknown> } catch { return json({ status: "NULL", reason: "invalid_request_body" }, 400) }
+      const release_tag = String(body.release_tag || "").trim()
+      const commit_sha = String(body.commit_sha || "").trim()
+      const workflow_hash = String(body.workflow_hash || "").trim()
+      const artifact_hash = String(body.artifact_hash || "").trim()
+      const validation_proof_id = String(body.validation_proof_id || "").trim()
+      const decision_id = String(body.decision_id || "").trim()
+      const invocation_nonce = String(body.invocation_nonce || "").trim()
+      const proof_references_raw = Array.isArray(body.proof_references) ? body.proof_references.map(String) : []
+      if (!release_tag) return json({ status: "NULL", reason: "missing_release_tag" }, 400)
+      if (!commit_sha || commit_sha.length < 40) return json({ status: "NULL", reason: "missing_commit_sha" }, 400)
+      if (!workflow_hash || workflow_hash.length !== 64) return json({ status: "NULL", reason: "missing_workflow_hash" }, 400)
+      if (!artifact_hash || artifact_hash.length !== 64) return json({ status: "NULL", reason: "missing_artifact_hash" }, 400)
+      if (!validation_proof_id) return json({ status: "NULL", reason: "missing_validation_proof_id" }, 400)
+      if (!decision_id) return json({ status: "NULL", reason: "missing_decision_id" }, 400)
+      if (!invocation_nonce) return json({ status: "NULL", reason: "missing_invocation_nonce" }, 400)
+      if (proof_references_raw.length === 0) return json({ status: "NULL", reason: "missing_proof_references" }, 400)
+      const proof = await env.DB.prepare(`SELECT proof_id, commit_sha, decision_id FROM proof_registry WHERE proof_id=?1 AND decision_id=?2`).bind(validation_proof_id, decision_id).first<{ proof_id: string, commit_sha: string, decision_id: string }>()
+      if (!proof) return json({ status: "NULL", reason: "proof_not_found" }, 400)
+      if (String(proof.commit_sha || "") !== commit_sha) return json({ status: "NULL", reason: "commit_sha_mismatch" }, 400)
+      const existing_nonce = await env.DB.prepare(`SELECT release_id FROM release_provenance_registry WHERE invocation_nonce=?1`).bind(invocation_nonce).first<{ release_id: string }>()
+      if (existing_nonce) return json({ status: "NULL", reason: "replay_detected" }, 409)
+      const existing_tag = await env.DB.prepare(`SELECT release_id FROM release_provenance_registry WHERE release_tag=?1`).bind(release_tag).first<{ release_id: string }>()
+      if (existing_tag) return json({ status: "NULL", reason: "release_tag_conflict" }, 409)
+      const release_lineage_hash = await sha256Hex(canonicalize({ release_tag, commit_sha, workflow_hash, artifact_hash, validation_proof_id, decision_id }))
+      const release_id = crypto.randomUUID()
+      const created_at = new Date().toISOString()
+      try {
+        const insertResult = await env.DB.prepare(`INSERT OR IGNORE INTO release_provenance_registry (release_id,release_tag,commit_sha,workflow_hash,artifact_hash,validation_proof_id,proof_references,release_lineage_hash,decision_id,invocation_nonce,status,evidence_only,append_only,mutable,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'RELEASED','false','true','false',?11)`).bind(release_id,release_tag,commit_sha,workflow_hash,artifact_hash,validation_proof_id,JSON.stringify(proof_references_raw),release_lineage_hash,decision_id,invocation_nonce,created_at).run()
+        if (!insertResult.meta?.changes || insertResult.meta.changes !== 1) return json({ status: "NULL", reason: "release_provenance_conflict" }, 409)
+      } catch { return json({ status: "NULL", reason: "release_provenance_conflict" }, 409) }
+      return json({ status: "RELEASE_PROVENANCE_REGISTERED", release_id, release_tag, commit_sha, workflow_hash, artifact_hash, validation_proof_id, release_lineage_hash, decision_id, created_at, append_only: true, mutable: false })
+    }
+
+    if (url.pathname === RELEASE_ATTESTATION_ROUTE && request.method === "POST") {
+      if (!authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
+      let body: Record<string, unknown>
+      try { body = await request.json() as Record<string, unknown> } catch { return json({ status: "NULL", reason: "invalid_request_body" }, 400) }
+      const release_id = String(body.release_id || "").trim()
+      const artifact_name = String(body.artifact_name || "").trim()
+      const artifact_hash = String(body.artifact_hash || "").trim()
+      const artifact_media_type = String(body.artifact_media_type || "").trim()
+      const commit_sha = String(body.commit_sha || "").trim()
+      const workflow_hash = String(body.workflow_hash || "").trim()
+      if (!release_id) return json({ status: "NULL", reason: "missing_release_id" }, 400)
+      if (!artifact_name) return json({ status: "NULL", reason: "missing_artifact_name" }, 400)
+      if (!artifact_hash || artifact_hash.length !== 64) return json({ status: "NULL", reason: "missing_artifact_hash" }, 400)
+      if (!artifact_media_type) return json({ status: "NULL", reason: "missing_artifact_media_type" }, 400)
+      if (!commit_sha || commit_sha.length < 40) return json({ status: "NULL", reason: "missing_commit_sha" }, 400)
+      if (!workflow_hash || workflow_hash.length !== 64) return json({ status: "NULL", reason: "missing_workflow_hash" }, 400)
+      const provenance = await env.DB.prepare(`SELECT release_id, release_tag, commit_sha, workflow_hash, artifact_hash, release_lineage_hash, validation_proof_id, status FROM release_provenance_registry WHERE release_id=?1`).bind(release_id).first<{ release_id: string, release_tag: string, commit_sha: string, workflow_hash: string, artifact_hash: string, release_lineage_hash: string, validation_proof_id: string, status: string }>()
+      if (!provenance) return json({ status: "NULL", reason: "release_provenance_not_found" }, 400)
+      if (provenance.status !== "PENDING" && provenance.status !== "RELEASED") return json({ status: "NULL", reason: "release_provenance_not_active" }, 400)
+      if (String(provenance.commit_sha || "") !== commit_sha) return json({ status: "NULL", reason: "commit_sha_mismatch" }, 400)
+      if (String(provenance.workflow_hash || "") !== workflow_hash) return json({ status: "NULL", reason: "workflow_hash_mismatch" }, 400)
+      if (String(provenance.artifact_hash || "") !== artifact_hash) return json({ status: "NULL", reason: "artifact_hash_mismatch" }, 400)
+      const release_lineage_hash = String(provenance.release_lineage_hash || "")
+      const validation_proof_id = String(provenance.validation_proof_id || "")
+      const attestation_hash = await sha256Hex(canonicalize({ release_id, artifact_name, artifact_hash, artifact_media_type, commit_sha, workflow_hash, release_lineage_hash, validation_proof_id }))
+      const attestation_id = crypto.randomUUID()
+      const created_at = new Date().toISOString()
+      try {
+        const insertResult = await env.DB.prepare(`INSERT OR IGNORE INTO release_artifact_attestation_registry (attestation_id,release_id,artifact_name,artifact_hash,artifact_media_type,commit_sha,workflow_hash,release_lineage_hash,attestation_hash,validation_proof_id,status,evidence_only,append_only,mutable,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'ATTESTED','false','true','false',?11)`).bind(attestation_id,release_id,artifact_name,artifact_hash,artifact_media_type,commit_sha,workflow_hash,release_lineage_hash,attestation_hash,validation_proof_id,created_at).run()
+        if (!insertResult.meta?.changes || insertResult.meta.changes !== 1) return json({ status: "NULL", reason: "attestation_conflict" }, 409)
+      } catch { return json({ status: "NULL", reason: "attestation_conflict" }, 409) }
+      return json({ status: "RELEASE_ARTIFACT_ATTESTED", attestation_id, release_id, release_tag: String(provenance.release_tag || ""), artifact_name, artifact_hash, artifact_media_type, commit_sha, workflow_hash, release_lineage_hash, attestation_hash, validation_proof_id, created_at, append_only: true, mutable: false })
+    }
+
+    if (url.pathname === RELEASE_LINEAGE_ROUTE && request.method === "GET") {
+      const release_tag = String(url.searchParams.get("tag") || "").trim()
+      const release_id_param = String(url.searchParams.get("release_id") || "").trim()
+      if (!release_tag && !release_id_param) return json({ status: "NULL", reason: "missing_tag_or_release_id" }, 400)
+      let provenance: { release_id: string, release_tag: string, commit_sha: string, workflow_hash: string, artifact_hash: string, validation_proof_id: string, proof_references: string, release_lineage_hash: string, decision_id: string, status: string, created_at: string } | null = null
+      if (release_tag) {
+        provenance = await env.DB.prepare(`SELECT release_id,release_tag,commit_sha,workflow_hash,artifact_hash,validation_proof_id,proof_references,release_lineage_hash,decision_id,status,created_at FROM release_provenance_registry WHERE release_tag=?1`).bind(release_tag).first()
+      } else {
+        provenance = await env.DB.prepare(`SELECT release_id,release_tag,commit_sha,workflow_hash,artifact_hash,validation_proof_id,proof_references,release_lineage_hash,decision_id,status,created_at FROM release_provenance_registry WHERE release_id=?1`).bind(release_id_param).first()
+      }
+      if (!provenance) return json({ status: "NULL", reason: "release_not_found" }, 404)
+      const attestations = await env.DB.prepare(`SELECT attestation_id,artifact_name,artifact_hash,artifact_media_type,attestation_hash,status,created_at FROM release_artifact_attestation_registry WHERE release_id=?1 AND status='ATTESTED'`).bind(provenance.release_id).all()
+      let proof_refs: string[] = []
+      try { proof_refs = JSON.parse(provenance.proof_references) } catch { proof_refs = [] }
+      return json({ status: "RELEASE_LINEAGE_VERIFIED", release_provenance: { ...provenance, proof_references: proof_refs }, attestations: attestations.results || [], lineage_verified: true, append_only: true, mutable: false, evidence_only: false })
+    }
+
+    if ((RELEASE_PROVENANCE_ROUTES as readonly string[]).includes(url.pathname) && request.method === "GET") {
+      return json({ status: "NULL", route: url.pathname, reason: "post_only", allowed_methods: ["POST"] }, 405)
     }
 
     return json({ status: "NULL", reason: "not_found" }, 404)

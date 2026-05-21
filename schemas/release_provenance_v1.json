@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "release_provenance_v1",
+  "title": "ReleaseProvenanceV1",
+  "description": "Governed release provenance binding: commit lineage → validation evidence → artifact hash → immutable release tag.",
+  "type": "object",
+  "required": [
+    "release_id",
+    "release_tag",
+    "commit_sha",
+    "workflow_hash",
+    "artifact_hash",
+    "validation_proof_id",
+    "proof_references",
+    "release_lineage_hash",
+    "decision_id",
+    "invocation_nonce",
+    "status",
+    "evidence_only",
+    "append_only",
+    "mutable",
+    "created_at"
+  ],
+  "properties": {
+    "release_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this release provenance record."
+    },
+    "release_tag": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Immutable git tag name for the release (e.g. v1.2.3). Unique across all releases."
+    },
+    "commit_sha": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 64,
+      "description": "Full git commit SHA that this release binds to. Must match proof commit lineage."
+    },
+    "workflow_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "SHA-256 of the canonical release workflow content. Ensures no stale workflow releases."
+    },
+    "artifact_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "SHA-256 of the release artifact. Deterministic and immutable after registration."
+    },
+    "validation_proof_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "proof_id from proof_registry that authorized this release. Must reference PROVEN proof."
+    },
+    "proof_references": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "description": "Ordered list of proof_id values forming the complete validation lineage."
+    },
+    "release_lineage_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "Deterministic SHA-256 over (release_tag, commit_sha, workflow_hash, artifact_hash, validation_proof_id, decision_id). Unique constraint enforces no duplicate lineage paths."
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Governed decision that authorized this release."
+    },
+    "invocation_nonce": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Single-use nonce for replay protection. Rejected if already consumed."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "RELEASED", "REJECTED", "SUPERSEDED"],
+      "description": "Lifecycle state. Only RELEASED status produces canonical release artifacts."
+    },
+    "evidence_only": {
+      "type": "string",
+      "const": "false",
+      "description": "This registry is authoritative, not evidence-only."
+    },
+    "append_only": {
+      "type": "string",
+      "const": "true",
+      "description": "Records are immutable once written."
+    },
+    "mutable": {
+      "type": "string",
+      "const": "false",
+      "description": "No mutable provenance records permitted."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp of provenance registration."
+    }
+  },
+  "additionalProperties": false
+}

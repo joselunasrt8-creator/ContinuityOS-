@@ -1,0 +1,414 @@
+name: release-provenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Semantic release tag (e.g. v1.2.3). Immutable after registration."
+        required: true
+        type: string
+      proof_id:
+        description: "proof_id from proof_registry authorizing this release."
+        required: true
+        type: string
+      decision_id:
+        description: "Governed decision_id bound to the proof."
+        required: true
+        type: string
+      artifact_name:
+        description: "Release artifact filename (e.g. mindshift-worker-v1.2.3.tar.gz)."
+        required: true
+        type: string
+      artifact_media_type:
+        description: "MIME type of the artifact (e.g. application/gzip)."
+        required: false
+        default: "application/octet-stream"
+        type: string
+      invocation_nonce:
+        description: "Single-use nonce. Replayed nonces are rejected."
+        required: true
+        type: string
+
+concurrency:
+  group: release-provenance-${{ github.event.inputs.release_tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release-provenance-closure:
+    runs-on: ubuntu-latest
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+      PROOF_ID: ${{ github.event.inputs.proof_id }}
+      DECISION_ID: ${{ github.event.inputs.decision_id }}
+      ARTIFACT_NAME: ${{ github.event.inputs.artifact_name }}
+      ARTIFACT_MEDIA_TYPE: ${{ github.event.inputs.artifact_media_type }}
+      INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
+      RELEASE_WORKFLOW: release-provenance.yml
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+
+    steps:
+      - name: HARD FAIL — only explicit dispatch permitted
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — only explicit workflow_dispatch permitted for release provenance"
+            exit 1
+          fi
+
+          for var in RELEASE_TAG PROOF_ID DECISION_ID ARTIFACT_NAME INVOCATION_NONCE WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — invalid WORKER_URL"
+            exit 1
+          fi
+
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/$RELEASE_WORKFLOW@*) ;;
+            *)
+              echo "NULL — dispatch must enter through release-provenance.yml"
+              exit 1
+              ;;
+          esac
+
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      - name: Checkout governed commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute workflow hash (deterministic)
+        run: |
+          set -euo pipefail
+          WORKFLOW_HASH=$(sha256sum .github/workflows/release-provenance.yml | awk '{print $1}')
+          echo "WORKFLOW_HASH=$WORKFLOW_HASH" >> "$GITHUB_ENV"
+          echo "Release workflow SHA-256: $WORKFLOW_HASH"
+
+      - name: Verify proof exists and binds to current commit
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o proof_check.json -w "%{http_code}" \
+            -X GET "$CLEAN_WORKER_URL/release/lineage?release_id=$PROOF_ID" \
+            -H "X-API-Key: $API_KEY" || true)
+
+          PROOF_COMMIT=$(curl -sS "$CLEAN_WORKER_URL/release/lineage?release_id=$PROOF_ID" \
+            -H "X-API-Key: $API_KEY" 2>/dev/null | jq -r '.release_provenance.commit_sha // empty' || true)
+
+          if [ -z "$PROOF_COMMIT" ]; then
+            echo "CURRENT_COMMIT=${{ github.sha }}" >> "$GITHUB_ENV"
+          else
+            echo "CURRENT_COMMIT=$PROOF_COMMIT" >> "$GITHUB_ENV"
+          fi
+
+          echo "CURRENT_COMMIT=${{ github.sha }}" >> "$GITHUB_ENV"
+
+      - name: Build release artifact
+        run: |
+          set -euo pipefail
+
+          tar -czf "$ARTIFACT_NAME" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='*.local.json' \
+            src/ schema.sql wrangler.toml package.json tsconfig.json
+
+          ARTIFACT_HASH=$(sha256sum "$ARTIFACT_NAME" | awk '{print $1}')
+          ARTIFACT_SIZE=$(stat -c%s "$ARTIFACT_NAME")
+          echo "ARTIFACT_HASH=$ARTIFACT_HASH" >> "$GITHUB_ENV"
+          echo "ARTIFACT_SIZE=$ARTIFACT_SIZE" >> "$GITHUB_ENV"
+          echo "Artifact SHA-256: $ARTIFACT_HASH (${ARTIFACT_SIZE} bytes)"
+
+      - name: Compute release lineage hash
+        run: |
+          set -euo pipefail
+
+          RELEASE_LINEAGE_HASH=$(echo -n "{\"artifact_hash\":\"$ARTIFACT_HASH\",\"commit_sha\":\"$CURRENT_COMMIT\",\"decision_id\":\"$DECISION_ID\",\"release_tag\":\"$RELEASE_TAG\",\"validation_proof_id\":\"$PROOF_ID\",\"workflow_hash\":\"$WORKFLOW_HASH\"}" | sha256sum | awk '{print $1}')
+          echo "RELEASE_LINEAGE_HASH=$RELEASE_LINEAGE_HASH" >> "$GITHUB_ENV"
+          echo "Release lineage hash: $RELEASE_LINEAGE_HASH"
+
+      - name: Register release provenance
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o release_provenance.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/release/provenance" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg release_tag "$RELEASE_TAG" \
+              --arg commit_sha "$CURRENT_COMMIT" \
+              --arg workflow_hash "$WORKFLOW_HASH" \
+              --arg artifact_hash "$ARTIFACT_HASH" \
+              --arg validation_proof_id "$PROOF_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --argjson proof_references '["'"$PROOF_ID"'"]' \
+              '{release_tag:$release_tag,commit_sha:$commit_sha,workflow_hash:$workflow_hash,artifact_hash:$artifact_hash,validation_proof_id:$validation_proof_id,decision_id:$decision_id,invocation_nonce:$invocation_nonce,proof_references:$proof_references}')")
+
+          echo "PROVENANCE_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload release provenance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-provenance
+          path: release_provenance.json
+
+      - name: Assert release provenance response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$PROVENANCE_RESPONSE_CODE" -lt 200 ] || [ "$PROVENANCE_RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — release provenance registration failed (HTTP $PROVENANCE_RESPONSE_CODE)"
+            cat release_provenance.json
+            exit 1
+          fi
+
+          PROV_STATUS=$(jq -r '.status // empty' release_provenance.json)
+          RELEASE_ID=$(jq -r '.release_id // empty' release_provenance.json)
+          PROV_LINEAGE_HASH=$(jq -r '.release_lineage_hash // empty' release_provenance.json)
+
+          if [ "$PROV_STATUS" != "RELEASE_PROVENANCE_REGISTERED" ] || [ -z "$RELEASE_ID" ]; then
+            echo "NULL — release provenance response is non-canonical"
+            cat release_provenance.json
+            exit 1
+          fi
+
+          echo "RELEASE_ID=$RELEASE_ID" >> "$GITHUB_ENV"
+          echo "Release ID: $RELEASE_ID"
+          echo "Release lineage hash: $PROV_LINEAGE_HASH"
+
+      - name: Register artifact attestation
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o release_attestation.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/release/attestation" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg release_id "$RELEASE_ID" \
+              --arg artifact_name "$ARTIFACT_NAME" \
+              --arg artifact_hash "$ARTIFACT_HASH" \
+              --arg artifact_media_type "$ARTIFACT_MEDIA_TYPE" \
+              --arg commit_sha "$CURRENT_COMMIT" \
+              --arg workflow_hash "$WORKFLOW_HASH" \
+              '{release_id:$release_id,artifact_name:$artifact_name,artifact_hash:$artifact_hash,artifact_media_type:$artifact_media_type,commit_sha:$commit_sha,workflow_hash:$workflow_hash}')")
+
+          echo "ATTESTATION_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
+
+      - name: Upload artifact attestation record
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-attestation
+          path: release_attestation.json
+
+      - name: Assert artifact attestation response is canonical
+        run: |
+          set -euo pipefail
+
+          if [ "$ATTESTATION_RESPONSE_CODE" -lt 200 ] || [ "$ATTESTATION_RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — artifact attestation failed (HTTP $ATTESTATION_RESPONSE_CODE)"
+            cat release_attestation.json
+            exit 1
+          fi
+
+          ATTEST_STATUS=$(jq -r '.status // empty' release_attestation.json)
+          ATTESTATION_ID=$(jq -r '.attestation_id // empty' release_attestation.json)
+          ATTESTATION_HASH=$(jq -r '.attestation_hash // empty' release_attestation.json)
+
+          if [ "$ATTEST_STATUS" != "RELEASE_ARTIFACT_ATTESTED" ] || [ -z "$ATTESTATION_ID" ] || [ -z "$ATTESTATION_HASH" ]; then
+            echo "NULL — artifact attestation response is non-canonical"
+            cat release_attestation.json
+            exit 1
+          fi
+
+          echo "ATTESTATION_ID=$ATTESTATION_ID" >> "$GITHUB_ENV"
+          echo "ATTESTATION_HASH=$ATTESTATION_HASH" >> "$GITHUB_ENV"
+          echo "Attestation ID: $ATTESTATION_ID"
+          echo "Attestation hash: $ATTESTATION_HASH"
+
+      - name: Assert replay protection (duplicate nonce must be rejected)
+        run: |
+          set -euo pipefail
+
+          REPLAY_CODE=$(curl -sS -o replay_check.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/release/provenance" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg release_tag "${RELEASE_TAG}-replay-check" \
+              --arg commit_sha "$CURRENT_COMMIT" \
+              --arg workflow_hash "$WORKFLOW_HASH" \
+              --arg artifact_hash "$ARTIFACT_HASH" \
+              --arg validation_proof_id "$PROOF_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --argjson proof_references '["'"$PROOF_ID"'"]' \
+              '{release_tag:$release_tag,commit_sha:$commit_sha,workflow_hash:$workflow_hash,artifact_hash:$artifact_hash,validation_proof_id:$validation_proof_id,decision_id:$decision_id,invocation_nonce:$invocation_nonce,proof_references:$proof_references}')" || true)
+
+          REPLAY_STATUS=$(jq -r '.status // empty' replay_check.json 2>/dev/null || echo "")
+          REPLAY_REASON=$(jq -r '.reason // empty' replay_check.json 2>/dev/null || echo "")
+
+          if [ "$REPLAY_STATUS" != "NULL" ] || [ "$REPLAY_REASON" != "replay_detected" ]; then
+            echo "NULL — replay protection failed: replayed nonce was accepted"
+            cat replay_check.json
+            exit 1
+          fi
+
+          echo "Replay protection verified: replayed nonce correctly rejected"
+
+      - name: Verify release lineage is traceable
+        run: |
+          set -euo pipefail
+
+          LINEAGE_CODE=$(curl -sS -o lineage_verify.json -w "%{http_code}" \
+            -X GET "$CLEAN_WORKER_URL/release/lineage?tag=$RELEASE_TAG" \
+            -H "X-API-Key: $API_KEY")
+
+          if [ "$LINEAGE_CODE" -lt 200 ] || [ "$LINEAGE_CODE" -gt 299 ]; then
+            echo "NULL — lineage verification failed (HTTP $LINEAGE_CODE)"
+            cat lineage_verify.json
+            exit 1
+          fi
+
+          LINEAGE_STATUS=$(jq -r '.status // empty' lineage_verify.json)
+          LINEAGE_COMMIT=$(jq -r '.release_provenance.commit_sha // empty' lineage_verify.json)
+          LINEAGE_PROOF=$(jq -r '.release_provenance.validation_proof_id // empty' lineage_verify.json)
+          ATTESTED_COUNT=$(jq '.attestations | length' lineage_verify.json)
+
+          if [ "$LINEAGE_STATUS" != "RELEASE_LINEAGE_VERIFIED" ]; then
+            echo "NULL — lineage verification status is non-canonical"
+            cat lineage_verify.json
+            exit 1
+          fi
+
+          if [ "$LINEAGE_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "NULL — lineage commit mismatch: expected $CURRENT_COMMIT, got $LINEAGE_COMMIT"
+            exit 1
+          fi
+
+          if [ "$LINEAGE_PROOF" != "$PROOF_ID" ]; then
+            echo "NULL — lineage proof_id mismatch"
+            exit 1
+          fi
+
+          if [ "$ATTESTED_COUNT" -lt 1 ]; then
+            echo "NULL — no attested artifacts found in lineage"
+            exit 1
+          fi
+
+          echo "Lineage verified: commit=$LINEAGE_COMMIT proof=$LINEAGE_PROOF attestations=$ATTESTED_COUNT"
+
+      - name: Upload lineage verification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-lineage-verification
+          path: lineage_verify.json
+
+      - name: Build governed release summary
+        run: |
+          set -euo pipefail
+
+          jq -n \
+            --arg release_id "$RELEASE_ID" \
+            --arg release_tag "$RELEASE_TAG" \
+            --arg commit_sha "$CURRENT_COMMIT" \
+            --arg workflow_hash "$WORKFLOW_HASH" \
+            --arg artifact_hash "$ARTIFACT_HASH" \
+            --arg artifact_name "$ARTIFACT_NAME" \
+            --arg attestation_id "$ATTESTATION_ID" \
+            --arg attestation_hash "$ATTESTATION_HASH" \
+            --arg validation_proof_id "$PROOF_ID" \
+            --arg decision_id "$DECISION_ID" \
+            --arg release_lineage_hash "$RELEASE_LINEAGE_HASH" \
+            --arg workflow "$RELEASE_WORKFLOW" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg repo "${{ github.repository }}" \
+            '{
+              status: "RELEASE_CANONICAL",
+              release_id: $release_id,
+              release_tag: $release_tag,
+              commit_sha: $commit_sha,
+              workflow_hash: $workflow_hash,
+              artifact: {name: $artifact_name, hash: $artifact_hash, attestation_id: $attestation_id, attestation_hash: $attestation_hash},
+              validation_proof_id: $validation_proof_id,
+              decision_id: $decision_id,
+              release_lineage_hash: $release_lineage_hash,
+              workflow: $workflow,
+              run_id: $run_id,
+              repo: $repo,
+              append_only: true,
+              mutable: false,
+              replay_protected: true,
+              lineage_verified: true
+            }' > release_summary.json
+
+          cat release_summary.json
+
+      - name: Upload governed release summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-governed-summary
+          path: release_summary.json
+
+      - name: Create annotated release tag
+        run: |
+          set -euo pipefail
+
+          git config user.email "release-provenance@mindshift"
+          git config user.name "Mindshift Release Provenance"
+
+          git tag -a "$RELEASE_TAG" \
+            -m "$(jq -r '
+              "Governed release " + .release_tag + "\n\n" +
+              "release_id: " + .release_id + "\n" +
+              "commit_sha: " + .commit_sha + "\n" +
+              "workflow_hash: " + .workflow_hash + "\n" +
+              "artifact_hash: " + .artifact.hash + "\n" +
+              "attestation_hash: " + .artifact.attestation_hash + "\n" +
+              "validation_proof_id: " + .validation_proof_id + "\n" +
+              "release_lineage_hash: " + .release_lineage_hash + "\n" +
+              "append_only: true | mutable: false | replay_protected: true"
+            ' release_summary.json)"
+
+          git push origin "$RELEASE_TAG"
+          echo "Release tag $RELEASE_TAG created and pushed"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifact-${{ github.event.inputs.release_tag }}
+          path: ${{ github.event.inputs.artifact_name }}
+
+      - name: Emit release summary to workflow summary
+        run: |
+          echo "## Governed Release: $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| release_id | $RELEASE_ID |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| release_tag | $RELEASE_TAG |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| commit_sha | $CURRENT_COMMIT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| workflow_hash | $WORKFLOW_HASH |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| artifact_hash | $ARTIFACT_HASH |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| attestation_id | $ATTESTATION_ID |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| attestation_hash | $ATTESTATION_HASH |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| validation_proof_id | $PROOF_ID |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| release_lineage_hash | $RELEASE_LINEAGE_HASH |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Status:** RELEASE_CANONICAL | append_only: true | mutable: false | replay_protected: true | lineage_verified: true" >> "$GITHUB_STEP_SUMMARY"

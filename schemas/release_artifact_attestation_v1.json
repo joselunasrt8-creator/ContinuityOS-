@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "release_artifact_attestation_v1",
+  "title": "ReleaseArtifactAttestationV1",
+  "description": "Governed artifact attestation: binds a specific artifact hash to release provenance and commit lineage. Immutable after registration.",
+  "type": "object",
+  "required": [
+    "attestation_id",
+    "release_id",
+    "artifact_name",
+    "artifact_hash",
+    "artifact_media_type",
+    "commit_sha",
+    "workflow_hash",
+    "release_lineage_hash",
+    "attestation_hash",
+    "validation_proof_id",
+    "status",
+    "evidence_only",
+    "append_only",
+    "mutable",
+    "created_at"
+  ],
+  "properties": {
+    "attestation_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this attestation record."
+    },
+    "release_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "release_id from release_provenance_registry. Must exist and be PENDING or RELEASED."
+    },
+    "artifact_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical artifact filename (e.g. mindshift-worker-v1.2.3.tar.gz)."
+    },
+    "artifact_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "SHA-256 of the artifact content. Must match the artifact_hash in the release provenance record."
+    },
+    "artifact_media_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MIME type of the artifact (e.g. application/gzip, application/octet-stream)."
+    },
+    "commit_sha": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 64,
+      "description": "Must match commit_sha in release_provenance_registry for the referenced release_id."
+    },
+    "workflow_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "Must match workflow_hash in release_provenance_registry. Ensures attestation is from the same governed workflow."
+    },
+    "release_lineage_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "Must match release_lineage_hash in release_provenance_registry. Binds attestation to exact lineage."
+    },
+    "attestation_hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "description": "SHA-256 over (release_id, artifact_name, artifact_hash, artifact_media_type, commit_sha, workflow_hash, release_lineage_hash, validation_proof_id). Unique attestation identity."
+    },
+    "validation_proof_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Must match validation_proof_id in the referenced release provenance record."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ATTESTED", "REJECTED", "REVOKED"],
+      "description": "Attestation lifecycle state. Only ATTESTED is canonical."
+    },
+    "evidence_only": {
+      "type": "string",
+      "const": "false",
+      "description": "This registry is authoritative."
+    },
+    "append_only": {
+      "type": "string",
+      "const": "true"
+    },
+    "mutable": {
+      "type": "string",
+      "const": "false"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}
