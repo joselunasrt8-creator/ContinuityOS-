@@ -307,6 +307,24 @@ test('execute_rejection_does_not_write_execution_registry', () => {
   assert.doesNotMatch(failClosedBlock, /INSERT INTO execution_registry/, 'execute rejection must be side-effect-free for execution_registry writes')
 })
 
+test('execute snapshot/provenance tree-hash check runs before all execute-side mutations', () => {
+  const executeStart = source.indexOf('if (url.pathname === "/execute" && request.method === "POST") {')
+  const treeHashCheck = source.indexOf('if (provenance.source_tree_hash !== executionSnapshot.repository_tree_hash || provenance.workflow_sha !== executionSnapshot.workflow_hash)', executeStart)
+  const executionInsert = source.indexOf('INSERT INTO execution_registry', executeStart)
+  const invocationUpdate = source.indexOf("UPDATE invocation_registry SET status='EXECUTED'", executeStart)
+  const authorityUpdate = source.indexOf("UPDATE authority_registry SET status='EXECUTED'", executeStart)
+  const snapshotInsert = source.indexOf('INSERT OR IGNORE INTO execution_snapshot_registry', executeStart)
+
+  assert.ok(executeStart >= 0 && treeHashCheck > executeStart, 'expected execute route and tree-hash drift guard')
+  assert.ok(treeHashCheck < executionInsert, 'tree-hash drift guard must run before execution_registry insert')
+  assert.ok(treeHashCheck < invocationUpdate, 'tree-hash drift guard must run before invocation_registry update')
+  assert.ok(treeHashCheck < authorityUpdate, 'tree-hash drift guard must run before authority_registry update')
+  assert.ok(treeHashCheck < snapshotInsert, 'tree-hash drift guard must run before execution_snapshot_registry insert')
+
+  const preMutationBlock = source.slice(treeHashCheck, Math.min(executionInsert, invocationUpdate, authorityUpdate, snapshotInsert))
+  assert.match(preMutationBlock, /reason:"execution_snapshot_hash_mismatch"/, 'tree-hash drift guard must fail closed with execution_snapshot_hash_mismatch')
+})
+
 test('valid_validate_execute_path_preserved', () => {
   assert.match(
     source,
