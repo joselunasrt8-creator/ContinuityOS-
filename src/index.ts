@@ -7388,6 +7388,17 @@ export default {
       if (String(validation.validated_object_hash || "") !== execHash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: String(validation.validated_object_hash || ""), actual_hash: execHash, indicator: "validated_object_execution_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
       if (String(compiled.status || "") !== "COMPILED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"policy_invalid" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", compiled_status: compiled.status || null, indicator: "policy_invalid_at_execution" }, drift_class: "execution_drift" })
+      const compiledCanonicalHash = await sha256Hex(canonicalize(executionCanonicalAeo))
+      const validationLineageCheck = verifyLineageOrigin({
+        stage: "validate",
+        decision_id,
+        validated_object_hash,
+        lineage_stage: String(validation.lineage_stage || ""),
+        lineage_origin_hash: String(validation.lineage_origin_hash || ""),
+        parent_compilation_hash: String(validation.parent_compilation_hash || ""),
+        compiled_hash: compiledCanonicalHash
+      })
+      if (!validationLineageCheck.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: validationLineageCheck.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: validationLineageCheck.reason }, drift_class: "execution_drift" })
       const delegatedExecution = await validateDelegatedAuthorityLineage(env, authority, executionCanonicalAeo)
       if (!delegatedExecution.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: delegatedExecution.reason }, { event_type: delegatedExecution.drift_class === "delegated_replay_resurrection" ? "REPLAY_BLOCKED" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", delegated_authority_id: String(authority.delegated_authority_id || ""), indicator: delegatedExecution.reason }, drift_class: delegatedExecution.drift_class })
       const provenanceValidation = await validateDeploymentProvenance(env, { route: "/execute", decision_id, validated_object_hash, authority, compiledCanonicalAeo: executionCanonicalAeo, provenance })
@@ -7480,6 +7491,17 @@ export default {
       if (!isFresh(String(validation.created_at || ""), VALIDATION_FRESHNESS_WINDOW_MS)) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"stale_validation" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", validation_created_at: validation?.created_at || null, freshness_window_ms: VALIDATION_FRESHNESS_WINDOW_MS, indicator: "stale_validation_blocked_at_proof" }, drift_class: "proof_drift" })
       if (!isFresh(String(execution.created_at || ""), PROOF_FRESHNESS_WINDOW_MS)) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_freshness_expired" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", execution_created_at: execution?.created_at || null, freshness_window_ms: PROOF_FRESHNESS_WINDOW_MS, indicator: "proof_freshness_window_expired" }, drift_class: "proof_drift" })
       if (String(execution.validated_object_hash || "") !== validated_object_hash || String(validation?.validated_object_hash || "") !== validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", expected_hash: validated_object_hash, execution_hash: String(execution.validated_object_hash || ""), validation_hash: String(validation?.validated_object_hash || ""), indicator: "validated_object_execution_mismatch" }, drift_class: "hash_drift" })
+      const validationOriginHashAtProof = await sha256Hex(canonicalize({ validation_id: String(validation?.validation_id || ""), decision_id, validated_object_hash, invocation_nonce }))
+      const executionLineageOriginCheck = verifyLineageOrigin({
+        stage: "execute",
+        decision_id,
+        validated_object_hash,
+        lineage_stage: String(execution.lineage_stage || ""),
+        lineage_origin_hash: String(execution.lineage_origin_hash || ""),
+        parent_validation_hash: String(execution.parent_validation_hash || ""),
+        validation_hash: validationOriginHashAtProof
+      })
+      if (!executionLineageOriginCheck.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: executionLineageOriginCheck.reason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", indicator: executionLineageOriginCheck.reason }, drift_class: "proof_drift" })
       if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       const executionContinuityRevoked = await continuityIsRevokedOrAmbiguous(env, String(execution.continuity_id || ""))
       if (executionContinuityRevoked) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"revoked_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lookup_blocked_by_revocation" }, drift_class: "proof_drift" })
