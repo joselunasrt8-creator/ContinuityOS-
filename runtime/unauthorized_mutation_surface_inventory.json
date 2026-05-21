@@ -3431,6 +3431,28 @@
       "containment_status": "NULL",
       "evidence_only": false,
       "non_authoritative": true
+    },
+    {
+      "surface_id": "db_write:execution_snapshot_registry",
+      "surface_type": "database_write_surface",
+      "source_file": "src/index.ts",
+      "entrypoint": "execution_snapshot_registry",
+      "mutation_capability": true,
+      "execution_capability": true,
+      "deployment_capability": false,
+      "authority_required": "canonical_runtime_route",
+      "aeo_required": true,
+      "validation_required": true,
+      "proof_required": true,
+      "replay_semantics": "execution_nonce_and_proof_lineage_consuming",
+      "drift_observable": true,
+      "proof_bound": true,
+      "governance_addressable": true,
+      "canonical_boundary_status": "CANONICAL_REGISTRY",
+      "bypass_risk": "raw_database_write",
+      "containment_status": "CANONICAL_ROUTE_BOUND",
+      "evidence_only": false,
+      "non_authoritative": true
     }
   ],
   "topology_reconciliation_inventory_closure": {
