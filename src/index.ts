@@ -313,7 +313,8 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   observer_attestation_registry: ["attestation_id", "observer_id", "observed_checkpoint_hash", "semantic_hash", "topology_hash", "reconciliation_hash", "sovereignty_hash", "equivalence_hash", "drift_classes", "legitimacy_status", "attestation_hash", "observer_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "generated_at", "created_at"],
   semantic_equivalence_registry: ["semantic_equivalence_id", "semantic_hash", "schema_semantic_hash", "topology_semantic_hash", "governance_semantic_hash", "portability_semantic_hash", "equivalence_hash", "drift_classes", "legitimacy_status", "semantic_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "generated_at", "created_at"],
   portable_governance_checkpoint_registry: ["checkpoint_id", "checkpoint_hash", "reconciliation_hash", "topology_hash", "semantic_equivalence_hash", "conformance_hash", "portable_envelope", "dsse_payload_type", "jcs_canonical", "drift_classes", "legitimacy_status", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "generated_at", "created_at"],
-  external_conformance_verification_registry: ["verification_id", "runtime_compatibility_hash", "governance_semantic_hash", "checkpoint_equivalence_hash", "federated_conformance_hash", "conformance_status", "drift_classes", "verification_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "remote_authority_denied", "generated_at", "created_at"]
+  external_conformance_verification_registry: ["verification_id", "runtime_compatibility_hash", "governance_semantic_hash", "checkpoint_equivalence_hash", "federated_conformance_hash", "conformance_status", "drift_classes", "verification_envelope", "evidence_only", "replay_neutral", "non_authoritative", "read_only", "mutation_capable", "creates_authority", "executable", "deployment_capable", "proof_generating", "merge_authorizing", "remote_authority_denied", "generated_at", "created_at"],
+  install_base_telemetry_registry: ["event_id", "event_type", "decision_id", "authority_id", "execution_id", "proof_id", "lineage_origin_hash", "lineage_origin_match", "evidence_only", "non_authoritative", "append_only", "payload", "created_at"]
 }
 
 type SchemaDiagnosticReason = "missing_required_table" | "missing_required_column" | "migration_required" | "database_unavailable" | "schema_initialization_failed"
@@ -349,6 +350,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
+type InstallBaseTelemetryEventType = "governed_execution_attempted" | "governed_execution_completed" | "invalid_execution_blocked" | "replay_rejected" | "continuity_rejected" | "workflow_integrity_drift" | "reconciliation_failure_detected" | "proof_generated" | "proof_rejected"
 
 
 type RecursiveMutationClass = "runtime_route_mutation" | "validator_mutation" | "schema_mutation" | "authority_semantics_mutation" | "proof_semantics_mutation" | "replay_semantics_mutation" | "policy_mutation" | "observability_mutation" | "federation_semantics_mutation" | "governance_surface_expansion"
@@ -1231,6 +1233,11 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_delegated_authority_registry_lineage ON delegated_authority_registry(delegated_authority_id, parent_authority_id, delegation_lineage_hash, delegation_root_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_delegated_authority_registry_replay ON delegated_authority_registry(delegated_authority_id, delegated_replay_chain_hash, projection_status)`,
       `CREATE TABLE IF NOT EXISTS observability_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, severity TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS install_base_telemetry_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL CHECK (event_type IN ('governed_execution_attempted','governed_execution_completed','invalid_execution_blocked','replay_rejected','continuity_rejected','workflow_integrity_drift','reconciliation_failure_detected','proof_generated','proof_rejected')), decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, lineage_origin_hash TEXT, lineage_origin_match TEXT NOT NULL CHECK (lineage_origin_match IN ('MATCH','MISMATCH','UNKNOWN')), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), append_only TEXT NOT NULL CHECK (append_only='true'), payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_type_created ON install_base_telemetry_registry(event_type, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_decision ON install_base_telemetry_registry(decision_id)`,
+      `CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_update BEFORE UPDATE ON install_base_telemetry_registry BEGIN SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only'); END`,
+      `CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_delete BEFORE DELETE ON install_base_telemetry_registry BEGIN SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only'); END`,
       `CREATE INDEX IF NOT EXISTS idx_observability_decision ON observability_registry(decision_id)`,
       `CREATE INDEX IF NOT EXISTS idx_observability_execution ON observability_registry(execution_id)`,
       `CREATE INDEX IF NOT EXISTS idx_observability_type ON observability_registry(event_type)`,
@@ -4937,6 +4944,23 @@ async function emitTelemetry(env: Env, event: {
   const payload = JSON.stringify({ ...(event.payload || {}), timestamp: created_at })
   await env.DB.prepare(`INSERT INTO observability_registry (event_id,event_type,decision_id,authority_id,execution_id,proof_id,severity,payload,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`)
     .bind(crypto.randomUUID(), event.event_type, event.decision_id || null, event.authority_id || null, event.execution_id || null, event.proof_id || null, event.severity || "INFO", payload, created_at)
+    .run()
+}
+
+async function emitInstallBaseTelemetryEvidence(env: Env, event: {
+  event_type: InstallBaseTelemetryEventType
+  decision_id?: string
+  authority_id?: string
+  execution_id?: string
+  proof_id?: string
+  lineage_origin_hash?: string
+  lineage_origin_match?: "MATCH" | "MISMATCH" | "UNKNOWN"
+  payload?: Record<string, unknown>
+}) {
+  const created_at = new Date().toISOString()
+  const payload = canonicalize({ ...(event.payload || {}), telemetry: "evidence_only", non_authoritative: true, append_only: true, created_at })
+  await env.DB.prepare(`INSERT INTO install_base_telemetry_registry (event_id,event_type,decision_id,authority_id,execution_id,proof_id,lineage_origin_hash,lineage_origin_match,evidence_only,non_authoritative,append_only,payload,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'true','true','true',?9,?10)`)
+    .bind(crypto.randomUUID(), event.event_type, event.decision_id || null, event.authority_id || null, event.execution_id || null, event.proof_id || null, event.lineage_origin_hash || null, event.lineage_origin_match || "UNKNOWN", payload, created_at)
     .run()
 }
 

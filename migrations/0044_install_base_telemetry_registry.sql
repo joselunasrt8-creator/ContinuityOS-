@@ -1,0 +1,34 @@
+CREATE TABLE IF NOT EXISTS install_base_telemetry_registry (
+  event_id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL CHECK (event_type IN (
+    'governed_execution_attempted','governed_execution_completed','invalid_execution_blocked','replay_rejected','continuity_rejected','workflow_integrity_drift','reconciliation_failure_detected','proof_generated','proof_rejected'
+  )),
+  decision_id TEXT,
+  authority_id TEXT,
+  execution_id TEXT,
+  proof_id TEXT,
+  lineage_origin_hash TEXT,
+  lineage_origin_match TEXT NOT NULL CHECK (lineage_origin_match IN ('MATCH','MISMATCH','UNKNOWN')),
+  evidence_only TEXT NOT NULL CHECK (evidence_only='true'),
+  non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'),
+  append_only TEXT NOT NULL CHECK (append_only='true'),
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_type_created
+  ON install_base_telemetry_registry(event_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_decision
+  ON install_base_telemetry_registry(decision_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_update
+BEFORE UPDATE ON install_base_telemetry_registry
+BEGIN
+  SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_delete
+BEFORE DELETE ON install_base_telemetry_registry
+BEGIN
+  SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only');
+END;
