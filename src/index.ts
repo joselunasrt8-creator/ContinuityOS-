@@ -2971,6 +2971,22 @@ async function verifyReconciliationRegistryRow(env: Env, registry: Reconciliatio
       if (String(row.continuity_id || "") !== String(context.continuity.continuity_id || "")) return "recursive_ancestry_drift"
       if (String(row.validated_object_hash || "") !== String(context.aeo.validated_object_hash || "")) return "recursive_ancestry_drift"
       if (String(row.status || "") !== "VALID" || String(row.result || "") !== "VALID") return "replay_chain_drift"
+      if (!String(row.parent_compilation_hash || "")) return "orphan_legitimacy_object_drift"
+      if (String(row.parent_compilation_hash || "") !== String(context.aeo.validated_object_hash || "")) return "recursive_ancestry_drift"
+      if (String(row.lineage_stage || "") !== "validate") return "recursive_ancestry_drift"
+      if (!String(row.lineage_origin_hash || "")) return "orphan_legitimacy_object_drift"
+      {
+        const validationLineageOrigin = verifyLineageOrigin({
+          stage: "validate",
+          decision_id: String(row.decision_id || ""),
+          validated_object_hash: String(row.validated_object_hash || ""),
+          lineage_stage: String(row.lineage_stage || ""),
+          lineage_origin_hash: String(row.lineage_origin_hash || ""),
+          parent_compilation_hash: String(row.parent_compilation_hash || ""),
+          compiled_hash: String(context.aeo.validated_object_hash || "")
+        })
+        if (!validationLineageOrigin.ok) return "recursive_ancestry_drift"
+      }
       context.validation = row
       return "VALID"
     case "execution_registry":
@@ -2980,6 +2996,22 @@ async function verifyReconciliationRegistryRow(env: Env, registry: Reconciliatio
       if (String(row.decision_id || "") !== String(context.validation.decision_id || "")) return "recursive_ancestry_drift"
       if (String(row.validated_object_hash || "") !== String(context.validation.validated_object_hash || "")) return "recursive_ancestry_drift"
       if (String(row.invocation_nonce || "") !== String(context.validation.invocation_nonce || "")) return "replay_chain_drift"
+      if (!String(row.parent_validation_hash || "")) return "orphan_legitimacy_object_drift"
+      if (String(row.parent_validation_hash || "") !== String(context.validation.lineage_origin_hash || "")) return "proof_lineage_drift"
+      if (String(row.lineage_stage || "") !== "execute") return "proof_lineage_drift"
+      if (!String(row.lineage_origin_hash || "")) return "orphan_legitimacy_object_drift"
+      {
+        const executionLineageOrigin = verifyLineageOrigin({
+          stage: "execute",
+          decision_id: String(row.decision_id || ""),
+          validated_object_hash: String(row.validated_object_hash || ""),
+          lineage_stage: String(row.lineage_stage || ""),
+          lineage_origin_hash: String(row.lineage_origin_hash || ""),
+          parent_validation_hash: String(row.parent_validation_hash || ""),
+          validation_hash: String(context.validation.lineage_origin_hash || "")
+        })
+        if (!executionLineageOrigin.ok) return "proof_lineage_drift"
+      }
       if (String(row.status || "") !== "EXECUTED") return "proof_lineage_drift"
       context.execution = row
       return "VALID"
@@ -2995,6 +3027,22 @@ async function verifyReconciliationRegistryRow(env: Env, registry: Reconciliatio
       try { authorityLineage = JSON.parse(String(row.authority_lineage || "{}")); executionLineage = JSON.parse(String(row.execution_lineage || "{}")) } catch { return "proof_lineage_drift" }
       if (String(authorityLineage.authority_id || "") !== String(context.authority.authority_id || "")) return "proof_lineage_drift"
       if (String(executionLineage.execution_id || "") !== String(context.execution.execution_id || "")) return "proof_lineage_drift"
+      if (!String(row.parent_execution_hash || "")) return "orphan_legitimacy_object_drift"
+      if (String(row.parent_execution_hash || "") !== String(context.execution.lineage_origin_hash || "")) return "proof_lineage_drift"
+      if (String(row.lineage_stage || "") !== "proof") return "proof_lineage_drift"
+      if (!String(row.lineage_origin_hash || "")) return "orphan_legitimacy_object_drift"
+      {
+        const proofLineageOrigin = verifyLineageOrigin({
+          stage: "proof",
+          decision_id: String(row.decision_id || ""),
+          validated_object_hash: String(row.validated_object_hash || ""),
+          lineage_stage: String(row.lineage_stage || ""),
+          lineage_origin_hash: String(row.lineage_origin_hash || ""),
+          parent_execution_hash: String(row.parent_execution_hash || ""),
+          execution_hash: String(context.execution.lineage_origin_hash || "")
+        })
+        if (!proofLineageOrigin.ok) return "proof_lineage_drift"
+      }
       context.proof = row
       return "VALID"
     }
