@@ -210,6 +210,7 @@ jobs:
           AUTHORITY_STATUS=$(jq -r '.status // empty' authority.json)
           AUTHORITY_DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
           AUTHORITY_CONTINUITY_ID=$(jq -r '.continuity_id // empty' authority.json)
+          AUTHORITY_EXPIRY=$(jq -r '.expiry // .expires_at // empty' authority.json)
 
           if [ "$AUTHORITY_STATUS" = "NULL" ] || [ "$AUTHORITY_STATUS" != "ACTIVE" ] || [ "$AUTHORITY_DECISION_ID" != "$DECISION_ID" ]; then
             echo "NULL — Authority response is non-canonical"
@@ -222,6 +223,14 @@ jobs:
             cat authority.json
             exit 1
           fi
+
+          if [ -z "$AUTHORITY_EXPIRY" ]; then
+            echo "NULL — Authority response missing expiry"
+            cat authority.json
+            exit 1
+          fi
+
+          echo "AUTHORITY_EXPIRY=$AUTHORITY_EXPIRY" >> "$GITHUB_ENV"
 
       - name: Save compile response
         run: |
@@ -502,7 +511,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          jq -n             --arg session_id "$SESSION_ID"             --arg decision_id "$DECISION_ID"             --arg invocation_nonce "$INVOCATION_NONCE"             --arg preo_status "VALID"             --arg continuity_status "VALID"             --arg validator_status "APPROVED"             --arg authority_status "ACTIVE"             --arg authority_expiry "2999-01-01T00:00:00.000Z"             --arg proof_status "VALID"             --arg proof_binding_hash "$VALIDATED_OBJECT_HASH"             --arg proof_id "$PROOF_ID"             --arg validated_object_hash "$VALIDATED_OBJECT_HASH"             --arg deployment_hash "$VALIDATED_OBJECT_HASH"             --arg repo "$DEPLOY_REPO"             --arg branch "$DEPLOY_BRANCH"             --arg workflow "$DEPLOY_WORKFLOW"             --arg commit_sha "${{ github.sha }}"             '{session_id:$session_id,decision_id:$decision_id,invocation_nonce:$invocation_nonce,preo:{status:$preo_status},continuity:{status:$continuity_status,orphaned:false},validator:{status:$validator_status,approved:true},replay:{status:"INVALID",reused:false},authority:{status:$authority_status,expires_at:$authority_expiry},proof:{status:$proof_status,binding_hash:$proof_binding_hash,proof_id:$proof_id},validated_object_hash:$validated_object_hash,deployment_hash:$deployment_hash,deployment_target:{repo:$repo,branch:$branch,workflow:$workflow,commit:$commit_sha}}' > governed-deploy-artifact.json
+          jq -n             --arg session_id "$SESSION_ID"             --arg decision_id "$DECISION_ID"             --arg invocation_nonce "$INVOCATION_NONCE"             --arg preo_status "VALID"             --arg continuity_status "VALID"             --arg validator_status "APPROVED"             --arg authority_status "ACTIVE"             --arg authority_expiry "$AUTHORITY_EXPIRY"             --arg proof_status "VALID"             --arg proof_binding_hash "$VALIDATED_OBJECT_HASH"             --arg proof_id "$PROOF_ID"             --arg validated_object_hash "$VALIDATED_OBJECT_HASH"             --arg deployment_hash "$VALIDATED_OBJECT_HASH"             --arg repo "$DEPLOY_REPO"             --arg branch "$DEPLOY_BRANCH"             --arg workflow "$DEPLOY_WORKFLOW"             --arg commit_sha "${{ github.sha }}"             '{session_id:$session_id,decision_id:$decision_id,invocation_nonce:$invocation_nonce,preo:{status:$preo_status},continuity:{status:$continuity_status,orphaned:false},validator:{status:$validator_status,approved:true},replay:{status:"INVALID",reused:false},authority:{status:$authority_status,expires_at:$authority_expiry},proof:{status:$proof_status,binding_hash:$proof_binding_hash,proof_id:$proof_id},validated_object_hash:$validated_object_hash,deployment_hash:$deployment_hash,deployment_target:{repo:$repo,branch:$branch,workflow:$workflow,commit:$commit_sha}}' > governed-deploy-artifact.json
 
       - name: Execute production deploy through governed wrapper only
         env:

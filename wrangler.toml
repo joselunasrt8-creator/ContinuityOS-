@@ -2,7 +2,18 @@ name = "mindshift-demo"
 main = "src/index.ts"
 compatibility_date = "2026-04-30"
 
+# Production D1 binding — canonical production surface.
+# All production deploys must go through .github/workflows/governed-deploy.yml.
+# Direct wrangler deploy without the governed workflow is classified as a
+# production authority bypass (see governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json).
 [[d1_databases]]
 binding = "DB"
 database_name = "mindshift-demo-prod"
 database_id = "9f8a3741-af9d-4e8b-b973-50967a6fd0e6"
+
+# Preview environment — isolated worker, no production D1 binding.
+# Preview deployments MUST NOT bind to production data and cannot execute
+# governed canonical routes against production state. Cloudflare Git
+# Integration, if enabled, must target only this environment.
+[env.preview]
+name = "mindshift-demo-preview"

@@ -177,7 +177,12 @@ function enforceGovernedDeployCommand(deployCommand: string[], artifact: Legitim
 
   const [cmd, ...args] = deployCommand;
   const normalized = [cmd, ...args].join(' ').toLowerCase();
-  if (normalized.includes('wrangler deploy') && cmd === 'wrangler') {
+  // Block direct wrangler deploy (cmd=wrangler) and shell-wrapped bypass patterns.
+  // npx wrangler deploy is the governed path and remains permitted when context is set.
+  if (
+    (cmd === 'wrangler' && /\bdeploy\b/.test(normalized)) ||
+    /\b(bash|sh|zsh)\b.*\bwrangler\b.*\bdeploy\b/.test(normalized)
+  ) {
     failClosed('direct wrangler invocation rejected', artifact, 'direct_wrangler_invocation_rejection');
   }
 }

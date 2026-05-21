@@ -1,0 +1,90 @@
+{
+  "issue_reference": "#584",
+  "schema_version": 1,
+  "document": "RESIDUAL_BYPASS_MATRIX",
+  "purpose": "Classify all remaining production-capable bypass paths after issue #584 containment measures. Residual bypasses are root-authority surfaces that cannot be fully eliminated from repository code alone.",
+  "classification_key": {
+    "P0": "No mutation capability (contained or non-production)",
+    "P1": "Mutation capability with governance controls in place",
+    "P2": "Mutation capability with partial governance controls; requires external action",
+    "P3": "Root authority bypass; requires account-level credentials"
+  },
+  "residual_bypasses": [
+    {
+      "bypass_id": "RB-001",
+      "name": "Cloudflare Git Integration (not yet disabled)",
+      "risk": "P3",
+      "preconditions": ["Cloudflare Git Integration enabled at account level", "Push to tracked branch"],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "Cloudflare dashboard deploy log only; not bound to MindShift proof registry",
+      "status": "OPEN — account-level disable required",
+      "closure_condition": "Git Integration disabled at Cloudflare account level and verified by administrator",
+      "break_glass": false
+    },
+    {
+      "bypass_id": "RB-002",
+      "name": "Direct wrangler deploy with valid CLOUDFLARE_API_TOKEN",
+      "risk": "P3",
+      "preconditions": ["Valid CLOUDFLARE_API_TOKEN with Workers:Write scope", "Local wrangler CLI"],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "Cloudflare dashboard deploy log only; not bound to MindShift proof registry",
+      "status": "CLASSIFIED_OPEN — root break-glass authority",
+      "closure_condition": "CLOUDFLARE_API_TOKEN scoped to GitHub Actions OIDC only; no static token capable of production deploy",
+      "break_glass": true,
+      "break_glass_classification": "EXPLICIT_ROOT_AUTHORITY"
+    },
+    {
+      "bypass_id": "RB-003",
+      "name": "Local governed-deploy.ts with fabricated artifact and valid token",
+      "risk": "P3",
+      "preconditions": [
+        "Valid CLOUDFLARE_API_TOKEN",
+        "MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed set locally",
+        "Fabricated legitimacy artifact with valid canonical chain responses"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "AUDIT_LOG — deploy_audit_registry.json entry emitted (rejection or success); Cloudflare dashboard deploy log",
+      "status": "RESIDUAL — requires canonical chain artifact (must hit live /session→/proof endpoints) AND token AND context",
+      "closure_condition": "CLOUDFLARE_API_TOKEN scoped to GitHub Actions OIDC only",
+      "break_glass": true,
+      "break_glass_classification": "LOCAL_ROOT_AUTHORITY_WITH_CANONICAL_CHAIN"
+    },
+    {
+      "bypass_id": "RB-004",
+      "name": "GitHub Actions admin workflow modification",
+      "risk": "P2",
+      "preconditions": ["GitHub repository admin access", "Ability to bypass branch protection or merge without PREO"],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "GitHub audit log; constitutional-integrity.yml detects workflow changes as PR-3_SOVEREIGNTY drift",
+      "status": "CLASSIFIED_OPEN — requires admin credentials; monitored by constitutional-integrity.yml",
+      "closure_condition": "Branch protection enforcement at target level; admin bypass disabled",
+      "break_glass": false
+    },
+    {
+      "bypass_id": "RB-005",
+      "name": "GitHub repository secrets mutation (MINDSHIFT_WORKER_URL redirect)",
+      "risk": "P2",
+      "preconditions": ["GitHub repository admin or environments admin access", "Ability to mutate MINDSHIFT_WORKER_URL or MINDSHIFT_API_KEY secrets"],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "GitHub audit log only; MindShift has no visibility into secret mutation",
+      "status": "CLASSIFIED_OPEN — requires admin credentials",
+      "closure_condition": "Secret write authority restricted to designated administrators; secret rotation policy enforced",
+      "break_glass": false
+    }
+  ],
+  "bypass_closure_requirements": [
+    "RB-001: Disable Cloudflare Git Integration at account level",
+    "RB-002: Scope CLOUDFLARE_API_TOKEN to GitHub Actions OIDC",
+    "RB-003: Resolved by RB-002 closure (no local token = no local deploy)",
+    "RB-004: Enforce branch protection rules and admin bypass policy per BRANCH_PROTECTION_POLICY.json",
+    "RB-005: Restrict secret write access per organization policy"
+  ],
+  "acceptance_condition": "No production-capable Cloudflare mutation path exists outside governed deployment lineage. Currently blocked by: RB-001 (requires account action). All other residual bypasses are classified root-authority surfaces observable in Cloudflare dashboard and/or GitHub audit log.",
+  "observability_requirement": "All production deploy events — governed or bypass — MUST be detectable. RB-001 and RB-002 are only visible in Cloudflare dashboard (external observability). RB-003 is visible in deploy_audit_registry.json. RB-004 and RB-005 visible in GitHub audit log. No production mutation path is fully unobservable.",
+  "fate_test_coverage": "tests/fate/issue-584-cloudflare-authority-bypass-containment.test.mjs"
+}

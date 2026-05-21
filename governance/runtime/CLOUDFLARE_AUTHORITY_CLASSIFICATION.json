@@ -1,0 +1,114 @@
+{
+  "issue_reference": "#584",
+  "schema_version": 1,
+  "document": "CLOUDFLARE_AUTHORITY_CLASSIFICATION",
+  "purpose": "Classify all Cloudflare-capable authority surfaces that could mutate the production MindShift worker outside the canonical legitimacy chain.",
+  "canonical_chain": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+  "classification_invariant": "No Cloudflare production mutation path exists outside the governed deployment lineage.",
+  "surfaces": [
+    {
+      "surface_id": "CF-001",
+      "surface_name": "Cloudflare Git Integration",
+      "authority_source": "Cloudflare account-level Git Integration (automatic deploy on push)",
+      "deploy_target": "production (default wrangler environment)",
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "bypass_condition": "Git Integration enabled on account; push to tracked branch triggers deploy outside canonical chain",
+      "containment_status": "CONTAINMENT_REQUIRED",
+      "containment_action": "Disable Git Integration at Cloudflare account level for the mindshift-demo worker. Cannot be enforced from wrangler.toml; requires account-level administrative action.",
+      "observability": "EXTERNAL_ONLY — deploy events visible in Cloudflare dashboard and Workers analytics; not visible to MindShift proof registry",
+      "evidence_path": ["wrangler.toml"],
+      "issue_reference": "#584"
+    },
+    {
+      "surface_id": "CF-002",
+      "surface_name": "Cloudflare API Token direct deploy",
+      "authority_source": "CLOUDFLARE_API_TOKEN or CF_API_TOKEN with Workers:Write scope",
+      "deploy_target": "production (default wrangler environment)",
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "bypass_condition": "Token holder runs wrangler deploy directly, bypassing governed-deploy.yml and the canonical chain",
+      "containment_status": "CLASSIFIED_OPEN",
+      "containment_action": "Scope token to minimum required permissions. Rotate token after each use or bind to GitHub Actions OIDC. Classify as root break-glass authority.",
+      "observability": "PARTIAL — wrangler deploy emits Cloudflare deployment record; not bound to MindShift proof registry unless governed workflow ran",
+      "evidence_path": ["governance/root_authority_registry.json", ".github/workflows/governed-deploy.yml"],
+      "issue_reference": "#584"
+    },
+    {
+      "surface_id": "CF-003",
+      "surface_name": "Cloudflare preview environment deploy",
+      "authority_source": "wrangler deploy --env preview",
+      "deploy_target": "mindshift-demo-preview (isolated, no production D1 binding)",
+      "mutation_capability": true,
+      "production_capable": false,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P0",
+      "bypass_condition": "Preview deploy targets separate worker with no production D1 binding; cannot execute governed canonical routes against production state",
+      "containment_status": "CONTAINED_BY_ENVIRONMENT_SEPARATION",
+      "containment_action": "wrangler.toml [env.preview] isolates preview worker. No production D1 binding in preview environment.",
+      "observability": "N/A — preview cannot reach production surfaces",
+      "evidence_path": ["wrangler.toml"],
+      "issue_reference": "#584"
+    },
+    {
+      "surface_id": "CF-004",
+      "surface_name": "Local wrangler deploy (production default)",
+      "authority_source": "Authenticated local wrangler CLI session with production credentials",
+      "deploy_target": "production (default wrangler environment)",
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "bypass_condition": "Local developer with CLOUDFLARE_API_TOKEN runs wrangler deploy without governed wrapper, bypassing canonical chain",
+      "containment_status": "PARTIAL — package.json deploy script disabled; governed-deploy.ts enforces context guard",
+      "containment_action": "package.json deploy script exits 1. Governed-deploy.ts rejects deploys outside MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed. Requires both a valid canonical artifact AND the governed context variable. Classified as root authority; requires account-level token restriction for full containment.",
+      "observability": "AUDIT_LOG — governed-deploy.ts emits deploy_audit_registry.json entry for all invocations including rejections",
+      "evidence_path": ["package.json", "scripts/governed-deploy.ts"],
+      "issue_reference": "#584"
+    },
+    {
+      "surface_id": "CF-005",
+      "surface_name": "GitHub Actions governed deploy workflow",
+      "authority_source": "workflow_dispatch on governed-deploy.yml, entered through governed legitimacy chain",
+      "deploy_target": "production (default wrangler environment)",
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": true,
+      "bypass_risk": "P1",
+      "bypass_condition": "workflow_dispatch with fabricated decision_id/validated_object_hash/invocation_nonce; requires /compile hash match to pass",
+      "containment_status": "GOVERNED — canonical chain validated before deploy; replay protection via nonce reservation",
+      "containment_action": "Caller workflow ref validated. All seven canonical endpoints must return canonical responses. Replay rejected. Authority expiry derived from /authority response.",
+      "observability": "FULL — all canonical chain responses uploaded as GitHub Actions artifacts; proof persisted in MindShift proof registry",
+      "evidence_path": [".github/workflows/governed-deploy.yml", ".github/workflows/prepare-governed-deploy.yml"],
+      "issue_reference": "#584"
+    }
+  ],
+  "containment_requirements": {
+    "CF-001_git_integration": {
+      "action": "DISABLE at Cloudflare account level",
+      "enforcement": "EXTERNAL — cannot be enforced from repository code",
+      "verification": "Account administrator must confirm Git Integration is disabled for the mindshift-demo worker",
+      "break_glass": "If Git Integration is re-enabled, all subsequent deploys must be treated as ungoverned production mutations"
+    },
+    "CF-002_api_token": {
+      "action": "Scope to Workers:Write for production only under GitHub Actions OIDC",
+      "enforcement": "EXTERNAL — account-level token management",
+      "verification": "Token rotation policy required; last-used audit in Cloudflare dashboard"
+    },
+    "CF-004_local_wrangler": {
+      "action": "Classified as root break-glass authority; requires both token AND governed context",
+      "enforcement": "governed-deploy.ts MINDSHIFT_GOVERNED_DEPLOY_CONTEXT guard + audit log",
+      "verification": "Any local deploy attempt emits to deploy_audit_registry.json"
+    }
+  },
+  "git_integration_containment": {
+    "status": "CONTAINMENT_REQUIRED",
+    "rationale": "Cloudflare Git Integration deploys on push outside the canonical MindShift legitimacy chain. The integration bypasses /session, /continuity, /authority, /compile, /validate, /execute, and /proof entirely. There is no MindShift-enforceable control that can block this; it requires account-level disablement.",
+    "required_account_action": "Disable Cloudflare Workers Git Integration for the mindshift-demo worker in the Cloudflare dashboard under Workers & Pages > mindshift-demo > Settings > Build & deployments",
+    "wrangler_toml_separation": "[env.preview] added to wrangler.toml to ensure any remaining Git Integration targets only the preview environment (non-production, no production D1 binding)"
+  }
+}

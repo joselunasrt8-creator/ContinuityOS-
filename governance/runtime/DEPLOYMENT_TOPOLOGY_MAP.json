@@ -1,0 +1,132 @@
+{
+  "issue_reference": "#584",
+  "schema_version": 1,
+  "document": "DEPLOYMENT_TOPOLOGY_MAP",
+  "purpose": "Map all deployment paths, authority surfaces, and topology boundaries for the MindShift Cloudflare Workers production deployment.",
+  "canonical_chain": ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"],
+  "worker_config": {
+    "production_worker": "mindshift-demo",
+    "preview_worker": "mindshift-demo-preview",
+    "entry_point": "src/index.ts",
+    "compatibility_date": "2026-04-30",
+    "d1_production": "mindshift-demo-prod (9f8a3741-af9d-4e8b-b973-50967a6fd0e6)",
+    "d1_preview": "none — preview environment has no D1 binding"
+  },
+  "deployment_paths": [
+    {
+      "path_id": "PATH-001",
+      "name": "Governed production deploy",
+      "trigger": "Manual workflow_dispatch on governed-deploy.yml, entered through prepare-governed-deploy.yml",
+      "steps": [
+        "prepare-governed-deploy.yml: /session → /continuity → /authority → /compile → nonce generation → print inputs",
+        "governed-deploy.yml: /session → /continuity → /authority → /compile → /validate → /execute → replay check → /proof",
+        "governed-deploy.ts: artifact validation → enforceGovernedDeployCommand → npx wrangler deploy"
+      ],
+      "production_capable": true,
+      "governed": true,
+      "canonical_chain_required": true,
+      "observability": "FULL",
+      "status": "ACTIVE"
+    },
+    {
+      "path_id": "PATH-002",
+      "name": "Cloudflare Git Integration auto-deploy",
+      "trigger": "Push to tracked branch with Git Integration enabled at account level",
+      "steps": [
+        "Cloudflare receives GitHub push webhook",
+        "Cloudflare builds and deploys worker directly",
+        "No canonical chain traversal"
+      ],
+      "production_capable": true,
+      "governed": false,
+      "canonical_chain_required": false,
+      "observability": "CLOUDFLARE_DASHBOARD_ONLY",
+      "status": "CONTAINMENT_REQUIRED — must be disabled at account level",
+      "containment_action": "Disable in Cloudflare dashboard: Workers & Pages > mindshift-demo > Settings > Build & deployments"
+    },
+    {
+      "path_id": "PATH-003",
+      "name": "Local wrangler deploy (production)",
+      "trigger": "Developer runs `wrangler deploy` or `npx wrangler deploy` locally with valid CLOUDFLARE_API_TOKEN",
+      "steps": [
+        "wrangler authenticates with CLOUDFLARE_API_TOKEN",
+        "wrangler deploys default (production) environment",
+        "No canonical chain traversal"
+      ],
+      "production_capable": true,
+      "governed": false,
+      "canonical_chain_required": false,
+      "observability": "PARTIAL — Cloudflare dashboard records deploy; MindShift proof registry has no entry",
+      "status": "CLASSIFIED_OPEN — package.json deploy script disabled as convenience guard; requires account-level token restriction for full containment",
+      "break_glass_classification": "ROOT_AUTHORITY"
+    },
+    {
+      "path_id": "PATH-004",
+      "name": "Local governed-deploy.ts invocation",
+      "trigger": "Developer runs `npx tsx scripts/governed-deploy.ts artifact.json npx wrangler deploy` with MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed and valid CLOUDFLARE_API_TOKEN",
+      "steps": [
+        "governed-deploy.ts validates legitimacy artifact (requires canonical chain artifact)",
+        "enforceGovernedDeployCommand validates context",
+        "npx wrangler deploy executes"
+      ],
+      "production_capable": true,
+      "governed": false,
+      "canonical_chain_required": true,
+      "observability": "AUDIT_LOG — deploy_audit_registry.json entry emitted",
+      "status": "RESIDUAL_BYPASS — requires both valid canonical artifact AND CLOUDFLARE_API_TOKEN AND governed context variable",
+      "break_glass_classification": "LOCAL_ROOT_AUTHORITY"
+    },
+    {
+      "path_id": "PATH-005",
+      "name": "Preview environment deploy",
+      "trigger": "wrangler deploy --env preview",
+      "steps": [
+        "wrangler deploys mindshift-demo-preview worker",
+        "No production D1 binding available",
+        "Preview worker cannot execute canonical routes against production state"
+      ],
+      "production_capable": false,
+      "governed": false,
+      "canonical_chain_required": false,
+      "observability": "CLOUDFLARE_DASHBOARD_ONLY",
+      "status": "CONTAINED_BY_ENVIRONMENT_SEPARATION — preview has no production D1 binding"
+    },
+    {
+      "path_id": "PATH-006",
+      "name": "Unauthorized workflow_dispatch",
+      "trigger": "Arbitrary GitHub Actions workflow_dispatch on governed-deploy.yml with fabricated inputs",
+      "steps": [
+        "CALLER_WORKFLOW_REF check validates the caller is governed-deploy.yml",
+        "All canonical chain endpoints must return canonical responses",
+        "/compile must return hash matching supplied validated_object_hash",
+        "Authority expiry must be in future (derived from /authority response)",
+        "Replay must be rejected"
+      ],
+      "production_capable": false,
+      "governed": false,
+      "canonical_chain_required": true,
+      "observability": "FULL — workflow run logs; canonical chain responses uploaded as artifacts",
+      "status": "BLOCKED — hard-fail checks at each canonical chain step"
+    }
+  ],
+  "topology_invariants": [
+    "Only PATH-001 is a governed production mutation path",
+    "PATH-002 must be disabled at account level to eliminate uncontrolled production deploys",
+    "PATH-003 and PATH-004 are classified as root break-glass authority; observable via Cloudflare dashboard and deploy_audit_registry.json respectively",
+    "PATH-005 cannot reach production surfaces due to environment isolation in wrangler.toml",
+    "PATH-006 is blocked by hard-fail checks in governed-deploy.yml"
+  ],
+  "production_mutation_invariant": "No production-capable Cloudflare mutation path exists outside governed deployment lineage after PATH-002 is disabled at the account level.",
+  "environment_separation": {
+    "production": {
+      "worker": "mindshift-demo",
+      "d1": "mindshift-demo-prod",
+      "deploy_command": "wrangler deploy (no --env flag)"
+    },
+    "preview": {
+      "worker": "mindshift-demo-preview",
+      "d1": "none",
+      "deploy_command": "wrangler deploy --env preview"
+    }
+  }
+}

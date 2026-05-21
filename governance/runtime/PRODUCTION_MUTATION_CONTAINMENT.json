@@ -1,0 +1,114 @@
+{
+  "issue_reference": "#584",
+  "schema_version": 1,
+  "document": "PRODUCTION_MUTATION_CONTAINMENT",
+  "purpose": "Record the containment status of all production mutation vectors for the MindShift Cloudflare Workers deployment.",
+  "canonical_invariant": "No production-capable Cloudflare mutation path exists outside governed deployment lineage.",
+  "containment_measures": [
+    {
+      "measure_id": "CM-001",
+      "name": "package.json deploy script disabled",
+      "target": "Local npm run deploy bypass",
+      "implementation": "package.json deploy script executes `echo ... && exit 1`",
+      "status": "ACTIVE",
+      "evidence_path": "package.json",
+      "limitation": "Does not block direct `wrangler deploy` or `npx wrangler deploy` invocations"
+    },
+    {
+      "measure_id": "CM-002",
+      "name": "governed-deploy.ts MINDSHIFT_GOVERNED_DEPLOY_CONTEXT guard",
+      "target": "governed-deploy.ts invocation outside GitHub Actions governed context",
+      "implementation": "enforceGovernedDeployCommand fails closed unless MINDSHIFT_GOVERNED_DEPLOY_CONTEXT === 'github_actions_governed'",
+      "status": "ACTIVE",
+      "evidence_path": "scripts/governed-deploy.ts",
+      "limitation": "Environment variable can be set locally; requires CLOUDFLARE_API_TOKEN for actual deploy to succeed"
+    },
+    {
+      "measure_id": "CM-003",
+      "name": "governed-deploy.ts wrangler invocation detection",
+      "target": "Direct wrangler deploy or shell-wrapped bypass patterns",
+      "implementation": "Blocks cmd=wrangler with deploy arg, and bash/sh/zsh-wrapped wrangler deploy patterns",
+      "status": "ACTIVE",
+      "evidence_path": "scripts/governed-deploy.ts",
+      "limitation": "npx wrangler deploy is permitted (governed path); other shell interpreters not explicitly enumerated"
+    },
+    {
+      "measure_id": "CM-004",
+      "name": "governed-deploy.yml canonical chain enforcement",
+      "target": "Production deploy without full /session→/proof traversal",
+      "implementation": "All seven canonical endpoints must return canonical responses; each step hard-fails closed",
+      "status": "ACTIVE",
+      "evidence_path": ".github/workflows/governed-deploy.yml",
+      "limitation": "None within GitHub Actions context"
+    },
+    {
+      "measure_id": "CM-005",
+      "name": "governed-deploy.yml CALLER_WORKFLOW_REF validation",
+      "target": "Workflow dispatch from unauthorized callers",
+      "implementation": "CALLER_WORKFLOW_REF must match */.github/workflows/governed-deploy.yml@*",
+      "status": "ACTIVE",
+      "evidence_path": ".github/workflows/governed-deploy.yml"
+    },
+    {
+      "measure_id": "CM-006",
+      "name": "governed-deploy.yml authority expiry from /authority response",
+      "target": "Hardcoded far-future authority expiry (2999) in legitimacy artifact",
+      "implementation": "AUTHORITY_EXPIRY extracted from /authority JSON response; fails closed if missing; used in legitimacy artifact",
+      "status": "ACTIVE",
+      "evidence_path": ".github/workflows/governed-deploy.yml",
+      "fix_description": "Replaced hardcoded '2999-01-01T00:00:00.000Z' with $AUTHORITY_EXPIRY derived from /authority endpoint response"
+    },
+    {
+      "measure_id": "CM-007",
+      "name": "wrangler.toml environment separation",
+      "target": "Preview deploy targeting production worker/database",
+      "implementation": "[env.preview] in wrangler.toml defines separate worker (mindshift-demo-preview) with no production D1 binding",
+      "status": "ACTIVE",
+      "evidence_path": "wrangler.toml",
+      "effect": "Preview deploys cannot bind to production D1; preview worker cannot execute canonical routes against production state"
+    },
+    {
+      "measure_id": "CM-008",
+      "name": "Cloudflare Git Integration — account-level disable required",
+      "target": "Automatic deploy on Git push via Cloudflare Git Integration",
+      "implementation": "REQUIRED — must be disabled at Cloudflare account level in Workers & Pages > mindshift-demo > Settings > Build & deployments",
+      "status": "CONTAINMENT_REQUIRED — cannot be enforced from repository code",
+      "evidence_path": "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+    },
+    {
+      "measure_id": "CM-009",
+      "name": "governed-deploy.ts deploy audit registry",
+      "target": "Unobservable production deploy attempts",
+      "implementation": "All governed-deploy.ts invocations (success, rejection, break-glass) emit to runtime/deploy_audit_registry.json",
+      "status": "ACTIVE",
+      "evidence_path": "scripts/governed-deploy.ts"
+    }
+  ],
+  "open_containment_requirements": [
+    {
+      "requirement": "Disable Cloudflare Git Integration at account level",
+      "priority": "P3",
+      "owner": "Account administrator",
+      "status": "OPEN"
+    },
+    {
+      "requirement": "Scope CLOUDFLARE_API_TOKEN to minimum required permissions (Workers:Write)",
+      "priority": "P3",
+      "owner": "Account administrator",
+      "status": "OPEN"
+    },
+    {
+      "requirement": "Bind CLOUDFLARE_API_TOKEN to GitHub Actions OIDC rather than static secret",
+      "priority": "P2",
+      "owner": "Account administrator",
+      "status": "OPEN"
+    }
+  ],
+  "production_mutation_status": {
+    "governed_path": "CONTAINED — PATH-001 (governed-deploy.yml) is the only authorized production mutation path",
+    "git_integration": "CONTAINMENT_REQUIRED — account-level disable not yet verified",
+    "local_wrangler": "CLASSIFIED_OPEN — root break-glass authority; audit observable",
+    "preview_environment": "CONTAINED — isolated by wrangler.toml [env.preview]",
+    "unauthorized_dispatch": "BLOCKED — hard-fail checks in governed-deploy.yml"
+  }
+}

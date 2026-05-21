@@ -123,6 +123,24 @@ The purpose of this registry is to:
 
 ---
 
+# GAP-006 — Cloudflare Production Authority Bypass Containment
+
+| Field | Value |
+|---|---|
+| gap_id | GAP-006 |
+| issue_reference | #584 |
+| surface | Cloudflare Workers deployment authority / production mutation paths |
+| risk_class | P3 |
+| bypass_condition | Production Cloudflare Worker deployment occurs outside canonical /session → /continuity → /authority → /compile → /validate → /execute → /proof chain. Vectors: Cloudflare Git Integration (auto-deploy on push), local wrangler deploy with valid API token, unauthorized workflow_dispatch with fabricated inputs, preview environment targeting production worker. |
+| closure_condition | All production-capable Cloudflare mutation paths either: (a) traverse the full canonical chain via governed-deploy.yml, or (b) are classified as root break-glass authority with observable audit trail. Cloudflare Git Integration must be disabled at account level. |
+| current_state | Governed deploy workflow (PATH-001) is active and enforces canonical chain. Git Integration requires account-level disable (OPEN). Local wrangler bypass is classified as root break-glass authority with audit observable. Preview environment isolated via wrangler.toml [env.preview]. Authority expiry in legitimacy artifact now derived from /authority response (was hardcoded 2999). Wrangler detection in governed-deploy.ts strengthened to cover shell-wrapped patterns. |
+| required_tests | production deploy outside governed workflow → NULL; unauthorized workflow dispatch → NULL; local bypass classified and observable; preview-only paths cannot mutate production; replayed deployment lineage rejected |
+| required_proofs | CLOUDFLARE_AUTHORITY_CLASSIFICATION.json, DEPLOYMENT_TOPOLOGY_MAP.json, PRODUCTION_MUTATION_CONTAINMENT.json, RESIDUAL_BYPASS_MATRIX.json |
+| fate_tests | tests/fate/issue-584-cloudflare-authority-bypass-containment.test.mjs |
+| status | PARTIAL — code containment active; Cloudflare Git Integration account-level disable pending |
+
+---
+
 # Canonical Closure Condition
 
 The governance gap registry reaches closure only when:

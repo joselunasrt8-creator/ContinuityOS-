@@ -1,13 +1,88 @@
 {
   "issue_reference": "#578",
+  "updated_by_issue": "#584",
   "surfaces": [
-    {"surface_name":"Cloudflare Git Integration","authority_source":"Cloudflare account integration settings","mutation_capability":true,"production_capability":true,"governed_by_mindshift":false,"bypass_risk":"P3","evidence_path":"wrangler.toml","containment_recommendation":"Do not classify closed; treat as production-capable bypass pending account-level containment.","issue_reference":"#578"},
-    {"surface_name":"GitHub Actions workflow dispatch authority","authority_source":"workflow_dispatch","mutation_capability":true,"production_capability":true,"governed_by_mindshift":true,"bypass_risk":"P2","evidence_path":".github/workflows/governed-deploy.yml","containment_recommendation":"Maintain hard-fail checks and canonical input requirements.","issue_reference":"#578"},
-    {"surface_name":"local Wrangler authority","authority_source":"authenticated local wrangler session","mutation_capability":true,"production_capability":true,"governed_by_mindshift":false,"bypass_risk":"P3","evidence_path":"package.json","containment_recommendation":"Direct deploy remains blocked in package script; retain explicit bypass classification.","issue_reference":"#578"}
+    {
+      "surface_name": "Cloudflare Git Integration",
+      "authority_source": "Cloudflare account integration settings",
+      "mutation_capability": true,
+      "production_capability": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "evidence_path": ["wrangler.toml", "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"],
+      "containment_recommendation": "DISABLE at Cloudflare account level. wrangler.toml [env.preview] added to isolate preview environment; does not block production-targeting Git Integration. Account-level disable required.",
+      "containment_status": "CONTAINMENT_REQUIRED",
+      "issue_reference": "#578",
+      "containment_issue_reference": "#584"
+    },
+    {
+      "surface_name": "GitHub Actions workflow dispatch authority",
+      "authority_source": "workflow_dispatch",
+      "mutation_capability": true,
+      "production_capability": true,
+      "governed_by_mindshift": true,
+      "bypass_risk": "P2",
+      "evidence_path": [".github/workflows/governed-deploy.yml", ".github/workflows/prepare-governed-deploy.yml"],
+      "containment_recommendation": "Maintain hard-fail checks and canonical input requirements. Authority expiry now derived from /authority response (not hardcoded).",
+      "containment_status": "GOVERNED",
+      "issue_reference": "#578",
+      "containment_issue_reference": "#584"
+    },
+    {
+      "surface_name": "local Wrangler authority",
+      "authority_source": "authenticated local wrangler session",
+      "mutation_capability": true,
+      "production_capability": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "evidence_path": ["package.json", "scripts/governed-deploy.ts"],
+      "containment_recommendation": "Direct deploy blocked in package script. governed-deploy.ts MINDSHIFT_GOVERNED_DEPLOY_CONTEXT guard and strengthened wrangler invocation detection active. Classified as root break-glass authority; observable via deploy_audit_registry.json.",
+      "containment_status": "CLASSIFIED_OPEN",
+      "issue_reference": "#578",
+      "containment_issue_reference": "#584"
+    },
+    {
+      "surface_name": "Cloudflare API token authority",
+      "authority_source": "CLOUDFLARE_API_TOKEN with Workers:Write scope",
+      "mutation_capability": true,
+      "production_capability": true,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P3",
+      "evidence_path": ["governance/root_authority_registry.json", "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"],
+      "containment_recommendation": "Scope to GitHub Actions OIDC. Rotate token after use. Classify as root break-glass authority.",
+      "containment_status": "CLASSIFIED_OPEN",
+      "issue_reference": "#578",
+      "containment_issue_reference": "#584"
+    },
+    {
+      "surface_name": "Cloudflare preview environment deploy",
+      "authority_source": "wrangler deploy --env preview",
+      "mutation_capability": false,
+      "production_capability": false,
+      "governed_by_mindshift": false,
+      "bypass_risk": "P0",
+      "evidence_path": ["wrangler.toml"],
+      "containment_recommendation": "CONTAINED by wrangler.toml [env.preview] environment separation. Preview worker (mindshift-demo-preview) has no production D1 binding.",
+      "containment_status": "CONTAINED_BY_ENVIRONMENT_SEPARATION",
+      "issue_reference": "#584"
+    }
   ],
   "issue_577_separation": {
     "production_deploy_closure_issue": "#577",
     "sovereignty_containment_issue": "#578",
+    "cloudflare_authority_bypass_containment_issue": "#584",
     "status": "SEPARATE_TRACKS_REQUIRED"
+  },
+  "issue_584_containment_summary": {
+    "status": "PARTIAL",
+    "code_containment_active": true,
+    "pending_account_action": "Disable Cloudflare Git Integration at account level",
+    "governance_documents": [
+      "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json",
+      "governance/runtime/DEPLOYMENT_TOPOLOGY_MAP.json",
+      "governance/runtime/PRODUCTION_MUTATION_CONTAINMENT.json",
+      "governance/runtime/RESIDUAL_BYPASS_MATRIX.json"
+    ],
+    "fate_tests": "tests/fate/issue-584-cloudflare-authority-bypass-containment.test.mjs"
   }
 }
