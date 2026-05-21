@@ -155,13 +155,13 @@ test('execution and proof preserve continuity lineage', () => {
 
   assert.match(
     source,
-    /INSERT INTO execution_registry[\s\S]*continuity_id[\s\S]*\.bind\(execution_id, authority\.session_id, decision_id, validated_object_hash, invocation_nonce, new Date\(\)\.toISOString\(\), String\(authority\.continuity_id \|\| ""\)[\s\S]*provenance\.workflow_sha[\s\S]*\)/,
+    /INSERT INTO execution_registry[\s\S]*SELECT \?1,\?2,\?3,\?4,\?5,'EXECUTED'[\s\S]*EXISTS \(SELECT 1 FROM continuity_registry c WHERE c\.continuity_id=\?7 AND c\.status='ACTIVE' AND c\.revoked_at IS NULL/,
     'execution must persist authority continuity_id into execution lineage',
   )
 
   assert.match(
     source,
-    /INSERT INTO proof_registry[\s\S]*identity_id,session_id,continuity_id,continuity_hash[\s\S]*authority_lineage,execution_lineage/,
+    /INSERT OR IGNORE INTO proof_registry[\s\S]*identity_id,session_id,continuity_id,continuity_hash[\s\S]*authority_lineage,execution_lineage/,
     'proof must persist continuity and lineage fields',
   )
 })
@@ -169,8 +169,7 @@ test('execution and proof preserve continuity lineage', () => {
 test('revocation propagates through continuity, authority, validation, and invocation state', () => {
   assert.match(
     source,
-    /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status=\?\$\{ids\.length \+ 1\}/,
-    /async function invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status='REVOKED'/,
+    /async function invalidateContinuityLineage[\s\S]*WITH RECURSIVE lineage\(continuity_id\)[\s\S]*UPDATE continuity_registry SET status=\?2, revoked_at=COALESCE\(revoked_at, \?3\)/,
     'continuity revocation must mark continuity records revoked',
   )
 
@@ -182,8 +181,7 @@ test('revocation propagates through continuity, authority, validation, and invoc
 
   assert.match(
     source,
-    /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=\?\$\{ids\.length \+ 1\}/,
-    /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason='continuity_revoked'/,
+    /async function invalidateContinuityLineage[\s\S]*UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=\?2/,
     'continuity revocation must invalidate dependent validations',
   )
 

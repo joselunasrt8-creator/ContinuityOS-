@@ -12,10 +12,10 @@ test('active continuity recursively traverses ancestry to a root', () => {
 })
 
 test('invalid ancestor status and expiry recursively invalidate descendants', () => {
-  assert.match(source, /collectContinuityDescendants/, 'revocation cascade must collect descendants recursively')
+  assert.match(source, /WITH RECURSIVE lineage\(continuity_id\)/, 'revocation cascade must resolve descendants recursively at write time')
   assert.match(source, /cascadeExpiration\(env, current_id, now\)/, 'expired ancestors must trigger descendant expiration cascade')
-  assert.match(source, /invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status=\?\$\{ids\.length \+ 1\}/, 'cascade must update all invalidated continuity records')
-  assert.match(source, /UPDATE invocation_registry SET status='REVOKED' WHERE continuity_id IN/, 'cascade must invalidate replay reservations across lineage')
+  assert.match(source, /invalidateContinuityLineage[\s\S]*UPDATE continuity_registry SET status=\?2, revoked_at=COALESCE\(revoked_at, \?3\)/, 'cascade must update all invalidated continuity records')
+  assert.match(source, /UPDATE invocation_registry SET status='REVOKED'[\s\S]*continuity_id IN \(SELECT continuity_id FROM lineage\)/, 'cascade must invalidate replay reservations across lineage')
 })
 
 test('continuity creation rejects orphaned parents and direct cycles', () => {

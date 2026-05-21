@@ -2413,14 +2413,33 @@ async function collectContinuityDescendants(env: Env, root_continuity_id: string
 }
 
 async function invalidateContinuityLineage(env: Env, continuity_id: string, status: "REVOKED" | "EXPIRED", reason: string, invalidated_at = new Date().toISOString()) {
-  const ids = await collectContinuityDescendants(env, continuity_id)
-  if (ids.length === 0) return
-  const placeholders = ids.map((_, index) => `?${index + 1}`).join(",")
-  await env.DB.prepare(`UPDATE continuity_registry SET status=?${ids.length + 1}, revoked_at=COALESCE(revoked_at, ?${ids.length + 2}) WHERE continuity_id IN (${placeholders}) AND status IN ('ACTIVE','RESERVED','EXECUTED','CONSUMED')`).bind(...ids, status, invalidated_at).run()
-  await env.DB.prepare(`UPDATE authority_registry SET status='REVOKED' WHERE continuity_id IN (${placeholders}) AND status IN ('ACTIVE','VALIDATED','RESERVED','EXECUTED')`).bind(...ids).run()
-  await env.DB.prepare(`UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=?${ids.length + 1} WHERE continuity_id IN (${placeholders}) AND status='VALID'`).bind(...ids, reason).run()
-  await env.DB.prepare(`UPDATE invocation_registry SET status='REVOKED' WHERE continuity_id IN (${placeholders}) AND status='RESERVED'`).bind(...ids).run()
-  const delegatedRows = await env.DB.prepare(`SELECT delegated_authority_id, delegation_lineage_hash FROM authority_registry WHERE continuity_id IN (${placeholders}) AND delegated_authority_id IS NOT NULL AND delegated_authority_id != ''`).bind(...ids).all<any>()
+  if (!continuity_id) return
+  const lineageCte = `WITH RECURSIVE lineage(continuity_id) AS (
+    SELECT continuity_id FROM continuity_registry WHERE continuity_id=?1
+    UNION ALL
+    SELECT c.continuity_id FROM continuity_registry c JOIN lineage l ON c.parent_continuity_id = l.continuity_id
+  )`
+  await env.DB.prepare(`${lineageCte}
+    UPDATE continuity_registry SET status=?2, revoked_at=COALESCE(revoked_at, ?3)
+    WHERE continuity_id IN (SELECT continuity_id FROM lineage)
+      AND status IN ('ACTIVE','RESERVED','EXECUTED','CONSUMED')`).bind(continuity_id, status, invalidated_at).run()
+  await env.DB.prepare(`${lineageCte}
+    UPDATE authority_registry SET status='REVOKED'
+    WHERE continuity_id IN (SELECT continuity_id FROM lineage)
+      AND status IN ('ACTIVE','VALIDATED','RESERVED','EXECUTED')`).bind(continuity_id).run()
+  await env.DB.prepare(`${lineageCte}
+    UPDATE validation_registry SET status='REVOKED', result='INVALID', reason=?2
+    WHERE continuity_id IN (SELECT continuity_id FROM lineage)
+      AND status='VALID'`).bind(continuity_id, reason).run()
+  await env.DB.prepare(`${lineageCte}
+    UPDATE invocation_registry SET status='REVOKED'
+    WHERE continuity_id IN (SELECT continuity_id FROM lineage)
+      AND status='RESERVED'`).bind(continuity_id).run()
+  const delegatedRows = await env.DB.prepare(`${lineageCte}
+    SELECT delegated_authority_id, delegation_lineage_hash
+    FROM authority_registry
+    WHERE continuity_id IN (SELECT continuity_id FROM lineage)
+      AND delegated_authority_id IS NOT NULL AND delegated_authority_id != ''`).bind(continuity_id).all<any>()
   for (const row of Array.isArray(delegatedRows?.results) ? delegatedRows.results : []) {
     await appendDelegatedRevocationProjection(env, { object_type: "DelegatedRevocationProjection", delegated_authority_id: String(row.delegated_authority_id || ""), delegation_lineage_hash: String(row.delegation_lineage_hash || ""), projection_status: status, revocation_reason: reason, evidence_only: true, replay_neutral: true }, invalidated_at)
   }
@@ -7323,7 +7342,13 @@ export default {
       try {
         const parent_validation_hash = await sha256Hex(canonicalize({ validation_id: String(validation.validation_id || ""), decision_id, validated_object_hash, invocation_nonce }))
         const executionLineageOriginHash = canonicalLineageHash({ lineage_stage: "execute", decision_id, validated_object_hash, parent_hash: parent_validation_hash })
-        await env.DB.prepare(`INSERT INTO execution_registry (execution_id,session_id,decision_id,validated_object_hash,invocation_nonce,status,created_at,continuity_id,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,delegated_authority_id,delegated_replay_chain_hash,delegation_lineage_hash,delegation_root_hash,parent_validation_hash,lineage_stage,lineage_origin_hash) VALUES (?1,?2,?3,?4,?5,'EXECUTED',?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,'execute',?20)`).bind(execution_id, authority.session_id, decision_id, validated_object_hash, invocation_nonce, new Date().toISOString(), String(authority.continuity_id || ""), provenance.repository, provenance.branch, provenance.pull_request_id, provenance.merge_commit_sha, provenance.source_tree_hash, provenance.workflow_run_id, provenance.workflow_sha, String(authority.delegated_authority_id || ""), String(authority.delegated_replay_chain_hash || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), parent_validation_hash, executionLineageOriginHash).run()
+        const executionWrite = await env.DB.prepare(`INSERT INTO execution_registry (execution_id,session_id,decision_id,validated_object_hash,invocation_nonce,status,created_at,continuity_id,repository,branch,pull_request_id,merge_commit_sha,source_tree_hash,workflow_run_id,workflow_sha,delegated_authority_id,delegated_replay_chain_hash,delegation_lineage_hash,delegation_root_hash,parent_validation_hash,lineage_stage,lineage_origin_hash)
+          SELECT ?1,?2,?3,?4,?5,'EXECUTED',?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,'execute',?20
+          WHERE EXISTS (SELECT 1 FROM continuity_registry c WHERE c.continuity_id=?7 AND c.status='ACTIVE' AND c.revoked_at IS NULL AND c.expires_at>?6)
+            AND EXISTS (SELECT 1 FROM authority_registry a WHERE a.decision_id=?3 AND a.session_id=?2 AND a.continuity_id=?7 AND a.status IN ('RESERVED','VALIDATED'))
+            AND EXISTS (SELECT 1 FROM validation_registry v WHERE v.decision_id=?3 AND v.validated_object_hash=?4 AND v.invocation_nonce=?5 AND v.session_id=?2 AND v.continuity_id=?7 AND v.status='VALID' AND v.result='VALID')
+            AND EXISTS (SELECT 1 FROM invocation_registry i WHERE i.decision_id=?3 AND i.validated_object_hash=?4 AND i.invocation_nonce=?5 AND i.continuity_id=?7 AND i.status='RESERVED')`).bind(execution_id, authority.session_id, decision_id, validated_object_hash, invocation_nonce, new Date().toISOString(), String(authority.continuity_id || ""), provenance.repository, provenance.branch, provenance.pull_request_id, provenance.merge_commit_sha, provenance.source_tree_hash, provenance.workflow_run_id, provenance.workflow_sha, String(authority.delegated_authority_id || ""), String(authority.delegated_replay_chain_hash || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), parent_validation_hash, executionLineageOriginHash).run()
+        if ((executionWrite.meta?.changes || 0) !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"revoked_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/execute", continuity_id: authority.continuity_id || null, indicator: "execution_blocked_by_revocation_closure_barrier" }, drift_class: "execution_drift" })
       } catch {
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"replayed_provenance" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "HIGH", payload: { route: "/execute", workflow_run_id: provenance.workflow_run_id, indicator: "duplicate_workflow_run" }, drift_class: "replay_drift" })
       }
