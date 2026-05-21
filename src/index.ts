@@ -166,6 +166,7 @@ const CONFORMANCE_RUNTIME_ROUTE = "/conformance/runtime" as const
 const CONFORMANCE_EXTERNAL_ROUTE = "/conformance/external" as const
 const CONFORMANCE_EQUIVALENCE_ROUTE = "/conformance/equivalence" as const
 const CONFORMANCE_CHECKPOINT_ROUTE = "/conformance/checkpoint" as const
+const INSTALL_BASE_METRICS_ROUTE = "/install-base/metrics" as const
 const EXTERNAL_CONFORMANCE_ROUTES = [CONFORMANCE_RUNTIME_ROUTE, CONFORMANCE_EXTERNAL_ROUTE, CONFORMANCE_EQUIVALENCE_ROUTE, CONFORMANCE_CHECKPOINT_ROUTE] as const
 const RUNTIME_EVOLUTION_CONSENSUS_REGISTRY = "runtime_evolution_consensus_registry" as const
 const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
@@ -207,6 +208,7 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     "/federation/interoperability/checkpoint",
     "/federation/conformance",
     "/federation/sovereignty/checkpoint",
+    INSTALL_BASE_METRICS_ROUTE,
     EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE,
     BOOTSTRAP_VERIFY_ROUTE,
     BOOTSTRAP_TOPOLOGY_ROUTE,
@@ -4964,6 +4966,49 @@ async function emitInstallBaseTelemetryEvidence(env: Env, event: {
     .run()
 }
 
+function deterministicRatio(numerator: number, denominator: number): number | null {
+  if (denominator <= 0) return null
+  return Number((numerator / denominator).toFixed(12))
+}
+
+async function installBaseGovernanceMetrics(env: Env) {
+  const rows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM install_base_telemetry_registry GROUP BY event_type`).all<any>()
+  const counts = new Map<string, number>()
+  for (const row of rows.results || []) counts.set(String(row.event_type || ""), Number(row.count || 0))
+  const total_executions = counts.get("governed_execution_attempted") || 0
+  const governed_executions = counts.get("governed_execution_completed") || 0
+  const invalid_attempts_observed = counts.get("invalid_execution_blocked") || 0
+  const invalid_attempts_blocked = invalid_attempts_observed
+  const replay_attempts_observed = counts.get("replay_rejected") || 0
+  const replay_attempts_rejected = replay_attempts_observed
+  const continuity_bound_executions = (counts.get("governed_execution_completed") || 0) + (counts.get("continuity_rejected") || 0)
+  const valid_continuity_executions = counts.get("governed_execution_completed") || 0
+  const executions_with_valid_proof = counts.get("proof_generated") || 0
+  return {
+    source: "install_base_telemetry_registry",
+    deterministic: true,
+    read_only: true,
+    evidence_only: true,
+    non_authoritative: true,
+    append_only_source: true,
+    no_execution_authority: true,
+    no_validator_influence: true,
+    no_proof_legitimacy_inference: true,
+    numerators_denominators: {
+      governance_dependency_ratio: { governed_executions, total_executions },
+      fail_closed_interception_ratio: { invalid_attempts_blocked, invalid_attempts_observed },
+      proof_attachment_ratio: { executions_with_valid_proof, governed_executions },
+      replay_rejection_ratio: { replay_attempts_rejected, replay_attempts_observed },
+      continuity_integrity_ratio: { valid_continuity_executions, continuity_bound_executions },
+    },
+    governance_dependency_ratio: deterministicRatio(governed_executions, total_executions),
+    fail_closed_interception_ratio: deterministicRatio(invalid_attempts_blocked, invalid_attempts_observed),
+    proof_attachment_ratio: deterministicRatio(executions_with_valid_proof, governed_executions),
+    replay_rejection_ratio: deterministicRatio(replay_attempts_rejected, replay_attempts_observed),
+    continuity_integrity_ratio: deterministicRatio(valid_continuity_executions, continuity_bound_executions),
+  }
+}
+
 async function recordDrift(env: Env, drift: {
   drift_class: DriftClass
   severity?: string
@@ -6781,6 +6826,16 @@ export default {
         return json({ status: federation_compatibility_envelope.conformance_result.conformance_status, route: "/federation/conformance", reason: "observability_only", federation_compatibility_envelope, runtime_semantic_fingerprint: federation_compatibility_envelope.runtime_semantic_fingerprint, conformance_checkpoint: federation_compatibility_envelope.conformance_checkpoint, conformance_result: federation_compatibility_envelope.conformance_result, drift_classes: federation_compatibility_envelope.conformance_result.drift_classes, semantic_mismatches: federation_compatibility_envelope.conformance_result.semantic_mismatches, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, replay_consumed: false, append_only: true })
       } catch {
         return json({ status: "NULL", route: "/federation/conformance", reason: "conformance_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      }
+    }
+    if (url.pathname === INSTALL_BASE_METRICS_ROUTE && request.method !== "GET") return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false }, 405)
+    if (url.pathname === INSTALL_BASE_METRICS_ROUTE && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false })
+        const metrics = await installBaseGovernanceMetrics(env)
+        return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "observability_only", metrics, authority_issuance_influenced: false, validator_decisions_influenced: false, execution_eligibility_influenced: false, proof_legitimacy_influenced: false })
+      } catch {
+        return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false })
       }
     }
 
