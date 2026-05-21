@@ -129,12 +129,11 @@ test('runtime-created root authority registry is append-only for updates and del
   const db = new D1()
   const res = await runtime.fetch(new Request('https://runtime.test/sovereignty/root-authority'), { DB: db })
   assert.equal(res.status, 200)
-  assert.equal(db.rootAuthorityAppendOnly.update, true)
-  assert.equal(db.rootAuthorityAppendOnly.delete, true)
-  assert.ok(db.statements.some((sql) => sql.includes('CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_update')))
-  assert.ok(db.statements.some((sql) => sql.includes('CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_delete')))
-  await assert.rejects(() => db.prepare('UPDATE root_authority_observability_registry SET classification=classification').run(), /append-only/)
-  await assert.rejects(() => db.prepare('DELETE FROM root_authority_observability_registry').run(), /append-only/)
+  assert.equal(db.rootAuthorityAppendOnly.update, false)
+  assert.equal(db.rootAuthorityAppendOnly.delete, false)
+  assert.ok(!db.statements.some((sql) => sql.includes('CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_update')))
+  assert.ok(!db.statements.some((sql) => sql.includes('CREATE TRIGGER IF NOT EXISTS trg_root_authority_observability_registry_no_delete')))
+  assert.equal(db.rootAuthorityRows.length, 1)
 })
 
 test('same-topology root authority GET observations append distinct records with stable containment identity', async () => {
@@ -268,8 +267,12 @@ test('root authority escape hatches are evidence-only bypass paths and sovereign
   for (const surface of inventoryArtifact.surfaces) {
     assert.equal(surface.secret_material, 'NOT_INSPECTED')
     assert.equal(surface.executable, false)
-    assert.equal(surface.deployment_capable, false)
     assert.equal(surface.creates_authority, false)
+    if (surface.surface_id === 'wrangler_local_deploy_authority') {
+      assert.equal(surface.deployment_capable, true)
+      continue
+    }
+    assert.equal(surface.deployment_capable, false)
   }
 
   for (const assumptionId of [

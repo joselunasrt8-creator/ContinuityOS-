@@ -1,0 +1,141 @@
+{
+  "version": "1.0",
+  "purpose": "Inventory all state-changing execution surfaces",
+  "surfaces": [
+    {
+      "surface_id": "github_production_deploy",
+      "path": ".github/workflows/governed-deploy.yml",
+      "mutation_type": "deployment",
+      "risk_class": "P3",
+      "classification": "state_changing_execution_surface",
+      "required_controls": [
+        "ACTIVE authority",
+        "VALID exact AEO",
+        "unused invocation_nonce",
+        "proof persistence"
+      ]
+    },
+    {
+      "surface_id": "prepare_governed_deploy",
+      "path": ".github/workflows/prepare-governed-deploy.yml",
+      "mutation_type": "authority_preparation",
+      "risk_class": "P2",
+      "classification": "execution_adjacent_mutation_surface",
+      "rationale": "Workflow creates session, continuity, authority, compile output, and invocation nonce used by governed deployment.",
+      "required_controls": [
+        "explicit workflow_dispatch only",
+        "valid worker URL and API key",
+        "session creation must return SESSION_ACTIVE",
+        "continuity creation must return CONTINUITY_ACTIVE",
+        "authority creation must bind matching decision_id and continuity_id",
+        "compile must return validated_object_hash",
+        "generated invocation_nonce must be single-use downstream"
+      ]
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "path": "src/index.ts",
+      "mutation_type": "runtime_execution",
+      "risk_class": "P3",
+      "classification": "runtime_boundary_surface",
+      "required_controls": [
+        "VALID exact AEO",
+        "replay protection",
+        "proof capture"
+      ],
+      "canonical_executable_routes": [
+        "/session",
+        "/continuity",
+        "/authority",
+        "/compile",
+        "/validate",
+        "/execute",
+        "/proof"
+      ],
+      "excluded_non_executable_routes": [
+        "/preo",
+        "/reconcile",
+        "/reconcile/schedule",
+        "/reconcile/report",
+        "/reconcile/drift"
+      ]
+    },
+    {
+      "surface_id": "runtime_closure_inventory",
+      "type": "observability",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
+      "surface_id": "database_write_surface_inventory",
+      "type": "database",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
+      "surface_id": "workflow_package_deploy_inventory",
+      "type": "ci_cd",
+      "state_changing": false,
+      "required_path": "classification only; cannot authorize execution",
+      "proof_type": "closure_audit_hash",
+      "risk_class": "P0",
+      "evidence_only": true,
+      "non_authoritative": true
+    }
+  ],
+  "canonical_executable_routes": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "governance_evidence_routes": [
+    {
+      "path": "/preo",
+      "classification": "governance_evidence_only_non_executable",
+      "authoritative_for_execution": false
+    }
+  ],
+  "observability_only_routes": [
+    {
+      "path": "/reconcile",
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "authoritative_for_execution": false
+    },
+    {
+      "path": "/reconcile/schedule",
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "authoritative_for_execution": false
+    },
+    {
+      "path": "/reconcile/report",
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "authoritative_for_execution": false
+    },
+    {
+      "path": "/reconcile/drift",
+      "classification": "observability_only_non_executable_non_authoritative_non_mutating",
+      "authoritative_for_execution": false
+    }
+  ],
+  "closure_verification": {
+    "issue": "342",
+    "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
+    "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
+    "inventory_hash": "ac72e82ef68c3c9c74828310fa62940b962ba97e25c4d262fd4438136da5db9f",
+    "unclassified_mutation_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "evidence_only": true,
+    "non_authoritative": true
+  }
+}
