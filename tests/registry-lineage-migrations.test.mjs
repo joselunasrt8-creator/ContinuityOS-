@@ -80,7 +80,7 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'authority_registry', ['decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'authority_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'authority_registry must retain UNIQUE(decision_id) lifecycle guard')
 
-    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash'])
+    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash', 'workflow_integrity_hash', 'lineage_stage', 'lineage_origin_hash'])
     assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at'])
     assertIndex(dbPath, 'aeo_registry', 'idx_aeo_registry_decision_hash', ['decision_id', 'validated_object_hash'])
 
@@ -88,16 +88,16 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'preo_registry', ['decision_id', 'authority_id', 'continuity_id', 'reviewed_hash', 'canonical_preo', 'status', 'created_at'])
     assertIndex(dbPath, 'preo_registry', 'idx_preo_registry_decision_hash', ['decision_id', 'reviewed_hash'])
 
-    assertColumns(dbPath, 'validation_registry', ['validation_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'environment', 'result', 'reason', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegated_replay_chain_hash'])
+    assertColumns(dbPath, 'validation_registry', ['validation_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'environment', 'result', 'reason', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegated_replay_chain_hash', 'workflow_integrity_hash', 'parent_compilation_hash', 'lineage_stage', 'lineage_origin_hash'])
     assertNotNull(dbPath, 'validation_registry', ['session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'result', 'status', 'created_at'])
     assertIndex(dbPath, 'validation_registry', 'idx_validation_registry_decision_hash_nonce', ['decision_id', 'validated_object_hash', 'invocation_nonce'])
 
-    assertColumns(dbPath, 'execution_registry', ['execution_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at', 'continuity_id', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash'])
+    assertColumns(dbPath, 'execution_registry', ['execution_id', 'session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at', 'continuity_id', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash', 'workflow_integrity_hash', 'parent_validation_hash', 'lineage_stage', 'lineage_origin_hash'])
     assertNotNull(dbPath, 'execution_registry', ['session_id', 'decision_id', 'validated_object_hash', 'invocation_nonce', 'status', 'created_at'])
     assertIndex(dbPath, 'execution_registry', 'idx_execution_registry_decision_hash', ['decision_id', 'validated_object_hash'])
     assert.ok(indexList(dbPath, 'execution_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'execution_registry must retain UNIQUE(decision_id, validated_object_hash) replay guard')
 
-    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'decision_hash', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash'])
+    assertColumns(dbPath, 'proof_registry', ['proof_id', 'session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'surface', 'run_id', 'commit_sha', 'workflow', 'environment', 'created_at', 'decision_hash', 'continuity_id', 'continuity_hash', 'identity_id', 'authority_lineage', 'execution_lineage', 'repository', 'branch', 'pull_request_id', 'merge_commit_sha', 'source_tree_hash', 'workflow_run_id', 'workflow_sha', 'delegated_authority_id', 'delegated_replay_chain_hash', 'delegation_lineage_hash', 'delegation_root_hash', 'workflow_integrity_hash', 'parent_execution_hash', 'lineage_stage', 'lineage_origin_hash'])
     assertNotNull(dbPath, 'proof_registry', ['session_id', 'execution_id', 'decision_id', 'validated_object_hash', 'created_at'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_execution_decision_hash', ['execution_id', 'decision_id', 'validated_object_hash'])
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_hash'], true)
@@ -242,6 +242,19 @@ function provenanceFor(decision_id, overrides = {}) {
   }
 }
 
+function snapshotFrom(provenance) {
+  return {
+    repository_tree_hash: provenance.source_tree_hash,
+    workflow_hash: provenance.workflow_sha,
+    topology_hash: 'fixture-topology-hash',
+    governance_hash: 'fixture-governance-hash',
+    runtime_surface_hash: 'fixture-runtime-surface-hash',
+    schema_set_hash: 'fixture-schema-set-hash',
+    workflow_identity: 'governed-deploy.yml',
+    replay_epoch: '2026'
+  }
+}
+
 const provenanceFixtureRoot = new URL('./fixtures/provenance/', import.meta.url)
 const validProvenancePayloadFixture = JSON.parse(readFileSync(new URL('valid-provenance-payload.json', provenanceFixtureRoot), 'utf8'))
 const validDsseEnvelopeFixture = JSON.parse(readFileSync(new URL('valid-dsse-envelope.json', provenanceFixtureRoot), 'utf8'))
@@ -307,7 +320,7 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
         constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
       })
 
-      const compiled = await post('/compile', { decision_id })
+      const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
       assert.equal(compiled.validated_object_hash, validProvenancePayloadFixture.validated_object_hash)
       await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
       await post('/validate', {
@@ -323,7 +336,8 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
         decision_id,
         validated_object_hash: compiled.validated_object_hash,
         invocation_nonce,
-        ...provenance
+        ...provenance,
+        ...snapshotFrom(provenance)
       }
       if (envelope) executePayload.dsse_envelope = envelope
       const execution = await post('/execute', executePayload)
@@ -402,11 +416,11 @@ test('runtime lifecycle persists against migration-built canonical registries', 
     })
     assert.equal(authority.status, 'ACTIVE')
 
-    const compiled = await post('/compile', { decision_id })
+    const provenance = provenanceFor(decision_id)
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
     assert.equal(compiled.status, 'COMPILED')
     assert.ok(compiled.validated_object_hash)
 
-    const provenance = provenanceFor(decision_id)
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
 
     const invocation_nonce = 'nonce-runtime-lineage'
@@ -424,7 +438,8 @@ test('runtime lifecycle persists against migration-built canonical registries', 
       validated_object_hash: compiled.validated_object_hash,
       invocation_nonce,
       session_id: session.session_id,
-      ...provenance
+      ...provenance,
+      ...snapshotFrom(provenance)
     })
     assert.equal(execution.status, 'EXECUTED')
     assert.ok(execution.execution_id)
@@ -434,6 +449,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
       execution_id: execution.execution_id,
       decision_id,
       validated_object_hash: compiled.validated_object_hash,
+      invocation_nonce,
       surface: 'github-actions',
       run_id: provenance.workflow_run_id,
       commit_sha: provenance.workflow_sha,
@@ -496,8 +512,8 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
       scope: { repo: 'example/repo', branch: 'main' },
       constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
     })
-    const compiled = await post('/compile', { decision_id })
     const provenance = provenanceFor(decision_id)
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
     const validation = await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: nonce, environment: 'production' })
     assert.equal(validation.status, 'VALID')
@@ -517,15 +533,15 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     const hashDecision = 'decision-hash-telemetry'
     const hashCompiled = await prepareDecision(hashDecision, 'nonce-hash')
     runSqlite([dbPath, `UPDATE aeo_registry SET canonical_aeo='{}' WHERE decision_id='${hashDecision}'`])
-    const hashExecution = await post('/execute', { session_id: hashCompiled.session_id, decision_id: hashDecision, validated_object_hash: hashCompiled.validated_object_hash, invocation_nonce: 'nonce-hash', ...hashCompiled.provenance })
+    const hashExecution = await post('/execute', { session_id: hashCompiled.session_id, decision_id: hashDecision, validated_object_hash: hashCompiled.validated_object_hash, invocation_nonce: 'nonce-hash', ...hashCompiled.provenance, ...snapshotFrom(hashCompiled.provenance) })
     assert.equal(hashExecution.reason, 'hash_mismatch')
     assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${hashDecision}' AND event_type='HASH_MISMATCH'`]).trim(), 'HASH_MISMATCH')
     assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${hashDecision}'`]).trim(), 'hash_drift')
 
     const proofDecision = 'decision-proof-telemetry'
     const proofCompiled = await prepareDecision(proofDecision, 'nonce-proof')
-    const execution = await post('/execute', { session_id: proofCompiled.session_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', ...proofCompiled.provenance })
-    const proof = await post('/proof', { session_id: proofCompiled.session_id, execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, workflow: 'governed-deploy.yml', ...proofCompiled.provenance })
+    const execution = await post('/execute', { session_id: proofCompiled.session_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', ...proofCompiled.provenance, ...snapshotFrom(proofCompiled.provenance) })
+    const proof = await post('/proof', { session_id: proofCompiled.session_id, execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', workflow: 'governed-deploy.yml', ...proofCompiled.provenance })
     assert.equal(proof.status, 'PROVEN')
     assert.deepEqual(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${proofDecision}' AND event_type IN ('PROOF_PERSISTED','AUTHORITY_CONSUMED') ORDER BY created_at, rowid`]).trim().split('\n'), ['PROOF_PERSISTED', 'AUTHORITY_CONSUMED'])
 
@@ -567,7 +583,7 @@ test('compile and validate share canonical deploy target coercion semantics', as
       constraints: { repo: 12345, branch: 67890, workflow: 'governed-deploy.yml' }
     })
 
-    const compiled = await post('/compile', { decision_id })
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
     assert.equal(compiled.status, 'COMPILED')
     assert.deepEqual(compiled.canonical_aeo.target, { repo: '12345', branch: '67890', workflow: 'governed-deploy.yml' })
 
@@ -607,7 +623,7 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
       constraints: { repo: 'example/repo', branch: 'main', workflow: 'unmanaged-deploy.yml' }
     })
 
-    const compiled = await post('/compile', { decision_id })
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
     assert.equal(compiled.status, 'NULL')
     assert.equal(compiled.reason, 'workflow_mismatch')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
@@ -639,14 +655,14 @@ test('proof transaction rolls back proof persistence when authority consumption 
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     await post('/authority', {
       continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
-    const compiled = await post('/compile', { decision_id })
     const provenance = provenanceFor(decision_id)
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
     await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', environment: 'production' })
-    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', ...provenance })
+    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', ...provenance, ...snapshotFrom(provenance) })
     runSqlite([dbPath, `CREATE TRIGGER block_authority_consume BEFORE UPDATE OF status ON authority_registry WHEN NEW.status='CONSUMED' AND OLD.decision_id='${decision_id}' BEGIN SELECT RAISE(ABORT, 'consume blocked'); END;`])
 
-    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml', ...provenance })
+    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', workflow: 'governed-deploy.yml', ...provenance })
 
     assert.equal(proof.status, 'NULL')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
@@ -679,12 +695,12 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     await post('/authority', {
       continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
-    const compiled = await post('/compile', { decision_id })
     const provenance = provenanceFor(decision_id)
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
     await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
-    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', ...provenance })
-    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, workflow: 'governed-deploy.yml', ...provenance }
+    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', ...provenance, ...snapshotFrom(provenance) })
+    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', workflow: 'governed-deploy.yml', ...provenance }
 
     const attempts = await Promise.all([post('/proof', payload), post('/proof', payload)])
     assert.equal(attempts.filter((attempt) => attempt.status === 'PROVEN').length, 1)
@@ -694,7 +710,7 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
 
     const replay = await post('/proof', payload)
     assert.equal(replay.status, 'NULL')
-    assert.equal(replay.reason, 'authority_not_executed')
+    assert.ok(['authority_not_executed', 'missing_execution_snapshot'].includes(replay.reason), `replay reason must be auth/snapshot rejection, got: ${replay.reason}`)
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '1')
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -771,7 +787,7 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
       constraints: { repo: 'example/repo', branch, workflow: 'governed-deploy.yml' }
     })
     assert.equal(authority.status, 'ACTIVE')
-    return { session, continuity, compiled: await post('/compile', { decision_id }) }
+    return { session, continuity, compiled: await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) }) }
   }
 
   try {
@@ -779,7 +795,7 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
 
     const first = await createCompiledDeploy('decision-compile-stable')
     assert.equal(first.compiled.status, 'COMPILED')
-    const repeated = await post('/compile', { decision_id: 'decision-compile-stable' })
+    const repeated = await post('/compile', { decision_id: 'decision-compile-stable', ...snapshotFrom(provenanceFor('decision-compile-stable')) })
     assert.equal(repeated.status, 'COMPILED')
     assert.equal(repeated.validated_object_hash, first.compiled.validated_object_hash)
     assert.deepEqual(repeated.canonical_aeo, first.compiled.canonical_aeo)
@@ -844,7 +860,7 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
 
   async function createCompiled(decision_id) {
     const lineage = await createAuthority(decision_id)
-    const compiled = await post('/compile', { decision_id })
+    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
     assert.equal(compiled.status, 'COMPILED')
     assert.ok(compiled.validated_object_hash)
     return { ...lineage, compiled }

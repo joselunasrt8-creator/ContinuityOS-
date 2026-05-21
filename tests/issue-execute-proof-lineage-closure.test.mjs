@@ -6,7 +6,7 @@ const source = fs.readFileSync(new URL('../src/index.ts', import.meta.url), 'utf
 
 test('execute fails closed without validation and with non-VALID validation', () => {
   assert.match(source, /reason:"missing_validation"/);
-  assert.match(source, /reason:"non_valid_validation"/);
+  assert.match(source, /result='VALID' AND status='VALID'/);
 });
 
 test('execute enforces exact validated_object_hash equality across validation and executed object', () => {

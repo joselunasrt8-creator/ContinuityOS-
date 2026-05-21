@@ -1,18 +1,85 @@
 {
   "version": "1.0",
   "purpose": "Known and potential execution bypass paths",
+  "fail_closed_response": "NULL",
   "bypass_paths": [
     {
       "path": "direct_wrangler_deploy",
-      "risk": "production deploy bypass"
+      "bypass_id": "direct_wrangler_deploy",
+      "risk": "production deploy bypass — wrangler deploy executed outside governed workflow",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    {
+      "path": "raw_d1_migration_apply",
+      "bypass_id": "raw_d1_migration_apply",
+      "risk": "D1 migration applied directly outside governed schema migration path",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+    },
+    {
+      "path": "runtime_raw_registry_write",
+      "bypass_id": "runtime_raw_registry_write",
+      "risk": "direct D1 registry write bypassing canonical runtime lifecycle",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+    },
+    {
+      "path": "manual_governed_workflow_dispatch_without_valid_object",
+      "bypass_id": "manual_governed_workflow_dispatch_without_valid_object",
+      "risk": "workflow_dispatch invoked without a valid compiled AEO or authorized execution object",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+    },
+    {
+      "path": "webhook_mutation_demo_object",
+      "bypass_id": "webhook_mutation_demo_object",
+      "risk": "webhook transfer_intent object mutates state outside governed proof path",
+      "required_response": "PROOFLESS_MUTATION_PATH -> NULL"
+    },
+    {
+      "path": "legacy_runtime_entrypoint_invocation",
+      "bypass_id": "legacy_runtime_entrypoint_invocation",
+      "risk": "legacy worker.js entrypoint invoked in production context outside governed deployment",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+    },
+    {
+      "path": "mutation_after_validation",
+      "bypass_id": "mutation_after_validation",
+      "risk": "object mutated after validation but before or during execution, breaking exact-object invariant",
+      "required_response": "HASH_MISMATCH -> NULL"
+    },
+    {
+      "path": "proof_without_execution_lineage",
+      "bypass_id": "proof_without_execution_lineage",
+      "risk": "proof created without verifiable execution lineage or canonical execution chain",
+      "required_response": "PROOFLESS_MUTATION_PATH -> NULL"
+    },
+    {
+      "path": "github_direct_push_to_main",
+      "bypass_id": "github_direct_push_to_main",
+      "risk": "source-control mutation without PREO_VALID, SCO visibility, or required GitHub checks",
+      "required_response": "MERGE_LEGITIMACY_NULL -> NULL"
+    },
+    {
+      "path": "github_force_push_to_main",
+      "bypass_id": "github_force_push_to_main",
+      "risk": "history rewrite can discard governed proof lineage and reuse stale review state",
+      "required_response": "MERGE_LEGITIMACY_NULL -> NULL"
+    },
+    {
+      "path": "github_branch_protection_bypass",
+      "bypass_id": "github_branch_protection_bypass",
+      "risk": "admin or ruleset bypass may mutate main outside legitimacy evidence",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
     },
     {
       "path": "manual_workflow_dispatch",
-      "risk": "unauthorized execution"
+      "bypass_id": "manual_workflow_dispatch",
+      "risk": "unauthorized execution",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
     },
     {
       "path": "raw_database_write",
-      "risk": "state mutation without validation"
+      "bypass_id": "raw_database_write",
+      "risk": "state mutation without validation",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
     },
     {
       "path": "undeclared_mutation_surface",

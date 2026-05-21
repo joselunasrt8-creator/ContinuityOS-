@@ -37,6 +37,13 @@ async function buildRuntime(dbPath) {
   return { post }
 }
 
+const TEST_SNAPSHOT = {
+  repository_tree_hash: 'test-tree-hash', workflow_hash: 'test-workflow-hash',
+  topology_hash: 'test-topology-hash', governance_hash: 'test-governance-hash',
+  runtime_surface_hash: 'test-surface-hash', schema_set_hash: 'test-schema-hash',
+  workflow_identity: 'governed-deploy.yml', replay_epoch: '2026'
+}
+
 async function seedAuthority(post, decision_id) {
   const session = await post('/session', { identity_id: `identity-${decision_id}` })
   const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
@@ -50,7 +57,7 @@ test('compile enforces ACTIVE unexpired authority fail-closed', async () => {
     applyMigrationChain(dbPath)
     const { post } = await buildRuntime(dbPath)
 
-    const missing = await post('/compile', { decision_id: 'missing-authority' })
+    const missing = await post('/compile', { decision_id: 'missing-authority', ...TEST_SNAPSHOT })
     assert.equal(missing.status, 'NULL')
     assert.equal(missing.reason, 'authority_missing')
 
@@ -65,7 +72,7 @@ test('compile enforces ACTIVE unexpired authority fail-closed', async () => {
       const decision = `decision-${c.status || 'ambiguous'}`
       await seedAuthority(post, decision)
       runSqlite([dbPath, `UPDATE authority_registry SET status='${c.status}' WHERE decision_id='${decision}'`])
-      const compiled = await post('/compile', { decision_id: decision })
+      const compiled = await post('/compile', { decision_id: decision, ...TEST_SNAPSHOT })
       assert.equal(compiled.status, 'NULL')
       assert.equal(compiled.reason, c.reason)
       assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision}'`]).trim(), '0')
@@ -74,15 +81,15 @@ test('compile enforces ACTIVE unexpired authority fail-closed', async () => {
     const expiredDecision = 'decision-expired'
     await seedAuthority(post, expiredDecision)
     runSqlite([dbPath, `UPDATE authority_registry SET expiry='2000-01-01T00:00:00.000Z' WHERE decision_id='${expiredDecision}'`])
-    const expired = await post('/compile', { decision_id: expiredDecision })
+    const expired = await post('/compile', { decision_id: expiredDecision, ...TEST_SNAPSHOT })
     assert.equal(expired.status, 'NULL')
     assert.equal(expired.reason, 'authority_expired')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${expiredDecision}'`]).trim(), '0')
 
     const activeDecision = 'decision-active'
     await seedAuthority(post, activeDecision)
-    const first = await post('/compile', { decision_id: activeDecision })
-    const second = await post('/compile', { decision_id: activeDecision })
+    const first = await post('/compile', { decision_id: activeDecision, ...TEST_SNAPSHOT })
+    const second = await post('/compile', { decision_id: activeDecision, ...TEST_SNAPSHOT })
     assert.equal(first.status, 'COMPILED')
     assert.equal(second.status, 'COMPILED')
     assert.equal(first.validated_object_hash, second.validated_object_hash)

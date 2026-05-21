@@ -63,9 +63,105 @@ Canonical runtime chain remains unchanged:
 ## Canonical federation literals (deterministic parity)
 - `runtime_id`
 - `portable_identifier == canonical_persisted_identifier`
-- `created_at is observational metadata only`
+- `created_at` is observational metadata only
 
-Required deterministic identifiers:
-- `drift identifiers`
-- `FATE identifiers`
-- `revocation divergence identifiers`
+## Portable legitimacy bundle fields
+- `runtime_id`
+- `reconciliation_id`
+- `decision_id`
+- `validated_object_hash`
+- `proof_id`
+- `execution_id`
+- `invocation_nonce`
+- `continuity_id`
+- `authority_lineage_hash`
+- `proof_lineage_hash`
+- `replay_lineage_hash`
+- `preo_lineage_hash`
+- `attestation_hash`
+- `reconciliation_merkle_root`
+- `federation_boundary`
+- `emitted_at`
+
+## Remote runtime classifications
+- `LOCAL_RUNTIME`
+- `FEDERATED_RUNTIME`
+- `EXTERNAL_REFERENCE`
+- `UNTRUSTED_RUNTIME`
+- `PORTABLE_EVIDENCE_ONLY`
+
+## Forbidden semantics
+The following semantics are forbidden and must never be present:
+- `inferred_legitimacy`
+- `remote_replay_trust`
+- `implicit_authority`
+- `remote_execution_inheritance`
+- `mutation_capable_reconciliation`
+- `alternate_execution_path`
+
+## Federated drift taxonomy
+- `federated_checkpoint_drift`
+- `federated_merkle_drift`
+- `federated_bundle_drift`
+- `federated_attestation_drift`
+- `federated_reconciliation_drift`
+- `federated_runtime_divergence_drift`
+- `federated_replay_drift`
+- `federated_preo_drift`
+- `federated_continuity_drift`
+- `federated_exact_object_drift`
+- `federated_identifier_resolution_drift`
+
+## FATE cases (all fail closed to NULL)
+- `federated_merkle_mismatch`
+- `federated_checkpoint_divergence`
+- `federated_replay_collision`
+- `federated_exact_object_divergence`
+- `federated_attestation_replay`
+- `federated_runtime_identity_drift`
+- `federated_preo_divergence`
+- `federated_continuity_divergence`
+- `federated_bundle_payload_drift`
+- `remote_authority_inference`
+- `remote_execution_legitimacy_inference`
+- `non_deterministic_reconciliation_order`
+- `federated_identifier_resolution_drift`
+- `federated_composite_lookup_identifier`
+- `federated_missing_canonical_identifier`
+- `non_deterministic_checkpoint_identity`
+- `timestamp_dependent_checkpoint_identity`
+
+## Federated revocation evidence fields
+- `runtime_id`
+- `remote_runtime_id`
+- `continuity_id`
+- `decision_id`
+- `validated_object_hash`
+- `revocation_class`
+- `revocation_reason`
+- `lineage_hash`
+- `reconciliation_merkle_root`
+- `attestation_hash`
+- `observed_at`
+
+## Federated revocation drift taxonomy
+- `federated_revocation_divergence_drift`
+- `federated_revocation_projection_drift`
+- `federated_revocation_replay_drift`
+- `federated_checkpoint_revocation_drift`
+- `federated_expiration_visibility_drift`
+- `federated_revocation_exact_object_drift`
+- `federated_revocation_anchor_drift`
+
+## Federated revocation FATE cases (all fail closed to NULL)
+- `federated_revocation_identity_mismatch`
+- `federated_revocation_replay_collision`
+- `federated_revocation_without_lineage`
+- `federated_remote_revocation_authority_inference`
+- `federated_checkpoint_revocation_divergence`
+- `federated_expired_lineage_visibility_corruption`
+- `federated_revocation_envelope_hash_mismatch`
+- `federated_revocation_exact_object_flag_drift`
+- `federated_revocation_anchor_mismatch`
+- `federated_revocation_reconciliation_hash_as_validated_hash`
+- `federated_revocation_stale_envelope_replay`
