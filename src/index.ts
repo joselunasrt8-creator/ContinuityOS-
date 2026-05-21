@@ -1125,6 +1125,35 @@ type DeploymentProvenance = {
   workflow_sha: string
 }
 
+type ExecutionSnapshotInput = {
+  repository_tree_hash: string
+  workflow_hash: string
+  topology_hash: string
+  governance_hash: string
+  runtime_surface_hash: string
+  schema_set_hash: string
+  workflow_identity: string
+  replay_epoch: string
+}
+
+function executionSnapshotFrom(input: any): ExecutionSnapshotInput {
+  const snapshot = input?.execution_snapshot || input || {}
+  return {
+    repository_tree_hash: String(snapshot.repository_tree_hash || ""),
+    workflow_hash: String(snapshot.workflow_hash || ""),
+    topology_hash: String(snapshot.topology_hash || ""),
+    governance_hash: String(snapshot.governance_hash || ""),
+    runtime_surface_hash: String(snapshot.runtime_surface_hash || ""),
+    schema_set_hash: String(snapshot.schema_set_hash || ""),
+    workflow_identity: String(snapshot.workflow_identity || snapshot.workflow_path || ""),
+    replay_epoch: String(snapshot.replay_epoch || "")
+  }
+}
+
+function missingExecutionSnapshotFields(snapshot: ExecutionSnapshotInput): string[] {
+  return Object.entries(snapshot).filter(([, value]) => !value).map(([key]) => key)
+}
+
 function deploymentProvenanceFrom(input: any): DeploymentProvenance {
   return {
     repository: String(input?.repository || input?.repo || ""),
@@ -1189,6 +1218,8 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE TABLE IF NOT EXISTS proof_quarantine_registry (quarantine_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, lineage_hash TEXT NOT NULL, quarantine_reason TEXT NOT NULL, canonical_proof_selected TEXT NOT NULL, duplicate_proof_archived TEXT NOT NULL, quarantine_generated_at TEXT NOT NULL, replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'))`,
       `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_invocation_registry_nonce_once ON invocation_registry(decision_id, validated_object_hash, invocation_nonce)`,
+      `CREATE TABLE IF NOT EXISTS execution_snapshot_registry (snapshot_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, continuity_id TEXT NOT NULL, authority_id TEXT NOT NULL, repository_tree_hash TEXT NOT NULL, workflow_hash TEXT NOT NULL, governance_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, runtime_surface_hash TEXT NOT NULL, schema_set_hash TEXT NOT NULL, workflow_identity TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, replay_epoch TEXT NOT NULL, status TEXT NOT NULL, execution_id TEXT, proof_id TEXT, created_at TEXT NOT NULL, UNIQUE(decision_id, validated_object_hash, invocation_nonce), UNIQUE(execution_id), UNIQUE(proof_id))`,
+      `CREATE INDEX IF NOT EXISTS idx_execution_snapshot_registry_lineage ON execution_snapshot_registry(decision_id, continuity_id, authority_id, invocation_nonce, replay_epoch)`,
       `CREATE TABLE IF NOT EXISTS attestation_registry (attestation_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, payload_hash TEXT NOT NULL, payload_type TEXT NOT NULL, signer_identity TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, workflow_run_id TEXT NOT NULL, workflow_sha TEXT NOT NULL, canonical_aeo_hash TEXT NOT NULL, transparency_log_id TEXT NOT NULL, transparency_integrated_time TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(envelope_hash), UNIQUE(workflow_run_id), UNIQUE(decision_id, validated_object_hash))`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_envelope_hash_unique ON attestation_registry(envelope_hash)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_attestation_registry_workflow_run_unique ON attestation_registry(workflow_run_id)`,
@@ -7165,7 +7196,10 @@ export default {
       try {
         const b = await body(request)
         const decision_id = String(b.decision_id || "")
+        const compileSnapshot = executionSnapshotFrom(b)
+        const missingCompileSnapshotFields = missingExecutionSnapshotFields(compileSnapshot)
         if (!decision_id) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/compile", indicator: "missing_decision_id" }, drift_class: "registry_drift" })
+        if (missingCompileSnapshotFields.length) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "execution_snapshot_missing_fields" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile", indicator: "execution_snapshot_missing_fields", missing_fields: missingCompileSnapshotFields }, drift_class: "workflow_source_drift" })
 
         const authorityHasStatus = await hasColumn(env, "authority_registry", "status")
         const authorityHasDecision = await hasColumn(env, "authority_registry", "decision_id")
@@ -7214,19 +7248,21 @@ export default {
           }
           const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash: storedHash, authority, required: requirePreoLineage })
           if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash: storedHash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
-          await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(first.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash: storedHash, indicator: "existing_canonical_aeo_reused" } })
-          return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, canonical_aeo: canonicalAeo })
+          const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash: storedHash, ...compileSnapshot }))
+          await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(first.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash: storedHash, validated_execution_snapshot, indicator: "existing_canonical_aeo_reused" } })
+          return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, validated_execution_snapshot, canonical_aeo: canonicalAeo })
         }
 
         const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope || "{}")), validation: { workflow: GOVERNED_WORKFLOW }, target, finality: { proof_required: true } })
         if (!canonical_aeo) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "registry_drift" })
         const canonical_aeo_json = canonicalize(canonical_aeo)
         const validated_object_hash = await sha256Hex(canonical_aeo_json)
+        const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash, ...compileSnapshot }))
         const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash, authority, required: requirePreoLineage })
         if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
         await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,status,created_at,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash) VALUES (?1,?2,?3,?4,?5,?6,'COMPILED',?7,?8,?9,?10,?11)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, new Date().toISOString(), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || "")).run()
-        await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash } })
-        return json({ status: "COMPILED", decision_id, validated_object_hash, canonical_aeo: JSON.parse(canonical_aeo_json) })
+        await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash, validated_execution_snapshot } })
+        return json({ status: "COMPILED", decision_id, validated_object_hash, validated_execution_snapshot, canonical_aeo: JSON.parse(canonical_aeo_json) })
       } catch (error: any) {
         await recordDrift(env, { drift_class: "registry_drift", severity: "CRITICAL", payload: { route: "/compile", error: String(error?.message || error || "unknown_error") } })
         return json({
@@ -7293,11 +7329,13 @@ export default {
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
-      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b)
+      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b); const executionSnapshot = executionSnapshotFrom(b)
       await emitTelemetry(env, { event_type: "EXECUTION_STARTED", decision_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce } })
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/execute" }, drift_class: "execution_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
+      const missingExecutionSnapshot = missingExecutionSnapshotFields(executionSnapshot)
+      if (missingExecutionSnapshot.length) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"execution_snapshot_missing_fields" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "execution_snapshot_missing_fields", missing_fields: missingExecutionSnapshot }, drift_class: "workflow_source_drift" })
       const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
       if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validation" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (String(validation.result || "") !== "VALID" || String(validation.status || "") !== "VALID") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"non_valid_validation" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", validation_result: validation.result || null, validation_status: validation.status || null, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "execution_drift" })
@@ -7347,6 +7385,7 @@ export default {
         hmac_secret: String(env.PROVENANCE_HMAC_SECRET || "")
       })
       if (!attestationValidation.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: attestationValidation.reason }, { event_type: attestationValidation.drift_class === "replay_drift" ? "REPLAY_BLOCKED" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", ...attestationValidation.payload, validated_object_hash }, drift_class: attestationValidation.drift_class })
+      if (provenance.source_tree_hash !== executionSnapshot.repository_tree_hash || provenance.workflow_sha !== executionSnapshot.workflow_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"execution_snapshot_hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/execute", indicator: "compile_execution_divergence", expected_tree_hash: executionSnapshot.repository_tree_hash, actual_tree_hash: provenance.source_tree_hash, expected_workflow_hash: executionSnapshot.workflow_hash, actual_workflow_hash: provenance.workflow_sha }, drift_class: "hash_drift" })
       const execution_id = crypto.randomUUID()
       try {
         const parent_validation_hash = await sha256Hex(canonicalize({ validation_id: String(validation.validation_id || ""), decision_id, validated_object_hash, invocation_nonce }))
@@ -7362,6 +7401,7 @@ export default {
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"replayed_provenance" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "HIGH", payload: { route: "/execute", workflow_run_id: provenance.workflow_run_id, indicator: "duplicate_workflow_run" }, drift_class: "replay_drift" })
       }
       await env.DB.prepare(`UPDATE invocation_registry SET status='EXECUTED' WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3`).bind(decision_id,validated_object_hash,invocation_nonce).run()
+      await env.DB.prepare(`INSERT OR IGNORE INTO execution_snapshot_registry (snapshot_id,decision_id,continuity_id,authority_id,repository_tree_hash,workflow_hash,governance_hash,topology_hash,runtime_surface_hash,schema_set_hash,workflow_identity,validated_object_hash,invocation_nonce,replay_epoch,status,execution_id,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,'EXECUTED',?15,?16)`).bind(crypto.randomUUID(),decision_id,String(authority.continuity_id || ""),String(authority.authority_id || ""),executionSnapshot.repository_tree_hash,executionSnapshot.workflow_hash,executionSnapshot.governance_hash,executionSnapshot.topology_hash,executionSnapshot.runtime_surface_hash,executionSnapshot.schema_set_hash,executionSnapshot.workflow_identity,validated_object_hash,invocation_nonce,executionSnapshot.replay_epoch,execution_id,new Date().toISOString()).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='EXECUTED' WHERE decision_id=?1`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "EXECUTION_COMPLETED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce, authority_status: "EXECUTED" } })
       return json({ status:"EXECUTED", session_id, execution_id })
@@ -7381,6 +7421,8 @@ export default {
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
       const proof_id = crypto.randomUUID()
       const decision_hash = proofDecisionHash(decision_id, validated_object_hash)
+      const executionSnapshot = await env.DB.prepare(`SELECT * FROM execution_snapshot_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 AND invocation_nonce=?4 AND status='EXECUTED' ORDER BY created_at DESC LIMIT 1`).bind(execution_id,decision_id,validated_object_hash,invocation_nonce).first<any>()
+      if (!executionSnapshot) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_execution_snapshot" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "missing_execution_snapshot" }, drift_class: "proof_drift" })
       const created_at = new Date().toISOString()
       let execution: any = null
       let session: any = null
@@ -7509,6 +7551,7 @@ export default {
         delegated_replay_chain_hash: String(execution.delegated_replay_chain_hash || "")
       })
       const parent_execution_hash = await sha256Hex(canonicalize({ execution_id, decision_id, validated_object_hash, invocation_nonce: String(execution.invocation_nonce || "") }))
+      const executionClosureHash = await sha256Hex(canonicalize({ execution_id, decision_id, validated_object_hash, invocation_nonce, execution_snapshot_hash: await sha256Hex(canonicalize(executionSnapshot)), workflow_identity: String(executionSnapshot.workflow_identity || "") }))
       const proofLineageOriginHash = canonicalLineageHash({ lineage_stage: "proof", decision_id, validated_object_hash, parent_hash: parent_execution_hash })
       const proofLineageCheck = verifyLineageOrigin({ stage: "proof", decision_id, validated_object_hash, lineage_stage: "proof", lineage_origin_hash: proofLineageOriginHash, parent_execution_hash, execution_hash: parent_execution_hash })
       if (!proofLineageCheck.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: proofLineageCheck.reason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", indicator: proofLineageCheck.reason }, drift_class: "proof_drift" })
@@ -7523,7 +7566,7 @@ export default {
               AND EXISTS (SELECT 1 FROM validation_registry WHERE decision_id=?4 AND validated_object_hash=?5 AND invocation_nonce=?25 AND session_id=?2 AND continuity_id=a.continuity_id AND status='VALID' AND result='VALID')
               AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),provenance.workflow_run_id,provenance.workflow_sha,String(b.workflow||GOVERNED_WORKFLOW),String(b.environment||""),created_at,String(execution.continuity_id || ""),provenance.repository,provenance.branch,provenance.pull_request_id,provenance.merge_commit_sha,provenance.source_tree_hash,provenance.workflow_run_id,provenance.workflow_sha,decision_hash,parent_execution_hash,proofLineageOriginHash,invocation_nonce),
           env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND session_id=?2 AND status='EXECUTED' AND continuity_id=?5 AND EXISTS (SELECT 1 FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.proof_id=?3 AND p.decision_id=?1 AND p.validated_object_hash=?4 AND e.invocation_nonce=?6)`).bind(decision_id,session_id,proof_id,validated_object_hash,String(execution.continuity_id || ""),invocation_nonce),
-          env.DB.prepare(`INSERT OR IGNORE INTO proof_propagation_outbox (outbox_id,proof_id,decision_id,execution_id,validated_object_hash,event_type,payload,status,publish_attempts,created_at,replay_neutral,fail_closed) SELECT ?1,?2,?3,?4,?5,'LEGITIMACY_PROOF_PERSISTED',?6,'PENDING',0,?7,'true','true' WHERE EXISTS (SELECT 1 FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.proof_id=?2 AND p.decision_id=?3 AND p.execution_id=?4 AND p.validated_object_hash=?5 AND e.invocation_nonce=?8)`).bind(crypto.randomUUID(),proof_id,decision_id,execution_id,validated_object_hash,canonicalize({ proof_id, decision_id, execution_id, validated_object_hash, invocation_nonce, route: "/proof", lineage_stage: "proof" }),created_at,invocation_nonce)
+          env.DB.prepare(`INSERT OR IGNORE INTO proof_propagation_outbox (outbox_id,proof_id,decision_id,execution_id,validated_object_hash,event_type,payload,status,publish_attempts,created_at,replay_neutral,fail_closed) SELECT ?1,?2,?3,?4,?5,'LEGITIMACY_PROOF_PERSISTED',?6,'PENDING',0,?7,'true','true' WHERE EXISTS (SELECT 1 FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.proof_id=?2 AND p.decision_id=?3 AND p.execution_id=?4 AND p.validated_object_hash=?5 AND e.invocation_nonce=?8)`).bind(crypto.randomUUID(),proof_id,decision_id,execution_id,validated_object_hash,canonicalize({ proof_id, decision_id, execution_id, validated_object_hash, invocation_nonce, route: "/proof", lineage_stage: "proof", execution_closure_hash: executionClosureHash }),created_at,invocation_nonce)
         ]
         if (validatedAttestation) {
           proofStatements.push(env.DB.prepare(`INSERT INTO attestation_registry (attestation_id,envelope_hash,payload_hash,payload_type,signer_identity,decision_id,validated_object_hash,workflow_run_id,workflow_sha,canonical_aeo_hash,transparency_log_id,transparency_integrated_time,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'VALIDATED',?13)`).bind(crypto.randomUUID(), validatedAttestation.envelope_hash, validatedAttestation.payload_hash, validatedAttestation.payload_type, validatedAttestation.signer_identity, validatedAttestation.decision_id, validatedAttestation.validated_object_hash, validatedAttestation.workflow_run_id, validatedAttestation.workflow_sha, validatedAttestation.canonical_aeo_hash, validatedAttestation.transparency_log_id, validatedAttestation.transparency_integrated_time, created_at))
@@ -7536,6 +7579,7 @@ export default {
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
       }
       const outboxQueued = proofBoundary[2]?.meta?.changes || 0
+      await env.DB.prepare(`UPDATE execution_snapshot_registry SET status='PROVEN', proof_id=?2 WHERE execution_id=?1 AND status='EXECUTED'`).bind(execution_id,proof_id).run()
       if (proofInserted !== 1 || authorityConsumed !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_consumption_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", proof_inserted: proofInserted, authority_consumed: authorityConsumed }, drift_class: "authority_drift" })
       if (outboxQueued !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_outbox_enqueue_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, severity: "CRITICAL", payload: { route: "/proof", outbox_queued: outboxQueued }, drift_class: "proof_drift" })
       await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, workflow_run_id: provenance.workflow_run_id } })
