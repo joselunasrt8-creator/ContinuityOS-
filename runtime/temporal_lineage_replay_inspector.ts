@@ -6,6 +6,7 @@ export type TemporalDriftClass =
   | 'temporal-induced'
   | 'epoch-induced'
   | 'continuity-induced'
+  | 'cross-registry-authority-induced'
 
 export interface TemporalLineageNode {
   id: string
@@ -35,6 +36,7 @@ export interface TemporalReplayInspectionInput {
   canonicalLineage: TemporalLineageNode[]
   replayLineage: TemporalLineageNode[]
   expectedEpoch: number
+  crossRegistryAuthorityStates?: Array<{ registry_id: string, decision_id: string, authority_status: string, authority_timestamp: string, continuity_id: string }>
 }
 
 function lineageHash(lineage: TemporalLineageNode[]): string {
@@ -90,6 +92,22 @@ export function inspectTemporalLineageReplay(input: TemporalReplayInspectionInpu
 
   if (lineageHash(input.canonicalLineage) !== lineageHash(input.replayLineage)) {
     issues.push({ class: 'replay-induced', code: 'deterministic_reconstruction_mismatch', details: 'canonical_hash!=replay_hash' })
+  }
+
+  const registryAuthorityStates = input.crossRegistryAuthorityStates || []
+  if (registryAuthorityStates.length > 1) {
+    const statusSet = new Set(registryAuthorityStates.map((state) => state.authority_status))
+    if (statusSet.size > 1) {
+      issues.push({ class: 'cross-registry-authority-induced', code: 'cross_registry_authority_disagreement', details: [...statusSet].join('|') })
+    }
+    const continuitySet = new Set(registryAuthorityStates.map((state) => state.continuity_id))
+    if (continuitySet.size > 1) {
+      issues.push({ class: 'cross-registry-authority-induced', code: 'cross_registry_continuity_mismatch', details: [...continuitySet].join('|') })
+    }
+    const temporalSet = new Set(registryAuthorityStates.map((state) => Date.parse(state.authority_timestamp)).filter((v) => Number.isFinite(v)))
+    if (temporalSet.size > 1) {
+      issues.push({ class: 'cross-registry-authority-induced', code: 'cross_registry_authority_temporal_divergence', details: String(temporalSet.size) })
+    }
   }
 
   const failClosedEpochDisagreement = issues.some((issue) => issue.class === 'epoch-induced')
