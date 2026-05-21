@@ -1,6 +1,6 @@
 # MindShift
 
-MindShift is Execution Ontology Infrastructure.
+MindShift is execution legitimacy infrastructure for AI-assisted systems.
 
 MindShift governs whether state-changing actions are permitted to exist before execution occurs.
 
@@ -79,16 +79,19 @@ See:
 
 # Positioning
 
-Compressed:
+Canonical external statement:
 
 ```text
-AI scales cognition.
-MindShift scales legitimacy.
+MindShift is execution legitimacy infrastructure for AI-assisted systems.
 ```
 
-MindShift does not replace intelligence.
+Execution gate:
 
-MindShift governs legitimacy before execution.
+```text
+VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID
+```
+
+MindShift does not replace intelligence. It enforces legitimacy before execution.
 
 
 
