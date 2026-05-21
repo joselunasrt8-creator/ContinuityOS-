@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-05-21T00:00:00.000Z",
+  "objective": "bounded runtime contraction through deterministic active-tree deletion",
+  "classifications": {
+    "AUTHORITATIVE_KEEP": [
+      "src/index.ts",
+      "src/routes/authority.ts",
+      "src/routes/compile.ts",
+      "src/routes/validate.ts",
+      "src/routes/execute.ts",
+      "src/routes/proof.ts",
+      "schemas/*.json",
+      "governance/runtime/CANONICAL_OBJECT_REGISTRY.json",
+      "governance/runtime/CANONICAL_RUNTIME_OWNERSHIP.json"
+    ],
+    "GENERATED_DELETE": [
+      "graph/output/runtime_edges.json",
+      "graph/output/runtime_nodes.json",
+      "graph/output/governance_edges.json",
+      "graph/output/governance_nodes.json",
+      "execution-surface-risk-scan.txt",
+      "execution-surface-filetree.txt"
+    ],
+    "ARCHIVE_DELETE": [
+      "session_archives/neo4j_topology_snapshot_20260518_055019.dump.gz"
+    ],
+    "DERIVED_DELETE": [
+      "wrangler.jsonc.bak"
+    ],
+    "HISTORICAL_DELETE": [
+      "Mindshift llm.pdf",
+      "Mindshift%20canon%20v3.1 Compressed.pdf.pdf",
+      "mindshift_checklist_v4.pdf"
+    ],
+    "DUPLICATE_DELETE": [
+      "mindshift_runtime_draft_kit.zip",
+      "mindshift-runtime-hardening-pack.zip"
+    ]
+  }
+}
