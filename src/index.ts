@@ -2600,6 +2600,34 @@ async function activeContinuity(env: Env, continuity_id: string, session: any, d
   return { ...lineage.requestedContinuity, canonical: lineage.requestedCanonical, ancestry: lineage.ancestry }
 }
 
+async function resolveCurrentContinuityIdentity(env: Env, session: any): Promise<{ continuity_id: string, identity_id: string } | null> {
+  const session_id = String(session?.session_id || "")
+  const identity_id = String(session?.identity_id || "")
+  if (!session_id || !identity_id) return null
+  const row = await env.DB.prepare(
+    `SELECT c.continuity_id, c.identity_id
+     FROM continuity_registry c
+     WHERE c.session_id=?1
+       AND c.identity_id=?2
+       AND c.status='ACTIVE'
+       AND (c.revoked_at IS NULL OR c.revoked_at='')
+       AND c.expires_at>?3
+       AND NOT EXISTS (
+         SELECT 1 FROM continuity_registry child
+         WHERE child.parent_continuity_id=c.continuity_id
+           AND child.session_id=c.session_id
+           AND child.identity_id=c.identity_id
+           AND child.status='ACTIVE'
+           AND (child.revoked_at IS NULL OR child.revoked_at='')
+           AND child.expires_at>?3
+       )
+     ORDER BY c.issued_at DESC, c.continuity_id DESC
+     LIMIT 1`
+  ).bind(session_id, identity_id, new Date().toISOString()).first<any>()
+  if (!row) return null
+  return { continuity_id: String(row.continuity_id || ""), identity_id: String(row.identity_id || "") }
+}
+
 function parseCanonicalRecordJson(value: unknown): Record<string, unknown> {
   try { return canonicalRecord(JSON.parse(String(value || "{}"))) } catch { return {} }
 }
@@ -7237,6 +7265,11 @@ export default {
       if (!continuity_id) return rejectWithTelemetry(env, { status: "NULL", reason: "missing_continuity_id" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/authority", session_id }, drift_class: "authority_drift" })
       const continuity = await activeContinuity(env, continuity_id, session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status: "NULL", reason: "invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/authority", session_id, continuity_id }, drift_class: "authority_drift" })
+      const currentContinuityIdentity = await resolveCurrentContinuityIdentity(env, session)
+      if (!currentContinuityIdentity) return rejectWithTelemetry(env, { status: "NULL", reason: "missing_continuity_identity" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "CRITICAL", payload: { route: "/authority", session_id, continuity_id, indicator: "missing_current_continuity_identity" }, drift_class: "authority_drift" })
+      if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(continuity_id || "")) {
+        return rejectWithTelemetry(env, { status: "NULL", reason: "continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "CRITICAL", payload: { route: "/authority", session_id, continuity_id, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_or_detached_continuity_identity" }, drift_class: "authority_drift" })
+      }
       const baseScope = canonicalRecord(b.scope || {})
       const rec: any = { authority_id: crypto.randomUUID(), decision_id, identity_id: String(session.identity_id || ""), session_id, continuity_id, owner: String(b.owner || "unknown"), intent: String(b.intent || "deploy_production"), scope: JSON.stringify(baseScope), constraints: JSON.stringify(b.constraints || {}), expiry: String(b.expiry || new Date(Date.now()+3600_000).toISOString()), status: "ACTIVE", created_at: new Date().toISOString() }
       const delegated = await buildDelegatedAuthorityForIssuance(env, b, rec)
@@ -7355,6 +7388,9 @@ export default {
       if (String(authority.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_session_id: authority.session_id, provided_session_id: session_id }, drift_class: "authority_drift" })
       const continuity = await activeContinuity(env, String(authority.continuity_id || ""), session, String(decision_id || ""))
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", continuity_id: authority.continuity_id || null }, drift_class: "authority_drift" })
+      const currentContinuityIdentity = await resolveCurrentContinuityIdentity(env, session)
+      if (!currentContinuityIdentity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_continuity_identity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/validate", continuity_id: authority.continuity_id || null, indicator: "missing_current_continuity_identity" }, drift_class: "authority_drift" })
+      if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/validate", continuity_id: authority.continuity_id || null, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_authority_continuity_identity" }, drift_class: "authority_drift" })
       if (String(authority.identity_id || "") !== String(session.identity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"identity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_identity_id: session.identity_id, provided_identity_id: authority.identity_id }, drift_class: "authority_drift" })
       const compiled = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id, validated_object_hash).first<any>()
       if (!compiled) {
@@ -7420,6 +7456,9 @@ export default {
       if (String(authority.session_id || "") !== session_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"session_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_session_id: authority.session_id, provided_session_id: session_id }, drift_class: "authority_drift" })
       const continuity = await activeContinuity(env, String(authority.continuity_id || ""), session, String(decision_id || ""))
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", continuity_id: authority.continuity_id || null, indicator: "orphaned_execution_prevented" }, drift_class: "execution_drift" })
+      const currentContinuityIdentity = await resolveCurrentContinuityIdentity(env, session)
+      if (!currentContinuityIdentity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_continuity_identity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/execute", continuity_id: authority.continuity_id || null, indicator: "missing_current_continuity_identity" }, drift_class: "execution_drift" })
+      if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/execute", continuity_id: authority.continuity_id || null, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_validation_continuity_identity" }, drift_class: "execution_drift" })
       if (String(validation.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: validation.continuity_id, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (String(validation.delegated_authority_id || "") !== String(authority.delegated_authority_id || "") || String(validation.delegated_replay_chain_hash || "") !== String(authority.delegated_replay_chain_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", delegated_authority_id: String(authority.delegated_authority_id || ""), indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
       const expectedValidationHash = await sha256Hex(canonicalize({ validation_id: String(validation.validation_id || ""), decision_id, validated_object_hash, invocation_nonce }))
@@ -7570,6 +7609,9 @@ export default {
       }
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
+      const currentContinuityIdentity = await resolveCurrentContinuityIdentity(env, session)
+      if (!currentContinuityIdentity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_continuity_identity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "missing_current_continuity_identity" }, drift_class: "proof_drift" })
+      if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_execution_continuity_identity" }, drift_class: "proof_drift" })
       const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
       let proofAeo: any
       try { proofAeo = JSON.parse(String(compiled?.canonical_aeo || "{}")) } catch { proofAeo = null }
