@@ -1,0 +1,84 @@
+{
+  "report_version": "2026-05-21.runtime-verification.v1",
+  "generated_at": "2026-05-21T00:00:00Z",
+  "scope": "mindshift governance runtime topology audit",
+  "canonical_execution_topology": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "active_execution_surfaces": {
+    "mutation_routes": [
+      "/session",
+      "/continuity",
+      "/authority",
+      "/compile",
+      "/validate",
+      "/execute",
+      "/proof"
+    ],
+    "workflow_surfaces": [
+      ".github/workflows/governed-deploy.yml",
+      ".github/workflows/prepare-governed-deploy.yml",
+      ".github/workflows/preo-candidate.yml",
+      ".github/workflows/sco-candidate.yml",
+      ".github/workflows/merge-governance-check.yml",
+      ".github/workflows/constitutional-integrity.yml"
+    ],
+    "validator_invocation_paths": [
+      "/validate",
+      "runtime/legitimacy/validators/schema-validator.js",
+      "tests/conformance-infrastructure.test.mjs"
+    ],
+    "proof_persistence_paths": [
+      "/proof",
+      "migrations/0011_proof_atomicity_unique_guard.sql",
+      "migrations/0041_proof_replay_idempotency.sql",
+      "migrations/0042_proof_execution_lineage_binding.sql"
+    ],
+    "replay_sensitive_surfaces": [
+      "/execute",
+      "/proof",
+      "governance/runtime/REPLAY_TESTS.json",
+      "tests/fate_replay_tests.json",
+      "migrations/0004_execution_replay_protection.sql"
+    ],
+    "merge_capable_surfaces": [
+      ".github/workflows/merge-governance-check.yml",
+      "governance/runtime/MERGE_GOVERNANCE_RULES.json",
+      "CODEOWNERS"
+    ]
+  },
+  "deploy_capable_surfaces": [
+    ".github/workflows/governed-deploy.yml",
+    ".github/workflows/prepare-governed-deploy.yml",
+    "wrangler.toml",
+    "package.json#scripts.deploy"
+  ],
+  "orphan_execution_candidates": [],
+  "undeclared_mutation_paths": [],
+  "validator_coverage_gaps": [],
+  "proof_continuity_gaps": [],
+  "replay_enforcement_gaps": [],
+  "topology_ownership_conflicts": [],
+  "workflow_authority_boundaries": {
+    "governed_deploy": "validator-bound deployment surface",
+    "prepare_governed_deploy": "candidate preparation only; non-authoritative",
+    "merge_governance_check": "merge gate evidence; non-mutating runtime authority",
+    "constitutional_integrity": "topology and legitimacy verification only"
+  },
+  "validation_results": {
+    "all_execution_capable_paths_route_through_canonical_topology": true,
+    "undeclared_execution_surfaces_exist": false,
+    "archive_or_generated_artifacts_executable": false,
+    "deploy_paths_validator_bound": true,
+    "proof_persistence_deterministic": true,
+    "replay_enforcement_singular": true,
+    "topology_ownership_canonical": true
+  },
+  "operational_readiness_assessment": "READY_WITH_BOUNDED_SURFACES"
+}
