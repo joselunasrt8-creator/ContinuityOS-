@@ -1,0 +1,60 @@
+{
+  "canonical_execution_chain": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "authoritative_execution_surfaces": [
+    "route:/session",
+    "route:/continuity",
+    "route:/authority",
+    "route:/compile",
+    "route:/validate",
+    "route:/execute",
+    "route:/proof"
+  ],
+  "deploy_capable_surfaces": [
+    "route:/execute",
+    "route:/proof"
+  ],
+  "forbidden_bypass_patterns": [
+    "workflow_dispatch->/execute without /validate",
+    "workflow_dispatch->direct_production_deploy",
+    "execute_without_authority",
+    "execute_without_proof",
+    "validator_escape",
+    "post_validation_object_mutation"
+  ],
+  "undeclared_surface_policy": {
+    "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "default_classification": "QUARANTINED"
+  },
+  "replay_sensitive_surfaces": [
+    "route:/authority",
+    "route:/execute",
+    "route:/proof"
+  ],
+  "proof_required_surfaces": [
+    "route:/execute",
+    "route:/proof"
+  ],
+  "validator_boundary_constraints": {
+    "validation_must_precede_execution": true,
+    "validated_object_must_equal_executed_object": true,
+    "validator_escape_response": "NULL"
+  },
+  "quarantine_conditions": [
+    "undeclared_mutation_surface",
+    "orphan_execution_attempt",
+    "replayed_execution_nonce",
+    "proofless_execution_attempt",
+    "validator_escape_attempt",
+    "workflow_dispatch_bypass",
+    "mutated_validated_object",
+    "conflicting_authoritative_ownership"
+  ]
+}
