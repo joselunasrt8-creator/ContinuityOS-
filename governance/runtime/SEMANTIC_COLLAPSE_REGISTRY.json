@@ -1,0 +1,81 @@
+{
+  "authoritative_primitives": {
+    "continuity": "continuity binding",
+    "lineage": "proof",
+    "observability": "proof",
+    "orchestration": "execution",
+    "governance": "merge governance",
+    "authority": "authority",
+    "validation": "validation",
+    "execution": "execution",
+    "proof": "proof",
+    "replay": "replay protection",
+    "topology": "deterministic topology",
+    "registry": "registry persistence"
+  },
+  "collapsed_domains": {
+    "continuity": [
+      "authority continuity",
+      "replay continuity",
+      "execution continuity"
+    ],
+    "lineage": [
+      "proof lineage",
+      "execution lineage"
+    ],
+    "observability": [
+      "evidence-only observability"
+    ],
+    "orchestration": [
+      "execution coordination boundary"
+    ],
+    "governance": [
+      "execution governance"
+    ]
+  },
+  "derived_only_domains": {
+    "observability": [
+      "telemetry",
+      "reporting",
+      "analytics"
+    ],
+    "lineage": [
+      "historical lineage narratives"
+    ]
+  },
+  "archive_only_domains": {
+    "governance overlays": [
+      "philosophical overlays",
+      "recursive ontology expansions",
+      "redundant reconciliation narratives",
+      "duplicate topology explanations"
+    ]
+  },
+  "execution_relevant_domains": {
+    "authority": true,
+    "validation": true,
+    "execution": true,
+    "proof": true,
+    "replay protection": true,
+    "continuity binding": true,
+    "deterministic topology": true,
+    "registry persistence": true,
+    "merge governance": true
+  },
+  "eliminated_duplicates": {
+    "continuity": [
+      "identity continuity",
+      "session continuity",
+      "lineage continuity"
+    ],
+    "observability": [
+      "observability governance",
+      "observability authority",
+      "observability orchestration"
+    ],
+    "governance": [
+      "governance recursion overlays",
+      "governance topology duplications"
+    ]
+  }
+}
