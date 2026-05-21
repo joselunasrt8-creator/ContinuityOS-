@@ -24,6 +24,7 @@ Canonical chain:
 - No proof creation.
 - No validator semantics changed.
 - Telemetry remains non-authoritative evidence.
+- Telemetry cannot influence validator outcomes, authority decisions, execution eligibility, or proof acceptance.
 
 ## Metrics
 
