@@ -1,7 +1,7 @@
 export type ContinuityStatus = "ACTIVE" | "REVOKED" | "EXPIRED" | string
 export type ContinuityNode = { continuity_id: string; session_id: string; identity_id?: string; parent_continuity_id?: string | null; continuity_hash: string; status: ContinuityStatus; expires_at?: string | null; revoked_at?: string | null }
 export type SessionNode = { session_id: string; identity_id?: string; continuity_status?: string; expires_at?: string | null; revoked_at?: string | null }
-export type ContinuityFailureReason = "missing_session_lineage" | "missing_continuity_lineage" | "revoked_session_lineage" | "revoked_continuity_lineage" | "expired_session_lineage" | "expired_continuity_lineage" | "orphan_continuity_lineage" | "ambiguous_continuity_lineage" | "continuity_cycle_detected" | "continuity_depth_exceeded" | "continuity_hash_mismatch" | "continuity_reconciliation_failed"
+export type ContinuityFailureReason = "missing_session_lineage" | "missing_continuity_lineage" | "revoked_session_lineage" | "revoked_continuity_lineage" | "expired_session_lineage" | "expired_continuity_lineage" | "orphan_continuity_lineage" | "ambiguous_continuity_lineage" | "continuity_cycle_detected" | "continuity_depth_exceeded" | "continuity_hash_mismatch" | "continuity_identity_mismatch" | "continuity_reconciliation_failed"
 export type ContinuityLineageVerifierInput = { now?: Date; maxDepth?: number; session: SessionNode | null; continuity: ContinuityNode | null; continuityById: Map<string, ContinuityNode | ContinuityNode[]>; expectedLineageHash?: string; computeLineageHash: (lineage: ContinuityNode[]) => string }
 export type ContinuityLineageVerification = { ok: true; lineage: ContinuityNode[]; lineage_hash: string } | { ok: false; reason: ContinuityFailureReason }
 
@@ -28,7 +28,10 @@ export function verifyContinuityLineage(input: ContinuityLineageVerifierInput): 
     if (!current.continuity_id) return { ok: false, reason: "continuity_reconciliation_failed" }
     if (visited.has(current.continuity_id)) return { ok: false, reason: "continuity_cycle_detected" }
     visited.add(current.continuity_id)
-    if (current.session_id !== input.session.session_id || (input.session.identity_id && current.identity_id && input.session.identity_id !== current.identity_id)) return { ok: false, reason: "continuity_reconciliation_failed" }
+    if (current.session_id !== input.session.session_id) return { ok: false, reason: "continuity_reconciliation_failed" }
+    const sessionIdentity = String(input.session.identity_id || "").trim()
+    const continuityIdentity = String(current.identity_id || "").trim()
+    if ((sessionIdentity || continuityIdentity) && sessionIdentity !== continuityIdentity) return { ok: false, reason: "continuity_identity_mismatch" }
     if ((current.revoked_at || "") || current.status !== "ACTIVE") return { ok: false, reason: "revoked_continuity_lineage" }
     if (isExpired(current.expires_at, nowMs)) return { ok: false, reason: "expired_continuity_lineage" }
     lineage.push(current)
