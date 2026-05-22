@@ -1,0 +1,158 @@
+{
+  "inventory_id": "issue-909-deploy-capable-token-authority",
+  "generated_from_repo": true,
+  "generated_at": "2026-05-22",
+  "issue": "#909",
+  "invariant": "deploy-capable token = portable execution authority",
+  "token_surfaces": [
+    {
+      "token_surface": "github_actions_secret_mindshift_api_key",
+      "credential_location": "GitHub Actions secret (repository/environment scope unknown from repo)",
+      "evidence": [
+        ".github/workflows/governed-deploy.yml",
+        ".github/workflows/prepare-governed-deploy.yml"
+      ],
+      "deploy_capable": true,
+      "portable_authority": true,
+      "scope_known": false,
+      "environment_scoped": "UNKNOWN",
+      "branch_scoped": true,
+      "approval_gated": "UNKNOWN",
+      "authority_bound": true,
+      "validator_bound": "PARTIAL",
+      "proof_bound": "PARTIAL",
+      "replay_safe": "PARTIAL",
+      "revocable": true,
+      "observable": true,
+      "closure_status": "OPEN",
+      "risk_level": "HIGH",
+      "lineage": "secrets.MINDSHIFT_API_KEY -> curl POST /session,/continuity,/authority,/compile,/validate,/execute,/proof -> governed deploy artifact + wrapper deploy -> production runtime + code deployment mutation",
+      "legitimacy_binding_status": "Bound in governed-deploy path; deploy-enabling use in prepare-governed-deploy exists before validate/proof completion."
+    },
+    {
+      "token_surface": "github_actions_secret_mindshift_worker_url",
+      "credential_location": "GitHub Actions secret (repository/environment scope unknown from repo)",
+      "evidence": [
+        ".github/workflows/governed-deploy.yml",
+        ".github/workflows/prepare-governed-deploy.yml"
+      ],
+      "deploy_capable": false,
+      "portable_authority": false,
+      "scope_known": false,
+      "environment_scoped": "UNKNOWN",
+      "branch_scoped": true,
+      "approval_gated": "UNKNOWN",
+      "authority_bound": false,
+      "validator_bound": false,
+      "proof_bound": false,
+      "replay_safe": false,
+      "revocable": true,
+      "observable": true,
+      "closure_status": "OPEN",
+      "risk_level": "MEDIUM",
+      "lineage": "secrets.MINDSHIFT_WORKER_URL -> endpoint routing for runtime mutation calls",
+      "legitimacy_binding_status": "Not itself authority, but endpoint redirection can influence where API key authority is applied."
+    },
+    {
+      "token_surface": "cloudflare_api_token_or_cf_api_token_for_wrangler",
+      "credential_location": "GitHub Actions secret or local shell env (exact name not declared in workflow)",
+      "evidence": [
+        ".github/workflows/governed-deploy.yml",
+        "scripts/governed-deploy.ts",
+        "wrangler.toml"
+      ],
+      "deploy_capable": true,
+      "portable_authority": true,
+      "scope_known": false,
+      "environment_scoped": "UNKNOWN",
+      "branch_scoped": false,
+      "approval_gated": "UNKNOWN",
+      "authority_bound": false,
+      "validator_bound": false,
+      "proof_bound": false,
+      "replay_safe": false,
+      "revocable": true,
+      "observable": "PARTIAL",
+      "closure_status": "OPEN",
+      "risk_level": "HIGH",
+      "lineage": "Cloudflare deploy credential -> npx wrangler deploy src/index.ts --config wrangler.toml -> Cloudflare Worker deployment mutation",
+      "legitimacy_binding_status": "Wrapper-enforced in governed workflow, but same token class can deploy outside canonical chain from any authenticated context."
+    },
+    {
+      "token_surface": "wrangler_local_auth_session",
+      "credential_location": "local Wrangler auth state on operator machine",
+      "evidence": [
+        "package.json",
+        "governance/root_authority_registry.json"
+      ],
+      "deploy_capable": true,
+      "portable_authority": true,
+      "scope_known": false,
+      "environment_scoped": false,
+      "branch_scoped": false,
+      "approval_gated": false,
+      "authority_bound": false,
+      "validator_bound": false,
+      "proof_bound": false,
+      "replay_safe": false,
+      "revocable": true,
+      "observable": false,
+      "closure_status": "OPEN",
+      "risk_level": "HIGH",
+      "lineage": "local wrangler login state -> wrangler deploy command -> production deployment mutation",
+      "legitimacy_binding_status": "Outside repository-governed legitimacy coupling unless human/operator process enforces wrapper discipline."
+    },
+    {
+      "token_surface": "github_actions_github_token_runtime",
+      "credential_location": "ephemeral GITHUB_TOKEN issued by GitHub Actions",
+      "evidence": [
+        ".github/workflows/governed-deploy.yml",
+        ".github/workflows/prepare-governed-deploy.yml"
+      ],
+      "deploy_capable": false,
+      "portable_authority": false,
+      "scope_known": true,
+      "environment_scoped": true,
+      "branch_scoped": true,
+      "approval_gated": "UNKNOWN",
+      "authority_bound": false,
+      "validator_bound": false,
+      "proof_bound": false,
+      "replay_safe": true,
+      "revocable": true,
+      "observable": true,
+      "closure_status": "CLOSED_NON_DEPLOY",
+      "risk_level": "LOW",
+      "lineage": "job token with contents/actions read only -> workflow metadata/artifact read access",
+      "legitimacy_binding_status": "No deploy mutation privilege evidenced in repo workflows."
+    },
+    {
+      "token_surface": "github_repo_admin_secret_write_authority",
+      "credential_location": "GitHub repository/admin settings (external)",
+      "evidence": [
+        "governance/root_authority_registry.json"
+      ],
+      "deploy_capable": true,
+      "portable_authority": true,
+      "scope_known": false,
+      "environment_scoped": "UNKNOWN",
+      "branch_scoped": false,
+      "approval_gated": "UNKNOWN",
+      "authority_bound": false,
+      "validator_bound": false,
+      "proof_bound": false,
+      "replay_safe": false,
+      "revocable": "ORG_POLICY_DEPENDENT",
+      "observable": "PARTIAL",
+      "closure_status": "OPEN",
+      "risk_level": "HIGH",
+      "lineage": "admin secret mutation -> alter deploy credentials/workflow inputs -> governed or unguided deployment mutation",
+      "legitimacy_binding_status": "External root authority assumption not verifiable from repository contents."
+    }
+  ],
+  "unverifiable_root_authority_assumptions": [
+    "Cloudflare account owner/admin may deploy independently of GitHub workflow.",
+    "GitHub repository/admin may mutate secret material and workflow permissions.",
+    "Repository environment protection rules and reviewer approvals are not represented in tracked files."
+  ]
+}
