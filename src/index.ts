@@ -5043,6 +5043,8 @@ async function installBaseGovernanceMetrics(env: Env) {
     validated_execution_total,
     proof_generated_total,
     execution_surface_count,
+    blocked_execution_total: counts.get("invalid_execution_blocked") || 0,
+    cost_per_legitimate_execution: null,
     invalid_execution_block_total: counts.get("invalid_execution_blocked") || 0,
     replay_rejection_total: counts.get("replay_rejected") || 0,
     hash_mismatch_total: counts.get("hash_mismatch_rejected") || 0,
