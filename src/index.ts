@@ -363,7 +363,7 @@ function schemaDiagnosticReason(error: unknown): SchemaDiagnosticReason {
 }
 
 type TelemetryEventType = "SESSION_CREATED" | "CONTINUITY_CREATED" | "AUTHORITY_CREATED" | "AEO_COMPILED" | "VALIDATION_GRANTED" | "VALIDATION_REJECTED" | "EXECUTION_STARTED" | "EXECUTION_COMPLETED" | "PROOF_PERSISTED" | "REPLAY_BLOCKED" | "HASH_MISMATCH" | "AUTHORITY_CONSUMED"
-type InstallBaseTelemetryEventType = "governed_execution_attempted" | "governed_execution_completed" | "invalid_execution_blocked" | "replay_rejected" | "continuity_rejected" | "workflow_integrity_drift" | "reconciliation_failure_detected" | "proof_generated" | "proof_rejected"
+type InstallBaseTelemetryEventType = "governed_execution_attempted" | "governed_execution_completed" | "validated_execution" | "proof_generated" | "execution_surface_observed" | "invalid_execution_blocked" | "replay_rejected" | "hash_mismatch_rejected" | "expired_authority_rejected" | "policy_violation_rejected" | "continuity_rejected" | "orphaned_lineage_observed" | "revocation_propagation_observed" | "continuity_expiry_rejected" | "stale_lineage_rejected" | "reconciliation_failure_detected" | "distributed_disagreement_observed" | "quorum_collapse_observed" | "temporal_divergence_observed" | "proof_lineage_conflict_observed" | "proof_rejected" | "workflow_integrity_drift"
 
 
 type RecursiveMutationClass = "runtime_route_mutation" | "validator_mutation" | "schema_mutation" | "authority_semantics_mutation" | "proof_semantics_mutation" | "replay_semantics_mutation" | "policy_mutation" | "observability_mutation" | "federation_semantics_mutation" | "governance_surface_expansion"
@@ -1228,7 +1228,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_delegated_authority_registry_lineage ON delegated_authority_registry(delegated_authority_id, parent_authority_id, delegation_lineage_hash, delegation_root_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_delegated_authority_registry_replay ON delegated_authority_registry(delegated_authority_id, delegated_replay_chain_hash, projection_status)`,
       `CREATE TABLE IF NOT EXISTS observability_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, severity TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
-      `CREATE TABLE IF NOT EXISTS install_base_telemetry_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL CHECK (event_type IN ('governed_execution_attempted','governed_execution_completed','invalid_execution_blocked','replay_rejected','continuity_rejected','workflow_integrity_drift','reconciliation_failure_detected','proof_generated','proof_rejected')), decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, lineage_origin_hash TEXT, lineage_origin_match TEXT NOT NULL CHECK (lineage_origin_match IN ('MATCH','MISMATCH','UNKNOWN')), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), append_only TEXT NOT NULL CHECK (append_only='true'), payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS install_base_telemetry_registry (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL CHECK (event_type IN ('governed_execution_attempted','governed_execution_completed','validated_execution','proof_generated','execution_surface_observed','invalid_execution_blocked','replay_rejected','hash_mismatch_rejected','expired_authority_rejected','policy_violation_rejected','continuity_rejected','orphaned_lineage_observed','revocation_propagation_observed','continuity_expiry_rejected','stale_lineage_rejected','reconciliation_failure_detected','distributed_disagreement_observed','quorum_collapse_observed','temporal_divergence_observed','proof_lineage_conflict_observed','proof_rejected','workflow_integrity_drift')), decision_id TEXT, authority_id TEXT, execution_id TEXT, proof_id TEXT, lineage_origin_hash TEXT, lineage_origin_match TEXT NOT NULL CHECK (lineage_origin_match IN ('MATCH','MISMATCH','UNKNOWN')), evidence_only TEXT NOT NULL CHECK (evidence_only='true'), non_authoritative TEXT NOT NULL CHECK (non_authoritative='true'), append_only TEXT NOT NULL CHECK (append_only='true'), payload TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_type_created ON install_base_telemetry_registry(event_type, created_at)`,
       `CREATE INDEX IF NOT EXISTS idx_install_base_telemetry_registry_decision ON install_base_telemetry_registry(decision_id)`,
       `CREATE TRIGGER IF NOT EXISTS trg_install_base_telemetry_registry_no_update BEFORE UPDATE ON install_base_telemetry_registry BEGIN SELECT RAISE(ABORT, 'install_base_telemetry_registry is append-only'); END`,
@@ -4967,14 +4967,18 @@ async function installBaseGovernanceMetrics(env: Env) {
   const counts = new Map<string, number>()
   for (const row of rows.results || []) counts.set(String(row.event_type || ""), Number(row.count || 0))
   const total_executions = counts.get("governed_execution_attempted") || 0
-  const governed_executions = counts.get("governed_execution_completed") || 0
+  const governed_execution_total = counts.get("governed_execution_completed") || 0
+  const validated_execution_total = counts.get("validated_execution") || 0
+  const proof_generated_total = counts.get("proof_generated") || 0
+  const execution_surface_count = counts.get("execution_surface_observed") || 0
+  const governed_executions = governed_execution_total
   const invalid_attempts_observed = counts.get("invalid_execution_blocked") || 0
   const invalid_attempts_blocked = invalid_attempts_observed
   const replay_attempts_observed = counts.get("replay_rejected") || 0
   const replay_attempts_rejected = replay_attempts_observed
   const continuity_bound_executions = (counts.get("governed_execution_completed") || 0) + (counts.get("continuity_rejected") || 0)
   const valid_continuity_executions = counts.get("governed_execution_completed") || 0
-  const executions_with_valid_proof = counts.get("proof_generated") || 0
+  const executions_with_valid_proof = proof_generated_total
   return {
     source: "install_base_telemetry_registry",
     deterministic: true,
@@ -4997,6 +5001,25 @@ async function installBaseGovernanceMetrics(env: Env) {
     proof_attachment_ratio: deterministicRatio(executions_with_valid_proof, governed_executions),
     replay_rejection_ratio: deterministicRatio(replay_attempts_rejected, replay_attempts_observed),
     continuity_integrity_ratio: deterministicRatio(valid_continuity_executions, continuity_bound_executions),
+    governed_execution_total,
+    validated_execution_total,
+    proof_generated_total,
+    execution_surface_count,
+    invalid_execution_block_total: counts.get("invalid_execution_blocked") || 0,
+    replay_rejection_total: counts.get("replay_rejected") || 0,
+    hash_mismatch_total: counts.get("hash_mismatch_rejected") || 0,
+    expired_authority_rejection_total: counts.get("expired_authority_rejected") || 0,
+    policy_violation_total: counts.get("policy_violation_rejected") || 0,
+    continuity_chain_depth: null,
+    orphaned_lineage_total: counts.get("orphaned_lineage_observed") || 0,
+    revocation_propagation_total: counts.get("revocation_propagation_observed") || 0,
+    continuity_expiry_total: counts.get("continuity_expiry_rejected") || 0,
+    stale_lineage_rejection_total: counts.get("stale_lineage_rejected") || 0,
+    registry_reconciliation_failure_total: counts.get("reconciliation_failure_detected") || 0,
+    distributed_disagreement_total: counts.get("distributed_disagreement_observed") || 0,
+    quorum_collapse_total: counts.get("quorum_collapse_observed") || 0,
+    temporal_divergence_total: counts.get("temporal_divergence_observed") || 0,
+    proof_lineage_conflict_total: counts.get("proof_lineage_conflict_observed") || 0,
   }
 }
 
@@ -5779,6 +5802,19 @@ function proofReplayEvidence(proof: any, candidate_count: number) {
   } as const
 }
 
+
+function installBaseTelemetryTypeFromRejection(reason: string, event_type?: TelemetryEventType): InstallBaseTelemetryEventType | null {
+  if (reason === "replay_detected" || reason === "nonce_used" || reason === "proof_replay" || event_type === "REPLAY_BLOCKED") return "replay_rejected"
+  if (reason === "hash_mismatch" || reason === "execution_hash_mismatch" || reason === "execution_snapshot_hash_mismatch" || event_type === "HASH_MISMATCH") return "hash_mismatch_rejected"
+  if (reason === "authority_expired") return "expired_authority_rejected"
+  if (reason === "policy_violation") return "policy_violation_rejected"
+  if (reason === "continuity_expired") return "continuity_expiry_rejected"
+  if (reason === "stale_lineage") return "stale_lineage_rejected"
+  if (reason === "invalid_continuity" || reason === "continuity_hash_mismatch") return "continuity_rejected"
+  if (String(reason || "").includes("lineage")) return "orphaned_lineage_observed"
+  return "invalid_execution_blocked"
+}
+
 async function rejectWithTelemetry(env: Env, response: Record<string, unknown>, telemetry: {
   event_type?: TelemetryEventType
   decision_id?: string
@@ -5793,6 +5829,17 @@ async function rejectWithTelemetry(env: Env, response: Record<string, unknown>, 
   const payload = { reason: response.reason, result: response.result, status: response.status, ...(telemetry.payload || {}) }
   if (telemetry.event_type) {
     await emitTelemetry(env, { ...telemetry, event_type: telemetry.event_type, payload })
+  }
+  const installBaseType = installBaseTelemetryTypeFromRejection(String(response.reason || ""), telemetry.event_type)
+  if (installBaseType) {
+    await emitInstallBaseTelemetryEvidence(env, {
+      event_type: installBaseType,
+      decision_id: telemetry.decision_id,
+      authority_id: telemetry.authority_id,
+      execution_id: telemetry.execution_id,
+      proof_id: telemetry.proof_id,
+      payload: { ...payload, execution_surface: String((telemetry.payload || {}).route || "unknown"), result: "NULL" }
+    })
   }
   if (telemetry.drift_class) {
     await recordDrift(env, { drift_class: telemetry.drift_class, severity: telemetry.severity, decision_id: telemetry.decision_id, execution_id: telemetry.execution_id, payload, detected_by: telemetry.detected_by })
@@ -7561,6 +7608,7 @@ export default {
       await env.DB.prepare(`INSERT INTO validation_registry (validation_id,session_id,continuity_id,decision_id,validated_object_hash,invocation_nonce,environment,result,reason,status,created_at,delegated_authority_id,delegated_replay_chain_hash,parent_compilation_hash,workflow_integrity_hash,lineage_stage,lineage_origin_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,'VALID',NULL,'VALID',?8,?9,?10,?11,?12,'validate',?13)`).bind(crypto.randomUUID(),session_id,String(authority.continuity_id || ""),decision_id,validated_object_hash,invocation_nonce,String(environment||""),new Date().toISOString(),String(authority.delegated_authority_id || ""),String(authority.delegated_replay_chain_hash || ""),parent_compilation_hash,String(compiled.workflow_integrity_hash || ""),validationLineageOriginHash).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='RESERVED' WHERE decision_id=?1 AND status IN ('ACTIVE','VALIDATED','RESERVED')`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/validate", validated_object_hash, invocation_nonce, authority_status: "RESERVED" } })
+      await emitInstallBaseTelemetryEvidence(env, { event_type: "validated_execution", decision_id, authority_id: String(authority.authority_id || ""), lineage_origin_hash: validationLineageOriginHash, lineage_origin_match: "MATCH", payload: { event_type: "validated_execution", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
       return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce })
     }
 
@@ -7584,6 +7632,7 @@ export default {
       if (proofReplay) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, proof_id: String(proofReplay.proof_id || ""), severity: "HIGH", payload: { route: "/execute", validated_object_hash, invocation_nonce, indicator: "proof_already_exists" }, drift_class: "replay_drift" })
       const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
       if (!authority || !["RESERVED","VALIDATED"].includes(String(authority.status))) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_reserved" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority?.authority_id || ""), severity: "HIGH", payload: { route: "/execute", authority_status: authority?.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
+      await emitInstallBaseTelemetryEvidence(env, { event_type: "governed_execution_attempted", decision_id, authority_id: String(authority.authority_id || ""), payload: { event_type: "governed_execution_attempted", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
       if (isExpired(String(authority.expiry || ""))) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_expired" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority?.authority_id || ""), severity: "HIGH", payload: { route: "/execute", authority_status: authority?.status || null, indicator: "authority_expired_after_validation" }, drift_class: "authority_drift" })
       const missingExecutionSnapshot = missingExecutionSnapshotFields(executionSnapshot)
       if (missingExecutionSnapshot.length) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"execution_snapshot_missing_fields" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "execution_snapshot_missing_fields", missing_fields: missingExecutionSnapshot }, drift_class: "workflow_source_drift" })
@@ -7655,6 +7704,8 @@ export default {
       await env.DB.prepare(`INSERT OR IGNORE INTO execution_snapshot_registry (snapshot_id,decision_id,continuity_id,authority_id,repository_tree_hash,workflow_hash,governance_hash,topology_hash,runtime_surface_hash,schema_set_hash,workflow_identity,validated_object_hash,invocation_nonce,replay_epoch,status,execution_id,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,'EXECUTED',?15,?16)`).bind(crypto.randomUUID(),decision_id,String(authority.continuity_id || ""),String(authority.authority_id || ""),executionSnapshot.repository_tree_hash,executionSnapshot.workflow_hash,executionSnapshot.governance_hash,executionSnapshot.topology_hash,executionSnapshot.runtime_surface_hash,executionSnapshot.schema_set_hash,executionSnapshot.workflow_identity,validated_object_hash,invocation_nonce,executionSnapshot.replay_epoch,execution_id,new Date().toISOString()).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='EXECUTED' WHERE decision_id=?1`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "EXECUTION_COMPLETED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce, authority_status: "EXECUTED" } })
+      await emitInstallBaseTelemetryEvidence(env, { event_type: "governed_execution_completed", decision_id, authority_id: String(authority.authority_id || ""), execution_id, payload: { event_type: "governed_execution_completed", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
+      await emitInstallBaseTelemetryEvidence(env, { event_type: "execution_surface_observed", decision_id, authority_id: String(authority.authority_id || ""), execution_id, payload: { event_type: "execution_surface_observed", execution_surface: "deploy_runtime", result: "NULL" } })
       return json({ status:"EXECUTED", session_id, execution_id })
     }
 
@@ -7852,6 +7903,7 @@ export default {
       if (proofInserted !== 1 || authorityConsumed !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_consumption_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", proof_inserted: proofInserted, authority_consumed: authorityConsumed }, drift_class: "authority_drift" })
       if (outboxQueued !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_outbox_enqueue_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, severity: "CRITICAL", payload: { route: "/proof", outbox_queued: outboxQueued }, drift_class: "proof_drift" })
       await emitTelemetry(env, { event_type: "PROOF_PERSISTED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", session_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, workflow_run_id: provenance.workflow_run_id } })
+      await emitInstallBaseTelemetryEvidence(env, { event_type: "proof_generated", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, payload: { event_type: "proof_generated", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
       await emitTelemetry(env, { event_type: "AUTHORITY_CONSUMED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, proof_id, severity: "INFO", payload: { route: "/proof", authority_status: "CONSUMED" } })
       return json({ status:"PROVEN", result:"OK", proof_id, proof: { proof_id, identity_id: String(authority.identity_id || ""), session_id, continuity_id: String(authority.continuity_id || ""), execution_id, decision_id, validated_object_hash, repository: provenance.repository, branch: provenance.branch, pull_request_id: provenance.pull_request_id, merge_commit_sha: provenance.merge_commit_sha, source_tree_hash: provenance.source_tree_hash, workflow_run_id: provenance.workflow_run_id, workflow_sha: provenance.workflow_sha } })
     }

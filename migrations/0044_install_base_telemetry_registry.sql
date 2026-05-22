@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS install_base_telemetry_registry (
   event_id TEXT PRIMARY KEY,
   event_type TEXT NOT NULL CHECK (event_type IN (
-    'governed_execution_attempted','governed_execution_completed','invalid_execution_blocked','replay_rejected','continuity_rejected','workflow_integrity_drift','reconciliation_failure_detected','proof_generated','proof_rejected'
+    'governed_execution_attempted','governed_execution_completed','validated_execution','proof_generated','execution_surface_observed','invalid_execution_blocked','replay_rejected','hash_mismatch_rejected','expired_authority_rejected','policy_violation_rejected','continuity_rejected','orphaned_lineage_observed','revocation_propagation_observed','continuity_expiry_rejected','stale_lineage_rejected','reconciliation_failure_detected','distributed_disagreement_observed','quorum_collapse_observed','temporal_divergence_observed','proof_lineage_conflict_observed','proof_rejected','workflow_integrity_drift'
   )),
   decision_id TEXT,
   authority_id TEXT,
