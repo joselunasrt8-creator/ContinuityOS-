@@ -286,16 +286,16 @@ test('undeclared_migration_schema_mutation_bypass_declared: legitimacy-dropping 
   );
 });
 
-// migration_governance_registry is declared as append-only evidence table in migration 0046
-test('migration_governance_registry_declared: 0046 migration creates append-only evidence surface declaration', () => {
+// migration_governance_registry is declared as append-only evidence table in migration 0047
+test('migration_governance_registry_declared: 0047 migration creates append-only evidence surface declaration', () => {
   const content = readFileSync(
-    path.join(repoRoot, 'migrations', '0046_migration_governance_registry.sql'),
+    path.join(repoRoot, 'migrations', '0047_migration_governance_registry.sql'),
     'utf8'
   ).toLowerCase();
 
   assert.ok(
     content.includes('create table if not exists migration_governance_registry'),
-    'migration 0046 must create migration_governance_registry table'
+    'migration 0047 must create migration_governance_registry table'
   );
   assert.ok(content.includes('creates_authority'), 'table must declare creates_authority constraint');
   assert.ok(content.includes('evidence_only'), 'table must declare evidence_only constraint');
