@@ -1,0 +1,116 @@
+{
+  "version": "1.0",
+  "purpose": "Formal classification of all bypass-capable actors for the main branch protection boundary.",
+  "canonical_invariant": "No bypass actor creates merge legitimacy. All bypass paths are root authority evidence only, never legitimacy.",
+  "issue": "380",
+  "actors": [
+    {
+      "actor_id": "github_repository_admin",
+      "actor_type": "github_admin",
+      "bypass_capability": "branch_protection_rule_disable_or_override",
+      "classification": "ROOT_REPOSITORY_AUTHORITY",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "audit_required": true,
+      "rationale": "Repository admin access allows disabling branch protection rules via GitHub Settings. This is a root authority escape hatch. It does not produce PREO_VALID or merge legitimacy."
+    },
+    {
+      "actor_id": "github_organization_owner",
+      "actor_type": "github_org_owner",
+      "bypass_capability": "organization_level_branch_protection_override",
+      "classification": "ROOT_REPOSITORY_AUTHORITY",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "audit_required": true,
+      "rationale": "Organization owner may override or delete branch protection rules at the org level. Same root authority classification as repository admin bypass."
+    },
+    {
+      "actor_id": "direct_push_actor",
+      "actor_type": "git_push_client",
+      "bypass_capability": "direct_push_to_main_without_pr",
+      "classification": "MERGE_LEGITIMACY_NULL",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "enforcement_mechanism": "branch_protection_rule: restrict_direct_push_to_main",
+      "audit_required": true,
+      "rationale": "Direct push to main bypasses PR creation, CODEOWNER review, and status checks. Branch protection blocks this path at the git receive-pack layer."
+    },
+    {
+      "actor_id": "force_push_actor",
+      "actor_type": "git_push_client",
+      "bypass_capability": "force_push_to_main_history_rewrite",
+      "classification": "MERGE_LEGITIMACY_NULL",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "enforcement_mechanism": "branch_protection_rule: allow_force_pushes = false",
+      "audit_required": true,
+      "rationale": "Force push rewrites history and can discard proof lineage and reuse stale review state. Branch protection blocks this path."
+    },
+    {
+      "actor_id": "branch_deletion_actor",
+      "actor_type": "git_push_client",
+      "bypass_capability": "delete_main_branch",
+      "classification": "MERGE_LEGITIMACY_NULL",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "enforcement_mechanism": "branch_protection_rule: allow_branch_deletion = false",
+      "audit_required": true,
+      "rationale": "Deleting main destroys the canonical branch and all proof lineage anchored to it. Branch protection blocks this path."
+    },
+    {
+      "actor_id": "unreviewed_merge_actor",
+      "actor_type": "github_pr_merge",
+      "bypass_capability": "merge_pr_without_required_codeowner_review",
+      "classification": "MERGE_LEGITIMACY_NULL",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "MERGE_LEGITIMACY_NULL; CODEOWNER approval required -> NULL",
+      "enforcement_mechanism": "branch_protection_rule: require_code_owner_reviews = true",
+      "audit_required": true,
+      "rationale": "Merging a PR without required CODEOWNER review bypasses the ownership authority declared in CODEOWNERS. Branch protection blocks this path."
+    },
+    {
+      "actor_id": "unchecked_merge_actor",
+      "actor_type": "github_pr_merge",
+      "bypass_capability": "merge_pr_without_required_status_checks",
+      "classification": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL -> NULL",
+      "enforcement_mechanism": "branch_protection_rule: require_status_checks = true",
+      "audit_required": true,
+      "rationale": "Merging a PR without required status checks passing means PREO is invalid and merge legitimacy is NULL. Branch protection blocks this path."
+    },
+    {
+      "actor_id": "stale_branch_merge_actor",
+      "actor_type": "github_pr_merge",
+      "bypass_capability": "merge_pr_with_stale_branch_not_up_to_date",
+      "classification": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+      "bypass_creates_merge_legitimacy": false,
+      "bypass_creates_preo_valid": false,
+      "bypass_response": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL -> NULL",
+      "enforcement_mechanism": "branch_protection_rule: require_branch_up_to_date_before_merge = true",
+      "audit_required": true,
+      "rationale": "Merging a branch that is not up to date with main allows stale PREO/SCO evidence to be used. Branch protection blocks this path."
+    }
+  ],
+  "enforcement_response": {
+    "all_bypass_paths": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+    "no_bypass_creates_legitimacy": true,
+    "no_bypass_creates_preo_valid": true,
+    "fail_closed": true,
+    "rationale": "The canonical invariant holds for all bypass paths: if no PREO_VALID exists, merge legitimacy is NULL, regardless of how the mutation occurred."
+  },
+  "normalization_prohibition": [
+    "admin bypass must never be treated as a shortcut to merge legitimacy",
+    "root authority evidence may invalidate legitimacy but may NEVER authorize merge",
+    "no hidden admin bypass normalization",
+    "no direct mutation shortcut",
+    "no weakened review boundary"
+  ]
+}

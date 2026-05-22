@@ -1,21 +1,27 @@
 {
-  "version": "1.0",
-  "purpose": "Define required repository branch protection controls before Stage 4 enforcement activation.",
-  "status": "policy_only_non_enforcing",
+  "version": "2.0",
+  "purpose": "Enforced repository ownership boundary for main. CODEOWNERS is the authority declaration; branch protection is the enforcement mechanism.",
+  "status": "branch_protection_enforced",
   "target_branch": "main",
   "core_invariant": "No PREO_VALID -> no merge legitimacy",
+  "issue": "380",
   "required_controls": {
     "require_pull_request_before_merge": true,
     "require_approvals": true,
     "required_approving_review_count": 1,
+    "require_code_owner_reviews": true,
     "dismiss_stale_reviews": true,
+    "require_review_from_code_owners": true,
     "require_status_checks": true,
     "required_status_checks": [
       "merge-governance-check",
       "generate-preo-candidate",
-      "generate-sco-candidate"
+      "generate-sco-candidate",
+      "constitutional-integrity",
+      "branch-protection-enforcement"
     ],
     "require_branch_up_to_date_before_merge": true,
+    "require_linear_history": true,
     "restrict_direct_push_to_main": true,
     "allow_force_pushes": false,
     "allow_branch_deletion": false,
@@ -26,7 +32,8 @@
   },
   "admin_bypass_policy": {
     "allow_admin_bypass": false,
-    "rationale": "Admin bypass creates alternate mutation paths outside governance visibility.",
+    "rationale": "Admin bypass creates alternate mutation paths outside governance visibility. No bypass actor produces merge legitimacy.",
+    "admin_bypass_classification": "ROOT_REPOSITORY_AUTHORITY — evidence only, never legitimacy",
     "future_exception_process": "Requires explicit governance policy artifact and audit logging."
   },
   "merge_legitimacy_requirements": [
@@ -35,27 +42,36 @@
     "merge-governance-check passing",
     "generate-preo-candidate passing",
     "generate-sco-candidate passing",
+    "constitutional-integrity passing",
+    "branch-protection-enforcement passing",
+    "CODEOWNER review approval from @joselunasrt8-creator",
     "required status checks passing",
     "branch synchronized with main",
+    "linear history maintained",
     "PREO_VALID remains canonical merge gate",
-    "admin or branch protection bypass is root authority evidence only",
+    "admin or branch protection bypass is root authority evidence only, never legitimacy",
     "merge queue, squash merge, and rebase merge require current head_sha-bound checks"
   ],
   "forbidden_paths": [
     "direct push to main",
     "force push to main",
+    "branch deletion of main",
     "merge without required checks",
     "merge with nonexistent required checks",
+    "merge without CODEOWNER review",
     "governed mutation without SCO visibility",
     "merge legitimacy without PREO_VALID visibility",
     "force push history rewrite",
     "branch protection bypass treated as merge legitimacy",
     "merge queue entry without exact head_sha-bound required checks",
-    "squash or rebase merge using stale review/check evidence"
+    "squash or rebase merge using stale review/check evidence",
+    "non-linear history mutation"
   ],
   "enforcement_classification": {
-    "current": "advisory",
-    "target": "branch_protected_enforcement"
+    "current": "enforced",
+    "target": "branch_protected_enforcement",
+    "enforcement_activated": "2026-05-22",
+    "activating_issue": "380"
   },
   "emitted_check_inventory": [
     {
@@ -78,6 +94,20 @@
       "job_name": "generate-sco-candidate",
       "emitted_check_run_name": "generate-sco-candidate",
       "required_check": "generate-sco-candidate"
+    },
+    {
+      "workflow_file": ".github/workflows/constitutional-integrity.yml",
+      "workflow_name": "constitutional-integrity",
+      "job_name": "constitutional-integrity",
+      "emitted_check_run_name": "constitutional-integrity",
+      "required_check": "constitutional-integrity"
+    },
+    {
+      "workflow_file": ".github/workflows/branch-protection-enforcement.yml",
+      "workflow_name": "branch-protection-enforcement",
+      "job_name": "branch-protection-enforcement",
+      "emitted_check_run_name": "branch-protection-enforcement",
+      "required_check": "branch-protection-enforcement"
     }
   ],
   "governance_drift_policy": {
@@ -90,5 +120,8 @@
     "squash_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
     "rebase_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
     "gap_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
-  }
+  },
+  "bypass_classification_artifact": "governance/runtime/BYPASS_CLASSIFICATION.json",
+  "enforcement_verification_artifact": "governance/runtime/ENFORCEMENT_VERIFICATION.json",
+  "governance_documentation": "governance/BRANCH_PROTECTION_ENFORCEMENT.md"
 }

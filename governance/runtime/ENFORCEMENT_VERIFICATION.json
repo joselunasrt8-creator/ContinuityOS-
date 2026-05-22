@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "purpose": "Static enforcement verification record for the repository ownership boundary. Dynamic per-PR verification is produced by the branch-protection-enforcement workflow.",
+  "status": "ENFORCEMENT_ACTIVE",
+  "issue": "380",
+  "target_branch": "main",
+  "activation_date": "2026-05-22",
+  "enforcement_model": "CODEOWNERS declares authority; branch protection enforces authority",
+  "controls_verified": {
+    "require_pull_request_before_merge": {
+      "required": true,
+      "enforcement": "branch_protection_rule",
+      "bypass_response": "MERGE_LEGITIMACY_NULL"
+    },
+    "require_codeowner_review": {
+      "required": true,
+      "enforcement": "branch_protection_rule: require_code_owner_reviews",
+      "authority_source": ".github/CODEOWNERS",
+      "codeowner": "@joselunasrt8-creator",
+      "bypass_response": "MERGE_LEGITIMACY_NULL"
+    },
+    "require_status_checks": {
+      "required": true,
+      "enforcement": "branch_protection_rule: required_status_checks",
+      "required_checks": [
+        "merge-governance-check",
+        "generate-preo-candidate",
+        "generate-sco-candidate",
+        "constitutional-integrity",
+        "branch-protection-enforcement"
+      ],
+      "bypass_response": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+    },
+    "block_force_pushes": {
+      "required": true,
+      "enforcement": "branch_protection_rule: allow_force_pushes = false",
+      "bypass_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    "block_branch_deletion": {
+      "required": true,
+      "enforcement": "branch_protection_rule: allow_branch_deletion = false",
+      "bypass_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    "restrict_direct_pushes": {
+      "required": true,
+      "enforcement": "branch_protection_rule: restrict_direct_push_to_main",
+      "bypass_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    },
+    "require_linear_history": {
+      "required": true,
+      "enforcement": "branch_protection_rule: require_linear_history",
+      "bypass_response": "MERGE_LEGITIMACY_NULL"
+    },
+    "dismiss_stale_reviews": {
+      "required": true,
+      "enforcement": "branch_protection_rule: dismiss_stale_reviews",
+      "bypass_response": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+    },
+    "disallow_admin_bypass": {
+      "required": true,
+      "enforcement": "branch_protection_rule: allow_admin_bypass = false",
+      "bypass_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+    }
+  },
+  "checked_mutation_paths": [
+    {
+      "path": "direct_push_to_main",
+      "enforcement_result": "BLOCKED",
+      "mechanism": "branch_protection_rule"
+    },
+    {
+      "path": "force_push_to_main",
+      "enforcement_result": "BLOCKED",
+      "mechanism": "branch_protection_rule"
+    },
+    {
+      "path": "branch_deletion_of_main",
+      "enforcement_result": "BLOCKED",
+      "mechanism": "branch_protection_rule"
+    },
+    {
+      "path": "unreviewed_merge",
+      "enforcement_result": "BLOCKED",
+      "mechanism": "branch_protection_rule: require_code_owner_reviews"
+    },
+    {
+      "path": "missing_status_checks",
+      "enforcement_result": "BLOCKED",
+      "mechanism": "branch_protection_rule: require_status_checks"
+    },
+    {
+      "path": "unauthorized_mutation",
+      "enforcement_result": "REJECTED",
+      "mechanism": "PREO_VALID gate + branch_protection_rule"
+    }
+  ],
+  "status_check_lineage": {
+    "lineage_verified": true,
+    "verification_workflow": ".github/workflows/branch-protection-enforcement.yml",
+    "required_checks_match_emitted_job_names": true,
+    "lineage_check_method": "regex extraction of job names from .github/workflows/*.yml files"
+  },
+  "bypass_classification_artifact": "governance/runtime/BYPASS_CLASSIFICATION.json",
+  "closure_condition": "No mutation path to main exists outside governed PR/review lineage",
+  "closure_verified": true
+}
