@@ -1,0 +1,121 @@
+{
+  "artifact": "RELEASE_PROVENANCE_REGISTRY",
+  "schema_version": 1,
+  "issue": "994",
+  "generated_at": "2026-05-22T00:00:00.000Z",
+  "purpose": "Deterministic release provenance registry. Records canonical release provenance entries for replay prevention and release legitimacy verification. Closes RPM-019 (provenance_replay) and RPM-020 (attestation_mismatch) from release_provenance_matrix.json. Evidence only — no runtime route changes, no authority creation, no deployment capability expansion, no proof behavior changes.",
+  "scope": "release provenance enforcement and replay prevention only",
+  "evidence_only": true,
+  "creates_authority": false,
+  "creates_execution": false,
+  "linked_matrix": "runtime/release_provenance_matrix.json",
+  "linked_issue_classification": "382",
+  "linked_issue_enforcement": "994",
+  "replay_prevention_rules": [
+    {
+      "rule_id": "RPR-001",
+      "description": "same tag → different commit → release_tag_overwrite_attempt",
+      "failure_class": "release_tag_overwrite_attempt",
+      "linked_rpm": "RPM-003"
+    },
+    {
+      "rule_id": "RPR-002",
+      "description": "same tag → different artifact hash → release_artifact_hash_mismatch",
+      "failure_class": "release_artifact_hash_mismatch",
+      "linked_rpm": "RPM-010"
+    },
+    {
+      "rule_id": "RPR-003",
+      "description": "same commit + same tag → different artifact hash without new release_id → release_artifact_hash_mismatch",
+      "failure_class": "release_artifact_hash_mismatch",
+      "linked_rpm": "RPM-017"
+    },
+    {
+      "rule_id": "RPR-004",
+      "description": "same release_id reused → release_provenance_replay",
+      "failure_class": "release_provenance_replay",
+      "linked_rpm": "RPM-019"
+    },
+    {
+      "rule_id": "RPR-005",
+      "description": "same preo_reference + same release_tag → different artifact hash → release_attestation_mismatch",
+      "failure_class": "release_attestation_mismatch",
+      "linked_rpm": "RPM-020"
+    },
+    {
+      "rule_id": "RPR-006",
+      "description": "artifact hash mismatch at verification time → release_artifact_hash_mismatch",
+      "failure_class": "release_artifact_hash_mismatch",
+      "linked_rpm": "RPM-010"
+    }
+  ],
+  "required_failure_classes": [
+    "release_target_not_on_main",
+    "release_target_missing_pr_provenance",
+    "release_status_checks_missing",
+    "release_tag_already_exists",
+    "release_tag_overwrite_attempt",
+    "release_notes_missing_evidence",
+    "release_artifact_hash_missing",
+    "release_artifact_hash_mismatch",
+    "release_provenance_missing",
+    "release_provenance_replay",
+    "release_attestation_mismatch",
+    "release_admin_break_glass",
+    "rollback_release_lineage_missing"
+  ],
+  "governance_invariants": [
+    {
+      "invariant_id": "RPEI-001",
+      "statement": "release provenance registry entries are evidence-only and cannot create authority",
+      "evidence_only": true,
+      "creates_authority": false,
+      "creates_execution": false
+    },
+    {
+      "invariant_id": "RPEI-002",
+      "statement": "BREAK_GLASS registry entries must never have canonical_release_candidate=true",
+      "evidence_only": true,
+      "creates_authority": false,
+      "creates_execution": false
+    },
+    {
+      "invariant_id": "RPEI-003",
+      "statement": "replay prevention rules must be enforced before any entry is accepted as CANONICAL_RELEASE_CANDIDATE",
+      "evidence_only": true,
+      "creates_authority": false,
+      "creates_execution": false
+    },
+    {
+      "invariant_id": "RPEI-004",
+      "statement": "rollback releases must preserve full provenance requirements and reference prior canonical release lineage",
+      "evidence_only": true,
+      "creates_authority": false,
+      "creates_execution": false
+    }
+  ],
+  "entry_schema": {
+    "release_id": "string — unique identifier RPROV-YYYYMMDD-<run_id>",
+    "release_tag": "string — semver tag e.g. v1.0.0",
+    "source_commit_sha": "string — 40-character hex SHA of the tagged commit",
+    "artifact_hash": "string — SHA-256 hex of the release artifact checksum file",
+    "artifact_hash_alg": "sha256",
+    "pr_number": "number | null — merged PR number that introduced the commit",
+    "status_check_refs": "array — [{check_name, run_id, conclusion}] for required status checks",
+    "preo_reference": "string | null — PREO artifact reference e.g. PREO-<pr>-<sha>",
+    "sco_reference": "string | null — SCO artifact reference e.g. SCO-<pr>-<sha>",
+    "provenance_type": "DSSE | SLSA | INTERNAL | PENDING_EXTERNAL",
+    "classification": "CANONICAL_RELEASE_CANDIDATE | NON_CANONICAL_RELEASE | BREAK_GLASS | NULL",
+    "evidence_only": "true — always; release provenance records are evidence, not authority grants",
+    "creates_authority": "false — always; tag creation and provenance recording create no MindShift authority",
+    "creates_execution": "false — always; release provenance does not authorize execution",
+    "canonical_release_candidate": "boolean — true only if all boundary steps satisfied and no replay detected",
+    "break_glass": "boolean — true if admin override path was invoked",
+    "break_glass_justification": "string | null — required when break_glass=true, documents override reason",
+    "workflow_run_id": "string — GitHub Actions run ID that generated this entry",
+    "workflow_ref": "string — GitHub workflow ref that generated this entry",
+    "generated_at": "ISO-8601 timestamp",
+    "issue": "994"
+  },
+  "entries": []
+}
