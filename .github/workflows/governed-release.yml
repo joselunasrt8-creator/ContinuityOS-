@@ -399,6 +399,31 @@ jobs:
           console.log('Evidence-only invariants verified');
           NODE
 
+      - name: Generate proposed registry patch — verify provenance can be appended (evidence only)
+        run: |
+          set -euo pipefail
+
+          # Copy registry to a staging path — the real registry is NEVER modified by this workflow.
+          # Automatic commit to main, GitHub release creation, tag push, package publication,
+          # and deployment are all prohibited. This step only generates an audit artifact.
+          cp runtime/release_provenance_registry.json proposed-registry-patch.json
+
+          node scripts/append-release-provenance.mjs release-provenance.json proposed-registry-patch.json
+
+          echo "REGISTRY_PATCH_GENERATED=true" >> "$GITHUB_ENV"
+
+          PATCH_HASH=$(node --input-type=module -e "
+            import { readFileSync } from 'node:fs'
+            const p = JSON.parse(readFileSync('proposed-registry-patch.json', 'utf8'))
+            process.stdout.write(p.registry_hash)
+          ")
+          echo "PROPOSED_REGISTRY_HASH=$PATCH_HASH" >> "$GITHUB_ENV"
+          echo "Proposed registry patch: entry_count=$(node --input-type=module -e "
+            import { readFileSync } from 'node:fs'
+            const p = JSON.parse(readFileSync('proposed-registry-patch.json', 'utf8'))
+            process.stdout.write(String(p.entry_count))
+          ") hash=${PATCH_HASH:0:16}..."
+
       - name: Upload release provenance artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -410,6 +435,13 @@ jobs:
             check_runs.json
             associated_prs.json
             status_check_refs.json
+
+      - name: Upload proposed registry patch — audit artifact only, not committed to main
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PROPOSED_REGISTRY_PATCH
+          path: proposed-registry-patch.json
 
       - name: Emit release provenance summary
         if: always()

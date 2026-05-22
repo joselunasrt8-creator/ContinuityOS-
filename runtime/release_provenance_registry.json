@@ -1,7 +1,11 @@
 {
   "artifact": "RELEASE_PROVENANCE_REGISTRY",
-  "schema_version": 1,
+  "schema_version": 2,
   "issue": "994",
+  "persistence_issue": "996",
+  "registry_hash_alg": "sha256",
+  "registry_hash": "5d502e1f669b5aeaf24b1bf942d1a1c0e06deed28ddd0d3f88635e08e50619c1",
+  "entry_count": 0,
   "generated_at": "2026-05-22T00:00:00.000Z",
   "purpose": "Deterministic release provenance registry. Records canonical release provenance entries for replay prevention and release legitimacy verification. Closes RPM-019 (provenance_replay) and RPM-020 (attestation_mismatch) from release_provenance_matrix.json. Evidence only — no runtime route changes, no authority creation, no deployment capability expansion, no proof behavior changes.",
   "scope": "release provenance enforcement and replay prevention only",
