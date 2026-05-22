@@ -1,4 +1,5 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
+import { canonicalize, toCanonicalAeo, REQUIRED_AEO_KEYS, type CanonicalAEO } from "./lib/aeo-governance"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -74,15 +75,6 @@ type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_APPEND_ONLY_TRIGGERS_ACTIVATED"
   | "BOOTSTRAP_RUNTIME_READY"
 
-type CanonicalAEO = {
-  intent: string
-  scope: Record<string, unknown>
-  validation: Record<string, unknown>
-  target: Record<string, unknown>
-  finality: Record<string, unknown>
-}
-
-const REQUIRED_AEO_KEYS = ["intent", "scope", "validation", "target", "finality"] as const
 const GOVERNED_WORKFLOW = "governed-deploy.yml"
 const RUNTIME_ID = "mindshift-worker-runtime" as const
 const RUNTIME_VERSION = "runtime-sovereignty-v1" as const
@@ -947,12 +939,6 @@ function canonicalRecord(v: unknown): Record<string, unknown> {
   return isPlainRecord(normalized) ? normalized : {}
 }
 
-function canonicalize(v: unknown): string {
-  const normalized = normalizeCanonicalValue(v)
-  if (Array.isArray(normalized)) return `[${normalized.map(canonicalize).join(",")}]`
-  if (isPlainRecord(normalized)) return `{${Object.keys(normalized).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(normalized[key])}`).join(",")}}`
-  return JSON.stringify(normalized)
-}
 async function sha256Hex(input: string): Promise<string> { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("") }
 
 function base64ToBytes(value: string): Uint8Array | null {
@@ -1199,18 +1185,6 @@ function proofDecisionHash(decision_id: string, validated_object_hash: string) {
   return `${decision_id}\u001f${validated_object_hash}`
 }
 
-function toCanonicalAeo(input: any): CanonicalAEO | null {
-  const keys = Object.keys(input || {}).sort()
-  if (keys.length !== REQUIRED_AEO_KEYS.length) return null
-  if (keys.join("|") !== [...REQUIRED_AEO_KEYS].sort().join("|")) return null
-  return Object.freeze({
-    intent: String(input.intent || ""),
-    scope: canonicalRecord(input.scope),
-    validation: canonicalRecord(input.validation),
-    target: canonicalRecord(input.target),
-    finality: canonicalRecord(input.finality)
-  })
-}
 
 async function assertSchemaAvailableReadOnly(env: Env) {
   await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='session_registry'`).first<any>()
