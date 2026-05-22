@@ -604,6 +604,50 @@
       "rationale": "append-only distributed legitimacy evidence; trigger-protected"
     },
     {
+      "surface_id": "db_write:deployment_provenance_registry",
+      "table": "deployment_provenance_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "append-only deployment provenance evidence (issue #890); UPDATE/DELETE trigger-blocked; UNIQUE replay guard; cannot create authority or authorize execution"
+    },
+    {
+      "surface_id": "db_write:deployment_proof_registry",
+      "table": "deployment_proof_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "append-only immutable deployment proof evidence (issue #891); UPDATE/DELETE trigger-blocked; UNIQUE proof_binding_hash guard; cannot create authority"
+    },
+    {
+      "surface_id": "db_write:deployment_rollback_registry",
+      "table": "deployment_rollback_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "append-only rollback lineage evidence (issue #893); UPDATE/DELETE trigger-blocked; UNIQUE rollback_proof_binding_hash guard; cannot create authority"
+    },
+    {
+      "surface_id": "db_write:migration_governance_registry",
+      "table": "migration_governance_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "append-only migration governance declaration evidence (issue #360); UPDATE/DELETE trigger-blocked; mutation_capable=false, creates_authority=false, executable=false enforced by schema CHECK constraints"
+    },
+    {
       "surface_id": "route:/reconcile",
       "table": null,
       "operation": null,
@@ -708,7 +752,7 @@
   },
   "classification_counts": {
     "AUTHORITATIVE": 10,
-    "EVIDENCE_ONLY": 41,
+    "EVIDENCE_ONLY": 45,
     "NON_EXECUTABLE": 8
   },
   "closure_verification": {

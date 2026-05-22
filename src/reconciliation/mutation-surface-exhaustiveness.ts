@@ -79,6 +79,10 @@ export const EVIDENCE_ONLY_MUTATION_TABLES: readonly string[] = [
   'federation_conformance_registry',
   'distributed_legitimacy_registry',
   'recursive_governance_replay_registry',
+  'deployment_provenance_registry',
+  'deployment_proof_registry',
+  'deployment_rollback_registry',
+  'migration_governance_registry',
 ] as const
 
 export const MUTATION_DRIFT_TAXONOMY = [
