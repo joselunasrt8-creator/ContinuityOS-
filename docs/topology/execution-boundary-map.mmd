@@ -1,0 +1,27 @@
+flowchart TD
+    I[Intent\n(Human / Workflow / Agent)] --> LB[Legitimacy Boundary]
+    LB --> V[Validator]
+    V --> XB[Execution Boundary]
+    XB --> P[Proof]
+    P --> R[Registry]
+    R --> OE[Observability Evidence]
+
+    WD[workflow_dispatch surface\nStatus: MONITORED] --> DTA[deploy-token authority surface\nStatus: MONITORED]
+    DTA --> DW[deploy wrapper surface\nStatus: MONITORED]
+    DW --> DM[deployment mutation surface\nStatus: MONITORED]
+    DM --> RW[registry write surface\nStatus: MONITORED]
+    RW --> PE[proof / observability evidence]
+
+    DS[Direct deploy\nStatus: OPEN risk] -. NULL unless legitimacy-bound .-> XB
+    DT[Direct token use\nStatus: OPEN risk] -. NULL unless legitimacy-bound .-> XB
+    DRW[Direct registry write\nStatus: OPEN risk] -. NULL unless legitimacy-bound .-> R
+    OM[Observability mutation\nStatus: CLOSED] -. NULL unless legitimacy-bound .-> R
+
+    subgraph Mutation-Capable Surface Distinction
+      DEP[Deployment surfaces\nMONITORED]
+      TOK[Token authority surfaces\nMONITORED]
+      REG[Registry mutation surfaces\nMONITORED]
+      OBSW[Observability write surfaces\nCLOSED]
+      WFS[Workflow dispatch surfaces\nMONITORED]
+      UK[Unknown surfaces\nUNKNOWN]
+    end

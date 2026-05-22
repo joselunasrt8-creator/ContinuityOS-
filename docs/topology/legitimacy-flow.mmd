@@ -1,0 +1,17 @@
+flowchart TD
+    I[Intent\n(Human / Workflow / Agent)] --> A[Authority]
+    A --> E[AEO]
+    E --> V[Validator]
+    V --> XB[Execution Boundary]
+    XB --> P[Proof]
+    P --> R[Registry]
+    R --> O[Observability]
+
+    OX[Observability Layer\n(Telemetry / Dashboards / Aggregation)] -->|may observe| O
+    OX -->|may aggregate| O
+    OX -->|may render| O
+
+    OX -. may not authorize .-> A
+    OX -. may not validate .-> V
+    OX -. may not execute .-> XB
+    OX -. may not create proof .-> P
