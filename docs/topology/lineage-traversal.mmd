@@ -1,0 +1,19 @@
+flowchart LR
+  Authority[Authority Lineage] --> AEO[AEO Lineage]
+  AEO --> Validator[Validator Lineage]
+  Validator --> Execution[Execution Lineage]
+  Execution --> Proof[Proof Lineage]
+  Proof --> Continuity[Continuity Lineage]
+  Continuity --> Reconciliation[Reconciliation Lineage]
+  Reconciliation --> Observability[Observability Lineage]
+
+  Deployment[Deployment Lineage (read-only)] -.-> Execution
+  Deployment -.-> Proof
+
+  Registry[Registry Lineage (read-only)] -.-> Authority
+  Registry -.-> Continuity
+  Registry -.-> Reconciliation
+
+  Replay[Replay Lineage (read-only, replay-sensitive)] -.-> Authority
+  Replay -.-> Execution
+  Replay -.-> Proof

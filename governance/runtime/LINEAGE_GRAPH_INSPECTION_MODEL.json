@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "issue": 922,
+  "generated_at": "2026-05-22T00:00:00Z",
+  "core_invariant": "lineage inspection = read-only legitimacy traversal",
+  "inspection_scope": "topology_model_only",
+  "inspection_guarantees": {
+    "read_only": true,
+    "mutation_capable": false,
+    "authority_capable": false,
+    "proof_capable": false,
+    "execution_capable": false,
+    "replay_mutation_capable": false,
+    "registry_rewrite_capable": false,
+    "autonomous_remediation_capable": false
+  },
+  "lineage_entity_taxonomy": [
+    {
+      "lineage_type": "authority_lineage",
+      "lineage_class": "authoritative_lineage",
+      "description": "Authority object ancestry and binding edges across session/continuity/authority artifacts.",
+      "authoritative": true,
+      "evidence_only": false,
+      "derived": false,
+      "replay_sensitive": true,
+      "append_only": true,
+      "source_of_truth": "authority_registry"
+    },
+    {
+      "lineage_type": "proof_lineage",
+      "lineage_class": "evidence_only_lineage",
+      "description": "Proof-of-transfer and proof propagation relationship evidence.",
+      "authoritative": false,
+      "evidence_only": true,
+      "derived": false,
+      "replay_sensitive": true,
+      "append_only": true,
+      "source_of_truth": "proof_registry"
+    },
+    {
+      "lineage_type": "continuity_lineage",
+      "lineage_class": "authoritative_lineage",
+      "description": "Continuity chain lineage for canonical runtime progression.",
+      "authoritative": true,
+      "evidence_only": false,
+      "derived": false,
+      "replay_sensitive": true,
+      "append_only": true,
+      "source_of_truth": "continuity_registry"
+    },
+    {
+      "lineage_type": "replay_lineage",
+      "lineage_class": "replay_sensitive_lineage",
+      "description": "Lineage edges used to detect object reuse and replay tuples.",
+      "authoritative": false,
+      "evidence_only": true,
+      "derived": true,
+      "replay_sensitive": true,
+      "append_only": true,
+      "source_of_truth": "invocation_registry"
+    },
+    {
+      "lineage_type": "deployment_lineage",
+      "lineage_class": "derived_lineage",
+      "description": "Deployment provenance traversal linking governed deployment artifacts to execution/proof evidence.",
+      "authoritative": false,
+      "evidence_only": true,
+      "derived": true,
+      "replay_sensitive": true,
+      "append_only": true,
+      "source_of_truth": "deployment_provenance_registry"
+    },
+    {
+      "lineage_type": "registry_lineage",
+      "lineage_class": "derived_lineage",
+      "description": "Cross-registry append-only relationship mapping between canonical registries.",
+      "authoritative": false,
+      "evidence_only": true,
+      "derived": true,
+      "replay_sensitive": false,
+      "append_only": true,
+      "source_of_truth": "registry_mutation_inventory"
+    },
+    {
+      "lineage_type": "observability_lineage",
+      "lineage_class": "evidence_only_lineage",
+      "description": "GET-safe observability evidence relationships that do not confer authority.",
+      "authoritative": false,
+      "evidence_only": true,
+      "derived": true,
+      "replay_sensitive": false,
+      "append_only": true,
+      "source_of_truth": "observability_inventory"
+    },
+    {
+      "lineage_type": "reconciliation_lineage",
+      "lineage_class": "derived_lineage",
+      "description": "Federated/distributed reconciliation lineage used for disagreement and closure inspection.",
+      "authoritative": false,
+      "evidence_only": true,
+      "derived": true,
+      "replay_sensitive": false,
+      "append_only": true,
+      "source_of_truth": "topology_reconciliation_registry"
+    }
+  ],
+  "relationship_taxonomy": [
+    {
+      "relationship": "authority_binds_aeo",
+      "source": "authority_registry",
+      "target": "aeo_registry",
+      "lineage_type": "authority_lineage",
+      "relationship_class": "authoritative"
+    },
+    {
+      "relationship": "aeo_validated_by_validator",
+      "source": "aeo_registry",
+      "target": "validation_registry",
+      "lineage_type": "authority_lineage",
+      "relationship_class": "authoritative"
+    },
+    {
+      "relationship": "validator_allows_execution",
+      "source": "validation_registry",
+      "target": "execution_registry",
+      "lineage_type": "authority_lineage",
+      "relationship_class": "authoritative"
+    },
+    {
+      "relationship": "execution_emits_proof",
+      "source": "execution_registry",
+      "target": "proof_registry",
+      "lineage_type": "proof_lineage",
+      "relationship_class": "evidence_only"
+    },
+    {
+      "relationship": "proof_binds_continuity",
+      "source": "proof_registry",
+      "target": "continuity_registry",
+      "lineage_type": "continuity_lineage",
+      "relationship_class": "authoritative"
+    },
+    {
+      "relationship": "continuity_links_reconciliation",
+      "source": "continuity_registry",
+      "target": "topology_reconciliation_registry",
+      "lineage_type": "reconciliation_lineage",
+      "relationship_class": "derived"
+    },
+    {
+      "relationship": "reconciliation_observed_by_observability",
+      "source": "topology_reconciliation_registry",
+      "target": "observability_inventory",
+      "lineage_type": "observability_lineage",
+      "relationship_class": "evidence_only"
+    },
+    {
+      "relationship": "proof_binds_deployment",
+      "source": "proof_registry",
+      "target": "deployment_provenance_registry",
+      "lineage_type": "proof_lineage",
+      "relationship_class": "derived"
+    },
+    {
+      "relationship": "deployment_references_registry_artifacts",
+      "source": "deployment_provenance_registry",
+      "target": "registry_mutation_inventory",
+      "lineage_type": "deployment_lineage",
+      "relationship_class": "derived"
+    },
+    {
+      "relationship": "replay_tuple_links_authority_execution_proof",
+      "source": "invocation_registry",
+      "target": "proof_registry",
+      "lineage_type": "replay_lineage",
+      "relationship_class": "replay_sensitive"
+    }
+  ],
+  "traversal_semantics": {
+    "lineage_ancestry_traversal": "Traverse predecessor edges from target object back to canonical authority root; stop on missing parent and mark orphan_candidate.",
+    "orphan_lineage_detection": "Mark lineage object ORPHAN when required predecessor edge is absent, malformed, or references UNKNOWN artifact.",
+    "replay_lineage_traversal": "Traverse replay tuple edges across authority/aeo/validation/execution/proof to detect reuse indicators without mutating status.",
+    "continuity_chain_inspection": "Walk continuity predecessor/successor edges and identify gaps, forks, or non-deterministic branch points as disagreement evidence.",
+    "deployment_provenance_traversal": "Traverse deployment provenance from deployment artifacts to execution/proof and back to authority chain for legitimacy evidence.",
+    "proof_relationship_traversal": "Inspect proof edges to execution, continuity, deployment, and reconciliation artifacts; unresolved references remain UNKNOWN.",
+    "distributed_disagreement_inspection": "Compare reconciliation checkpoints and observability snapshots across domains; disagreements are evidence-only and non-operative.",
+    "registry_relationship_traversal": "Traverse append-only registry references to map cross-registry legitimacy graph edges without schema rewrite."
+  },
+  "replay_sensitive_traversal_edges": [
+    "authority_registry -> validation_registry",
+    "validation_registry -> execution_registry",
+    "execution_registry -> proof_registry",
+    "invocation_registry -> execution_registry",
+    "invocation_registry -> proof_registry",
+    "continuity_registry -> execution_registry"
+  ],
+  "orphan_lineage_conditions": [
+    "missing_authority_parent",
+    "missing_continuity_predecessor",
+    "proof_without_execution_reference",
+    "deployment_without_proof_binding",
+    "registry_reference_target_absent",
+    "reconciliation_checkpoint_without_continuity_anchor",
+    "observability_event_without_subject_reference",
+    "unknown_source_or_target"
+  ],
+  "normalized_relationship_examples": [
+    {
+      "lineage_type": "proof_lineage",
+      "source": "proof_registry",
+      "target": "deployment_provenance_registry",
+      "relationship": "proof_binds_deployment",
+      "append_only": true,
+      "mutation_capable": false,
+      "authority_capable": false,
+      "inspection_only": true,
+      "replay_sensitive": true,
+      "closure_status": "MONITORED"
+    },
+    {
+      "lineage_type": "observability_lineage",
+      "source": "observability_inventory",
+      "target": "topology_reconciliation_registry",
+      "relationship": "observability_describes_reconciliation",
+      "append_only": true,
+      "mutation_capable": false,
+      "authority_capable": false,
+      "inspection_only": true,
+      "replay_sensitive": false,
+      "closure_status": "MONITORED"
+    },
+    {
+      "lineage_type": "replay_lineage",
+      "source": "invocation_registry",
+      "target": "execution_registry",
+      "relationship": "replay_tuple_references_execution",
+      "append_only": true,
+      "mutation_capable": false,
+      "authority_capable": false,
+      "inspection_only": true,
+      "replay_sensitive": true,
+      "closure_status": "MONITORED"
+    }
+  ],
+  "non_authoritative_boundary": {
+    "inspection_must_not_create_authority": true,
+    "inspection_must_not_create_proof": true,
+    "inspection_must_not_execute": true,
+    "inspection_must_not_mutate_replay_state": true,
+    "inspection_must_not_rewrite_registries": true,
+    "inspection_must_not_remediate_autonomously": true
+  },
+  "closure_status": "MONITORED"
+}
