@@ -1,0 +1,471 @@
+name: governed-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (must match vX.Y.Z)'
+        required: true
+        type: string
+      source_commit_sha:
+        description: 'Exact 40-character commit SHA to release from (must be reachable from main)'
+        required: true
+        type: string
+      pr_number:
+        description: 'Merged PR number that introduced this commit to main'
+        required: true
+        type: string
+      release_notes:
+        description: 'Release notes content (must include tag, commit SHA, PR number, and provenance/artifact hash reference)'
+        required: true
+        type: string
+      break_glass_justification:
+        description: 'If non-empty, this release is classified BREAK_GLASS. Documents admin override reason. BREAK_GLASS releases are recorded but cannot be classified CANONICAL_RELEASE_CANDIDATE.'
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: governed-release-${{ github.event.inputs.release_tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  governed-release-verification:
+    runs-on: ubuntu-latest
+
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+      SOURCE_COMMIT_SHA: ${{ github.event.inputs.source_commit_sha }}
+      PR_NUMBER: ${{ github.event.inputs.pr_number }}
+      RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+      BREAK_GLASS_JUSTIFICATION: ${{ github.event.inputs.break_glass_justification }}
+
+    steps:
+      - name: HARD FAIL — reject non-dispatch invocation and missing inputs
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — governed-release must be invoked via explicit workflow_dispatch only"
+            exit 1
+          fi
+
+          for var in RELEASE_TAG SOURCE_COMMIT_SHA PR_NUMBER; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required input: $var"
+              exit 1
+            fi
+          done
+
+          if ! echo "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]'; then
+            echo "NULL — release_tag_format_invalid: $RELEASE_TAG must match vX.Y.Z"
+            exit 1
+          fi
+
+          if ! echo "$SOURCE_COMMIT_SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "NULL — source_commit_sha_invalid: must be a 40-character lowercase hex SHA"
+            exit 1
+          fi
+
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Verify source commit is reachable from main — reject non-main commits
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --depth=500 2>/dev/null || true
+
+          if ! git cat-file -e "$SOURCE_COMMIT_SHA^{commit}" 2>/dev/null; then
+            echo "NULL — release_target_not_on_main: commit $SOURCE_COMMIT_SHA not found in repository"
+            echo "COMMIT_ON_MAIN=false" >> "$GITHUB_ENV"
+            echo "FAILURE_CLASS=release_target_not_on_main" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+          MAIN_HEAD=$(git rev-parse origin/main)
+          if ! git merge-base --is-ancestor "$SOURCE_COMMIT_SHA" "$MAIN_HEAD" 2>/dev/null; then
+            echo "NULL — release_target_not_on_main: $SOURCE_COMMIT_SHA is not reachable from main HEAD ($MAIN_HEAD)"
+            echo "COMMIT_ON_MAIN=false" >> "$GITHUB_ENV"
+            echo "FAILURE_CLASS=release_target_not_on_main" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+          echo "COMMIT_ON_MAIN=true" >> "$GITHUB_ENV"
+          echo "MAIN_HEAD=$MAIN_HEAD" >> "$GITHUB_ENV"
+
+      - name: Reject release tag if it already exists — enforce tag immutability
+        run: |
+          set -euo pipefail
+
+          EXISTING_TAG_SHA=$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | awk '{print $1}' || true)
+
+          if [ -n "$EXISTING_TAG_SHA" ]; then
+            RESOLVED_SHA=$(git rev-list -n1 "$EXISTING_TAG_SHA" 2>/dev/null || echo "")
+            if [ -n "$RESOLVED_SHA" ] && [ "$RESOLVED_SHA" != "$SOURCE_COMMIT_SHA" ]; then
+              echo "NULL — release_tag_overwrite_attempt: $RELEASE_TAG already points to $RESOLVED_SHA, cannot redirect to $SOURCE_COMMIT_SHA"
+              echo "FAILURE_CLASS=release_tag_overwrite_attempt" >> "$GITHUB_ENV"
+            else
+              echo "NULL — release_tag_already_exists: $RELEASE_TAG already exists at $EXISTING_TAG_SHA"
+              echo "FAILURE_CLASS=release_tag_already_exists" >> "$GITHUB_ENV"
+            fi
+            echo "TAG_DOES_NOT_EXIST=false" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+          echo "TAG_DOES_NOT_EXIST=true" >> "$GITHUB_ENV"
+
+      - name: Validate release notes include required evidence references
+        run: |
+          set -euo pipefail
+
+          MISSING_FIELDS=""
+          COMMIT_PREFIX="${SOURCE_COMMIT_SHA:0:12}"
+
+          if ! echo "$RELEASE_NOTES" | grep -qF "$RELEASE_TAG"; then
+            MISSING_FIELDS="$MISSING_FIELDS release_tag"
+          fi
+
+          if ! echo "$RELEASE_NOTES" | grep -qF "$COMMIT_PREFIX"; then
+            MISSING_FIELDS="$MISSING_FIELDS source_commit_sha"
+          fi
+
+          if ! echo "$RELEASE_NOTES" | grep -qF "$PR_NUMBER"; then
+            MISSING_FIELDS="$MISSING_FIELDS pr_number"
+          fi
+
+          if ! echo "$RELEASE_NOTES" | grep -qiE 'provenance|attestation|artifact.hash|sha256|sha-256'; then
+            MISSING_FIELDS="$MISSING_FIELDS provenance_or_artifact_hash_reference"
+          fi
+
+          if [ -n "$MISSING_FIELDS" ]; then
+            echo "NULL — release_notes_missing_evidence: required evidence fields missing from release notes:$MISSING_FIELDS"
+            echo "RELEASE_NOTES_VALID=false" >> "$GITHUB_ENV"
+            echo "FAILURE_CLASS=release_notes_missing_evidence" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+          echo "RELEASE_NOTES_VALID=true" >> "$GITHUB_ENV"
+
+      - name: Verify PR provenance and required status checks via GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          CHECK_RUNS=$(curl -sS \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/$SOURCE_COMMIT_SHA/check-runs" \
+            2>/dev/null || echo '{"check_runs":[]}')
+
+          ASSOCIATED_PRS=$(curl -sS \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/$SOURCE_COMMIT_SHA/pulls" \
+            2>/dev/null || echo '[]')
+
+          echo "$CHECK_RUNS" > check_runs.json
+          echo "$ASSOCIATED_PRS" > associated_prs.json
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const prNumber = parseInt(process.env.PR_NUMBER, 10);
+          const checkRuns = JSON.parse(readFileSync('check_runs.json', 'utf8'));
+          const associatedPrs = JSON.parse(readFileSync('associated_prs.json', 'utf8'));
+
+          const prNumbers = Array.isArray(associatedPrs) ? associatedPrs.map((pr) => pr.number) : [];
+          if (!prNumbers.includes(prNumber)) {
+            console.error(`NULL — release_target_missing_pr_provenance: commit not associated with PR #${prNumber}`);
+            console.error(`Associated PRs found: ${JSON.stringify(prNumbers)}`);
+            process.exit(1);
+          }
+
+          const runs = checkRuns.check_runs || [];
+          const required = ['merge-governance-check', 'generate-preo-candidate', 'generate-sco-candidate'];
+          const passed = runs
+            .filter((r) => r.conclusion === 'success' || r.conclusion === 'neutral')
+            .map((r) => r.name);
+
+          const missing = required.filter((c) => !passed.some((p) => p.includes(c)));
+          if (missing.length > 0) {
+            console.error(`NULL — release_status_checks_missing: required checks not passing: ${missing.join(', ')}`);
+            process.exit(1);
+          }
+
+          const statusCheckRefs = required.map((name) => {
+            const run = runs.find((r) => r.name.includes(name));
+            return {
+              check_name: name,
+              run_id: run ? String(run.id) : null,
+              conclusion: run ? run.conclusion : 'MISSING',
+            };
+          });
+
+          writeFileSync('status_check_refs.json', JSON.stringify(statusCheckRefs, null, 2));
+          console.log(`PR provenance verified: PR #${prNumber}`);
+          console.log(`Status checks verified: ${required.join(', ')}`);
+          NODE
+
+          echo "PR_PROVENANCE_VERIFIED=true" >> "$GITHUB_ENV"
+          echo "STATUS_CHECKS_VERIFIED=true" >> "$GITHUB_ENV"
+
+      - name: Generate artifact hash — SHA-256 of governed source files
+        run: |
+          set -euo pipefail
+
+          {
+            find src/ -name '*.ts' -type f 2>/dev/null | sort
+            find governance/ -name '*.json' -type f 2>/dev/null | sort
+            find runtime/ -name '*.json' -type f 2>/dev/null | sort
+          } | while IFS= read -r f; do
+            sha256sum "$f"
+          done > source_checksums.txt
+
+          if [ ! -s source_checksums.txt ]; then
+            echo "NULL — release_artifact_hash_missing: no source files found to hash"
+            echo "FAILURE_CLASS=release_artifact_hash_missing" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+          ARTIFACT_HASH=$(sha256sum source_checksums.txt | awk '{print $1}')
+          echo "ARTIFACT_HASH=$ARTIFACT_HASH" >> "$GITHUB_ENV"
+          echo "Artifact hash: $ARTIFACT_HASH"
+
+      - name: Classify release — CANONICAL_RELEASE_CANDIDATE, NON_CANONICAL_RELEASE, or BREAK_GLASS
+        run: |
+          set -euo pipefail
+
+          CLASSIFICATION="CANONICAL_RELEASE_CANDIDATE"
+
+          # Break glass path: classify immediately as BREAK_GLASS — never normalize to canonical
+          if [ -n "${BREAK_GLASS_JUSTIFICATION:-}" ]; then
+            CLASSIFICATION="BREAK_GLASS"
+          fi
+
+          # All governance failures produce NON_CANONICAL_RELEASE (overrides CANONICAL only)
+          if [ "$CLASSIFICATION" != "BREAK_GLASS" ]; then
+            if [ "${COMMIT_ON_MAIN:-false}" != "true" ] || \
+               [ "${TAG_DOES_NOT_EXIST:-false}" != "true" ] || \
+               [ "${RELEASE_NOTES_VALID:-false}" != "true" ] || \
+               [ "${PR_PROVENANCE_VERIFIED:-false}" != "true" ] || \
+               [ "${STATUS_CHECKS_VERIFIED:-false}" != "true" ] || \
+               [ -z "${ARTIFACT_HASH:-}" ]; then
+              CLASSIFICATION="NON_CANONICAL_RELEASE"
+            fi
+          fi
+
+          echo "RELEASE_CLASSIFICATION=$CLASSIFICATION" >> "$GITHUB_ENV"
+          echo "Release classified as: $CLASSIFICATION"
+
+      - name: Generate deterministic release provenance object — evidence only
+        run: |
+          set -euo pipefail
+
+          RELEASE_ID="RPROV-$(date -u +%Y%m%d)-${{ github.run_id }}"
+          STATUS_CHECK_REFS=$(cat status_check_refs.json 2>/dev/null || echo '[]')
+
+          BREAK_GLASS_ACTIVE=false
+          IS_CANONICAL=false
+          if [ -n "${BREAK_GLASS_JUSTIFICATION:-}" ]; then BREAK_GLASS_ACTIVE=true; fi
+          if [ "$RELEASE_CLASSIFICATION" = "CANONICAL_RELEASE_CANDIDATE" ]; then IS_CANONICAL=true; fi
+
+          jq -n \
+            --arg release_id "$RELEASE_ID" \
+            --arg release_tag "$RELEASE_TAG" \
+            --arg source_commit_sha "$SOURCE_COMMIT_SHA" \
+            --arg artifact_hash "${ARTIFACT_HASH:-}" \
+            --arg pr_number "$PR_NUMBER" \
+            --argjson status_check_refs "$STATUS_CHECK_REFS" \
+            --arg preo_reference "PREO-${PR_NUMBER}-${SOURCE_COMMIT_SHA}" \
+            --arg sco_reference "SCO-${PR_NUMBER}-${SOURCE_COMMIT_SHA}" \
+            --arg provenance_type "INTERNAL" \
+            --arg classification "$RELEASE_CLASSIFICATION" \
+            --arg workflow_run_id "${{ github.run_id }}" \
+            --arg workflow_ref "${{ github.workflow_ref }}" \
+            --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg break_glass_justification "${BREAK_GLASS_JUSTIFICATION:-}" \
+            --argjson break_glass_active "$BREAK_GLASS_ACTIVE" \
+            --argjson canonical_release_candidate "$IS_CANONICAL" \
+            --arg issue "994" \
+            '{
+              release_id: $release_id,
+              release_tag: $release_tag,
+              source_commit_sha: $source_commit_sha,
+              artifact_hash: $artifact_hash,
+              artifact_hash_alg: "sha256",
+              pr_number: ($pr_number | tonumber),
+              status_check_refs: $status_check_refs,
+              preo_reference: $preo_reference,
+              sco_reference: $sco_reference,
+              provenance_type: $provenance_type,
+              classification: $classification,
+              evidence_only: true,
+              creates_authority: false,
+              creates_execution: false,
+              canonical_release_candidate: $canonical_release_candidate,
+              break_glass: $break_glass_active,
+              break_glass_justification: (if $break_glass_justification == "" then null else $break_glass_justification end),
+              workflow_run_id: $workflow_run_id,
+              workflow_ref: $workflow_ref,
+              generated_at: $generated_at,
+              issue: $issue
+            }' > release-provenance.json
+
+      - name: Replay prevention — reject duplicate provenance against registry
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync } from 'node:fs';
+
+          const newEntry = JSON.parse(readFileSync('release-provenance.json', 'utf8'));
+          const registryPath = 'runtime/release_provenance_registry.json';
+          const registry = existsSync(registryPath)
+            ? JSON.parse(readFileSync(registryPath, 'utf8'))
+            : { entries: [] };
+
+          const entries = registry.entries || [];
+          const tag = newEntry.release_tag;
+          const commitSha = newEntry.source_commit_sha;
+          const artifactHash = newEntry.artifact_hash;
+          const releaseId = newEntry.release_id;
+
+          for (const existing of entries) {
+            if (existing.release_id === releaseId) {
+              console.error(`NULL — release_provenance_replay: release_id ${releaseId} already in registry`);
+              process.exit(1);
+            }
+            if (existing.release_tag === tag && existing.source_commit_sha !== commitSha) {
+              console.error(`NULL — release_tag_overwrite_attempt: ${tag} already exists for ${existing.source_commit_sha}`);
+              process.exit(1);
+            }
+            if (existing.release_tag === tag && existing.artifact_hash !== artifactHash) {
+              console.error(`NULL — release_artifact_hash_mismatch: ${tag} has existing hash ${existing.artifact_hash}`);
+              process.exit(1);
+            }
+            if (
+              existing.preo_reference === newEntry.preo_reference &&
+              existing.release_tag === tag &&
+              existing.artifact_hash !== artifactHash
+            ) {
+              console.error(`NULL — release_attestation_mismatch: preo_reference ${newEntry.preo_reference} has conflicting artifact hash`);
+              process.exit(1);
+            }
+          }
+
+          console.log('Replay prevention: no duplicate provenance detected');
+          NODE
+
+          echo "REPLAY_CHECK_PASSED=true" >> "$GITHUB_ENV"
+
+      - name: Verify evidence-only invariants and BREAK_GLASS boundary
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+
+          const entry = JSON.parse(readFileSync('release-provenance.json', 'utf8'));
+
+          assert.equal(entry.evidence_only, true, 'release provenance must be evidence_only=true');
+          assert.equal(entry.creates_authority, false, 'release provenance must have creates_authority=false');
+          assert.equal(entry.creates_execution, false, 'release provenance must have creates_execution=false');
+
+          if (entry.break_glass === true) {
+            assert.equal(
+              entry.canonical_release_candidate, false,
+              'BREAK_GLASS release must never have canonical_release_candidate=true — RPI-008',
+            );
+            assert.equal(
+              entry.classification, 'BREAK_GLASS',
+              'BREAK_GLASS release must have classification=BREAK_GLASS',
+            );
+            assert.ok(
+              entry.break_glass_justification !== null && entry.break_glass_justification.length > 0,
+              'BREAK_GLASS release must have non-null break_glass_justification',
+            );
+          }
+
+          console.log('Evidence-only invariants verified');
+          NODE
+
+      - name: Upload release provenance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RELEASE_PROVENANCE
+          path: |
+            release-provenance.json
+            source_checksums.txt
+            check_runs.json
+            associated_prs.json
+            status_check_refs.json
+
+      - name: Emit release provenance summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "### Governed Release Verification"
+            echo ""
+            echo "Classification: **${RELEASE_CLASSIFICATION:-NOT_REACHED}**"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Release Tag | \`$RELEASE_TAG\` |"
+            echo "| Source Commit | \`$SOURCE_COMMIT_SHA\` |"
+            echo "| PR Number | #$PR_NUMBER |"
+            echo "| Artifact Hash | \`${ARTIFACT_HASH:-MISSING}\` |"
+            echo "| Commit on Main | ${COMMIT_ON_MAIN:-false} |"
+            echo "| Tag Does Not Exist | ${TAG_DOES_NOT_EXIST:-false} |"
+            echo "| Notes Valid | ${RELEASE_NOTES_VALID:-false} |"
+            echo "| PR Provenance | ${PR_PROVENANCE_VERIFIED:-false} |"
+            echo "| Status Checks | ${STATUS_CHECKS_VERIFIED:-false} |"
+            echo "| Break Glass | ${BREAK_GLASS_JUSTIFICATION:+YES} |"
+            echo ""
+            echo "#### Release Provenance Object"
+            echo '```json'
+            cat release-provenance.json 2>/dev/null || echo '{}'
+            echo '```'
+            echo ""
+            echo "> **Evidence only** — this workflow classifies the release provenance boundary."
+            echo "> It does not create a GitHub release, push tags, create authority, or expand deployment capability."
+            echo "> Canonical release chain: PR-reviewed commit → required status checks → canonical main commit"
+            echo "> → governed release tag → release notes with evidence → provenance/attestation reference → immutable artifact identity"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: HARD FAIL — reject non-CANONICAL_RELEASE_CANDIDATE classifications
+        run: |
+          set -euo pipefail
+
+          case "${RELEASE_CLASSIFICATION:-NULL}" in
+            CANONICAL_RELEASE_CANDIDATE)
+              echo "Release verified as CANONICAL_RELEASE_CANDIDATE"
+              echo "Artifact hash: $ARTIFACT_HASH"
+              ;;
+            BREAK_GLASS)
+              echo "NULL — release_admin_break_glass: BREAK_GLASS releases are recorded but cannot proceed through the canonical governed path"
+              echo "Break glass justification: ${BREAK_GLASS_JUSTIFICATION}"
+              echo "The provenance artifact is uploaded for audit. BREAK_GLASS cannot be normalized to CANONICAL_RELEASE."
+              exit 1
+              ;;
+            NON_CANONICAL_RELEASE)
+              echo "NULL — Release classified as NON_CANONICAL_RELEASE — canonical boundary not satisfied"
+              echo "Failure class: ${FAILURE_CLASS:-unknown}"
+              exit 1
+              ;;
+            *)
+              echo "NULL — Release classification not reached: ${RELEASE_CLASSIFICATION:-NULL}"
+              exit 1
+              ;;
+          esac
