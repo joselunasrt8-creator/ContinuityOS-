@@ -1,0 +1,10 @@
+{
+  "id": "stale_lineage_execution",
+  "description": "Execution attempt using expired authority that has already been consumed; lineage is stale",
+  "authority_status": "CONSUMED",
+  "replayed_nonce": false,
+  "has_proof": true,
+  "has_lineage": true,
+  "consumed_authority": true,
+  "expected": "NULL"
+}

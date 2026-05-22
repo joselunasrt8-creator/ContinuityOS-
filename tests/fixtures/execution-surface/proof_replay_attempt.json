@@ -1,0 +1,10 @@
+{
+  "id": "proof_replay_attempt",
+  "description": "Attempt to replay an already-persisted proof against the same execution lineage",
+  "has_proof": true,
+  "has_authority": true,
+  "has_lineage": true,
+  "proof_already_persisted": true,
+  "replayed_proof": true,
+  "expected": "NULL"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "authority_reuse_attempt",
+  "description": "Attempt to execute a second deploy using an authority already consumed by a prior execution",
+  "has_proof": false,
+  "has_authority": true,
+  "has_lineage": true,
+  "authority_consumed": true,
+  "expected": "NULL"
+}
