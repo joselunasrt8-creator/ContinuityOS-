@@ -1,0 +1,6 @@
+flowchart LR
+  A[workflow_dispatch] --> B[deploy-token authority]
+  B --> C[deploy wrapper]
+  C --> D[registry mutation]
+  D --> E[observability evidence]
+  E -.-> F[observability ≠ authority]
