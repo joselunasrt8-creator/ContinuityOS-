@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const source = fs.readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
 
 test('execute fails closed without validation and with non-VALID validation', () => {
-  assert.match(source, /reason:"missing_validation"/);
+  assert.match(source, /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/);
   assert.match(source, /result='VALID' AND status='VALID'/);
 });
 

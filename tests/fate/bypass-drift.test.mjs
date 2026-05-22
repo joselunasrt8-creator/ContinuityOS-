@@ -30,6 +30,6 @@ test('no direct deploy workflow bypass exists', () => {
 
 test('no /execute path works without prior /validate evidence', () => {
   assert.match(source, /SELECT \* FROM validation_registry WHERE decision_id=\?1 AND validated_object_hash=\?2 AND invocation_nonce=\?3 AND result='VALID'/)
-  assert.match(source, /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_validation" \}/)
+  assert.match(source, /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/)
   assert.match(source, /indicator: "validation_lineage_missing_or_mismatched"/)
 })

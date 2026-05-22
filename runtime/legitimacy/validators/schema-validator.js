@@ -1,4 +1,5 @@
 import { canonicalize, hashCanonical, normalize } from '../../../src/canonical.js'
+import { NULL_STATUS, INVALID_RESULT } from '../../../src/result.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,7 +10,7 @@ const SCHEMA_DIR = resolve(__dirname, '../schemas')
 const VALID_SCHEMA = 'VALID_SCHEMA'
 const INVALID_SCHEMA = 'INVALID_SCHEMA'
 const UNKNOWN_OBJECT_TYPE = 'UNKNOWN_OBJECT_TYPE'
-const NULL = 'NULL'
+const NULL = NULL_STATUS
 
 const SCHEMA_FILES = Object.freeze({
   Authority: 'AUTHORITY.schema.json',
@@ -45,7 +46,9 @@ function result(status, object_type, object_hash, errors, canonicalized_object) 
 }
 
 function nullResult(object_type, errors) {
-  return result(NULL, object_type, null, errors, null)
+  const errArray = Array.isArray(errors) ? errors : []
+  const base = result(NULL, object_type, null, errArray, null)
+  return { ...base, result: INVALID_RESULT, reason: errArray[0] ?? 'validation_failed' }
 }
 
 export { canonicalize }

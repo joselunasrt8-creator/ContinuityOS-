@@ -45,8 +45,8 @@ test('execution requires decision_id, validated_object_hash, and a VALID validat
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"missing_validation\" \}/,
-    'missing validation hash match must return NULL / INVALID with missing_validation',
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:\"NULL\", result:\"INVALID\", reason:\"hash_mismatch\" \}/,
+    'missing validation hash match must return NULL / INVALID with canonical hash_mismatch',
   )
 
   assert.match(
@@ -202,8 +202,8 @@ test('execute_rejects_unvalidated_hash', () => {
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_validation" \}/,
-    'execute must reject unvalidated hashes with missing_validation',
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/,
+    'execute must reject unvalidated hashes with canonical hash_mismatch',
   )
 })
 
@@ -275,7 +275,7 @@ test('execute_requires_prior_valid_validation', () => {
 
   assert.match(
     source,
-    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"missing_validation" \}/,
+    /if \(!validation\) return rejectWithTelemetry\(env, \{ status:"NULL", result:"INVALID", reason:"hash_mismatch" \}/,
     'execute must fail closed when no VALID validation row exists',
   )
 })

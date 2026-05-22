@@ -5,6 +5,7 @@ import { join } from 'node:path'
 
 const root = process.cwd()
 const NULL_STATUS = 'NULL'
+const INVALID_RESULT = 'INVALID'
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(join(root, relativePath), 'utf8'))
@@ -17,6 +18,8 @@ function getPath(source, path) {
 function failClosed(reason) {
   const error = new Error(`${NULL_STATUS}: ${reason}`)
   error.conformance_status = NULL_STATUS
+  error.result = INVALID_RESULT
+  error.reason = reason
   throw error
 }
 

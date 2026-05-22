@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 
 test('execute rejects missing validation lineage and stale replayed validation', () => {
-  assert.match(source, /reason:"missing_validation"/)
+  assert.match(source, /reason:"hash_mismatch"[\s\S]*indicator: "validation_lineage_missing_or_mismatched"/)
   assert.match(source, /reason:"stale_validation"/)
   assert.match(source, /reason:"nonce_not_reserved"/)
 })
