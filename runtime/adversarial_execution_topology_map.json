@@ -1,0 +1,297 @@
+{
+  "artifact": "ADVERSARIAL_EXECUTION_TOPOLOGY_MAP",
+  "schema_version": 1,
+  "issue": "695",
+  "generated_at": "2026-05-22T00:00:00.000Z",
+  "source_map": "runtime/REVERSE_CLOSURE_MUTATION_MAP.json",
+  "source_map_issue": "383",
+  "purpose": "Adversarial execution surface verification against current reverse-closure topology. Enumerates every classified surface from #383, verifies fail-closed invariants, and maps each adversarial category to the surfaces it exercises. Generated after #940, #383, #896, and external Cloudflare Git Integration disable.",
+  "canonical_chain": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
+  "canonical_valid_path": {
+    "condition": "VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID",
+    "components": {
+      "VALID": "object hash at /validate equals object hash at /execute",
+      "AUTHORIZED": "authority_registry entry exists, not consumed, not expired, canonical subject",
+      "UNUSED": "nonce not seen, object_hash not seen, execution_id not replayed",
+      "POLICY_VALID": "session_id, continuity_id, decision_id, runtime_id all match across canonical chain"
+    },
+    "result": "VALID",
+    "all_other_paths": "NULL"
+  },
+  "adversarial_categories": [
+    {
+      "category_id": "ADV-001",
+      "name": "workflow_dispatch_bypass",
+      "description": "Attempt to trigger governed-deploy.yml or prepare-governed-deploy.yml without full canonical chain traversal or with fabricated inputs",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-001", "RCM-002", "RCM-003", "RCM-005", "RCM-006", "RCM-013", "RCM-018"],
+      "verification_basis": "governed-deploy.yml checks event_name=workflow_dispatch, validates CALLER_WORKFLOW_REF, requires DECISION_ID/VALIDATED_OBJECT_HASH/INVOCATION_NONCE, verifies replay at /execute; fabricated dispatch inputs fail /compile hash match requirement"
+    },
+    {
+      "category_id": "ADV-002",
+      "name": "shell_wrapped_deploy_attempts",
+      "description": "Attempt to bypass governed-deploy.ts wrapper via bash/sh/zsh -c 'wrangler deploy' patterns or direct wrangler CLI invocation",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-009", "RCM-011"],
+      "verification_basis": "governed-deploy.ts enforceGovernedDeployCommand blocks (bash|sh|zsh) -c wrangler deploy patterns and direct wrangler invocation via failClosed('direct wrangler invocation rejected'); package.json deploy script exits 1"
+    },
+    {
+      "category_id": "ADV-003",
+      "name": "orphan_execution",
+      "description": "Execution attempt without valid session/continuity lineage chain — detached continuity_id, missing session, or lineage chain gap",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-013", "RCM-014", "RCM-018"],
+      "verification_basis": "canonical chain requires /session → /continuity → /authority with matching session_id/continuity_id/decision_id/runtime_id across all objects; detached lineage → NULL at /authority or /compile"
+    },
+    {
+      "category_id": "ADV-004",
+      "name": "replay_reuse",
+      "description": "Attempt to reuse consumed execution artifacts: seen object hash, used nonce, replayed execution_id, or duplicate proof tuple",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-005", "RCM-006", "RCM-013", "RCM-014", "RCM-015"],
+      "verification_basis": "seenObjectHashes set blocks duplicate object_hash; usedNonces set blocks nonce reuse; deployment_provenance_registry UNIQUE hash guard; deployment_proof_registry proof_binding_hash UNIQUE guard; governed-deploy.ts tupleCollision detection"
+    },
+    {
+      "category_id": "ADV-005",
+      "name": "stale_proof_lineage",
+      "description": "Proof presented with expired authority chain, expired continuity, or authority beyond AUTHORITY_EXPIRY",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-005", "RCM-013", "RCM-014"],
+      "verification_basis": "within(now, authority.expires_at) check; AUTHORITY_EXPIRY derived dynamically from /authority response (not hardcoded); governed-deploy.yml fails closed when authority expiry missing"
+    },
+    {
+      "category_id": "ADV-006",
+      "name": "authority_reuse",
+      "description": "Attempt to reuse consumed authority (authority_id in consumedAuthorities set) or expired authority",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-005", "RCM-013"],
+      "verification_basis": "consumedAuthorities set blocks authority_id reuse; authority.status === CONSUMED → NULL; revoked authority → NULL"
+    },
+    {
+      "category_id": "ADV-007",
+      "name": "undeclared_registry_mutation",
+      "description": "INSERT/UPDATE/DELETE on a table not in the declared mutation surface inventory",
+      "expected_outcome": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-012", "RCM-013"],
+      "verification_basis": "MUTATION_SURFACE_EXHAUSTIVENESS.json fail_closed_response = UNDECLARED_MUTATION_SURFACE -> NULL; scanner enforces exhaustiveness against src/index.ts; 63 declared surfaces cover all known tables"
+    },
+    {
+      "category_id": "ADV-008",
+      "name": "hidden_deploy_path_discovery",
+      "description": "Enumeration of surfaces that could create production mutations outside the canonical governed path, including environment promotion, preview-to-production, and ungoverned release artifacts",
+      "expected_outcome": "NULL (for classified surfaces) or OPEN (for known gaps requiring external closure)",
+      "verified": true,
+      "surfaces_exercised": ["RCM-008", "RCM-010", "RCM-011", "RCM-012", "RCM-016", "RCM-017"],
+      "verification_basis": "Cloudflare Git Integration external disable active (RCM-008 CONTAINED); no scheduled deploy workflows (RCM-007 CLOSED); all hidden paths classified in REVERSE_CLOSURE_MUTATION_MAP with bypass_risk and closure_action; OPEN surfaces require external action (#380, #382, #584)"
+    },
+    {
+      "category_id": "ADV-009",
+      "name": "proof_lineage_corruption",
+      "description": "Proof with mismatched validated_object_hash vs execution_hash, detached execution lineage, or proof_id not matching persisted proof registry entry",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-013", "RCM-014"],
+      "verification_basis": "validateProof: validated_object_hash === hashObject(object) AND execution_hash === hashObject(object); execution must be in executionRegistry with matching object_hash and persisted=true; persistedProofId must match proof_registry entry"
+    },
+    {
+      "category_id": "ADV-010",
+      "name": "exact_object_drift",
+      "description": "Object hash at /validate differs from object hash at /execute — state mutation between validation and execution",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-013"],
+      "verification_basis": "validatedHash = hashObject(object) at /validate; executedHash = hashObject(executedObject) at /execute; validatedHash !== executedHash → NULL"
+    },
+    {
+      "category_id": "ADV-011",
+      "name": "mutation_after_validation",
+      "description": "State change to execution object after /validate completes but before /execute registers result — post-validation mutation",
+      "expected_outcome": "NULL",
+      "verified": true,
+      "surfaces_exercised": ["RCM-013"],
+      "verification_basis": "Object hash is computed at /execute and must match hash computed at /validate; any mutation between steps changes canonical hash → NULL via exact-object enforcement"
+    },
+    {
+      "category_id": "ADV-012",
+      "name": "bypass_capable_local_terminal_execution",
+      "description": "Local terminal execution bypassing governed deploy context guard — wrangler deploy with CLOUDFLARE_API_TOKEN without MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed",
+      "expected_outcome": "NULL (governed path); BREAK_GLASS (acknowledged non-normal execution with root credential)",
+      "verified": true,
+      "surfaces_exercised": ["RCM-010", "RCM-011", "RCM-019"],
+      "verification_basis": "governed-deploy.ts context guard exits when MINDSHIFT_GOVERNED_DEPLOY_CONTEXT != github_actions_governed; BREAK_GLASS classification acknowledges non-zero residual risk until token scoped to OIDC (#584 closure condition); root credential paths explicitly non-normal"
+    },
+    {
+      "category_id": "ADV-013",
+      "name": "credential_misuse_classification",
+      "description": "Classification and audit verification of root credential usage paths — CLOUDFLARE_API_TOKEN, GitHub admin credentials, Cloudflare account owner",
+      "expected_outcome": "BREAK_GLASS (classified non-normal, not NULL because external constraint cannot cryptographically block)",
+      "verified": true,
+      "surfaces_exercised": ["RCM-010", "RCM-011", "RCM-019"],
+      "verification_basis": "RCM-010, RCM-011, RCM-019 explicitly classified BREAK_GLASS; root_authority_constraints.json root_authority_escalation=NULL; audit observable via Cloudflare dashboard and GitHub audit log; creates_legitimacy=false for all break-glass surfaces"
+    },
+    {
+      "category_id": "ADV-014",
+      "name": "reconciliation_telemetry_misuse",
+      "description": "Attempt to use observability/reconciliation/telemetry surfaces to create authority, validation, execution, proof, or legitimacy",
+      "expected_outcome": "NULL (cannot create authority or authorize execution)",
+      "verified": true,
+      "surfaces_exercised": ["RCM-020", "RCM-021"],
+      "verification_basis": "RCM-020 GET-only routes; RCM-021 trigger-blocked append-only; MUTATION_SURFACE_EXHAUSTIVENESS.json NON_EXECUTABLE classification for all observability routes; creates_authority=false, execution_capable=false, creates_legitimacy=false for all OBSERVABILITY_ONLY surfaces"
+    }
+  ],
+  "fail_closed_invariant_verification": [
+    {
+      "invariant": "undeclared_mutation",
+      "condition": "UNDECLARED_MUTATION_SURFACE → NULL",
+      "verified": true,
+      "evidence": "MUTATION_SURFACE_EXHAUSTIVENESS.json fail_closed_response; src/index.ts static scan enforces 63 declared surfaces; undeclared table → UNDECLARED_MUTATION_SURFACE -> NULL"
+    },
+    {
+      "invariant": "replayed_execution",
+      "condition": "replayed_execution → NULL",
+      "verified": true,
+      "evidence": "seenObjectHashes blocks duplicate object_hash; usedNonces blocks nonce reuse; deployment registries UNIQUE hash guards; tupleCollision detection in governed-deploy.ts"
+    },
+    {
+      "invariant": "stale_authority",
+      "condition": "stale_authority → NULL",
+      "verified": true,
+      "evidence": "within(now, authority.expires_at) at /authority; AUTHORITY_EXPIRY dynamically derived from /authority response; governed-deploy.yml fails closed on missing expiry"
+    },
+    {
+      "invariant": "detached_lineage",
+      "condition": "detached_lineage → NULL",
+      "verified": true,
+      "evidence": "session_id/continuity_id/decision_id/runtime_id match enforced across canonical chain; continuity chain must include authority_id and session_id; orphan execution → NULL"
+    },
+    {
+      "invariant": "proof_mismatch",
+      "condition": "proof_mismatch → NULL",
+      "verified": true,
+      "evidence": "proof.validated_object_hash must equal hashObject(object); proof.execution_hash must equal hashObject(object); persisted proof registry must match all hash fields"
+    },
+    {
+      "invariant": "post_validation_mutation",
+      "condition": "post_validation_mutation → NULL",
+      "verified": true,
+      "evidence": "exact-object enforcement: validatedHash !== executedHash → NULL; object is re-hashed at /execute and compared against /validate hash"
+    },
+    {
+      "invariant": "undeclared_deploy_path",
+      "condition": "undeclared_deploy_path → NULL",
+      "verified": true,
+      "evidence": "DEPLOYMENT_TOPOLOGY_MAP.json enumerates all deploy paths; REVERSE_CLOSURE_MUTATION_MAP enumerates all 22 surfaces; no ungoverned deploy path exists outside classified surfaces; Cloudflare Git Integration external disable active"
+    },
+    {
+      "invariant": "validator_bypass",
+      "condition": "validator_bypass → NULL",
+      "verified": true,
+      "evidence": "/validate is a required canonical chain step; execution without validation → missing validated_object_hash → proof hash mismatch → NULL; governed-deploy.yml requires VALIDATE_STATUS=APPROVED"
+    }
+  ],
+  "specific_surface_verifications": {
+    "cloudflare_git_integration": {
+      "surface_id": "RCM-008",
+      "classification": "CONTAINED",
+      "active_production_authority": false,
+      "verification": "External account-level disable confirmed active per #584/#896. Code-side containment: wrangler.toml [env.preview] isolates preview environment. CF-001 classified CONTAINMENT_REQUIRED in CLOUDFLARE_AUTHORITY_CLASSIFICATION.json. No production authority created by this surface while disabled.",
+      "re_enable_risk": "If Git Integration re-enabled, all subsequent push-triggered deploys bypass canonical chain — ungoverned production mutation. Observable only in Cloudflare dashboard.",
+      "adversarial_outcome": "CONTAINED while disabled; hidden_deploy_path_discovery category covers re-enable risk"
+    },
+    "break_glass_paths": {
+      "surface_ids": ["RCM-010", "RCM-011", "RCM-019"],
+      "classification": "BREAK_GLASS",
+      "non_normal_execution": true,
+      "creates_legitimacy": false,
+      "verification": "All three surfaces explicitly classified BREAK_GLASS. authority_capable=true, execution_capable=true but creates_legitimacy=false. root_authority_constraints.json root_authority_escalation=NULL. Audit observable via Cloudflare dashboard and GitHub audit log.",
+      "adversarial_outcome": "credential_misuse_classification and bypass_capable_local_terminal_execution categories verified — these surfaces are non-normal execution, not NULL (cannot cryptographically constrain root credentials at repository level)"
+    },
+    "observability_surfaces": {
+      "surface_ids": ["RCM-020", "RCM-021"],
+      "classification": "OBSERVABILITY_ONLY",
+      "cannot_create_authority": true,
+      "cannot_create_validation": true,
+      "cannot_create_execution": true,
+      "cannot_create_proof": true,
+      "cannot_create_legitimacy": true,
+      "verification": "RCM-020 GET-only routes; RCM-021 trigger-blocked append-only install_base_telemetry_registry. MUTATION_SURFACE_EXHAUSTIVENESS.json NON_EXECUTABLE classification. reconciliation_telemetry_misuse adversarial category verified → NULL for all escalation attempts.",
+      "adversarial_outcome": "reconciliation_telemetry_misuse → NULL"
+    },
+    "release_tag_creation": {
+      "surface_ids": ["RCM-016", "RCM-017"],
+      "classification": "OPEN",
+      "linked_issue": "#382",
+      "verification": "No governed release/tag creation workflow exists. Tags can be created without canonical chain traversal. hidden_deploy_path_discovery category enumerates this as classified OPEN gap. Closure requires #382 release provenance boundary definition.",
+      "adversarial_outcome": "OPEN — risk is classified and acknowledged, closure requires #382"
+    },
+    "branch_protection": {
+      "surface_ids": ["RCM-001", "RCM-003"],
+      "classification": "OPEN",
+      "linked_issue": "#380",
+      "verification": "BRANCH_PROTECTION_POLICY.json is policy_only_non_enforcing. GitHub repository settings do not enforce required status checks, PR reviews, or block direct pushes to main. workflow_dispatch_bypass category enumerates this as classified OPEN gap. Closure requires external GitHub settings action per #380.",
+      "adversarial_outcome": "OPEN — risk is classified and acknowledged, closure requires #380"
+    }
+  },
+  "surface_adversarial_index": [
+    { "surface_id": "RCM-001", "status": "OPEN", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-008"], "adversarial_result": "OPEN — branch protection not enforced externally, linked #380" },
+    { "surface_id": "RCM-002", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-009"], "adversarial_result": "CONTAINED — merge-governance-check + PREO/SCO gate active" },
+    { "surface_id": "RCM-003", "status": "OPEN", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-008"], "adversarial_result": "OPEN — branch protection enforcement policy-only, linked #380" },
+    { "surface_id": "RCM-004", "status": "CONTAINED", "mutation_capable": false, "adversarial_categories": ["ADV-001"], "adversarial_result": "CONTAINED — CODEOWNERS advisory; depends on #380 enforcement" },
+    { "surface_id": "RCM-005", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-004", "ADV-005", "ADV-006"], "adversarial_result": "CONTAINED — canonical chain + nonce + expiry; fabricated inputs blocked by /compile hash match" },
+    { "surface_id": "RCM-006", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-004"], "adversarial_result": "CONTAINED — prepare-governed-deploy has no deploy capability; tuple replay risk is residual" },
+    { "surface_id": "RCM-007", "status": "CLOSED", "mutation_capable": false, "adversarial_categories": [], "adversarial_result": "CLOSED — no scheduled deploy workflows exist" },
+    { "surface_id": "RCM-008", "status": "CONTAINED", "mutation_capable": false, "adversarial_categories": ["ADV-008"], "adversarial_result": "CONTAINED — external disable active; re-enable risk classified OBSERVABILITY_ONLY-dependent" },
+    { "surface_id": "RCM-009", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-002", "ADV-012"], "adversarial_result": "CONTAINED — context guard + canonical legitimacy artifact required; shell-wrap blocked" },
+    { "surface_id": "RCM-010", "status": "BREAK_GLASS", "mutation_capable": true, "adversarial_categories": ["ADV-012", "ADV-013"], "adversarial_result": "BREAK_GLASS — root credential, non-normal execution, creates_legitimacy=false, audit observable" },
+    { "surface_id": "RCM-011", "status": "BREAK_GLASS", "mutation_capable": true, "adversarial_categories": ["ADV-002", "ADV-012", "ADV-013"], "adversarial_result": "BREAK_GLASS — direct wrangler bypass possible with token; classified non-normal; token scope closure in #584" },
+    { "surface_id": "RCM-012", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-007", "ADV-008"], "adversarial_result": "CONTAINED — migration_governance_registry evidence-only; raw wrangler d1 apply requires token + CLI access" },
+    { "surface_id": "RCM-013", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-003", "ADV-004", "ADV-005", "ADV-006", "ADV-007", "ADV-009", "ADV-010", "ADV-011"], "adversarial_result": "CONTAINED — 7-step canonical chain enforced; all adversarial inputs verified fail-closed" },
+    { "surface_id": "RCM-014", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-004", "ADV-009"], "adversarial_result": "CONTAINED — /proof route exclusive; evidence surfaces trigger-blocked; proof hash match required" },
+    { "surface_id": "RCM-015", "status": "CLOSED", "mutation_capable": false, "adversarial_categories": ["ADV-004", "ADV-009"], "adversarial_result": "CLOSED — append-only, trigger-blocked, UNIQUE hash guards; no authority or execution capability" },
+    { "surface_id": "RCM-016", "status": "OPEN", "mutation_capable": true, "adversarial_categories": ["ADV-008"], "adversarial_result": "OPEN — no governed release workflow; linked #382; classified and acknowledged" },
+    { "surface_id": "RCM-017", "status": "OPEN", "mutation_capable": true, "adversarial_categories": ["ADV-007", "ADV-008"], "adversarial_result": "OPEN — no publish workflow exists; linked #382; classified and acknowledged" },
+    { "surface_id": "RCM-018", "status": "CONTAINED", "mutation_capable": true, "adversarial_categories": ["ADV-001", "ADV-003", "ADV-012"], "adversarial_result": "CONTAINED — AGENTS.md protocol + merge governance; branch protection (#380) required for full enforcement" },
+    { "surface_id": "RCM-019", "status": "BREAK_GLASS", "mutation_capable": true, "adversarial_categories": ["ADV-012", "ADV-013"], "adversarial_result": "BREAK_GLASS — root credentials classified non-normal; creates_legitimacy=false; audit log observable" },
+    { "surface_id": "RCM-020", "status": "OBSERVABILITY_ONLY", "mutation_capable": false, "adversarial_categories": ["ADV-014"], "adversarial_result": "OBSERVABILITY_ONLY — GET-only routes; cannot create authority, execution, proof, or legitimacy" },
+    { "surface_id": "RCM-021", "status": "OBSERVABILITY_ONLY", "mutation_capable": false, "adversarial_categories": ["ADV-014"], "adversarial_result": "OBSERVABILITY_ONLY — trigger-blocked append-only; non-authoritative; write failure non-blocking" },
+    { "surface_id": "RCM-022", "status": "CLOSED", "mutation_capable": false, "adversarial_categories": [], "adversarial_result": "CLOSED — adversarial verification now implemented by this artifact (#695)" }
+  ],
+  "summary": {
+    "total_surfaces_verified": 22,
+    "adversarial_categories_verified": 14,
+    "fail_closed_invariants_verified": 8,
+    "by_status": {
+      "CLOSED": 3,
+      "CONTAINED": 10,
+      "OPEN": 5,
+      "BREAK_GLASS": 3,
+      "OBSERVABILITY_ONLY": 2
+    },
+    "mutation_capable_surfaces": {
+      "CONTAINED": ["RCM-002", "RCM-005", "RCM-006", "RCM-009", "RCM-012", "RCM-013", "RCM-014", "RCM-018"],
+      "OPEN": ["RCM-001", "RCM-003", "RCM-016", "RCM-017"],
+      "BREAK_GLASS": ["RCM-010", "RCM-011", "RCM-019"]
+    },
+    "non_mutation_surfaces": {
+      "CLOSED": ["RCM-007", "RCM-015", "RCM-022"],
+      "CONTAINED": ["RCM-004", "RCM-008"],
+      "OBSERVABILITY_ONLY": ["RCM-020", "RCM-021"]
+    },
+    "note_on_rcm022_status": "RCM-022 (adversarial_verification) was OPEN in REVERSE_CLOSURE_MUTATION_MAP. It is now CLOSED because this artifact (#695 adversarial verification) is the required closure action. The test suite at tests/fate/issue-695-adversarial-execution-verification.test.mjs provides adversarial evidence."
+  }
+}
