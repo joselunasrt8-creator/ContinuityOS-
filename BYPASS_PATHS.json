@@ -140,6 +140,18 @@
       "bypass_id": "branch_protection_bypass",
       "risk": "admin or ruleset bypass may mutate main outside legitimacy evidence",
       "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL; never legitimacy"
+    },
+    {
+      "path": "raw_d1_migration_apply_production",
+      "bypass_id": "raw_d1_migration_apply_production",
+      "risk": "wrangler d1 migrations apply executed against production database outside governed workflow or PR review process — directly mutates schema and registry structure without legitimacy evidence",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+    },
+    {
+      "path": "undeclared_migration_schema_mutation",
+      "bypass_id": "undeclared_migration_schema_mutation",
+      "risk": "migration file drops or modifies required legitimacy columns, uniqueness constraints, or append-only triggers without explicit governance declaration — removes legitimacy preservation invariants",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
     }
   ],
   "closure_verification": {

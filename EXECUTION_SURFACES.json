@@ -43,9 +43,40 @@
       "path": "migrations/",
       "mutation_type": "schema_migration",
       "risk_class": "P2",
-      "classification": "database_mutation_surface",
-      "capabilities": ["D1 registry writes", "schema evolution"],
-      "required_controls": ["migration chain integrity", "canonical schema match"]
+      "classification": "governed_infrastructure_mutation_surface",
+      "governance_classification": "governed_infrastructure_mutation",
+      "surface_declaration": "DECLARED",
+      "production_apply_path": "governed_workflow_only",
+      "raw_production_apply": "DENIED",
+      "bypass_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "capabilities": ["D1 registry writes", "schema evolution", "legitimacy column mutation"],
+      "required_controls": [
+        "migration chain integrity",
+        "canonical schema match",
+        "governed workflow or explicit governance evidence required for production apply",
+        "no raw wrangler d1 migrations apply --remote outside governed workflow",
+        "required legitimacy columns must be preserved",
+        "uniqueness constraints must be preserved",
+        "append-only semantics must be preserved",
+        "migration creates no authority, proof finality, or execution capability"
+      ],
+      "legitimacy_columns_required": [
+        "authority_registry.decision_id UNIQUE",
+        "authority_registry.continuity_id",
+        "authority_registry.status",
+        "validation_registry.validated_object_hash",
+        "validation_registry.invocation_nonce",
+        "validation_registry.status",
+        "execution_registry.validated_object_hash UNIQUE",
+        "execution_registry.invocation_nonce",
+        "execution_registry.workflow_run_id UNIQUE",
+        "proof_registry.decision_hash UNIQUE",
+        "proof_registry.execution_id",
+        "proof_registry.validated_object_hash",
+        "proof_registry.workflow_run_id UNIQUE",
+        "continuity_registry.continuity_hash UNIQUE",
+        "invocation_registry PRIMARY_KEY(decision_id, validated_object_hash, invocation_nonce)"
+      ]
     },
     {
       "surface_id": "package_manager_scripts",
