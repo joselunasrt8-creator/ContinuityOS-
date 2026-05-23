@@ -27,6 +27,22 @@
     {
       "id": "proof",
       "type": "PROOF"
+    },
+    {
+      "id": "runtime:continuity",
+      "type": "EXECUTION"
+    },
+    {
+      "id": "runtime:deployment",
+      "type": "EXECUTION"
+    },
+    {
+      "id": "runtime:federation",
+      "type": "EXECUTION"
+    },
+    {
+      "id": "runtime:lineage",
+      "type": "EXECUTION"
     }
   ],
   "edges": [
@@ -57,6 +73,46 @@
     },
     {
       "from": "session",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:continuity",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:deployment",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:deployment",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:federation",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:federation",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:lineage",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:lineage",
       "to": "continuity",
       "type": "DEPENDS_ON"
     }

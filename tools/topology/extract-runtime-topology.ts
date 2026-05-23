@@ -1,4 +1,9 @@
-import { writeFileSync } from "node:fs";
+import {
+  writeFileSync,
+  readdirSync,
+} from "node:fs";
+
+import { join } from "node:path";
 
 type NodeType =
   | "SESSION"
@@ -85,7 +90,44 @@ const topology: RuntimeTopology = {
   ],
 };
 
-const topologyJson = JSON.stringify(topology, null, 2);
+const routesPath = "src/runtime";
+
+try {
+  const runtimeEntries = readdirSync(routesPath, {
+    withFileTypes: true,
+  });
+
+  for (const entry of runtimeEntries) {
+    const nodeId = `runtime:${entry.name}`;
+
+    topology.nodes.push({
+      id: nodeId,
+      type: "EXECUTION",
+    });
+
+    topology.edges.push({
+      from: "validation",
+      to: nodeId,
+      type: "DEPENDS_ON",
+    });
+
+    if (entry.isDirectory()) {
+      topology.edges.push({
+        from: nodeId,
+        to: "continuity",
+        type: "DEPENDS_ON",
+      });
+    }
+  }
+} catch (err) {
+  console.error("Runtime discovery failed:", err);
+}
+
+const topologyJson = JSON.stringify(
+  topology,
+  null,
+  2
+);
 
 writeFileSync(
   "runtime-topology.json",
