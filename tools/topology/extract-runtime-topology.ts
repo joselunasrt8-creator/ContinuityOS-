@@ -14,7 +14,8 @@ type NodeType =
   | "VALIDATION"
   | "EXECUTION"
   | "PROOF"
-  | "REGISTRY";
+  | "REGISTRY"
+  | "RECONCILIATION";
 
 type EdgeType =
   | "COMPILES_TO"
@@ -90,6 +91,30 @@ const topology: RuntimeTopology = {
   ],
 };
 
+function classifyRuntimeNode(
+  name: string
+): NodeType {
+  if (
+    name.includes("continuity") ||
+    name.includes("lineage")
+  ) {
+    return "CONTINUITY";
+  }
+
+  if (
+    name.includes("federation") ||
+    name.includes("reconciliation")
+  ) {
+    return "RECONCILIATION";
+  }
+
+  if (name.includes("registry")) {
+    return "REGISTRY";
+  }
+
+  return "EXECUTION";
+}
+
 const routesPath = "src/runtime";
 
 try {
@@ -102,7 +127,7 @@ try {
 
     topology.nodes.push({
       id: nodeId,
-      type: "EXECUTION",
+      type: classifyRuntimeNode(entry.name),
     });
 
     topology.edges.push({

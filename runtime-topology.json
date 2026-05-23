@@ -30,7 +30,7 @@
     },
     {
       "id": "runtime:continuity",
-      "type": "EXECUTION"
+      "type": "CONTINUITY"
     },
     {
       "id": "runtime:deployment",
@@ -38,11 +38,11 @@
     },
     {
       "id": "runtime:federation",
-      "type": "EXECUTION"
+      "type": "RECONCILIATION"
     },
     {
       "id": "runtime:lineage",
-      "type": "EXECUTION"
+      "type": "CONTINUITY"
     }
   ],
   "edges": [
