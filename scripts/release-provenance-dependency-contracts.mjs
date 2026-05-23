@@ -557,6 +557,51 @@ export function classifyDependency(consumptionEvidence, contractObject, options 
   })
 }
 
+// ── Required export compatibility names (Issue #1006 spec) ─────────────────
+
+export const ALLOWED_DEPENDENCY_USES = {
+  OBSERVE: 'OBSERVE',
+  AUDIT: 'AUDIT',
+  PACKAGE_METADATA: 'PACKAGE_METADATA',
+  DEPLOYMENT_INPUT_EVIDENCE: 'DEPLOYMENT_INPUT_EVIDENCE',
+}
+
+/**
+ * Builds a RELEASE_PROVENANCE_DEPENDENCY_CONTRACT object with a computed contract_hash.
+ * All evidence-only invariants are fixed. contract_hash is computed over canonical fields.
+ *
+ * @param {object} [params]
+ * @returns {object} dependency contract object
+ */
+export function buildDependencyContract({
+  contract_id = null,
+  consumer_id = null,
+  requires_external_policy = false,
+  requires_human_approval = false,
+  requires_deployment_authority = false,
+  allowed_use = 'OBSERVE | AUDIT | PACKAGE_METADATA | DEPLOYMENT_INPUT_EVIDENCE',
+} = {}) {
+  const base = {
+    artifact: 'RELEASE_PROVENANCE_DEPENDENCY_CONTRACT',
+    contract_id,
+    consumer_id,
+    evidence_only: true,
+    creates_authority: false,
+    creates_execution: false,
+    creates_proof: false,
+    required_consumption_result: 'CONSUMABLE_EVIDENCE',
+    requires_external_policy,
+    requires_human_approval,
+    requires_deployment_authority,
+    allowed_use,
+    contract_hash_alg: 'sha256',
+  }
+  return { ...base, contract_hash: computeContractHash(base) }
+}
+
+export const evaluateDependencyContract = classifyDependency
+export const validateDependencyBoundary = validateContractBoundary
+
 // ── CLI runner ──────────────────────────────────────────────────────────────
 
 const __filename = fileURLToPath(import.meta.url)

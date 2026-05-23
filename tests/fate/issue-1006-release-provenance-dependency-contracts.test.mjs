@@ -60,6 +60,10 @@ import {
   validateContractBoundary,
   validateConsumptionBoundary,
   classifyDependency,
+  ALLOWED_DEPENDENCY_USES,
+  buildDependencyContract,
+  evaluateDependencyContract,
+  validateDependencyBoundary,
 } from '../../scripts/release-provenance-dependency-contracts.mjs'
 
 const REQUIRED_DEPENDENCY_CLASSES = [
@@ -1172,4 +1176,90 @@ test('FATE #1006 non-regression: issue-1000 FATE test file is present', () => {
     existsSync(join(root, 'tests/fate/issue-1000-release-provenance-causal-ordering.test.mjs')),
     '#1000 FATE test file must remain present',
   )
+})
+
+// ── Issue #1006 required export name compatibility ────────────────────────────
+
+test('FATE #1006-compat-1: ALLOWED_DEPENDENCY_USES is exported with all four required use values', () => {
+  assert.ok(typeof ALLOWED_DEPENDENCY_USES === 'object' && ALLOWED_DEPENDENCY_USES !== null)
+  assert.equal(ALLOWED_DEPENDENCY_USES.OBSERVE, 'OBSERVE')
+  assert.equal(ALLOWED_DEPENDENCY_USES.AUDIT, 'AUDIT')
+  assert.equal(ALLOWED_DEPENDENCY_USES.PACKAGE_METADATA, 'PACKAGE_METADATA')
+  assert.equal(ALLOWED_DEPENDENCY_USES.DEPLOYMENT_INPUT_EVIDENCE, 'DEPLOYMENT_INPUT_EVIDENCE')
+})
+
+test('FATE #1006-compat-2: buildDependencyContract is exported and is a function', () => {
+  assert.equal(typeof buildDependencyContract, 'function')
+})
+
+test('FATE #1006-compat-3: buildDependencyContract produces a valid contract object with all required fields', () => {
+  const contract = buildDependencyContract({ contract_id: 'c-001', consumer_id: 'consumer-001' })
+  assert.equal(contract.artifact, 'RELEASE_PROVENANCE_DEPENDENCY_CONTRACT')
+  assert.equal(contract.contract_id, 'c-001')
+  assert.equal(contract.consumer_id, 'consumer-001')
+  assert.equal(contract.evidence_only, true)
+  assert.equal(contract.creates_authority, false)
+  assert.equal(contract.creates_execution, false)
+  assert.equal(contract.creates_proof, false)
+  assert.equal(contract.required_consumption_result, 'CONSUMABLE_EVIDENCE')
+  assert.equal(typeof contract.requires_external_policy, 'boolean')
+  assert.equal(typeof contract.requires_human_approval, 'boolean')
+  assert.equal(typeof contract.requires_deployment_authority, 'boolean')
+  assert.equal(contract.contract_hash_alg, 'sha256')
+  assert.equal(typeof contract.contract_hash, 'string')
+  assert.equal(contract.contract_hash.length, 64)
+  assert.ok(/^[0-9a-f]{64}$/.test(contract.contract_hash))
+})
+
+test('FATE #1006-compat-4: buildDependencyContract contract_hash matches computeContractHash', () => {
+  const contract = buildDependencyContract({ contract_id: 'c-001', consumer_id: 'consumer-001' })
+  assert.equal(contract.contract_hash, computeContractHash(contract))
+})
+
+test('FATE #1006-compat-5: buildDependencyContract contract satisfies classifyDependency with valid consumption', () => {
+  const consumption = makeConsumableEvidence()
+  const contract = buildDependencyContract({ contract_id: 'c-001', consumer_id: 'consumer-001' })
+  const result = classifyDependency(consumption, contract)
+  assert.equal(result.dependency_result, DEPENDENCY_RESULTS.DEPENDENCY_SATISFIED)
+})
+
+test('FATE #1006-compat-6: evaluateDependencyContract is exported and is a function', () => {
+  assert.equal(typeof evaluateDependencyContract, 'function')
+})
+
+test('FATE #1006-compat-7: evaluateDependencyContract produces identical result to classifyDependency', () => {
+  const consumption = makeConsumableEvidence()
+  const contract = makeContract()
+  const r1 = classifyDependency(consumption, contract)
+  const r2 = evaluateDependencyContract(consumption, contract)
+  assert.equal(r1.dependency_result, r2.dependency_result)
+  assert.equal(r1.dependency_hash, r2.dependency_hash)
+  assert.deepEqual(r1.dependency_classes, r2.dependency_classes)
+})
+
+test('FATE #1006-compat-8: evaluateDependencyContract produces identical NULL result to classifyDependency', () => {
+  const contract = makeContract()
+  const r1 = classifyDependency(null, contract)
+  const r2 = evaluateDependencyContract(null, contract)
+  assert.equal(r1.dependency_result, DEPENDENCY_RESULTS.NULL)
+  assert.equal(r1.dependency_hash, r2.dependency_hash)
+})
+
+test('FATE #1006-compat-9: validateDependencyBoundary is exported and is a function', () => {
+  assert.equal(typeof validateDependencyBoundary, 'function')
+})
+
+test('FATE #1006-compat-10: validateDependencyBoundary produces identical result to validateContractBoundary', () => {
+  const valid = { evidence_only: true, creates_authority: false, creates_execution: false, creates_proof: false }
+  const r1 = validateContractBoundary(valid)
+  const r2 = validateDependencyBoundary(valid)
+  assert.equal(r1.valid, r2.valid)
+  assert.deepEqual(r1.violations, r2.violations)
+})
+
+test('FATE #1006-compat-11: validateDependencyBoundary rejects authority_grant field', () => {
+  const bad = { evidence_only: true, creates_authority: false, creates_execution: false, creates_proof: false, authority_grant: 'admin' }
+  const check = validateDependencyBoundary(bad)
+  assert.equal(check.valid, false)
+  assert.ok(check.violations.some((v) => v.includes('authority_grant')))
 })
