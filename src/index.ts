@@ -160,6 +160,7 @@ const CONFORMANCE_EQUIVALENCE_ROUTE = "/conformance/equivalence" as const
 const CONFORMANCE_CHECKPOINT_ROUTE = "/conformance/checkpoint" as const
 
 const INSTALL_BASE_METRICS_ROUTE = "/install-base/metrics" as const
+const TELEMETRY_ROUTE = "/metrics" as const
 const GOVERNANCE_OBSERVABILITY_ROUTE = "/observability/governance" as const
 const GOVERNANCE_OBSERVABILITY_TELEMETRY_ROUTE = "/observability/governance/telemetry" as const
 const GOVERNANCE_OBSERVABILITY_METRICS_ROUTE = "/observability/governance/metrics" as const
@@ -219,6 +220,7 @@ const NON_EXECUTABLE_OBSERVABILITY_ROUTES = [
     "/federation/conformance",
     "/federation/sovereignty/checkpoint",
     INSTALL_BASE_METRICS_ROUTE,
+    TELEMETRY_ROUTE,
     ...GOVERNANCE_OBSERVABILITY_ROUTES,
     EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE,
     BOOTSTRAP_VERIFY_ROUTE,
@@ -5056,6 +5058,9 @@ async function installBaseGovernanceMetrics(env: Env) {
     continuity_expiry_total: counts.get("continuity_expiry_rejected") || 0,
     stale_lineage_rejection_total: counts.get("stale_lineage_rejected") || 0,
     registry_reconciliation_failure_total: counts.get("reconciliation_failure_detected") || 0,
+    replay_rejected_total: counts.get("replay_rejected") || 0,
+    continuity_revocation_total: counts.get("revocation_propagation_observed") || 0,
+    reconciliation_failure_total: counts.get("reconciliation_failure_detected") || 0,
     distributed_disagreement_total: counts.get("distributed_disagreement_observed") || 0,
     quorum_collapse_total: counts.get("quorum_collapse_observed") || 0,
     temporal_divergence_total: counts.get("temporal_divergence_observed") || 0,
@@ -6960,6 +6965,27 @@ export default {
         return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "observability_only", metrics, authority_issuance_influenced: false, validator_decisions_influenced: false, execution_eligibility_influenced: false, proof_legitimacy_influenced: false })
       } catch {
         return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false })
+      }
+    }
+    if (url.pathname === TELEMETRY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, validates_objects: false, executes_actions: false, creates_proof: false, mutates_registries: false, repairs_failures: false, turns_failed_executions_valid: false }, 405)
+    if (url.pathname === TELEMETRY_ROUTE && request.method === "GET") {
+      try {
+        if (!hasDb(env)) return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false })
+        const telemetryRows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM install_base_telemetry_registry GROUP BY event_type`).all<any>()
+        const telemetryCounts = new Map<string, number>()
+        for (const row of telemetryRows.results || []) telemetryCounts.set(String(row.event_type || ""), Number(row.count || 0))
+        const metrics = {
+          governed_execution_total: telemetryCounts.get("governed_execution_completed") || 0,
+          blocked_execution_total: telemetryCounts.get("invalid_execution_blocked") || 0,
+          proof_generated_total: telemetryCounts.get("proof_generated") || 0,
+          replay_rejected_total: telemetryCounts.get("replay_rejected") || 0,
+          continuity_revocation_total: telemetryCounts.get("revocation_propagation_observed") || 0,
+          reconciliation_failure_total: telemetryCounts.get("reconciliation_failure_detected") || 0,
+          execution_surface_count: telemetryCounts.get("execution_surface_observed") || 0,
+        }
+        return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "observability_only", metrics, creates_authority: false, validates_objects: false, executes_actions: false, creates_proof: false, mutates_registries: false, repairs_failures: false, turns_failed_executions_valid: false, read_only: true, evidence_only: true, non_authoritative: true })
+      } catch {
+        return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false })
       }
     }
 
