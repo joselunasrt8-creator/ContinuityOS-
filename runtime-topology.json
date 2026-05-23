@@ -1,0 +1,120 @@
+{
+  "nodes": [
+    {
+      "id": "session",
+      "type": "SESSION"
+    },
+    {
+      "id": "continuity",
+      "type": "CONTINUITY"
+    },
+    {
+      "id": "authority",
+      "type": "AUTHORITY"
+    },
+    {
+      "id": "aeo",
+      "type": "AEO"
+    },
+    {
+      "id": "validation",
+      "type": "VALIDATION"
+    },
+    {
+      "id": "execution",
+      "type": "EXECUTION"
+    },
+    {
+      "id": "proof",
+      "type": "PROOF"
+    },
+    {
+      "id": "runtime:continuity",
+      "type": "CONTINUITY"
+    },
+    {
+      "id": "runtime:deployment",
+      "type": "EXECUTION"
+    },
+    {
+      "id": "runtime:federation",
+      "type": "RECONCILIATION"
+    },
+    {
+      "id": "runtime:lineage",
+      "type": "CONTINUITY"
+    }
+  ],
+  "edges": [
+    {
+      "from": "authority",
+      "to": "aeo",
+      "type": "COMPILES_TO"
+    },
+    {
+      "from": "aeo",
+      "to": "validation",
+      "type": "VALIDATES"
+    },
+    {
+      "from": "validation",
+      "to": "execution",
+      "type": "EXECUTES"
+    },
+    {
+      "from": "execution",
+      "to": "proof",
+      "type": "PROVES"
+    },
+    {
+      "from": "continuity",
+      "to": "authority",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "session",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:continuity",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:deployment",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:deployment",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:federation",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:federation",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "validation",
+      "to": "runtime:lineage",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "from": "runtime:lineage",
+      "to": "continuity",
+      "type": "DEPENDS_ON"
+    }
+  ]
+}
