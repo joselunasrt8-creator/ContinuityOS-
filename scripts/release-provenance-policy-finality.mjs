@@ -51,8 +51,8 @@ export const POLICY_FINALITY_CLASSES = {
 }
 
 // Reconciliation classes that indicate integrity-breaking conditions.
-// These classes in reconciliation evidence produce NULL finality regardless of
-// the declared reconciliation_result.
+// Presence of any of these in policy_reconciliation_classes produces NULL finality
+// regardless of the declared policy_reconciliation_result — even POLICY_RECONCILED.
 const INTEGRITY_BREAKING_RECON_CLASSES = new Set([
   POLICY_RECONCILIATION_CLASSES.POLICY_LINEAGE_MUTATION,
   POLICY_RECONCILIATION_CLASSES.POLICY_HASH_MISMATCH,
@@ -65,7 +65,7 @@ const INTEGRITY_BREAKING_RECON_CLASSES = new Set([
   POLICY_RECONCILIATION_CLASSES.POLICY_BREAK_GLASS_NORMALIZATION,
 ])
 
-// Reconciliation classes that signal unresolved dependency or policy disagreement.
+// Reconciliation classes that signal unresolved dependency disagreement.
 const DEPENDENCY_DISAGREEMENT_CLASSES = new Set([
   POLICY_RECONCILIATION_CLASSES.POLICY_BINDING_MISSING,
 ])
@@ -74,6 +74,16 @@ const DEPENDENCY_DISAGREEMENT_CLASSES = new Set([
 const POLICY_DISAGREEMENT_CLASSES = new Set([
   POLICY_RECONCILIATION_CLASSES.POLICY_REFERENCE_MISMATCH,
 ])
+
+// Array fields that must be arrays (if present) in the reconciliation evidence.
+const REQUIRED_ARRAY_FIELDS = [
+  'binding_ids',
+  'contract_ids',
+  'consumer_ids',
+  'policy_evaluation_hashes',
+  'policy_hashes',
+  'policy_reconciliation_classes',
+]
 
 /**
  * Returns true if the hash is a valid 64-char lowercase hex SHA-256 string.
@@ -112,7 +122,7 @@ export function computeFinalityHash(fields) {
 
 /**
  * Builds the finality evidence object.
- * Always sets evidence_only, creates_authority correctly.
+ * Always sets evidence_only, creates_authority, creates_execution, creates_proof.
  * Computes policy_finality_hash deterministically.
  */
 function buildFinality(result, classes, reconHash, bindingIds, contractIds, consumerIds) {
@@ -129,6 +139,8 @@ function buildFinality(result, classes, reconHash, bindingIds, contractIds, cons
     artifact: 'RELEASE_PROVENANCE_POLICY_FINALITY',
     evidence_only: true,
     creates_authority: false,
+    creates_execution: false,
+    creates_proof: false,
     policy_finality_result: result,
     policy_finality_classes: classes,
     policy_reconciliation_hash: reconHash,
@@ -160,13 +172,16 @@ function boundaryNullClass(boundary) {
  *
  * Policy finality results:
  *   POLICY_FINALIZED  — reconciliation_result is POLICY_RECONCILED, all boundaries
- *                       clean, hash integrity verified, no BREAK_GLASS normalization
+ *                       clean, hash integrity verified, no integrity-breaking classes,
+ *                       no BREAK_GLASS normalization
  *   POLICY_NOT_FINAL  — non-integrity drift or unresolved dependency/policy disagreement
  *   NULL              — boundary violation, authority/proof/execution/deployment attempt,
- *                       malformed hash, BREAK_GLASS normalization, lineage mutation,
- *                       or integrity-breaking drift
+ *                       missing/malformed hash, BREAK_GLASS normalization, lineage
+ *                       mutation, or integrity-breaking drift
  *
- * NULL always takes precedence over POLICY_NOT_FINAL.
+ * NULL always takes precedence over POLICY_NOT_FINAL (fail closed).
+ * Integrity-breaking classes produce NULL before any result classification,
+ * even when policy_reconciliation_result is POLICY_RECONCILED.
  * POLICY_NOT_FINAL is not repaired — it is observed and classified only.
  *
  * @param {object|null} reconciliationEvidence - RELEASE_PROVENANCE_POLICY_RECONCILIATION object
@@ -183,6 +198,43 @@ export function classifyPolicyFinality(reconciliationEvidence) {
   }
 
   const reconHash = reconciliationEvidence.policy_reconciliation_hash ?? null
+
+  // ── Step 1: Boundary invariant check ─────────────────────────────────────
+
+  const boundary = validateBoundary(reconciliationEvidence)
+  if (!boundary.valid) {
+    return buildFinality(
+      POLICY_FINALITY_RESULTS.NULL,
+      [boundaryNullClass(boundary)],
+      reconHash, [], [], [],
+    )
+  }
+
+  // ── Step 2: BREAK_GLASS normalization detection ───────────────────────────
+
+  if (detectBreakGlassNormalization(reconciliationEvidence)) {
+    return buildFinality(
+      POLICY_FINALITY_RESULTS.NULL,
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_BREAK_GLASS_NORMALIZATION],
+      reconHash, [], [], [],
+    )
+  }
+
+  // ── Step 3: Array field validation ───────────────────────────────────────
+  // All six array fields must be arrays if present; non-array values are
+  // boundary violations that would corrupt computeReconciliationHash.
+
+  for (const field of REQUIRED_ARRAY_FIELDS) {
+    const val = reconciliationEvidence[field]
+    if (val !== undefined && val !== null && !Array.isArray(val)) {
+      return buildFinality(
+        POLICY_FINALITY_RESULTS.NULL,
+        [POLICY_FINALITY_CLASSES.POLICY_FINALITY_BOUNDARY_VIOLATION],
+        reconHash, [], [], [],
+      )
+    }
+  }
+
   const bindingIds = Array.isArray(reconciliationEvidence.binding_ids)
     ? [...reconciliationEvidence.binding_ids].sort()
     : []
@@ -193,39 +245,34 @@ export function classifyPolicyFinality(reconciliationEvidence) {
     ? [...reconciliationEvidence.consumer_ids].sort()
     : []
 
-  // ── Step 1: Boundary invariant check ─────────────────────────────────────
+  // ── Step 4: Hash is required ──────────────────────────────────────────────
+  // Missing, null, undefined, or empty hash → NULL.
+  // A POLICY_RECONCILED payload without policy_reconciliation_hash must never
+  // become POLICY_FINALIZED.
 
-  const boundary = validateBoundary(reconciliationEvidence)
-  if (!boundary.valid) {
+  if (!reconHash) {
     return buildFinality(
       POLICY_FINALITY_RESULTS.NULL,
-      [boundaryNullClass(boundary)],
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_MALFORMED_HASH],
       reconHash, bindingIds, contractIds, consumerIds,
     )
   }
 
-  // ── Step 2: BREAK_GLASS normalization detection ───────────────────────────
+  // ── Step 5: Hash format validation ────────────────────────────────────────
 
-  if (detectBreakGlassNormalization(reconciliationEvidence)) {
+  if (!isValidHex64(reconHash)) {
     return buildFinality(
       POLICY_FINALITY_RESULTS.NULL,
-      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_BREAK_GLASS_NORMALIZATION],
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_MALFORMED_HASH],
       reconHash, bindingIds, contractIds, consumerIds,
     )
   }
 
-  // ── Step 3: Hash format and integrity validation ──────────────────────────
+  // ── Step 6: Hash integrity verification ──────────────────────────────────
 
-  if (reconHash !== null && reconHash !== undefined) {
-    if (!isValidHex64(reconHash)) {
-      return buildFinality(
-        POLICY_FINALITY_RESULTS.NULL,
-        [POLICY_FINALITY_CLASSES.POLICY_FINALITY_MALFORMED_HASH],
-        reconHash, bindingIds, contractIds, consumerIds,
-      )
-    }
-
-    const recomputed = computeReconciliationHash({
+  let recomputed
+  try {
+    recomputed = computeReconciliationHash({
       binding_ids: reconciliationEvidence.binding_ids ?? [],
       contract_ids: reconciliationEvidence.contract_ids ?? [],
       consumer_ids: reconciliationEvidence.consumer_ids ?? [],
@@ -235,31 +282,47 @@ export function classifyPolicyFinality(reconciliationEvidence) {
       policy_reconciliation_result:
         reconciliationEvidence.policy_reconciliation_result ?? POLICY_RECONCILIATION_RESULTS.NULL,
     })
-
-    if (reconHash !== recomputed) {
-      return buildFinality(
-        POLICY_FINALITY_RESULTS.NULL,
-        [POLICY_FINALITY_CLASSES.POLICY_FINALITY_LINEAGE_MUTATION],
-        reconHash, bindingIds, contractIds, consumerIds,
-      )
-    }
+  } catch (_) {
+    return buildFinality(
+      POLICY_FINALITY_RESULTS.NULL,
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_BOUNDARY_VIOLATION],
+      reconHash, bindingIds, contractIds, consumerIds,
+    )
   }
 
-  // ── Step 4: Classify based on reconciliation result ───────────────────────
+  if (reconHash !== recomputed) {
+    return buildFinality(
+      POLICY_FINALITY_RESULTS.NULL,
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_LINEAGE_MUTATION],
+      reconHash, bindingIds, contractIds, consumerIds,
+    )
+  }
 
-  const reconResult = reconciliationEvidence.policy_reconciliation_result
+  // ── Step 7: Integrity-breaking class check ────────────────────────────────
+  // Applied before any finality result classification — even POLICY_RECONCILED
+  // evidence with integrity-breaking classes produces NULL.
+
   const reconClasses = Array.isArray(reconciliationEvidence.policy_reconciliation_classes)
     ? reconciliationEvidence.policy_reconciliation_classes
     : []
 
-  // NULL reconciliation result → integrity-breaking condition
-  if (!reconResult || reconResult === POLICY_RECONCILIATION_RESULTS.NULL) {
-    const finalClass = reconClasses.some((c) => INTEGRITY_BREAKING_RECON_CLASSES.has(c))
-      ? POLICY_FINALITY_CLASSES.POLICY_FINALITY_INTEGRITY_DRIFT
-      : POLICY_FINALITY_CLASSES.POLICY_FINALITY_BOUNDARY_VIOLATION
+  if (reconClasses.some((c) => INTEGRITY_BREAKING_RECON_CLASSES.has(c))) {
     return buildFinality(
       POLICY_FINALITY_RESULTS.NULL,
-      [finalClass],
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_INTEGRITY_DRIFT],
+      reconHash, bindingIds, contractIds, consumerIds,
+    )
+  }
+
+  // ── Step 8: Classify based on reconciliation result ───────────────────────
+
+  const reconResult = reconciliationEvidence.policy_reconciliation_result
+
+  // NULL reconciliation result → NULL finality
+  if (!reconResult || reconResult === POLICY_RECONCILIATION_RESULTS.NULL) {
+    return buildFinality(
+      POLICY_FINALITY_RESULTS.NULL,
+      [POLICY_FINALITY_CLASSES.POLICY_FINALITY_BOUNDARY_VIOLATION],
       reconHash, bindingIds, contractIds, consumerIds,
     )
   }
@@ -273,17 +336,9 @@ export function classifyPolicyFinality(reconciliationEvidence) {
     )
   }
 
-  // POLICY_DRIFT_DETECTED → check integrity-breaking classes before classifying NOT_FINAL
+  // POLICY_DRIFT_DETECTED → POLICY_NOT_FINAL (non-integrity drift only; integrity
+  // cases already handled in step 7)
   if (reconResult === POLICY_RECONCILIATION_RESULTS.POLICY_DRIFT_DETECTED) {
-    if (reconClasses.some((c) => INTEGRITY_BREAKING_RECON_CLASSES.has(c))) {
-      return buildFinality(
-        POLICY_FINALITY_RESULTS.NULL,
-        [POLICY_FINALITY_CLASSES.POLICY_FINALITY_INTEGRITY_DRIFT],
-        reconHash, bindingIds, contractIds, consumerIds,
-      )
-    }
-
-    // Classify non-integrity drift: policy disagreement, dependency disagreement, or general drift
     const hasPolicyDisagreement = reconClasses.some((c) => POLICY_DISAGREEMENT_CLASSES.has(c))
     const hasDependencyDisagreement = reconClasses.some((c) => DEPENDENCY_DISAGREEMENT_CLASSES.has(c))
 
