@@ -1,5 +1,5 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
-import type { CanonicalAEO } from "./lib/aeo-governance.ts"
+import { canonicalize, toCanonicalAeo, REQUIRED_AEO_KEYS, type CanonicalAEO } from "./lib/aeo-governance.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -939,30 +939,6 @@ function normalizeCanonicalValue(v: unknown): unknown {
 function canonicalRecord(v: unknown): Record<string, unknown> {
   const normalized = normalizeCanonicalValue(v)
   return isPlainRecord(normalized) ? normalized : {}
-}
-
-const REQUIRED_AEO_KEYS = ["intent", "scope", "validation", "target", "finality"] as const
-
-function canonicalize(v: unknown): string {
-  const normalized = normalizeCanonicalValue(v)
-  if (Array.isArray(normalized)) return `[${normalized.map((item) => canonicalize(item)).join(",")}]`
-  if (isPlainRecord(normalized)) return `{${Object.keys(normalized).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(normalized[key])}`).join(",")}}`
-  return JSON.stringify(normalized)
-}
-
-function toCanonicalAeo(input: unknown): CanonicalAEO | null {
-  if (!isPlainRecord(input)) return null
-  const keys = Object.keys(input).sort()
-  if (keys.length !== REQUIRED_AEO_KEYS.length) return null
-  if (keys.join("|") !== [...REQUIRED_AEO_KEYS].sort().join("|")) return null
-  if (!String(input.intent || "")) return null
-  return Object.freeze({
-    intent: String(input.intent || ""),
-    scope: canonicalRecord(input.scope),
-    validation: canonicalRecord(input.validation),
-    target: canonicalRecord(input.target),
-    finality: canonicalRecord(input.finality),
-  })
 }
 
 async function sha256Hex(input: string): Promise<string> { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("") }

@@ -109,6 +109,15 @@ function workflowSurface(file, existing) {
 }
 
 function databaseSurface(table, existing) {
+  if (existing) {
+    return {
+      ...existing,
+      surface_id: `db_write:${table}`,
+      surface_type: 'database_write_surface',
+      source_file: SRC_PATH,
+      non_authoritative: true,
+    }
+  }
   if (table === 'proof_propagation_outbox') {
     return {
       surface_id: 'db_write:proof_propagation_outbox',
@@ -155,7 +164,7 @@ function databaseSurface(table, existing) {
     canonical_boundary_status: existing?.canonical_boundary_status || (canonicalRegistry ? 'CANONICAL_REGISTRY' : 'NON_DEPLOY_OR_PREPARATION'),
     bypass_risk: 'raw_database_write',
     containment_status: existing?.containment_status || (canonicalRegistry ? 'CANONICAL_ROUTE_BOUND' : 'NON_DEPLOY_OR_EVIDENCE_ONLY'),
-    evidence_only: canonicalRegistry ? false : (existing?.evidence_only ?? !proofBound),
+    evidence_only: existing?.evidence_only ?? !proofBound,
     non_authoritative: true,
   }
 }
