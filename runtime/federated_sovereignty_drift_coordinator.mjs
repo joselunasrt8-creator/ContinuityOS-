@@ -1,4 +1,6 @@
-import crypto from "node:crypto";
+import { canonicalize, hashCanonical } from '../src/canonical.js';
+
+export { canonicalize, hashCanonical };
 
 export const FEDERATION_DRIFT_CLASSES = Object.freeze({
   REMOTE_AUTHORITY_INHERITANCE: "REMOTE_AUTHORITY_INHERITANCE",
@@ -8,30 +10,6 @@ export const FEDERATION_DRIFT_CLASSES = Object.freeze({
   FEDERATED_PROOF_CONTAMINATION: "FEDERATED_PROOF_CONTAMINATION",
   CROSS_RUNTIME_LINEAGE_COLLAPSE: "CROSS_RUNTIME_LINEAGE_COLLAPSE"
 });
-
-export function canonicalize(value) {
-  if (Array.isArray(value)) {
-    return value.map(canonicalize);
-  }
-
-  if (value && typeof value === "object") {
-    return Object.keys(value)
-      .sort()
-      .reduce((acc, key) => {
-        acc[key] = canonicalize(value[key]);
-        return acc;
-      }, {});
-  }
-
-  return value;
-}
-
-export function hashCanonical(value) {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(canonicalize(value)))
-    .digest("hex");
-}
 
 export function reconcileFederatedSovereignty({
   localRuntime,

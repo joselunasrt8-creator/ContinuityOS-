@@ -1,4 +1,6 @@
-import crypto from "node:crypto";
+import { canonicalize, hashCanonical } from '../src/canonical.js';
+
+export { canonicalize, hashCanonical };
 
 export const PORTABILITY_DRIFT_CLASSES = Object.freeze({
   BUNDLE_HASH_DIVERGENCE: "BUNDLE_HASH_DIVERGENCE",
@@ -8,30 +10,6 @@ export const PORTABILITY_DRIFT_CLASSES = Object.freeze({
   AUTHORITY_PORTABILITY_ATTEMPT: "AUTHORITY_PORTABILITY_ATTEMPT",
   BUNDLE_LINEAGE_FRAGMENTATION: "BUNDLE_LINEAGE_FRAGMENTATION"
 });
-
-export function canonicalize(value) {
-  if (Array.isArray(value)) {
-    return value.map(canonicalize);
-  }
-
-  if (value && typeof value === "object") {
-    return Object.keys(value)
-      .sort()
-      .reduce((acc, key) => {
-        acc[key] = canonicalize(value[key]);
-        return acc;
-      }, {});
-  }
-
-  return value;
-}
-
-export function hashCanonical(value) {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(canonicalize(value)))
-    .digest("hex");
-}
 
 export function generatePortableLegitimacyBundle({
   runtime_id,

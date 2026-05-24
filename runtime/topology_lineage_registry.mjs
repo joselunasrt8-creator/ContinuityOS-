@@ -1,10 +1,7 @@
-import crypto from "node:crypto";
+import { hashCanonical } from '../src/canonical.js';
 
 export function deterministicLineageHash(payload) {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload))
-    .digest("hex");
+  return hashCanonical(payload);
 }
 
 export function persistTopologyLineage({

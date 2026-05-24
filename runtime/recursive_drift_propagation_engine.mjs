@@ -1,4 +1,6 @@
-import crypto from "node:crypto";
+import { canonicalize, hashCanonical } from '../src/canonical.js';
+
+export { canonicalize, hashCanonical };
 
 export const DRIFT_CLASSES = Object.freeze({
   LINEAGE_COLLAPSE: "LINEAGE_COLLAPSE",
@@ -8,30 +10,6 @@ export const DRIFT_CLASSES = Object.freeze({
   RECURSIVE_DRIFT_OVERFLOW: "RECURSIVE_DRIFT_OVERFLOW",
   EXECUTION_CONTINUITY_INVALID: "EXECUTION_CONTINUITY_INVALID"
 });
-
-export function canonicalize(value) {
-  if (Array.isArray(value)) {
-    return value.map(canonicalize);
-  }
-
-  if (value && typeof value === "object") {
-    return Object.keys(value)
-      .sort()
-      .reduce((acc, key) => {
-        acc[key] = canonicalize(value[key]);
-        return acc;
-      }, {});
-  }
-
-  return value;
-}
-
-export function hashCanonical(value) {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(canonicalize(value)))
-    .digest("hex");
-}
 
 export function propagateRecursiveDrift({
   root,

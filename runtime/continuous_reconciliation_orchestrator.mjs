@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import { hashCanonical } from '../src/canonical.js';
 
 import {
   scanRuntimeSurfaces
@@ -15,10 +15,7 @@ export const ORCHESTRATOR_DRIFT = Object.freeze({
 });
 
 export function deterministicCheckpoint(payload) {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload))
-    .digest("hex");
+  return hashCanonical(payload);
 }
 
 export function orchestrateContinuousReconciliation({

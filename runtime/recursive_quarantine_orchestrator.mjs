@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import { hashCanonical } from '../src/canonical.js';
 
 export const QUARANTINE_DRIFT = Object.freeze({
   TOPOLOGY_CONTAMINATION: "TOPOLOGY_CONTAMINATION",
@@ -8,10 +8,7 @@ export const QUARANTINE_DRIFT = Object.freeze({
 });
 
 export function deterministicQuarantineHash(payload) {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload))
-    .digest("hex");
+  return hashCanonical(payload);
 }
 
 export function recursivelyQuarantine({

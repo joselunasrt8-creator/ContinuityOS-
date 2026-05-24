@@ -1,3 +1,5 @@
+import { normalize } from '../src/canonical.js';
+
 export const SURFACE_CLASSES = Object.freeze({
   OBSERVABILITY: "OBSERVABILITY",
   MUTATION_CAPABLE: "MUTATION_CAPABLE",
@@ -13,7 +15,7 @@ export const DRIFT_CLASSES = Object.freeze({
 });
 
 export function canonicalizeSurface(surface) {
-  return Object.freeze({
+  return normalize({
     route: surface.route,
     method: surface.method,
     classification: surface.classification,
