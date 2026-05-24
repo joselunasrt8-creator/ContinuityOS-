@@ -1,5 +1,5 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
-import { canonicalize, toCanonicalAeo, REQUIRED_AEO_KEYS, type CanonicalAEO } from "./lib/aeo-governance"
+import { canonicalize, toCanonicalAeo, REQUIRED_AEO_KEYS, type CanonicalAEO } from "./lib/aeo-governance.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
