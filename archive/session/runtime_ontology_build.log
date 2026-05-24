@@ -1,0 +1,1043 @@
+cd1d1ec Add canonical NULL propagation topology graph
+3c7c0ec Add visualization topology and ontology compression completion layer
+402f3e0 Add canonical glossary, invariant core, federation protocol, and runtime manifest
+39562fe Add legitimacy calculus and canonical runtime theorem layer
+32373ba Add recursive governance and deterministic legitimacy ontology layers
+bac8f04 Add ontology compression and legitimacy graph formalization layer
+4cc3daf Add canonical legitimacy primitives and sovereignty compression layer
+b3d3bb5 Implement Issue #1047 — surface graph reconciliation and coordination telemetry (#1048)
+19b30d2 Implement Issue #1040 — inter-surface legitimacy coordination rules (#1046)
+d006c94 Implement Issue #1041 — hierarchical governance routing for authority resolution (#1045)
+e17d3dd Add missing export compatibility names for Issue #1006 (#1044)
+fb55279 Implement Issue #1042 — install-base telemetry and legitimacy dependency metrics (#1043)
+13553ba Implement Issue #1012 — RELEASE_PROVENANCE_POLICY_FINALITY_V1 (#1013)
+13dc0ea Implement release provenance consumption boundary
+faad467 Add invariant registry
+014e1de Add legitimacy glossary
+7661d97 Implement Issue #1010 — RELEASE_PROVENANCE_POLICY_RECONCILIATION_V1 (#1011)
+1171bc4 Implement Issue #1008 — RELEASE_PROVENANCE_POLICY_BINDINGS_V1 (#1009)
+d1afdcd Implement Issue #998 — RELEASE_PROVENANCE_RECONCILIATION_V1 (#999)
+7ae1536 Implement RELEASE_PROVENANCE_DEPENDENCY_CONTRACTS_V1 (#1006) (#1007)
+b0004c6 Implement Issue #1002 — RELEASE_PROVENANCE_FINALITY_CHECKPOINTS_V1 (#1003)
+bc54fc5 feat(#1000): release provenance causal ordering — RELEASE_PROVENANCE_CAUSAL_ORDERING_V1 (#1001)
+d79ab3d feat(#996): release provenance registry persistence — RELEASE_PROVENANCE_REGISTRY_PERSISTENCE_V1 (#997)
+5818e5b feat(#994): release provenance enforcement — RELEASE_PROVENANCE_ENFORCEMENT_V1 (#995)
+66efed9 feat(#382): release provenance and artifact attestation boundary (#993)
+a9e541a feat(#380): main branch protection enforcement boundary governance (#942)
+bced37d feat(#695): adversarial execution surface verification from #383 reverse-closure map (#941)
+8223e31 docs(#383): add reverse-closure mutation map after #896 and recent merges (#940)
+5e748b8 Contain Cloudflare production authority bypass for issue #584 (#896)
+60e96a1 Implement authorized mutation surface exhaustiveness (#358) (#939)
+664a933 Implement semantic consistency closure for issues #367 and #607 (#935)
+882c173 fix(migrations): rename 0046 → 0047 for migration_governance_registry (#938)
+9b80d1c chore: stage PR #936 files for merge verification (#937)
+e3c5c40 Implement governed D1 migration legitimacy closure (issue #360) (#933)
+b20b989 Implement governed deployment spine (#890–#893) (#936)
+4d56166 docs: create legitimacy topology visualization layer for issue 924 (#928)
+bdbc647 docs: model Neo4j runtime legitimacy topology for issue 923 (#927)
+f814fc1 docs: create lineage graph inspection model for issue 922 (#926)
+8529e0c docs: render execution surface map for issue 921 (#925)
+e853797 docs: inventory observability write surfaces for issue 911 (#920)
+e4539a9 docs: inventory registry mutation surfaces for issue 910 (#919)
+d130011 Inventory deploy-capable token authority surfaces
+c66bccd docs: inventory workflow_dispatch deployment surfaces for issue 908 (#917)
+75f0477 Add remaining issue #912 install-base aggregation metrics (#916)
+c4e04db Patch install-base telemetry failure handling
+af49906 docs: inventory deployment-capable bypass surfaces for issue 907 (#913)
+9dbbac0 Generate canonical unauthorized mutation surface inventory and closure audit (#905)
+286fa8f Add non-authoritative install-base telemetry dependency metrics (#904)
+b08044c Enforce exact AEO canonical shape and deterministic hash tests (#902)
+58e3aa9 Bump ws in the npm_and_yarn group across 1 directory (#898)
+ef7baa1 compress: close 85 speculative/superseded issues, delete 33 non-runtime artifacts, add preservation manifest (#889)
+1ede193 Fix 35 failing baseline tests: execution snapshot, lineage migrations, authority/stale validation ordering (#888)
+aa24fc3 Implement issue #871 read-only governance observability layer (#880)
+32ef3c0 Add deterministic install-base governance dependency metrics (#878)
+d42c7c7 Add install-base telemetry evidence-only event schema (#877)
+1f1a196 Enforce workflow integrity lineage drift checks for execute/proof (#876)
+fa59da9 Close runtime sovereignty mutation surface gap for issue #838 (#875)
+2aa44e6 Enforce continuity identity freshness across authority lifecycle (#874)
+dafdb98 Implement #835 cross-registry legitimacy reconciliation checks (#873)
+d8b336d Enforce execute/proof lineage origin determinism (#872)
+4d27204 docs: add governance closure ledger classifications (#865)
+1d9ea5b docs: add canonical observability index (#864)
+c364ae1 docs: add issue #853 graph cleanup plan for runtime freeze phase (#863)
+23a7bae docs: add observability boundary drift review for issue 854 (#862)
+272f0b1 docs: define passive legitimacy topology classification map for issue 855 (#861)
+d4a7bd3 docs: add install-base compression developer framing (#859)
+f085a6b docs: add non-operative install-base telemetry specification (#857)
+fc80798 Harden continuity identity convergence across recursive lineage (#845)
+a1bb215 docs: constrain PLTL/PLOL to passive observability only (#852)
+3deef9e Enforce stricter executable topology reconciliation (#844)
+2b47066 Enforce explicit executable route classification (#833)
+3b55259 Fix governance fixture drift and stale root-authority matchers (#832)
+f085f2b test: enforce execute tree-hash guard ordering before mutations (#828)
+520040c Enforce VALID SQL parity and normalize TS test runtime (#824)
+3e4e3f0 Add bounded runtime verification report, docs, and tests (#823)
+5847f70 chore: contract runtime tree via deterministic artifact deletion (#822)
+b08bf90 chore: prune non-authoritative artifacts and add deletion report (#820)
+e25f8a7 Add execution surface closure registry, scanner, and adversarial tests (#821)
+437df41 Add semantic collapse registry, validator, and tests (#819)
+c835d10 Collapse runtime reference ownership to canonical registry (#818)
+96dc187 Add runtime reference collapse ownership and reconciler (#817)
+eada8f0 Add canonical governance object registry with artifact classifications (#815)
+51de08e docs: compress external positioning language (#816)
+9a35ad7 Harden hash-bound execution snapshot closure (#814)
+f4bbf50 Add governed agent execution model and merge enforcement artifact (#807)
+51b4afa Add deterministic distributed legitimacy quorum collapse semantics (#801)
+2e64226 Harden cross-registry authority reconciliation fail-closed semantics (#800)
+90853b1 Add deterministic fail-closed cross-registry authority reconciliation (#799)
+f4a8f64 Add bounded legitimacy freshness barriers at execute/proof (#798)
+5ea84ba Harden deterministic revocation closure barriers (#797)
+c0bfd70 Add deterministic temporal lineage replay inspection simulator (#774)
+a045be3 Add deterministic legitimacy graph inspection tooling (#772)
+29e83e4 Add deterministic canonical legitimacy graph projection MVP (#770)
+1b5a2b1 Fix temporal depth drift in traversal hash reconstruction (#768)
+65ead82 Fix cross-registry reconciliation drift (#766)
+bca5e75 Classify proof propagation outbox surface (#764)
+413f9bc Bind governed deploy proof to invocation nonce (#759)
+9336244 Add provenance DSSE conformance fixtures (#757)
+f365950 Harden provenance HMAC secret boundaries (#754)
+59b24a3 Separate provenance HMAC secret from API key (#753)
+acba0b5 Bind proof validation to invocation nonce (#752)
+70e3b97 Fix proof boundary batch result handling (#751)
+460f8e0 Add AGENTS.md with Cursor Cloud development instructions (#749)
+2a052e4 Add constitutional governance closure artifacts and fate tests (#750)
+26010f8 Add runtime sovereignty governance closure artifacts and tests (#703)
+0d985e1 Add deterministic state snapshot governance closure artifacts and tests (#702)
+7077233 Add temporal governance closure artifacts and fate tests (#701)
+7f559ba Add cross-runtime federation governance closure artifacts and FATE tests (#700)
+0f64d93 Add distributed delegation governance closure artifacts and fate tests (#699)
+3f3ab57 Add issue #680 distributed orchestration governance fixtures and tests (#698)
+4d019c2 Add proof-backed transactional outbox for legitimacy propagation (#697)
+ef311fa Add adversarial execution-surface closure verification suite (#696)
+94c6c4f Harden governed deploy proof lineage and replay tuple checks (#694)
+251748c Fix execute validation failure reasons for deterministic replay gating (#693)
+97af075 Restore canonical execute hash_mismatch rejection telemetry (#692)
+e5f7bb8 Stabilize proof replay closure and canonical index lineage (#691)
+8efa2e5 Fix canonical hash mismatch and proof replay fail-closed guards (#690)
+b1e4bd3 Issue #677: codify bounded replay-safe delivery guarantees (#689)
+24f56a9 Enforce execute/proof lineage closure on validated object hash (#688)
+67585bf Harden execute boundary against validation-to-execution drift (#686)
+48bc8cd Harden proof persistence CAS semantics for issue 674 (#685)
+d6a4afd Add governance spec for AI-generated simulation artifacts (#660)
+3e03d67 Add bounded FATE coverage for skill governance stack (#638)
+2d91988 Add bounded skill provenance revocation lineage validation (#631)
+c454167 Implement Issue #618 DSSE skill provenance envelope validation (#623
+93db5d0 Add non-operative skill surfaces registry with fail-closed validation (#622)
+4ccc405 Add deterministic capability risk classification v1 (#621)
+cd9a448 Issue #615: add deterministic skill metadata schema and validation (#620)
+f285c65 Add append-only deploy audit registry persistence (#619)
+faf612b Enforce governed CI deploy path parity (#614)
+a261ffb test: cover deployment hash parity denial in governed deploy wrapper (#613)
+3989d16 Add fail-closed governed deploy wrapper for issue 610 (#612)
+3b12575 Fix execute validation lineage rejections to canonical hash_mismatch (#611)
+9f8fb76 Add break-glass sovereignty classification artifacts (#609)
+75310bc Fix proof registry bootstrap index compatibility (#605)
+b1a5af8 Add deterministic install-base governance telemetry primitives (#604)
+b5f6693 Enforce fail-closed replay and observability bootstrap invariants (#603)
+52ec57c test: add issue 544 legitimacy drift FATE expansion coverage (#602)
+5fc4936 Implement local cross-registry reconciliation drift taxonomy for issue 542 (#601)
+896cc02 Add deterministic federated legitimacy reconciliation engine (#600)
+41e6bcf Implement deterministic identity continuity closure checks (#599)
+242fd6c Add root-authority containment graph and revocation semantics (#598)
+d4042f7 Fix runtime test loading for lineage-origin enforcement (#597)
+c636ac4 Enforce deterministic lineage origin across validate execute proof (#595)
+75fa5af Add read-only install-base telemetry report and deterministic hash (#594)
+2802cfb Add deterministic cross-registry reconciliation report checks (#592)
+aa04d8e Stabilize brittle continuity and ATAO boundary tests (#591)
+f44e2fa test: expand issue-565 deterministic NULL telemetry taxonomy (#586)
+acd041f Contain Cloudflare Git integration production bypass classification (#585)
+a2a3423 Add issue #578 root authority sovereignty classification artifacts (#583)
+3ade199 Issue #577: add governed deploy closure FATE coverage (#582)
+798792e test: add issue #569 FATE synthetic legitimacy separation spec (#581)
+bc426b8 test: add issue-565 NULL telemetry taxonomy specs (#576)
+aeefa03 docs: add minimum external adoption path for governed deploy (#575)
+b085dff Fix #568 assertion drift for compile fail-closed invariant (#574)
+84cb783 test(issue-568): harden deterministic arbitrator parity null-path coverage (#573)
+fb4cd07 test: add issue #568 deterministic arbitrator parity coverage (#571)
+399961a Stabilize validation hash lineage and authority status guards (#563)
+093e23a docs: clarify governed deploy install-base quickstart (#557)
+9811b84 docs: add governed GitHub deploy readiness checklist (#555)
+d38c051 docs: add governed deploy quickstart install-base workflow (#553)
+0639c5f Harden continuity lineage enforcement and fail-closed ancestry checks (#552)
+119d0af Add deterministic ATAO authority boundary validation tests (#546)
+767c792 Add deterministic reconciliation traversal hashing (#545)
+cfffa9b test: add spec-to-AEO fail-closed authority-bound coverage (#539)
+3c5f08d Add deterministic reconciliation traversal hashing (#535)
+5b36c96 Add bounded FATE legitimacy verification suite (#534)
+f2ea87a Harden reconciliation report determinism and route invariants (#529)
+d392d49 Add deterministic reconciliation evidence report artifact (#525)
+5cb4ae1 Add FATE coverage for cross-registry reconciliation legitimacy (#524)
+2f993fc Restore proof replay fail-closed uniqueness semantics (#523)
+1bf5d84 Add deterministic failure-mode canon coverage audit (#522)
+a060223 Add comprehensive FATE (Functional Adequacy Test Expansion) test suite for reconciliation
+8293a3b Add deterministic reconciliation invariants and verification framework
+1d568f3 Enforce compile-time active authority gating (#519)
+b63a4af Enforce continuity revocation cascade in proof lineage resolution (#518)
+3044701 Enforce proof lineage binding to executed execution state (#517)
+bc86b5c Add deterministic replay recovery FATE coverage for canonical proof lineage (#516)
+e3988eb Add legitimacy-bound compute governance schemas and validators (#515)
+983694b Stabilize proof decision_hash migration/bootstrap sequencing (#514)
+aecc08e Harden proof uniqueness fail-closed governance (#491)
+10dec04 Restore proof fail-closed invariants (#490)
+b068511 Enforce deterministic canonical proof replay (#489)
+2d9718f Fail closed ambiguous proof lineage (#487)
+f303b38 Harden /proof duplicate replay evidence semantics (#486)
+fe57006 Enforce idempotent /proof replay lineage behavior (#485)
+561415e Enforce proof execution lineage binding (#483)
+e6fa69b Bind execute lineage to VALID validation rows (#482)
+07958c2 Enforce execute binding to compiled+validated object lineage (#481)
+93071da test: enforce validate compile-binding invariants (#479)
+021d966 test: harden branch-protection required-check parity coverage (#478)
+ffd48aa test: upgrade observability authority audit to behavioral invariants (#477)
+5daa6dc test: audit observability authority boundaries for issue 474 (#475)
+1bf3e72 Close merge legitimacy bypass audit gaps (#472)
+5d12cb1 Contain root authority escape hatch evidence (#470)
+c35d334 Close governed deploy continuity gap (#468)
+d0acf30 Add deterministic Wrangler dry-run script (#465)
+0524105 Ignore local Neo4j environment file
+6d678d7 Add deterministic governance artifact regeneration (#464)
+911a50b Document constitutional-integrity guard invariant requirements.
+ec83aa5 Harden cross-registry consistency checks (#463)
+e80843a Resolve governance topology reconciliation merge
+d5f864f Finalize governance topology reconciliation state
+5a63e1d Ignore Neo4j environment configuration
+778db63 Close Neo4j Control Graph boundary (#443)
+eee53dc Add failure-mode canon v1 (#451)
+4f103f4 Add Neo4j authority boundary template
+c9581be Add Neo4j constitutional graph loader
+e92ba4a Add recursive legitimacy traversal topology
+81b981f Add constitutional reconciliation observability views
+2d0e2af Add constitutional drift taxonomy topology
+85e3d56 Add legitimacy semantic edge topology
+7fbefda Add constitutional topology materialization
+a72005a Add governance legitimacy graph ingestion
+a496011 Bootstrap runtime legitimacy graph ingestion
+eb23698 Merge branch 'main' into chore/neo4j-control-graph-closure
+ddfa4e4 Prepare Neo4j reconciliation structure
+a4d5db9 Document Neo4j control graph closure boundary
+4306117 Graph/runtime topology bootstrap (#440)
+7fe1774 Trigger constitutional check (#439)
+db91260 Bootstrap/constitutional check (#438)
+ed9a5f4 Expand constitutional governance CODEOWNERS
+4d24361 Bind PR governance classification into constitutional CI
+71b782e Add governance PR classification matrix
+722388d Add constitutional integrity CI enforcement workflow
+a557c5a Governance: add machine-readable closure artifacts (#437)
+5fb78da Add Neo4j live topology synchronization design
+62cf592 Add continuous Neo4j reconciliation query catalog
+94f98b5 Add Neo4j query library artifact
+4bed944 Add Neo4j node taxonomy artifact
+051289c Add Neo4j execution legitimacy graph schema
+71531f9 Ignore Python cache artifacts
+263ec15 Add APOC-free Neo4j graph ingestion
+f027249 add portable legitimacy bundle generator
+cc406fe add federated sovereignty drift coordinator
+b5c82a6 add recursive drift propagation engine
+7a9e2fe add topology lineage registry
+1710e1f add recursive quarantine orchestrator
+73d4bab add continuous reconciliation orchestrator
+56dd51a add autonomous runtime surface scanner
+acd0dc9 add surface inventory reconciliation governance layer
+39be324 add reconciliation scheduler governance layer
+a025d56 Add governance gap registry artifact (#351)
+c39f620 ignore local generated artifacts
+90b3a08 Add control graph reconciliation engine (#418)
+67cbe1c Merge control graph runtime integration layer
+b25b4d7 Add Control Graph bootstrap documentation
+706ddea Add reconciliation visualization Cypher layer
+ee6014a Add legitimacy traversal Cypher query layer
+644df5c Add runtime topology Cypher query layer
+4466126 Add observability-only Neo4j ingestion layer
+ff7faac Add observability-only repo graph extractor
+85e547e Add MindShift Control Graph taxonomy
+91267e6 Queue A: Add repository sovereignty enforcement checklist
+3391d4b Queue D: Map continuity and legitimacy threat lineage
+f75697b Queue G: Define multi-agent coordination boundary
+95b308f Queue C: Create Control Graph visualization artifacts
+14e0753 Queue E: Freeze canonical governance terminology
+f5f5a48 Queue B: Create canonical invariant registry
+c51e455 Establish canonical repository identity in README
+49fda2c Establish repository ownership boundary
+d94ba9f Bind validate to compiled AEO origin (#377)
+e5b474e Extract canonical serialization primitive (#376)
+5575ef7 Add governance consensus infrastructure (#375)
+6f3d1f5 Define Codex execution protocol (#374)
+adae8e9 Add cross-registry reconciliation evidence layer (#347)
+6b36e87 Merge pull request #346 from joselunasrt8-creator/codex/add-deterministic-topology-reconciliation-primitives
+8a89299 Add deterministic runtime topology reconciliation
+97b962d Merge pull request #345 from joselunasrt8-creator/codex/implement-recursive-governance-containment-layer
+fd0d8c2 Add recursive governance drift containment
+db340f6 Merge pull request #344 from joselunasrt8-creator/codex/implement-closure-verification-for-mutation-paths
+5cf8ca6 Add unauthorized mutation closure inventory
+673ec3d Merge pull request #343 from joselunasrt8-creator/codex/resolve-pr-#338-conflicts-after-pr-#337-merge
+b7c0f03 Resolve root authority containment conflicts
+754e0af Merge pull request #337 from joselunasrt8-creator/codex/implement-root-authority-containment-hardening-v2
+d2d2b4e Harden root authority containment observability
+60d5b73 Merge pull request #332 from joselunasrt8-creator/codex/implement-root-authority-containment-layer
+c4e7f48 Merge branch 'main' into codex/implement-root-authority-containment-layer
+d67b95b Merge pull request #334 from joselunasrt8-creator/codex/implement-root-authority-containment-layer-ofayep
+6239fc2 Merge branch 'main' into codex/implement-root-authority-containment-layer-ofayep
+78f029d Fix observability route registry merge
+f0960d4 Add root authority containment observability
+31bce5e Merge pull request #331 from joselunasrt8-creator/codex/implement-sovereignty-dependency-classification-9pgol8
+75b9ebe Add infrastructure dependency reconciliation observability
+6651c38 Merge pull request #330 from joselunasrt8-creator/codex/implement-recursive-legitimacy-containment-engine
+1c26646 Add legitimacy quarantine containment engine
+8e41c5a Merge pull request #326 from joselunasrt8-creator/codex/implement-deterministic-legitimacy-propagation-engine
+33e83d5 Implement legitimacy drift propagation
+d4ed725 Merge pull request #325 from joselunasrt8-creator/codex/implement-deterministic-topology-reconciliation-engine
+c730a32 Add deterministic topology reconciliation engine
+97812f1 Merge pull request #321 from joselunasrt8-creator/codex/add-deterministic-topology-reconciliation-layer
+8556a9a Add canonical runtime topology reconciliation bundle
+a82e832 Merge pull request #320 from joselunasrt8-creator/codex/implement-deterministic-runtime-sovereignty-containment
+2594408 Add runtime surface containment observability
+d3bc064 Merge pull request #319 from joselunasrt8-creator/codex/implement-deterministic-fate-attack-tests
+3b51480 Add deterministic FATE attack suites
+5bca3c2 Merge pull request #318 from joselunasrt8-creator/codex/implement-runtime-validation-for-legitimacy-schemas
+bda9d30 Add legitimacy schema runtime validator
+a2b212a Merge pull request #317 from joselunasrt8-creator/codex/extend-fate-for-continuous-governance-verification
+44c3890 Add continuous FATE governance stress observability
+e1a48f2 Merge pull request #316 from joselunasrt8-creator/codex/implement-deterministic-delegated-authority-lineage
+c95de92 Add delegated authority lineage continuity
+2877e9e Merge pull request #315 from joselunasrt8-creator/codex/add-recursive-reconciliation-closure-verification
+0b6bf6b Add recursive reconciliation closure observability
+e959394 Merge pull request #314 from joselunasrt8-creator/codex/implement-cross-registry-legitimacy-graph-closure
+2c1a346 Add legitimacy graph closure observability
+da17a2d Merge pull request #313 from joselunasrt8-creator/codex/add-bootstrap-sovereignty-verification-features
+0be4ca1 Add bootstrap sovereignty observability
+ddb5ec9 Merge pull request #312 from joselunasrt8-creator/codex/implement-sovereignty-dependency-classification
+710b645 Add external authority sovereignty containment
+ce66e23 Merge pull request #302 from joselunasrt8-creator/codex/implement-runtime-evolution-consensus-objects
+4781de2 Add runtime evolution consensus governance
+566dfd8 Merge pull request #301 from joselunasrt8-creator/codex/implement-federated-sovereignty-consensus-agent
+9791e56 Merge branch 'main' into codex/implement-federated-sovereignty-consensus-agent
+2ed9d3b Implement federated sovereignty consensus
+5b937b2 Merge pull request #300 from joselunasrt8-creator/codex/implement-deterministic-runtime-sovereignty-system
+b2685bb Add runtime sovereignty manifest freeze
+985990b Merge pull request #299 from joselunasrt8-creator/codex/add-recursive-governance-enforcement-boundary
+2ad85d1 Merge branch 'main' into codex/add-recursive-governance-enforcement-boundary
+f91e994 Add recursive governance enforcement boundary
+ccacba5 Merge pull request #298 from joselunasrt8-creator/codex/repair-deterministic-bootstrap-ordering
+8933319 Merge branch 'main' into codex/repair-deterministic-bootstrap-ordering
+7e95c7b Stabilize proof bootstrap quarantine ordering
+3bb2fb0 Merge pull request #297 from joselunasrt8-creator/codex/implement-recursive-governance-enforcement
+5278b93 Add recursive governance enforcement
+7ca802f Merge pull request #296 from joselunasrt8-creator/codex/implement-federation-conformance-verification
+fa7072c Add federation conformance verification
+e49b5cb Merge pull request #295 from joselunasrt8-creator/codex/build-distributed-legitimacy-conformance-infrastructure
+b18b072 Add distributed legitimacy conformance harness
+125bd9e Merge pull request #293 from joselunasrt8-creator/codex/implement-governance-compression-layer
+dd3e7b2 Add governance compression observability
+c960631 Merge pull request #292 from joselunasrt8-creator/codex/implement-distributed-legitimacy-reconciliation-layer
+985221e Add distributed reconciliation governance
+902a759 Merge pull request #290 from joselunasrt8-creator/codex/close-issue-#275-with-reconciliation-artifact
+8726705 Add Issue 275 reconciliation closure artifact
+12a0357 Merge pull request #289 from joselunasrt8-creator/codex/implement-distributed-legitimacy-interoperability
+61cdefc Add distributed legitimacy interoperability
+fe212d1 Merge pull request #288 from joselunasrt8-creator/codex/implement-federated-trust-observability
+1f15c5a Add federated trust topology observability
+3ce94fc Merge pull request #287 from joselunasrt8-creator/codex/close-pr-#285-and-recreate-observability
+1fb7235 Guard federated revocation observability rebuild
+efdc926 Merge pull request #286 from joselunasrt8-creator/codex/fix-control-flow-regression-for-/preo-route
+558ebf8 Repair PREO route dispatch
+f561742 Merge pull request #284 from joselunasrt8-creator/codex/clarify-if-this-is-a-revision
+1d4b054 Merge branch 'main' into codex/clarify-if-this-is-a-revision
+2c10712 Repair federated revocation observability invariants
+8f98176 Add federated revocation observability
+fcb78d6 Merge pull request #283 from joselunasrt8-creator/codex/fix-portable-identifier-emission-and-checkpoint-identity
+70bd70c Extend federated reconciliation hardening coverage
+1d14343 Merge pull request #282 from joselunasrt8-creator/codex/expand-reconciliation-substrate-infrastructure
+d803341 Harden federated reconciliation observability
+6430f3f Merge pull request #281 from joselunasrt8-creator/codex/create-clean-implementation-branch-for-provenance
+4b755e2 Harden cryptographic provenance attestations v2
+3d69c71 Merge pull request #278 from joselunasrt8-creator/codex/create-evidence-bundle-script-for-mindshift
+76b2242 Merge pull request #280 from joselunasrt8-creator/codex/expand-federated-reconciliation-infrastructure
+64f4fc1 Expand federated reconciliation observability
+84efacb Merge pull request #279 from joselunasrt8-creator/codex/implement-recursive-reconciliation-traversal-engine
+373c9e0 Implement recursive reconciliation traversal
+70544e6 Add MindShift evidence collector
+d92a9f6 Merge pull request #277 from joselunasrt8-creator/codex/expand-continuous-reconciliation-verification
+2dc5bdb Harden reconciliation verification coverage
+6daac08 Merge pull request #276 from joselunasrt8-creator/codex/create-registry-relationship-map
+91440ed docs: add registry relationship map
+19f6655 Merge pull request #274 from joselunasrt8-creator/codex/repair-canonical-runtime-integrity
+8278eb9 Restore runtime boundary separation
+8966026 Merge pull request #272 from joselunasrt8-creator/revert-271-alert-autofix-2
+f29682c Revert "Potential fix for code scanning alert no. 2: Information exposure through a stack trace"
+8e92637 Merge pull request #271 from joselunasrt8-creator/alert-autofix-2
+a916e8b Potential fix for code scanning alert no. 2: Information exposure through a stack trace
+729a7a3 Merge pull request #270 from joselunasrt8-creator/revert-269-codex/implement-read-only-reconciliation-infrastructure
+13c18fa Revert "Add observability-only `/reconcile` with deterministic cross-registry lineage reconciliation"
+463b77d Merge pull request #269 from joselunasrt8-creator/codex/implement-read-only-reconciliation-infrastructure
+478092b Merge branch 'main' into codex/implement-read-only-reconciliation-infrastructure
+179683f Add observability-only runtime reconciliation
+9a4de20 Merge pull request #268 from joselunasrt8-creator/codex/implement-deployment-provenance-lineage-binding
+a179523 Harden deployment provenance lineage
+ad8c838 Merge pull request #267 from joselunasrt8-creator/codex/fix-preo-integration-and-authorization
+59afd1b Harden PREO lineage gating
+31ab799 Merge pull request #266 from joselunasrt8-creator/governance-post-265-smoke
+b69e0ed test governed branch protection after parity repair
+4ffb935 Merge pull request #265 from joselunasrt8-creator/codex/align-governance-and-emitted-check-run-names
+2ebb1bf Align governance checks with emitted workflows
+dd1fb8c Merge pull request #263 from joselunasrt8-creator/codex/remove-duplicate-continuity-block-implementation
+98dc4e6 Repair runtime merge duplication
+fb1d37f Merge pull request #256 from joselunasrt8-creator/codex/implement-recursive-continuity-lineage-validation
+fbdbf15 Merge branch 'main' into codex/implement-recursive-continuity-lineage-validation
+d9dd2f9 Merge pull request #257 from joselunasrt8-creator/codex/implement-recursive-continuity-depth-enforcement
+b4a9bff Merge pull request #261 from joselunasrt8-creator/codex/enforce-strict-recursive-scope-rules
+b127870 Enforce continuity scope subset narrowing
+e615f26 Merge pull request #260 from joselunasrt8-creator/codex/enforce-recursive-continuity-scope-narrowing
+a8da2f4 Enforce recursive continuity scope narrowing
+5198ad0 Enforce recursive continuity scope narrowing
+ceb8880 Merge pull request #259 from joselunasrt8-creator/inspect-recursive-continuity
+587560e reject over-depth continuity admission
+35f9b08 Merge pull request #258 from joselunasrt8-creator/inspect-recursive-continuity
+347241c Enforce continuity lineage depth fail-closed
+0394df8 enforce recursive continuity depth ceilings
+9bfad28 Harden recursive continuity lineage enforcement
+60bd3bb Merge pull request #255 from joselunasrt8-creator/codex/repair-exact-object-enforcement-failures
+ffdeeda Harden exact-object hash enforcement
+6227060 Merge pull request #254 from joselunasrt8-creator/codex/analyze-repository-and-generate-governance-artifacts
+f69e7d9 Classify post-254 runtime FATE failures
+5bc3604 Add runtime governance artifacts
+f2b9929 Merge pull request #222 from joselunasrt8-creator/test-governed-pr-flow
+02b6576 Merge pull request #252 from joselunasrt8-creator/issue-251-sovereignty-boundary-tests
+9c669c6 Record Cloudflare preview deploy sovereignty violation
+227a8bd Enforce workflow deploy exclusivity assertions
+5df78bf Enforce proof lineage static assertions
+5972033 Enforce exact-object static runtime assertions
+0645539 Add Cloudflare sovereignty checklist
+d1f9a7b Add legacy surface disposition document
+0054909 Add workflow deploy exclusivity FATE test scaffold
+b139a3f Add proof-lineage rejection FATE test scaffold
+07aba67 Add exact-object re-derivation FATE test scaffold
+4ed6c91 Merge pull request #250 from joselunasrt8-creator/joselunasrt8-creator-patch-9
+aa3b3b5 Create SECURITY.md
+00296aa Merge pull request #249 from joselunasrt8-creator/joselunasrt8-creator-patch-8
+91a66b0 Create CODE_OF_CONDUCT.md
+742db1b Merge pull request #248 from joselunasrt8-creator/joselunasrt8-creator-patch-7
+8851255 Create CONTRIBUTING.md
+7f3c26f Merge pull request #247 from joselunasrt8-creator/joselunasrt8-creator-patch-7
+2c367a0 Create LICENSE
+ff8eec5 Merge pull request #245 from joselunasrt8-creator/issue-243-execution-surface-classification
+18d6024 Merge branch 'main' into issue-243-execution-surface-classification
+baf5cbd Add execution surface classification for issue 243
+76b4f54 Merge pull request #240 from joselunasrt8-creator/execution-economic-binding
+d80d527 Add execution economic binding contract FATE test
+9bfdd56 Add execution economic binding contract
+f539204 Merge pull request #238 from joselunasrt8-creator/economic-governance-enforcement
+81b4642 Add economic governance FATE test
+05549e9 Add minimal economic governance layer
+fe63b3a Merge pull request #236 from joselunasrt8-creator/continuity-lineage-enforcement
+da531d8 Add continuity lineage enforcement FATE test
+23c6fb4 Merge pull request #234 from joselunasrt8-creator/observability-drift-enforcement
+d6a1426 Add observability drift enforcement FATE test
+235d32a Merge pull request #232 from joselunasrt8-creator/proof-lineage-enforcement
+26c39b4 Add proof lineage enforcement FATE test
+93430ca Merge pull request #231 from joselunasrt8-creator/exact-object-enforcement
+715d881 Add exact object enforcement FATE test
+217cf38 Merge pull request #229 from joselunasrt8-creator/authority-replay-enforcement
+d352f6d Add authority lifecycle consumption test
+d4664ac Merge pull request #227 from joselunasrt8-creator/expand-runtime-surface-inventory
+34244f9 Expand runtime surface inventory
+737621b Merge pull request #225 from joselunasrt8-creator/runtime-enforcement-plan
+689c6f4 Add runtime enforcement plan
+c77e9e9 Merge pull request #223 from joselunasrt8-creator/branch-protection-policy
+3dbee21 Add branch protection policy
+5ad1845 Add harmless governed test marker
+d851851 Merge pull request #221 from joselunasrt8-creator/plan-enforced-boundaries
+e49e3fc Fix merge governance diff base
+c4dd0f5 Fix SCO candidate diff base
+6d7ec7b Fix PREO candidate diff base
+8157060 Bind PREO and SCO candidates in merge governance check
+db1e086 Add SCO candidate workflow
+42e515e Add PREO candidate workflow
+6abbc46 Add enforced boundary roadmap
+212e67f Merge pull request #219 from joselunasrt8-creator/add-preo-sco-merge-gate
+c8d4529 Add PR changed-file classification test
+e1e405b Add merge rules coverage test
+4d5b24a Add PREO field coverage test
+9a15ed1 Add SCO governed path coverage test
+868d16c Add merge governance artifact presence test
+fefd66e Add PREO and SCO merge gate artifacts
+a95753a Add PREO and SCO merge gate artifacts
+85e42b5 Add PREO and SCO merge gate artifacts
+0ff2567 Merge pull request #218 from joselunasrt8-creator/add-runtime-governance-bundle
+5b6e6fc Add drift coverage mapping test
+652686c Add replay coverage mapping test
+026dec6 Add proof schema coverage test
+9e092e1 Add AEO exact object coverage test
+37f94de Classify prepare governed deploy surface
+4131311 Add bypass path reconciliation test
+255c694 Add execution surface reconciliation test
+bb47e90 Add governance bundle presence test
+af4f6f7 Add canonical runtime governance bundle
+457c2b6 Add canonical runtime governance bundle
+716040e Add canonical runtime governance bundle
+a663e5f Add canonical runtime governance bundle
+5779952 Add canonical runtime governance bundle
+5d0714e Add canonical runtime governance bundle
+34a7af8 Merge pull request #217 from joselunasrt8-creator/codex/fix-prepare-governed-deploy-workflow
+6478e07 Fix governed deploy continuity chain
+23243f3 Merge pull request #216 from joselunasrt8-creator/codex/fix-schema-initialization-failure-on-/authority
+73d7d47 Synchronize runtime schema bootstrap diagnostics
+81567f2 Merge pull request #215 from joselunasrt8-creator/codex/fix-github-deployment-failure
+97dbf79 Fix governed runtime session and compile determinism
+d7b3618 Merge pull request #214 from joselunasrt8-creator/codex/add-machine-readable-legitimacy-standards
+a92a6c7 Merge branch 'main' into codex/add-machine-readable-legitimacy-standards
+c27bc5d Add continuity legitimacy hardening and standards maps
+9d952eb Merge pull request #213 from joselunasrt8-creator/codex/add-fail-closed-error-handling-for-/session
+29613eb Fail closed on schema bootstrap errors
+58736e7 Merge pull request #212 from joselunasrt8-creator/codex/create-executable-fate-v1-tests
+ab51ecc Add executable FATE expansion tests
+12cf86f Merge pull request #211 from joselunasrt8-creator/codex/fix-prepare-governed-deploy.yml-for-session-handling-39ze1g
+2fc00e1 Fail closed without deploy session before authority
+1f0d464 Merge pull request #210 from joselunasrt8-creator/codex/fix-prepare-governed-deploy.yml-for-session-handling
+27a9b75 Bind prepare deploy authority to session
+4faa7f7 Merge pull request #209 from joselunasrt8-creator/add-mindshift-validation-bundle-v1
+fd697be Merge pull request #206 from joselunasrt8-creator/codex/add-preo-schema-and-validator-specification
+c98df0e Merge branch 'main' into codex/add-preo-schema-and-validator-specification
+b825a2e Add MindShift Validation Bundle v1
+d6bf54b Merge pull request #208 from joselunasrt8-creator/codex/fix-preo-governance-inconsistencies
+49d9720 Fix PREO canonicalization and schema alignment
+ae3ff6e Merge pull request #207 from joselunasrt8-creator/codex/add-preo-schema-and-validator-specification-tscgpq
+70d6adc Add PREO schema and validator specification
+0883fc6 Add PREO schema and validator specification
+8807fab Merge pull request #204 from joselunasrt8-creator/codex/generate-governance-json-specifications
+233d3b0 Merge pull request #205 from joselunasrt8-creator/add-preo-sco-governance
+4f7ab62 Add PREO and SCO governance specifications
+94f4086 Add governance specification artifacts
+f113ebe Add TypeScript compiler for validation checks
+46421a4 Update validation bundle with generated repo object map
+8abb898 Merge pull request #203 from joselunasrt8-creator/codex/add-mindshift-validation-bundle-to-repo
+8cac041 Add MindShift validation bundle
+a943a60 Merge pull request #201 from joselunasrt8-creator/joselunasrt8-creator-patch-5
+a134e33 Add files via upload
+f4d3a41 Merge pull request #200 from joselunasrt8-creator/codex/fix-duplicate-declarations-in-proof-atomicity
+243e064 Restore canonical AEO record normalization
+4d2fa27 Merge pull request #193 from joselunasrt8-creator/codex/implement-proof-lifecycle-atomic-hardening
+11f603b Merge branch 'main' into codex/implement-proof-lifecycle-atomic-hardening
+0eebab7 Update registry-lineage-migrations.test.mjs
+905711f Merge pull request #195 from joselunasrt8-creator/codex/fix-corrupted-test-block-in-registry-lineage-migrations
+8d46dc6 Repair canonical coercion migration test
+0709f73 Resolve registry lineage test merge coverage
+181e524 Quarantine historical proof duplicates
+a60648c Harden proof lifecycle atomicity
+6ba79b5 Merge pull request #192 from joselunasrt8-creator/codex/fix-compile-hash-determinism-issues
+c24c255 Harden compile validation canonical consistency
+d435609 Merge pull request #191 from joselunasrt8-creator/codex/implement-session-continuity-enforcement
+fbde65a Fix deterministic compile hashing
+79c6949 Add session continuity enforcement
+e15e554 Merge pull request #190 from joselunasrt8-creator/codex/update-github-actions-for-api-evidence
+eafde5d Capture governed deploy runtime evidence
+f1fef3a Merge pull request #189 from joselunasrt8-creator/codex/implement-runtime-observability-agent
+68dfb29 Add runtime observability and drift registries
+694ade7 Merge pull request #188 from joselunasrt8-creator/codex/investigate-proof-persistence-failure
+20797bf Close proof boundary contract
+86ef60f Merge pull request #187 from joselunasrt8-creator/codex/investigate-/execute-failure-in-runtime
+ac21c9a Fix execute response contract
+1b227eb Merge pull request #186 from joselunasrt8-creator/codex/verify-canonical-registry-lineage-completeness
+45d1c87 Complete canonical registry lineage rebuild
+e130367 Merge pull request #185 from joselunasrt8-creator/codex/investigate-registry-schema-drift
+0f77d9a Fix canonical AEO registry migration drift
+4d083d5 Merge pull request #184 from joselunasrt8-creator/codex/audit-github-actions-for-canonical-workflow
+7aab81e Harden governed deploy workflow boundaries
+bd6c3d0 Merge pull request #183 from joselunasrt8-creator/codex/diagnose-non-deterministic-behavior-in-/compile
+393e26f Make compile workflow target deterministic
+311411d Merge pull request #182 from joselunasrt8-creator/codex/enforce-authentication-on-mutation-endpoints
+79b10ca Remove stale validate-pr workflow
+3956159 Enforce API key on runtime mutations
+a1ce59e Canonical reset: validated system baseline
+abec8b8 Merge pull request #181 from joselunasrt8-creator/codex/fix-cloudflare-worker-1101-failure
+6d848e6 Fix /compile fail-closed behavior and schema guards
+12e3f5f Merge pull request #180 from joselunasrt8-creator/codex/rebuild-governed-runtime-for-enforcement-v1
+c6b1c12 Reboot enforcement runtime with canonical governed path
+3134623 Merge pull request #179 from joselunasrt8-creator/codex/fix-compile-runtime-error-for-constraints
+009d58e Fix /compile runtime constraints ReferenceError
+a831fab Merge pull request #178 from joselunasrt8-creator/codex/fix-constraints-not-defined-compile-error
+56c0935 Fix compile constraints scoping and canonical AEO validation
+36d5bbc Merge pull request #177 from joselunasrt8-creator/codex/refactor-aeo-hashing-and-metadata-separation
+cbd39b6 Merge branch 'main' into codex/refactor-aeo-hashing-and-metadata-separation
+88ecc07 Refactor AEO hashing to canonical object only
+5fdd5c6 Merge pull request #176 from joselunasrt8-creator/codex/refactor-aeo-object-structure-in-index.ts
+8cfe3b6 Merge branch 'main' into codex/refactor-aeo-object-structure-in-index.ts
+595aa92 Refactor AEO canonical shape from registry metadata
+960dcc5 Merge pull request #175 from joselunasrt8-creator/codex/harden-mindshift-enforcement-gaps
+54ab5bb Merge branch 'main' into codex/harden-mindshift-enforcement-gaps
+20a0e2b Harden PR authority binding and AEO core enforcement
+8add103 Merge pull request #173 from joselunasrt8-creator/codex/fix-workflow-mismatch-in-src/index.ts
+7490494 Merge branch 'main' into codex/fix-workflow-mismatch-in-src/index.ts
+a025875 Merge pull request #174 from joselunasrt8-creator/codex/enforcement-lock-hardening
+cac9884 Fix canonical governed workflow matching across runtime
+5894eb8 Add enforcement lock hardening migration
+4868faa Merge pull request #172 from joselunasrt8-creator/codex/fix-runtime-workflow-mismatch-in-src/index.ts
+f6833e4 Fix canonical workflow matching across validate and execute
+ad4c9e3 Merge pull request #171 from joselunasrt8-creator/codex/fix-governed-deploy-validation-blocker
+eec71d8 Fix governed deploy workflow canonical validation alignment
+1fed02d Merge pull request #170 from joselunasrt8-creator/codex/fix-governed-deploy-workflow-mismatch
+c6860d2 Fix governed deploy workflow mismatch handling
+951de3c Merge pull request #169 from joselunasrt8-creator/codex/update-/validate-to-return-diagnostic-reasons
+bbc96ce Add NULL diagnostic reasons for /validate responses
+332e858 Merge pull request #168 from joselunasrt8-creator/codex/fix-/validate-diagnostics-to-include-reasons
+e169afb Add NULL diagnostic reasons to /validate responses
+e01cc48 Merge pull request #167 from joselunasrt8-creator/codex/improve-validation-diagnostics-in-governed-deploy
+49e2539 Improve governed deploy validation diagnostics
+ba70adf Merge pull request #166 from joselunasrt8-creator/codex/fix-governed-deploy-hash-mismatch
+0942510 Fix governed deploy hash mismatch by removing authority creation
+567ad0a Merge pull request #163 from joselunasrt8-creator/codex/add-prepare-governed-deploy-workflow
+bb99ee0 Merge branch 'main' into codex/add-prepare-governed-deploy-workflow
+b6e4b5b Accept ACTIVE authority status in PR validation
+7c765f6 Merge pull request #165 from joselunasrt8-creator/codex/fix-failing-checks-in-pr-#163
+6cacded Fix /authority success criteria in PR validation workflow
+c6e5d32 fix: bind worker to correct D1 database
+0818fd1 Merge pull request #164 from joselunasrt8-creator/codex/fix-pr-validation-workflow-authority-handling
+78fa431 Fix authority response validation for PR workflow
+54f1f4f Add expiry to authority payloads in workflows
+b59af08 Add prepare-governed-deploy workflow for dispatch inputs
+5bff47c deploy test 2
+decfcd6 deploy test 1
+1637199 test: governed deploy run 2 (replay)
+08240a2 test: governed deploy run 1
+be537a1 test: governed deploy run 1
+d9e52fd Merge pull request #162 from joselunasrt8-creator/codex/implement-strict-deployment-execution-gate
+ef2dc67 Enforce strict deploy execution gate and proof persistence
+900b4ed Merge pull request #161 from joselunasrt8-creator/codex/create-tests-for-validation-rules-canonical-set
+9ceb665 Add canonical validation rules static test suite
+b555068 Merge pull request #160 from joselunasrt8-creator/codex/fix-pr-#158-according-to-review-feedback
+2bbc5fa Refine governed deploy boundary wording and guards
+75d4507 Merge pull request #159 from joselunasrt8-creator/codex/implement-governed-deploy-surface
+47d834e Implement governed deploy surface chain endpoints and fail-closed routing
+14e62d1 Merge pull request #157 from joselunasrt8-creator/codex/resolve-merge-conflicts-for-pr-#152
+a150281 Resolve conflicts and finalize PR authority bootstrap
+defcb10 Merge pull request #156 from joselunasrt8-creator/codex/resolve-merge-conflicts-in-pr-#152
+c920ba9 Resolve PR validation workflow merge conflicts
+86ca73b Merge pull request #155 from joselunasrt8-creator/codex/update-pr-workflow-for-authority-creation
+c8194a0 Merge branch 'main' into codex/update-pr-workflow-for-authority-creation
+7a666d9 Add PR authority bootstrap before validate-pr workflow call
+0c47013 Merge pull request #154 from joselunasrt8-creator/codex/modify-pr-validation-workflow-in-github
+c38ee5c Add authority check before PR validation workflow
+b01099c Merge pull request #153 from joselunasrt8-creator/codex/fix-pr-validation-regression-issue
+422a6fb Restore legacy PR workflow display name
+133104d Merge pull request #152 from joselunasrt8-creator/codex/align-repo-with-sealed-mindshift-structure
+4cdb1a0 Align runtime to canonical governed archive path
+b3bb92f Merge pull request #150 from joselunasrt8-creator/codex/audit-mindshift-repo-for-execution-lock-spec-v1
+ce5acfe Harden execution lock routes and governed deploy constraints
+b7755ab Merge pull request #149 from joselunasrt8-creator/codex/run-signature-tamper-test
+2c391e2 Fix migration 0003 duplicate-column drift
+c6a0272 Merge pull request #148 from joselunasrt8-creator/codex/fix-typescript-compile-issues
+81d1a25 Fix worker TypeScript environment typechecking
+1953f78 Merge pull request #147 from joselunasrt8-creator/codex/enforce-ed25519-signature-verification
+e2812b7 Enforce runtime Ed25519 bundle verification in /validate
+5b04e8f Merge pull request #146 from joselunasrt8-creator/codex/finalize-validation-and-execution-alignment
+f7584a8 Harden validate path with canonical hash and Ed25519 checks
+d02b6c8 Merge pull request #145 from joselunasrt8-creator/codex/review-mindshift_bundle_generator.sh-for-safety
+3b26f03 Harden bundle generator authority boundaries
+5cdf56b Merge pull request #144 from joselunasrt8-creator/codex/review-uploaded-files
+8919f66 Add MindShift bundle generator script
+44326b6 Merge pull request #143 from joselunasrt8-creator/joselunasrt8-creator-patch-4
+bee100c Add files via upload
+4418e07 Merge pull request #142 from joselunasrt8-creator/codex/apply-targeted-fixes-for-deploy-chain
+36b91c2 Enforce strict validate/execute/proof deploy chain
+b7a134a Merge pull request #141 from joselunasrt8-creator/codex/fix-p1-lifecycle-bug
+4e4b07c Fix validate/execute lifecycle to reserve then consume authority+nonce
+70b25e5 Merge pull request #140 from joselunasrt8-creator/codex/lock-production-deploy-behind-validation
+3904c04 Lock production deploy behind validated governed boundary
+60ee8e2 Merge pull request #139 from joselunasrt8-creator/joselunasrt8-creator-patch-3
+12b06b6 Add files via upload
+f6a522b Merge pull request #138 from joselunasrt8-creator/codex/update-github-actions-workflow-for-strict-validation
+ac7ae1b Improve PR validation workflow secret error clarity
+d3e593d Clarify required MindShift secret checks in PR validation
+1da7bed Harden PR validation workflow fail-closed checks
+552a66b Update mindshift-pr-validate.yml
+54bbf3c Update governed-deploy.yml
+00914d9 Update mindshift-pr-validate.yml
+09c3f04 Merge pull request #137 from joselunasrt8-creator/codex/refactor-cloudflare-worker-for-pr-validation
+4cd9dc7 Harden /validate-pr with fail-closed authority checks
+dcbd22f Merge pull request #136 from joselunasrt8-creator/revert-132-joselunasrt8-creator-patch-3
+a45fe6b Revert "Delete mindshift-validate-pr.yml"
+6535a49 Merge pull request #132 from joselunasrt8-creator/joselunasrt8-creator-patch-3
+0c67e1e Merge pull request #135 from joselunasrt8-creator/trigger-pr-check
+fb6dac2 Merge branch 'main' into trigger-pr-check
+871e9fa Merge pull request #134 from joselunasrt8-creator/add-pr-validation
+7ed565d trigger PR validation workflow
+2e678a6 Merge branch 'add-pr-validation'
+b00a397 trigger workflow
+e3a75b8 Merge pull request #133 from joselunasrt8-creator/codex/fix-github-actions-workflow-reliability
+0846d9e Fix PR validation workflow trigger and payload handling
+adada87 trigger check
+a498e4d Remove old PR validation workflow
+a5a14e6 trigger PR validation
+4489f74 Delete mindshift-validate-pr.yml
+e7ab339 Merge pull request #131 from joselunasrt8-creator/add-pr-validation
+d28ddcd Fix PR validation payload
+74236aa Add MindShift PR validation workflow
+51f52c3 Merge pull request #130 from joselunasrt8-creator/codex/fix-governed-deploy-replay-protection
+13480d4 Fix validate replay protection for governed deploy nonce
+9ad54d9 Merge pull request #129 from joselunasrt8-creator/codex/fix-missing-d1-binding-for-cloudflare-worker
+8e6d696 Fix Cloudflare D1 binding configuration
+38c1621 Merge pull request #128 from joselunasrt8-creator/codex/add-post-/prepare-deploy-route
+9623110 Reapply prepare-deploy route handler wiring
+3da112c Merge pull request #127 from joselunasrt8-creator/codex/add-post-/prepare-deploy-route
+04a1448 Restore prepare-deploy workflow semantics
+af2ef3f Merge pull request #126 from joselunasrt8-creator/codex/secure-/prepare-deploy-endpoint
+106c6e6 Secure prepare-deploy endpoint with API key auth
+4c2e26d Merge pull request #125 from joselunasrt8-creator/codex/fix-deploy-replay-protection-handling
+fbb19f2 Fix governed deploy nonce replay consumption in /validate
+1229c16 Merge pull request #124 from joselunasrt8-creator/codex/add-temporary-post-/prepare-deploy-endpoint
+312a85b Add temporary prepare-deploy endpoint for nonce-based deploy validation
+8ed012c Merge pull request #123 from joselunasrt8-creator/codex/adjust-nonce-creation-for-validation-flow
+dcef4e8 Fix nonce minting to occur only in compile/prep flow
+6ab57cc Merge pull request #122 from joselunasrt8-creator/codex/enforce-invocation_nonce-in-governed-deploy
+0a27dc6 Enforce invocation nonce in governed deploy validation
+06d7e09 Merge pull request #121 from joselunasrt8-creator/joselunasrt8-creator-patch-3
+35e513a Update governed-deploy.yml
+1ca1a5d Merge pull request #120 from joselunasrt8-creator/codex/add-post-/validate-pr-route
+8336f97 Add validate-pr worker endpoint for PR checks
+aa5a976 Merge pull request #119 from joselunasrt8-creator/codex/add-post-/validate-pr-endpoint
+9aece80 Add fail-closed /validate-pr endpoint
+40e63bd Merge pull request #115 from joselunasrt8-creator/codex/fix-replay-protection-for-validation
+6cf6624 Fix /validate replay protection with single-use consumption
+4f5fb0d Merge pull request #114 from joselunasrt8-creator/codex/add-replay-protection-for-validated_object_hash
+84e7f81 Add validated object hash replay protection
+8cd467d Merge pull request #113 from joselunasrt8-creator/codex/audit-governed-deploy.yml-for-exact-object-enforcement
+5180969 Enforce exact hash matching in validate gate
+308cb8d Merge pull request #112 from joselunasrt8-creator/codex/harden-production-deployment-path
+0b4973a Harden governed deploy with mandatory MindShift validation inputs
+74bc629 Merge pull request #111 from joselunasrt8-creator/joselunasrt8-creator-patch-1
+a63a33b Update mindshift-validate-pr.yml
+6da6447 Create mindshift-validate-pr.yml
+75ee525 Resolve index merge conflict
+dd78427 Merge pull request #108 from joselunasrt8-creator/codex/update-github-actions-and-cloudflare-worker-setup
+0509492 Harden governed production deploy boundary
+675ad85 Enforce governed deploy concurrency
+de2e5b5 Fix execute validation lookup
+59140ef Merge pull request #107 from joselunasrt8-creator/codex/fix-governed-deploy-concurrency-issue
+f34bf61 Add job-level concurrency lock to governed deploy workflow
+cb93bc9 Merge pull request #106 from joselunasrt8-creator/codex/fix-concurrency-block-in-governed-deploy.yml
+b16be4e Fix workflow-level concurrency placement for governed deploy
+4e65321 Merge pull request #105 from joselunasrt8-creator/codex/add-concurrency-to-governed-deploy.yml
+29e8b44 Enforce single-run guarded production deploy workflow
+581f9d5 Delete .github/workflows/mindshift-demo.yml
+e9c38fb Delete .github/workflows/transfer-v3.yml
+f11c689 Delete .github/workflows/transfer.yml
+349003e Delete .github/workflows/transfer-v2-frozen.yml
+03c0ca2 Delete .github/workflows/governed-dispatch-target.yml
+ae36308 Delete .github/workflows/dispatcher-test.yml
+d76fb6a Delete .github/workflows/compile-decision.yml
+2fd2990 Merge pull request #104 from joselunasrt8-creator/codex/fix-/execute-flow-for-deterministic-execution
+3559609 Fix execute fallback and authority consume behavior
+e7f489d Merge pull request #103 from joselunasrt8-creator/codex/update-workflow-in-governed-deploy.yml
+91878b3 Use workflow file name in authority AEO target
+2a067df Merge pull request #102 from joselunasrt8-creator/codex/fix-github-actions-dispatch-failure
+ea4c38a Fix workflow dispatch target to require workflow filename
+4fb94c8 Merge pull request #101 from joselunasrt8-creator/codex/fix-hash-mismatch-in-execution
+70a03b8 Use existing VALID validation for execute replay path
+cadfebf Merge pull request #100 from joselunasrt8-creator/codex/fix-github-workflow-dispatch-403-error
+47f9d37 Add GitHub User-Agent header for workflow dispatch
+0fbe4af Merge pull request #99 from joselunasrt8-creator/codex/fix-validated_object_hash-mismatch-in-execute
+0f44cb0 Fix execute flow to reuse validated object hash records
+e006206 Merge pull request #98 from joselunasrt8-creator/codex/update-governed-deploy.yml-for-github-dispatch
+df72623 Switch governed deploy execute path to decision-based dispatch
+d74366a Merge pull request #97 from joselunasrt8-creator/codex/verify-src/index.ts-before-updates
+db14a96 Link execution/proof lineage to validated object hash
+aa1a4c9 Merge pull request #96 from joselunasrt8-creator/codex/verify-and-update-buildvalidation-in-index.ts
+180dc52 Harden validation with explicit authority identity binding checks
+ef00bac Merge pull request #95 from joselunasrt8-creator/codex/harden-response-handling-in-routes
+863c228 Harden runtime fail-closed body and validation behavior
+2849b3a Merge pull request #93 from joselunasrt8-creator/codex/update-cloudflare-worker-for-github-workflow-dispatch
+e192798 Fix GitHub dispatch auth headers and debug response handling
+3617969 Merge pull request #92 from joselunasrt8-creator/codex/fix-cloudflare-worker-github-dispatch-inputs
+5c9a3c2 Ensure workflow dispatch always includes environment input
+a3b45bd Merge pull request #91 from joselunasrt8-creator/codex/fix-d1-schema-mismatch-for-authority_registry
+43f701a Add D1 migration to align registry schemas
+80fdf33 Merge pull request #90 from joselunasrt8-creator/codex/fix-d1-schema-setup-for-governed-deploy
+7b08511 Add D1 governed deploy schema migration and docs
+302d75d Add files via upload
+5555a33 Merge pull request #89 from joselunasrt8-creator/codex/fix-worker-for-error-code-1101
+6384c4f Harden worker error handling for /authority and add route-check
+b66a923 Merge pull request #88 from joselunasrt8-creator/codex/fix-worker-runtime-crash-on-post-/authority
+4c39bcf Fix /authority worker crash and enforce JSON failures
+bfdbf97 Merge pull request #87 from joselunasrt8-creator/codex/align-worker-with-reference-implementation
+272f447 Harden governed deploy JSON contract and diagnostics
+c9ccf34 Merge pull request #86 from joselunasrt8-creator/codex/fix-governed-deploy-for-success
+9c5254c Fix governed deploy route/path alignment and webhook surface
+eeedadc Merge pull request #85 from joselunasrt8-creator/codex/fix-cloudflare-worker-routes-for-deployment
+ebbf806 Add governed deploy route compatibility stubs
+8f64e36 Merge pull request #84 from joselunasrt8-creator/codex/fix-worker-deploy-workflow-route-mismatch
+3c4f427 Fix governed deploy Worker route contract
+843a65d Merge pull request #83 from joselunasrt8-creator/codex/implement-governed-production-deploy-path
+390a751 Add governed production deploy path via MindShift
+035569b Merge pull request #82 from joselunasrt8-creator/codex/implement-github-deploy-lock-for-mindshift
+ffb77f3 Add MindShift-governed production deploy workflow
+1904bb2 Merge pull request #81 from joselunasrt8-creator/codex/fix-pr-merge-conflicts-locally
+a7eff7b Resolve runtime merge conflicts and enforce validated object hash
+2aba683 Merge pull request #79 from joselunasrt8-creator/codex/add-get-/replay-test-endpoint
+621308d Add beginner-friendly replay-test flow with non-replayable result
+15f5f8a Merge pull request #77 from joselunasrt8-creator/codex/generate-github-deploy-integration-prompt
+c6eb32b Add governed deploy boundary coded prompt artifact
+694ea54 Merge pull request #76 from joselunasrt8-creator/codex/fix-syntax-error-in-src/index.ts
+09eab3d Clarify self-contained replay test flow in index handler
+282bb9f Merge pull request #75 from joselunasrt8-creator/codex/fix-cloudflare-worker-route-/replay-test
+e413ef2 Fix replay-test to be deterministic in single request
+6328b53 Merge pull request #74 from joselunasrt8-creator/codex/fix-cloudflare-worker-for-deterministic-replay
+536a114 Harden replay-test flow and trim worker runbook
+32a7145 Merge pull request #73 from joselunasrt8-creator/codex/establish-clean-coding-workflow
+1e11fc4 Align D1 schema with worker runtime and document clean deploy flow
+da8eb34 Merge pull request #72 from joselunasrt8-creator/codex/fix-/replay-test-route-in-src/index.ts
+10372e7 Fix replay-test to run deterministic one-request replay proof
+c04a04d Merge pull request #71 from joselunasrt8-creator/codex/restore-full-mindshift-worker-runtime
+e563752 Restore full MindShift Worker runtime in src/index.ts
+7c60eff Merge pull request #70 from joselunasrt8-creator/codex/update-cloudflare-worker-for-github-actions
+1f2f60c Add governed GitHub Actions execution path
+848829f Merge pull request #69 from joselunasrt8-creator/codex/add-replay-prevention-test-route
+b16453d Add replay-test endpoint with replay lock demo
+8a138da Merge pull request #68 from joselunasrt8-creator/codex/audit-and-update-cloudflare-worker-project
+b66986e Fix authority lifecycle and execution validation rules
+cc81ad6 Merge pull request #67 from joselunasrt8-creator/codex/resolve-github-merge-conflict-in-index.ts
+ae995d5 Resolve index.ts merge conflict for authority lifecycle flow
+3d9b0d7 Merge pull request #66 from joselunasrt8-creator/revert-65-codex/update-cloudflare-worker-with-authority-lifecycle
+47ba6b0 Revert "Enforce single-use authorities: use ACTIVE/CONSUMED statuses and block re-execution"
+8d5c833 Merge pull request #65 from joselunasrt8-creator/codex/update-cloudflare-worker-with-authority-lifecycle
+2bd26c1 Merge branch 'main' into codex/update-cloudflare-worker-with-authority-lifecycle
+ded5335 Clarify fail-closed authority gate in execute path
+8c49c9a Merge pull request #53 from joselunasrt8-creator/update_worker_name_to_mindshift-demo
+551fef9 Use 403 fail-closed responses in execute authority gate
+948cb56 Update wrangler config name to mindshift-demo
+1fdaaf9 Merge pull request #63 from joselunasrt8-creator/codex/update-github-deployment-process
+0cd9640 Enforce governed GitHub Actions deploy flow
+ee6c8e2 Merge pull request #62 from joselunasrt8-creator/codex/update-cloudflare-worker-with-authority-lifecycle
+ca24dd7 Add authority lifecycle and replay prevention
+5471987 Merge pull request #61 from joselunasrt8-creator/codex/update-cloudflare-worker-for-validation-and-execution
+1ae8c81 Harden validate and execute with D1 authority checks
+4fa3feb Merge pull request #60 from joselunasrt8-creator/codex/update-cloudflare-worker-for-validation
+fbb72e2 Harden validate route with D1 authority checks
+116d1d9 Merge pull request #58 from joselunasrt8-creator/codex/update-mindshift-demo-for-cloudflare-d1
+c917332 Add D1 persistence schema and debug record routes
+de099f7 Merge pull request #57 from joselunasrt8-creator/codex/update-cloudflare-worker-for-d1-persistence
+7a5b050 Add D1 persistence for authority execution and proof routes
+5ff12c8 Merge pull request #56 from joselunasrt8-creator/codex/update-cloudflare-worker-for-proof-records
+19b2826 Update worker execution and proof flow
+b3260ea Merge pull request #55 from joselunasrt8-creator/codex/update-cloudflare-worker-for-mindshift-demo
+63306a3 Update Worker execute flow to call real webhook
+607c93c Merge pull request #54 from joselunasrt8-creator/codex/update-execute-route-to-real-webhook
+0095459 Implement real webhook execution and browser test flow
+161f2d5 Update index.ts
+f520cf3 Update wrangler.toml
+9cf9853 Create index.ts
+7f493aa Merge pull request #52 from joselunasrt8-creator/codex/set-up-cloudflare-worker-and-verify-endpoints
+d3bd269 Set up local D1-backed Worker authority lifecycle pipeline
+eb1b37f Create Save the final script as mindshift_bundle_generator.sh
+c1aaf38 Update worker.js
+b382086 Update gateway.js
+3c67f26 Update worker.js
+4132780 Update wrangler.toml
+10b4f49 Delete package-lock.json
+35afe3e Update wrangler.toml
+f8c8a34 Update gateway.js
+2336b20 Update wrangler.toml
+48e9d0e Update registry.js
+77e003a Update worker.js
+1a6e5b0 Create package.json
+e7ea9b7 Update wrangler.toml
+cad46ff Update worker.js
+4dcb8b0 Update wrangler.toml
+36d7598 Delete package.json
+910a4a0 Update worker.js
+c6cbff0 Create wrangler.toml
+ba418d5 Create worker.js
+f0523c1 Update transfer.yml
+9445677 Update transfer-v2-frozen.yml
+fc6c14c Update transfer-v3.yml
+79b1c53 Update governed-dispatch-target.yml
+3110f5f Update transfer.yml
+04ca8e3 Update mindshift-demo.yml
+9e0de7a Update registry.js
+de7e348 Update gateway.js
+5d77d56 Update registry.js
+2014191 Update gateway.js
+e0f0306 Update transfer.yml
+d937871 Update transfer.yml
+5d40112 Update transfer.yml
+35afbdc Update transfer.yml
+c592f58 Update transfer.yml
+0345bad Update transfer.yml
+c9f45c6 Create compile-decision.yml
+019b189 Update decision.json
+8fcf658 Update transfer.yml
+0ba23e2 Create compile-decision.js
+187e722 Create decision.json
+02be0bb Update server.js
+b284d28 Update dispatcher-test.yml
+5e5e759 Update dispatcher-test.yml
+31d8871 Update dispatcher-test.yml
+d2c4370 Create dispatcher-test.yml
+3ba3d40 Create governed-dispatch-target.yml
+747fcef Create transfer-v3.yml
+69603e9 Delete transfer-v3.yml
+0dffa6d Create transfer-v3.yml
+81cd529 Update transfer-v2-frozen.yml
+4116aa2 Update proof.schema.json
+35cd8c5 Update proof.schema.json
+7504668 Update transfer-v2-frozen.yml
+6b9ae1c Update transfer-v2-frozen.yml
+acb1339 Create proof.schema.json
+f41bfd1 Update transfer-v2-frozen.yml
+82c4895 Update lock.json
+cd3af75 Update transfer-v2-frozen.yml
+51e28f3 Update transfer-v2-frozen.yml
+e0a04b0 Update package.json
+45c05ab Update server.js
+449e4a4 Update transfer.yml
+2c1659d Update transfer.yml
+621886c Update transfer.yml
+cdae51b Update transfer.yml
+fc09ce4 Update transfer-v2-frozen.yml
+1c27648 Create transfer-v2-frozen.yml
+4bf4d35 Merge pull request #50 from joselunasrt8-creator/copilot/add-non-blocking-system-lock
+56414c5 Add non-blocking system lock baseline (mindshift/lock.json + final verify steps)
+72d2e88 Initial plan
+45242f9 Merge pull request #48 from joselunasrt8-creator/copilot/fixenv-branch-resolution
+6cba6ea fix: move ACTUAL_BRANCH to step env in mindshift-demo.yml
+fea4621 Initial plan
+aa46c7a Merge pull request #47 from joselunasrt8-creator/copilot/fix-deterministic-validator-branch-check
+dbb7075 Fix validator branch check for pull_request runs
+636cd29 Initial plan
+8ee492d Update transfer.yml
+5080248 Update transfer.yml
+aa2a043 Update mindshift-demo.yml
+3fd8d73 Update transfer.yml
+e195faa Update mindshift-demo.yml with deterministic local validator logic.
+910d2ed fix: resolve validator URL correctly for local and external validator
+bca2cab Update Call Validator API step.
+9275918 Merge pull request #30 from joselunasrt8-creator/copilot/add-support-for-validator-url
+025c55c Merge pull request #42 from joselunasrt8-creator/copilot/create-current-system-snapshot-doc
+f718ad4 Merge pull request #45 from joselunasrt8-creator/copilot/refactor-gateway-as-entrypoint
+3b9ab1a Merge pull request #44 from joselunasrt8-creator/copilot/implement-persistent-execution-registry
+95b4c1d Initial plan
+6c0b180 Add SQLite execution registry (registry.js) and integrate into server/gateway
+8c2ecb8 Initial plan
+9df1a08 Merge pull request #41 from joselunasrt8-creator/copilot/prepare-validator-service
+02a35f3 Merge pull request #43 from joselunasrt8-creator/copilot/add-minimal-persistent-registry-again
+d42451e docs: add CURRENT_SYSTEM_SNAPSHOT.md founder-readable system overview
+798e79a Initial plan
+2669e39 Add Dockerfile, request logging, and deployment instructions
+547ba2d Initial plan
+34afc31 Initial plan
+70a8bc6 Merge pull request #40 from joselunasrt8-creator/copilot/add-minimal-persistent-registry
+1640fe7 Initial plan
+b4de658 Merge pull request #39 from joselunasrt8-creator/copilot/dockerize-validator-service
+5972d41 Initial plan
+39ce0c3 Merge pull request #38 from joselunasrt8-creator/copilot/update-transfer-workflow-webhook-handling
+88fdece fix: add checkout step and contents:read permission to transfer job so aeo.json is available for proof artifact
+e9b7e90 Initial plan
+46e1f79 Merge pull request #37 from joselunasrt8-creator/copilot/update-transfer-workflow-rate-limiting
+5d3cf81 fix: handle webhook.site rate limiting in transfer workflow
+c4d7ccb Initial plan
+92d1dd5 Add audit instructions for MindShift
+f045b6c Add audit instructions for MindShift
+9ed9ebe Update *.instructions.md
+877a494 Add MindShift repository instructions
+25be554 Merge pull request #36 from joselunasrt8-creator/copilot/update-validator-token-authentication
+9a90867 Update server.js
+100968b feat: add Bearer token authentication to POST /validate endpoint
+cd677c8 Initial plan
+6709edd Merge pull request #34 from joselunasrt8-creator/copilot/update-gateway-validator-payload
+a12ca71 Align gateway and workflows with validator contract; enforce fail-closed behavior
+ef90f0c Initial plan
+5936f3a Merge pull request #33 from joselunasrt8-creator/copilot/create-gateway-js-file
+7fd9d24 feat: add gateway.js implementing MindShift Gateway v1
+e51a6de Initial plan
+fd5f6c4 Merge pull request #32 from joselunasrt8-creator/copilot/update-mindshift-validator
+6da6219 Address code review: clarify compact JSON intent and document additional field ordering
+2b3966d Implement canonical JSON signature for cryptographic authority binding
+0a84b8e Initial plan
+43f1e25 Merge pull request #31 from joselunasrt8-creator/copilot/strengthen-validator-security-model
+14310f9 Strengthen validator security model with SHA256 signature verification
+c2bed78 Initial plan
+b7a7435 Add VALIDATOR_URL secret/env/fallback resolution to both workflow files
+544ffd8 Initial plan
+8654301 Merge pull request #29 from joselunasrt8-creator/copilot/update-validator-url-config
+b7c7416 feat: make validator URL configurable via VALIDATOR_URL env var
+2f45ca8 Initial plan
+23ee7cb Merge pull request #27 from joselunasrt8-creator/copilot/prepare-validator-api-independent-service
+9ddd1a1 Add GET /health endpoint to validator API for standalone service readiness
+fdcdd24 Initial plan
+9a434d9 Merge pull request #24 from joselunasrt8-creator/copilot/update-validator-architecture
+407acf3 Merge pull request #26 from joselunasrt8-creator/copilot/update-validator-functionality
+6935212 Merge pull request #25 from joselunasrt8-creator/copilot/prepare-validator-api-for-independent-use
+df67904 Fix duplicate /health route in server.js; clean up README duplicate curl example
+5760529 Fix duplicate /health route in server.js and clean up README duplicate section
+e4e8b3b Fix duplicate GET /health route and clean up README duplicate health section
+20d872c Initial plan
+47b9e18 Initial plan
+9329503 Initial plan
+8c6bcd2 Merge pull request #22 from joselunasrt8-creator/copilot/prepare-validator-api-for-independent-service
+4539466 Merge pull request #21 from joselunasrt8-creator/copilot/prepare-validator-api-independent-service
+2f36129 Add GET /health endpoint and update README with curl example
+f1d9e29 Add GET /health endpoint and update README with standalone service section
+fbfda55 Initial plan
+a91c480 Initial plan
+3267c89 Merge pull request #20 from joselunasrt8-creator/copilot/add-health-endpoint-strengthen-expiry-validation
+a71198f feat: add GET / health endpoint and strengthen expires_at string validation
+a3845a0 Initial plan
+ffd0e3f Merge pull request #19 from joselunasrt8-creator/copilot/add-expiry-validation
+e60b93a feat: add AEO expiry validation with expires_at field
+d254e03 Initial plan
+bbc0981 Merge pull request #18 from joselunasrt8-creator/copilot/upgrade-workflow-validation-artifact
+7e549a8 Initial plan
+f8deb82 Merge pull request #17 from joselunasrt8-creator/copilot/update-github-actions-workflow-again
+6d2a28f Style: add space after comma in execution_surfaces array
+f1591a3 Fix YAML syntax errors: replace heredoc JSON with jq -n in both workflows
+2a8bf09 Initial plan
+5370db3 Merge pull request #16 from joselunasrt8-creator/copilot/update-github-actions-workflow-again
+ebe4c3e Initial plan
+4da7f11 Merge pull request #15 from joselunasrt8-creator/copilot/update-github-actions-workflow-another-one
+0840c39 Merge pull request #14 from joselunasrt8-creator/copilot/update-github-actions-workflow-again
+3930c7d Tighten wait-for-validator step to exit 1 if server never starts (fail-closed)
+68e94a7 Initial plan
+cbc36bc Initial plan
+010211d Merge pull request #13 from joselunasrt8-creator/copilot/add-minimal-validator-api
+f8106da Wire GitHub Actions workflows to call validator API instead of inline YAML validation
+e0c3e79 Initial plan
+9b45983 Merge pull request #12 from joselunasrt8-creator/copilot/add-validator-api
+2e991df Initial plan
+cc19618 Merge pull request #11 from joselunasrt8-creator/copilot/update-proof-artifact-and-validator-api
+f61e811 Add minimal validator API (server.js, package.json) and update README
+cc5642a Initial plan
+7a255eb Merge pull request #10 from joselunasrt8-creator/copilot/improve-proof-artifacts
+21fbede fix: add permissions: {} to validate job in mindshift-demo.yml for least-privilege consistency
+292311c Initial plan
+3175188 Merge pull request #9 from joselunasrt8-creator/copilot/improve-execution-model
+d09b863 Initial plan
+35d9923 Merge pull request #8 from joselunasrt8-creator/copilot/strengthen-governed-execution-demo
+e805831 feat: convert proof artifacts to proof-of-transfer.json with all required fields
+d410fc5 Initial plan
+d518889 Merge pull request #7 from joselunasrt8-creator/copilot/strengthen-governed-execution
+6ce8558 Initial plan
+d48d901 Merge pull request #6 from joselunasrt8-creator/copilot/add-governed-execution-prototype
+834b102 Initial plan
+c43a565 Merge pull request #5 from joselunasrt8-creator/copilot/add-github-actions-workflow
+757f0e5 fix: add permissions block to validate job, fix curl --fail, fix heredoc indentation
+f22594e feat: add transfer workflow triggered on push to main and workflow_dispatch
+44d0810 Initial plan
+2b78e55 Merge pull request #4 from joselunasrt8-creator/copilot/extend-workflow-for-validation
+7175917 Extend workflow: two independent execution surfaces with combined proof artifact
+1753a30 Initial plan
+badad23 Merge pull request #3 from joselunasrt8-creator/copilot/update-github-actions-workflow
+9dc5311 feat: write proof artifact file and upload as workflow artifact after authority validation
+e20d20a Initial plan
+f563d64 Update mindshift-demo.yml
+9268a4f Update mindshift-demo.yml
+325491f Update mindshift-demo.yml
+13cc069 Update mindshift-demo.yml
+03c576a Update mindshift-demo.yml
+b70523d Update README.md
+0563cbc Update mindshift-demo.yml
+b69329c Update mindshift-demo.yml
+a596f8c Update mindshift-demo.yml
+3c64f29 Update mindshift-demo.yml
+e4729cc Update mindshift-demo.yml
+7b48325 Update mindshift-demo.yml
+3d50e99 Create mindshift-demo.yml
+ac16c5f Initial commit
