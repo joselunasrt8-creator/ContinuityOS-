@@ -9,7 +9,9 @@ const snapshot = JSON.parse(readFileSync(new URL('../../runtime/federation/feder
 test('deterministic reconciliation stable', () => {
   assert.match(source, /function deterministicFederationSnapshot/)
   assert.match(source, /deterministic_hash/)
-  assert.match(source, /Object\.keys\(o\)\.sort\(\)/)
+  // Canonical key ordering is now delegated to src/canonical.js (hashCanonical)
+  assert.match(source, /from "\.\.\/\.\.\/canonical\.js"/)
+  assert.match(source, /hashCanonical/)
 })
 
 test('orphan federation proofs quarantined, replay divergence and topology mismatch detected', () => {

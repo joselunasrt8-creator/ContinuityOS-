@@ -15,7 +15,7 @@
  *             quorum drift telemetry (#1052), visualization projection (#1054).
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 // ── Result constants ───────────────────────────────────────────────────────────
 
@@ -79,18 +79,6 @@ function isValidSha256Hex(v: unknown): boolean {
   return typeof v === 'string' && HEX64_RE.test(v)
 }
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + (value as unknown[]).map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
-}
-
 function safeObj(input: unknown): Record<string, unknown> {
   if (input === null || input === undefined || typeof input !== 'object' || Array.isArray(input)) {
     return {}
@@ -136,18 +124,18 @@ function detectProjectionBoundaryViolation(obj: Record<string, unknown>): string
  */
 export function computeTemporalReplayVisualizationHash(fields: Record<string, unknown>): string {
   const { temporal_replay_hash: _excluded, ...rest } = fields
-  return createHash('sha256').update(canonicalJson(rest), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(rest))
 }
 
 function computeVisualizationProjectionHashForVerification(
   projection: Record<string, unknown>,
 ): string {
   const { projection_hash: _excluded, ...rest } = projection
-  return createHash('sha256').update(canonicalJson(rest), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(rest))
 }
 
 function computeFrameHash(frameFields: Omit<TemporalReplayFrame, 'frame_hash'>): string {
-  return createHash('sha256').update(canonicalJson(frameFields), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(frameFields))
 }
 
 function computeTransitionId(
@@ -157,8 +145,7 @@ function computeTransitionId(
   to_hash: string,
   transition_type: ReplayTransitionType,
 ): string {
-  const payload = canonicalJson({ from_frame, from_hash, to_frame, to_hash, transition_type })
-  return createHash('sha256').update(payload, 'utf8').digest('hex')
+  return sha256Hex(canonicalize({ from_frame, from_hash, to_frame, to_hash, transition_type }))
 }
 
 // ── Transition classification ──────────────────────────────────────────────────

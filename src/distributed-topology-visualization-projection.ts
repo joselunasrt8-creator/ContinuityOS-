@@ -17,7 +17,7 @@
  *   It converts existing evidence into deterministic graph projection artifacts only.
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 // ── Result constants ───────────────────────────────────────────────────────────
 
@@ -103,27 +103,11 @@ function isValidSha256Hex(v: unknown): boolean {
   return typeof v === 'string' && HEX64_RE.test(v)
 }
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + (value as unknown[]).map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
-}
-
 function safeObj(input: unknown): Record<string, unknown> {
   if (input === null || input === undefined || typeof input !== 'object' || Array.isArray(input)) {
     return {}
   }
   return input as Record<string, unknown>
-}
-
-function sha256Hex(data: string): string {
-  return createHash('sha256').update(data, 'utf8').digest('hex')
 }
 
 // ── Hash function ──────────────────────────────────────────────────────────────
@@ -148,7 +132,7 @@ export function computeTopologyVisualizationProjectionHash(
       : rest.edges,
   }
 
-  return createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(payload))
 }
 
 // ── Null projection builder ────────────────────────────────────────────────────
@@ -199,7 +183,7 @@ export function buildDistributedTopologyVisualizationProjection(
 ): DistributedTopologyVisualizationProjection {
   const obj = safeObj(input)
 
-  const source_observation_hash = sha256Hex(canonicalJson(obj))
+  const source_observation_hash = sha256Hex(canonicalize(obj))
   const nullDistributedHash = sha256Hex('')
 
   // Step 1: Fail closed if artifact_type is missing or invalid

@@ -12,7 +12,7 @@
  * Quorum legitimacy must never overwrite divergent topology views.
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 import { LEGITIMACY_CONFLICT_RESULTS } from './legitimacy-conflict-arbitration.ts'
 
@@ -84,18 +84,6 @@ const HEX64_RE = /^[0-9a-f]{64}$/
 
 function isValidSha256Hex(v: unknown): boolean {
   return typeof v === 'string' && HEX64_RE.test(v)
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + (value as unknown[]).map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
 }
 
 function safeObj(input: unknown): Record<string, unknown> {
@@ -171,7 +159,7 @@ function detectBoundaryViolation(obj: Record<string, unknown>): DistributedTopol
  */
 export function computeTopologyParticipantHash(fields: Record<string, unknown>): string {
   const { participant_hash: _excluded, ...rest } = fields
-  return createHash('sha256').update(canonicalJson(rest), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(rest))
 }
 
 /**
@@ -195,7 +183,7 @@ export function computeDistributedTopologyHash(fields: Record<string, unknown>):
       : rest.surface_graph_hashes,
   }
 
-  return createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(payload))
 }
 
 // ── Boundary validator (public) ────────────────────────────────────────────────

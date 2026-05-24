@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import { hashCanonical } from '../canonical.js';
 
 export const REQUIRED_POLICY_RESULT = "VALID_AND_AUTHORIZED_AND_UNUSED_AND_POLICY_VALID";
 
@@ -12,24 +12,8 @@ export const WORKLOAD_CLASSES = Object.freeze([
   "evaluation",
 ]);
 
-function stable(value) {
-  if (Array.isArray(value)) return value.map(stable);
-  if (value && typeof value === "object") {
-    return Object.keys(value).sort().reduce((acc, key) => {
-      acc[key] = stable(value[key]);
-      return acc;
-    }, {});
-  }
-  return value;
-}
-
-export function canonicalize(value) {
-  return JSON.stringify(stable(value));
-}
-
 export function fingerprintObject(value) {
-  const canonical = canonicalize(value);
-  return crypto.createHash("sha256").update(canonical).digest("hex");
+  return hashCanonical(value);
 }
 
 function isIsoDate(s) {

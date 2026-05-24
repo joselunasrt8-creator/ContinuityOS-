@@ -10,7 +10,7 @@
  * It classifies divergence; it does not change legitimacy state.
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 import {
   DISTRIBUTED_TOPOLOGY_RESULTS,
@@ -63,18 +63,6 @@ function safeObj(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>
 }
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + (value as unknown[]).map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
-}
-
 // ── Collapse reason rule-priority order ───────────────────────────────────────
 // Boundary violations first, then convergence failures, then participant state.
 
@@ -123,7 +111,7 @@ const HASH_PROBLEM_CLASSES = new Set<string>([
  */
 export function computeObservationHash(fields: Record<string, unknown>): string {
   const { observation_hash: _excluded, ...rest } = fields
-  return createHash('sha256').update(canonicalJson(rest), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(rest))
 }
 
 // ── Null observation builder ───────────────────────────────────────────────────

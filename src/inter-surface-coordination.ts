@@ -12,7 +12,7 @@
  * another surface. This module evaluates that cross-surface constraint.
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 // ── Coordination results ───────────────────────────────────────────────────────
 
@@ -87,18 +87,6 @@ const KNOWN_INTERACTIONS = new Set<string>(Object.values(INTERACTION_TYPES))
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + value.map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
-}
-
 function safeObj(input: unknown): Record<string, unknown> {
   if (input === null || input === undefined || typeof input !== 'object' || Array.isArray(input)) {
     return {}
@@ -128,7 +116,7 @@ export function computeInterSurfaceCoordinationHash(fields: Record<string, unkno
       : rest.forbidden_conditions,
   }
 
-  return createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(payload))
 }
 
 // ── Result builder ─────────────────────────────────────────────────────────────

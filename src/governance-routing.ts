@@ -16,7 +16,7 @@
  * mismatch, expired, revoked, consumed) returns NULL. Fail closed.
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 // ── Route results ──────────────────────────────────────────────────────────────
 
@@ -114,18 +114,6 @@ const KNOWN_SURFACES = new Set([
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + value.map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
-}
-
 /**
  * Computes a deterministic SHA-256 route hash.
  *
@@ -154,7 +142,7 @@ export function computeGovernanceRouteHash(fields: {
     surface: fields.surface,
     target: fields.target,
   }
-  return createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(payload))
 }
 
 function buildRoute(
@@ -204,7 +192,7 @@ function scopesMatch(
 ): boolean {
   if (!required || Object.keys(required).length === 0) return true
   for (const [key, val] of Object.entries(required)) {
-    if (canonicalJson(provided[key]) !== canonicalJson(val)) return false
+    if (canonicalize(provided[key]) !== canonicalize(val)) return false
   }
   return true
 }

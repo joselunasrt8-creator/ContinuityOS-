@@ -10,6 +10,7 @@ import {
   GraphEdge,
   RuntimeTopologySnapshot,
 } from "./control_graph_emitter.ts"
+import { hashCanonical } from "../src/canonical.js"
 
 export const RECONCILIATION_MODE =
   "OBSERVABILITY_ONLY"
@@ -181,10 +182,7 @@ export function reconciliationSnapshot(
 export function runtimeTopologyChecksum(
   topology: RuntimeTopologySnapshot,
 ): string {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(topology))
-    .digest("hex")
+  return hashCanonical(topology)
 }
 
 export function validateObservabilityBoundary(

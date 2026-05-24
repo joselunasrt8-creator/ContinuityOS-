@@ -19,7 +19,7 @@
  * Conflict arbitration must never overwrite legitimacy state.
  */
 
-import { createHash } from 'node:crypto'
+import { canonicalize, sha256Hex } from './canonical.js'
 
 // ── Result constants ────────────────────────────────────────────────────────────
 
@@ -83,18 +83,6 @@ function isValidSha256Hex(v: unknown): boolean {
   return typeof v === 'string' && HEX64_RE.test(v)
 }
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    return '[' + (value as unknown[]).map(canonicalJson).join(',') + ']'
-  }
-  const obj = value as Record<string, unknown>
-  const keys = Object.keys(obj).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}'
-}
-
 function safeObj(input: unknown): Record<string, unknown> {
   if (input === null || input === undefined || typeof input !== 'object' || Array.isArray(input)) {
     return {}
@@ -108,7 +96,7 @@ function normalizeInputArray(arr: unknown): unknown[] {
 
 function sortedArrayValues(arr: unknown[]): string[] {
   return arr
-    .map((v) => (typeof v === 'string' ? v : canonicalJson(v)))
+    .map((v) => (typeof v === 'string' ? v : canonicalize(v)))
     .sort()
 }
 
@@ -144,7 +132,7 @@ export function computeLegitimacyConflictHash(fields: Record<string, unknown>): 
       : rest.causal_inputs,
   }
 
-  return createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(payload))
 }
 
 /**
@@ -175,7 +163,7 @@ export function computeArbitrationHash(fields: Record<string, unknown>): string 
       : rest.causal_inputs,
   }
 
-  return createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex')
+  return sha256Hex(canonicalize(payload))
 }
 
 // ── Boundary validation ─────────────────────────────────────────────────────────

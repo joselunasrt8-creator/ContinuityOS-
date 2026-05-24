@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { canonicalize, sha256Hex } from '../src/canonical.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -52,17 +52,8 @@ type DeployAuditRegistry = {
   entries: DeployAuditEntry[];
 };
 
-function canonicalize(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalize(v)}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function hashTarget(target: Record<string, unknown>): string {
-  return createHash('sha256').update(canonicalize(target)).digest('hex');
+  return sha256Hex(canonicalize(target));
 }
 
 function getRegistryPath(): string {
@@ -98,8 +89,8 @@ function persistEvent(event: DeployAuditEntry): void {
     process.exit(1);
   }
 
-  const replayKey = createHash('sha256').update(canonicalize(event)).digest('hex');
-  const duplicated = registry.entries.some((entry) => createHash('sha256').update(canonicalize(entry)).digest('hex') === replayKey);
+  const replayKey = sha256Hex(canonicalize(event));
+  const duplicated = registry.entries.some((entry) => sha256Hex(canonicalize(entry)) === replayKey);
   if (duplicated) return;
 
   const tupleCollision = event.event_type === 'governed_deploy_success' && registry.entries.some((entry) =>

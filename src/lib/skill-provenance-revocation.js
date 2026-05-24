@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { canonicalize, hashCanonical } from '../canonical.js';
 
 export const SKILL_PROVENANCE_REVOCATION_SCHEMA_VERSION = 'SKILL_PROVENANCE_REVOCATION_V1';
 
@@ -13,15 +13,11 @@ function isPlainObject(value) {
 }
 
 export function canonicalizeRevocationLineage(value) {
-  if (Array.isArray(value)) return `[${value.map((entry) => canonicalizeRevocationLineage(entry)).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalizeRevocationLineage(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
+  return canonicalize(value);
 }
 
 export function hashRevocationLineage(value) {
-  return createHash('sha256').update(canonicalizeRevocationLineage(value)).digest('hex');
+  return hashCanonical(value);
 }
 
 function isValidRevocationRecord(record) {

@@ -1,4 +1,4 @@
-import { sha256Hex } from "../../canonical.js"
+import { hashCanonical } from "../../canonical.js"
 
 export const FEDERATION_MODES = ["OBSERVE_ONLY", "RECONCILE_ONLY"] as const
 export type FederationMode = (typeof FEDERATION_MODES)[number]
@@ -54,18 +54,6 @@ export type ReconciliationResult = {
   drift_classes: FederationDriftClass[]
   orphan_proofs: string[]
   flags: ReconciliationFlags
-}
-
-function stable(v: unknown): string {
-  if (v === null || typeof v !== "object") return JSON.stringify(v)
-  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`
-  const o = v as Record<string, unknown>
-  const keys = Object.keys(o).sort()
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`
-}
-
-function hashCanonical(v: unknown): string {
-  return sha256Hex(stable(v))
 }
 
 export function deterministicFederationSnapshot(snapshot: FederatedLegitimacySnapshot) {
