@@ -1,13 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 
 class D1 { prepare() { return { bind() { return this }, all() { return Promise.resolve({ results: [] }) }, first() { return Promise.resolve(null) }, run() { return Promise.resolve({ meta: { changes: 1 } }) } } } }
 async function worker() {
-  const { transformSync } = await import('esbuild')
-  return (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 test('runtime self-integrity checkpoint is deterministic', async () => {

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0026_external_authority_registry.sql', import.meta.url), 'utf8')
@@ -19,8 +20,7 @@ class D1 {
 }
 
 async function worker() {
-  const { transformSync } = await import('esbuild')
-  return (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 test('external_authority_registry schema is append-only and contains required runtime fields', () => {

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0021_federation_conformance.sql', import.meta.url), 'utf8')
@@ -108,8 +109,7 @@ test('federation conformance registry is append-only evidence', () => {
 })
 
 test('GET /federation/conformance is non-executable and replay-neutral', async () => {
-  const { transformSync } = await import('esbuild')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const response = await worker.fetch(new Request('https://runtime.test/federation/conformance', { method: 'GET' }), { DB: new ConformanceD1() })
   assert.equal(response.status, 200)
   const body = await response.json()

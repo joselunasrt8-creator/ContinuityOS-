@@ -11,6 +11,7 @@ import {
   traverseCrossRegistries,
   deterministicReconciliationReport,
 } from '../../runtime/reconciliation/cross-registry-reconciliation-engine.js'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0039_cross_registry_reconciliation_registry.sql', import.meta.url), 'utf8')
@@ -20,8 +21,7 @@ const equivalence = JSON.parse(readFileSync(new URL('../../governance/cross-regi
 const inventory = JSON.parse(readFileSync(new URL('../../runtime/unauthorized_mutation_surface_inventory.json', import.meta.url), 'utf8'))
 
 async function loadWorker() {
-  const { transformSync } = await import('esbuild')
-  return (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 function continuityMaterial(input) {

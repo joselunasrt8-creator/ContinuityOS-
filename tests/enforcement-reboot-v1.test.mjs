@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from './helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../migrations/0006_enforcement_reboot_v1.sql', import.meta.url), 'utf8')
@@ -11,9 +12,7 @@ const sessionContinuityMigration = readFileSync(new URL('../migrations/0010_iden
 const governedDeployWorkflow = readFileSync(new URL('../.github/workflows/governed-deploy.yml', import.meta.url), 'utf8')
 
 test('runtime mutation endpoints reject unauthorized requests before body parsing or DB access', async () => {
-  const { transformSync } = await import('esbuild')
-  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const mutationEndpoints = ['/session', '/authority', '/compile', '/validate', '/execute', '/proof']
 
   for (const endpoint of mutationEndpoints) {
@@ -36,9 +35,7 @@ test('runtime mutation endpoints reject unauthorized requests before body parsin
 })
 
 test('authorized session mutation request returns canonical SESSION_ACTIVE response', async () => {
-  const { transformSync } = await import('esbuild')
-  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   let writes = 0
   const env = {
     API_KEY: 'test-key',
@@ -68,9 +65,7 @@ test('authorized session mutation request returns canonical SESSION_ACTIVE respo
 })
 
 test('authorized authority mutation request succeeds with active session', async () => {
-  const { transformSync } = await import('esbuild')
-  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   let writes = 0
   const env = {
     API_KEY: 'test-key',

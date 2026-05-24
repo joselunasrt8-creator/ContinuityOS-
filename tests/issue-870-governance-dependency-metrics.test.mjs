@@ -1,12 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { transformSync } from 'esbuild'
-
+import { importWorker } from './helpers/import-worker.mjs'
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 
 function workerFromSource() {
-  return import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)
+  return importWorker()
 }
 
 test('issue-870: governance dependency metrics are deterministic read-only observability derived from telemetry', async () => {

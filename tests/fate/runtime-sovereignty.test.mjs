@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0024_runtime_sovereignty_registry.sql', import.meta.url), 'utf8')
@@ -19,8 +20,7 @@ class D1 {
 }
 
 async function worker() {
-  const { transformSync } = await import('esbuild')
-  return (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 test('Runtime Sovereignty Manifest contains deterministic identity fields and excludes generated_at from sovereignty hash', () => {

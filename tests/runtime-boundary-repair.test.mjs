@@ -1,8 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { transformSync } from 'esbuild'
-
+import { importWorker } from './helpers/import-worker.mjs'
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 const canonicalRoutes = ['/session', '/continuity', '/authority', '/compile', '/validate', '/execute', '/proof']
 
@@ -20,7 +19,7 @@ test('canonical executable runtime routes exclude governance and observability s
 })
 
 test('/reconcile is non-executable and cannot initialize or mutate runtime state', async () => {
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const calls = []
   const env = {
     API_KEY: 'test-key',
