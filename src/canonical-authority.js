@@ -32,6 +32,7 @@ export const CANONICAL_AUTHORITY_INVENTORY = Object.freeze([
   Object.freeze({ module: 'runtime/topology_lineage_registry.mjs', exports: Object.freeze(['deterministicLineageHash']), authority: false, delegates_to: 'src/canonical.js' }),
   Object.freeze({ module: 'runtime/recursive_quarantine_orchestrator.mjs', exports: Object.freeze(['deterministicQuarantineHash']), authority: false, delegates_to: 'src/canonical.js' }),
   Object.freeze({ module: 'src/continuity-lineage-closure-hardening.ts', exports: Object.freeze(['computeClosureTopologyHash', 'traverseContinuityAncestry', 'enforceLineageFreshnessBarrier', 'collapseOrphanedSubtrees', 'auditLineageEquivalence', 'computeLineageRepairDiagnostics', 'validateLineageReconstructability', 'classifyLineageDrift', 'verifyDistributedContinuityLineageClosure']), authority: false, delegates_to: 'src/canonical.js' }),
+  Object.freeze({ module: 'src/recursive-revocation-propagation.ts', exports: Object.freeze(['computeRevocationTopologyHash', 'traverseDescendantRevocation', 'verifyRevocationPropagationCompleteness', 'enforceStaleLineageCollapse', 'reconstructRevocationChronology', 'auditRevocationAncestry', 'validateRevokedReplayIneligibility', 'validateRevokedProofContinuity', 'verifyDistributedRevocationConvergence', 'classifyRevocationDrift', 'computeRevocationRepairDiagnostics', 'buildRevocationPropagationAuditSurface', 'propagateRevocationLineage']), authority: false, delegates_to: 'src/canonical.js' }),
 ])
 
 // ── Duplicate Serialization Surface Detection ──────────────────────────────
