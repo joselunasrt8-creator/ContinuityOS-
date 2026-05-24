@@ -12,7 +12,7 @@ import {
   driftEvent,
   replayEvent,
   quarantineEvent,
-} from "./control_graph_emitter"
+} from "./control_graph_emitter.ts"
 
 export const emitter = new ControlGraphEmitter()
 

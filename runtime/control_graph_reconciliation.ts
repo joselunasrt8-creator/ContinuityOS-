@@ -9,7 +9,7 @@ import {
   GraphNode,
   GraphEdge,
   RuntimeTopologySnapshot,
-} from "./control_graph_emitter"
+} from "./control_graph_emitter.ts"
 
 export const RECONCILIATION_MODE =
   "OBSERVABILITY_ONLY"

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { verifyContinuityLineage, type ContinuityNode, type SessionNode } from "../src/runtime/continuity/verifyContinuityLineage"
+import { verifyContinuityLineage, type ContinuityNode, type SessionNode } from "../src/runtime/continuity/verifyContinuityLineage.ts"
 
 const computeLineageHash = (lineage: ContinuityNode[]) => lineage.map((node) => node.continuity_id).join("->")
 

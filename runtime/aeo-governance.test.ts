@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
-import { canonicalize, toCanonicalAeo } from "../src/lib/aeo-governance"
+import { canonicalize, toCanonicalAeo } from "../src/lib/aeo-governance.ts"
 
 const sha256Hex = (value: string) => createHash("sha256").update(value).digest("hex")
 
