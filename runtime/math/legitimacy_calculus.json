@@ -1,0 +1,14 @@
+{
+  "object_type": "LegitimacyCalculus",
+  "canonical_legitimacy_equation": {
+    "expression": "VALID ∧ AUTHORIZED ∧ CONTINUOUS ∧ REPLAY_SAFE ∧ EXACT_OBJECT_EQUALITY ∧ PROOF_BOUND ∧ TOPOLOGY_CONSISTENT ∧ GOVERNANCE_VALID"
+  },
+  "null_conditions": [
+    "authority_missing",
+    "replay_detected",
+    "topology_drift",
+    "proof_absent",
+    "hash_mismatch"
+  ],
+  "status": "ONTOLOGY_STABILIZED"
+}

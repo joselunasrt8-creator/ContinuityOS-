@@ -1,0 +1,31 @@
+{
+  "object_type": "CanonicalRuntimeTheorems",
+  "theorems": [
+    {
+      "theorem_id": "CRT-001",
+      "name": "Replay Theorem",
+      "statement": "REPLAY → NULL"
+    },
+    {
+      "theorem_id": "CRT-002",
+      "name": "Proof Lineage Theorem",
+      "statement": "PROOF requires EXECUTION lineage"
+    },
+    {
+      "theorem_id": "CRT-003",
+      "name": "Authority Consumption Theorem",
+      "statement": "consumed authority cannot re-authorize execution"
+    },
+    {
+      "theorem_id": "CRT-004",
+      "name": "Exact Object Equality Theorem",
+      "statement": "validated object must equal executed object"
+    },
+    {
+      "theorem_id": "CRT-005",
+      "name": "Observability Non-Authority Theorem",
+      "statement": "observability cannot create legitimacy"
+    }
+  ],
+  "status": "NON_EXECUTABLE"
+}

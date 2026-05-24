@@ -1,0 +1,16 @@
+{
+  "object_type": "AuthorityConsumptionModel",
+  "states": [
+    "ISSUED",
+    "EXECUTED",
+    "CONSUMED",
+    "REVOKED",
+    "NULL"
+  ],
+  "constraints": [
+    "consumed_authority_cannot_replay",
+    "revoked_authority_invalidates_execution",
+    "authority_requires_continuity"
+  ],
+  "replay_safe": true
+}

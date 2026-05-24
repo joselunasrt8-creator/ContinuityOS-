@@ -1,0 +1,15 @@
+{
+  "object_type": "LegitimacyInheritanceModel",
+  "inheritance_rules": [
+    "remote_proof_does_not_create_local_authority",
+    "execution_inherits_validation_constraints",
+    "proof_inherits_execution_constraints",
+    "reconciliation_inherits_topology_constraints"
+  ],
+  "forbidden_inheritance": [
+    "authority_without_validation",
+    "proof_without_execution",
+    "topology_without_lineage"
+  ],
+  "status": "NON_AUTHORITATIVE"
+}

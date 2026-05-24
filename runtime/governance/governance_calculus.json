@@ -1,0 +1,11 @@
+{
+  "object_type": "GovernanceCalculus",
+  "equation": "mutation_legitimacy = f(authority, validation, continuity, topology, replay, proof, governance)",
+  "governance_properties": [
+    "deterministic",
+    "fail_closed",
+    "replay_safe",
+    "lineage_bound"
+  ],
+  "status": "MATHEMATICAL_MODEL"
+}

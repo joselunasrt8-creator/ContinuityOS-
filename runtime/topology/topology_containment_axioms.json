@@ -1,0 +1,11 @@
+{
+  "object_type": "TopologyContainmentAxioms",
+  "axioms": [
+    "undeclared_execution_surface → NULL",
+    "topology_drift → reconciliation_required",
+    "proofless_mutation → INVALID",
+    "boundary_escape → sovereignty_failure",
+    "orphan_lineage → containment_required"
+  ],
+  "status": "FAIL_CLOSED"
+}
