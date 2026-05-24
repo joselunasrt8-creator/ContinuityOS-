@@ -1,13 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0029_reconciliation_closure_registry.sql', import.meta.url), 'utf8')
 
 async function loadWorker() {
-  const { transformSync } = await import('esbuild')
-  return (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 const closureColumns = ['closure_id', 'closure_hash', 'deterministic_reconciliation_anchor', 'recursive_checkpoint_identity', 'reconciliation_equivalence_state', 'lineage_depth', 'bounded_window', 'graph_checkpoint_hash', 'bootstrap_checkpoint_hash', 'runtime_sovereignty_checkpoint_hash', 'federation_conformance_checkpoint_hash', 'drift_classes', 'closure_object_hash', 'evidence_only', 'replay_neutral', 'mutation_capable', 'remote_authority_denied', 'read_only', 'creates_authority', 'execution_started', 'replay_consumed', 'generated_at', 'created_at']

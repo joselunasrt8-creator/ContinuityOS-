@@ -13,6 +13,7 @@ import {
   classifyProductionMutationCapability,
   deriveRevocationPropagation,
 } from '../../runtime/sovereignty/root-authority-containment.js'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0036_root_authority_observability_registry.sql', import.meta.url), 'utf8')
@@ -62,8 +63,7 @@ class D1 {
 }
 
 async function worker() {
-  const { transformSync } = await import('esbuild')
-  return (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 test('deterministic topology hashing and containment identity are canonical-order independent', () => {

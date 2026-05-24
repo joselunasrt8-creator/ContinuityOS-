@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 
@@ -71,8 +72,7 @@ test('federated reconciliation registry remains append-only and deterministic', 
 })
 
 test('observability-only route returns a replay-neutral reconciliation envelope without expanding execution surfaces', async () => {
-  const { transformSync } = await import('esbuild')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const response = await worker.fetch(new Request('https://runtime.test/federation/reconcile/distributed', { method: 'GET' }), { DB: new ReadOnlyD1() })
   assert.equal(response.status, 200)
   const body = await response.json()

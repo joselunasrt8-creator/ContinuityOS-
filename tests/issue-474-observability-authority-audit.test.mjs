@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { importWorker } from './helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 
@@ -17,9 +18,7 @@ const escalationParams = 'creates_authority=true&mutation_capable=true&deploy_ca
 const prohibitedRegistryWrites = ['authority_registry', 'canonical_aeo_registry', 'validation_registry', 'execution_registry', 'proof_registry', 'invocation_registry', 'governance_lock_registry', 'execution_replay_protection']
 
 async function loadWorker() {
-  const { transformSync } = await import('esbuild')
-  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
-  return (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 function createEnv() {

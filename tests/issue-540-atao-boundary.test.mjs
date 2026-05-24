@@ -2,13 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { importWorker } from './helpers/import-worker.mjs'
 
 const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
 
 async function loadWorker() {
-  const { transformSync } = await import('esbuild')
-  const compiled = transformSync(source, { loader: 'ts', format: 'esm' }).code
-  return (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default
+  return (await importWorker()).default
 }
 
 function post(path, body) {

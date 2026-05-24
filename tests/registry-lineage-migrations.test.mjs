@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { importWorker } from './helpers/import-worker.mjs'
 
 function runSqlite(args, options = {}) {
   const result = spawnSync('sqlite3', args, { encoding: 'utf8', ...options })
@@ -275,9 +276,8 @@ async function persistPreo(post, decision_id, validated_object_hash, provenance)
 }
 
 test('runtime provenance attestations never use API key as HMAC fallback', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
 
   async function runScenario({ name, envelope, envSecret = provenanceFixtureSecret, omitEnvSecret = false, expectedStatus, expectedReason, prove = false }) {
     const dir = mkdtempSync(join(tmpdir(), `mindshift-provenance-${name}-`))
@@ -379,9 +379,8 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
 })
 
 test('runtime lifecycle persists against migration-built canonical registries', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-runtime-lineage-'))
   const dbPath = join(dir, 'runtime.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -482,9 +481,8 @@ test('runtime lifecycle persists against migration-built canonical registries', 
 
 
 test('runtime telemetry records replay, hash mismatch, proof, and bypass drift', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-observability-'))
   const dbPath = join(dir, 'observability.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -555,9 +553,8 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
 
 
 test('compile and validate share canonical deploy target coercion semantics', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-target-coercion-'))
   const dbPath = join(dir, 'coercion.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -595,9 +592,8 @@ test('compile and validate share canonical deploy target coercion semantics', as
 })
 
 test('compile rejects non-governed workflows before persisting canonical AEOs', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-workflow-rejection-'))
   const dbPath = join(dir, 'workflow.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -634,9 +630,8 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
 })
 
 test('proof transaction rolls back proof persistence when authority consumption fails', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-rollback-'))
   const dbPath = join(dir, 'rollback.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -674,9 +669,8 @@ test('proof transaction rolls back proof persistence when authority consumption 
 })
 
 test('duplicate and concurrent proof attempts fail closed without duplicate proof rows', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-duplicates-'))
   const dbPath = join(dir, 'duplicates.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -718,9 +712,8 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
 })
 
 test('runtime non-session startup quarantines historical duplicate proof lineage before enforcing uniqueness', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-proof-startup-'))
   const dbPath = join(dir, 'startup.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -754,9 +747,8 @@ test('runtime non-session startup quarantines historical duplicate proof lineage
 })
 
 test('compile is deterministic and fails closed on mismatched execution hash', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-compile-determinism-'))
   const dbPath = join(dir, 'runtime.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
@@ -822,9 +814,8 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
 
 
 test('validate binds validation persistence to compiled canonical AEO origin', async () => {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const dir = mkdtempSync(join(tmpdir(), 'mindshift-validate-compile-origin-'))
   const dbPath = join(dir, 'runtime.sqlite')
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }

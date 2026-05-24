@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { importWorker } from '../helpers/import-worker.mjs'
 
 function runSqlite(args, options = {}) {
   const result = spawnSync('sqlite3', args, { encoding: 'utf8', ...options })
@@ -24,9 +25,8 @@ function sqlLiteral(value) { return value == null ? 'NULL' : `'${String(value).r
 class SqliteD1Database { constructor(dbPath){ this.dbPath=dbPath } prepare(sql){ const dbPath=this.dbPath; return { values:[], bind(...values){ this.values=values; return this }, materialized(){ return sql.replace(/\?(\d+)/g, (_m, i)=>sqlLiteral(this.values[Number(i)-1])) }, run(){ const out=runSqlite(['-json', dbPath, `${this.materialized()}; SELECT changes() AS changes;`]); const rows=JSON.parse(out||'[]'); return Promise.resolve({meta:{changes:rows.at(-1)?.changes??0}})}, all(){ const out=runSqlite(['-json', dbPath, this.materialized()]); return Promise.resolve({results:JSON.parse(out||'[]')})}, first(){ const out=runSqlite(['-json', dbPath, this.materialized()]); return Promise.resolve((JSON.parse(out||'[]'))[0]||null)} } } }
 
 async function buildRuntime(dbPath) {
-  const { transformSync } = await import('esbuild')
   const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
-  const worker = (await import(`data:text/javascript;base64,${Buffer.from(transformSync(source, { loader: 'ts', format: 'esm' }).code).toString('base64')}`)).default
+  const worker = (await importWorker()).default
   const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
   const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
   const post = async (path, payload) => {
