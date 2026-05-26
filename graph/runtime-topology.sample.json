@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-26T06:45:24.507Z",
+  "generated_at": "2026-05-26T07:58:05.831Z",
   "nodes": [
     {
       "id": "src/canonical-authority.js",
@@ -452,6 +452,42 @@
       "production_closure_relevant": true
     },
     {
+      "id": "src/lib/conflict-set.ts",
+      "type": "authority",
+      "label": "src/lib/conflict-set.ts",
+      "file_path": "src/lib/conflict-set.ts",
+      "symbol": "conflict-set.ts",
+      "mutation_capable": false,
+      "authority_bound": true,
+      "continuity_bound": false,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": false,
+      "topology_visible": true,
+      "closure_status": "PARTIAL",
+      "artifact_role": "runtime",
+      "risk_scope": "production_runtime",
+      "production_closure_relevant": true
+    },
+    {
+      "id": "src/lib/finality-classification.ts",
+      "type": "authority",
+      "label": "src/lib/finality-classification.ts",
+      "file_path": "src/lib/finality-classification.ts",
+      "symbol": "finality-classification.ts",
+      "mutation_capable": false,
+      "authority_bound": true,
+      "continuity_bound": true,
+      "validator_bound": false,
+      "replay_safe": true,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CONTAINED",
+      "artifact_role": "runtime",
+      "risk_scope": "production_runtime",
+      "production_closure_relevant": true
+    },
+    {
       "id": "src/lib/legitimacy-governance.js",
       "type": "authority",
       "label": "src/lib/legitimacy-governance.js",
@@ -465,6 +501,42 @@
       "proof_generating": true,
       "topology_visible": true,
       "closure_status": "OPEN",
+      "artifact_role": "runtime",
+      "risk_scope": "production_runtime",
+      "production_closure_relevant": true
+    },
+    {
+      "id": "src/lib/quorum-attestation.ts",
+      "type": "authority",
+      "label": "src/lib/quorum-attestation.ts",
+      "file_path": "src/lib/quorum-attestation.ts",
+      "symbol": "quorum-attestation.ts",
+      "mutation_capable": false,
+      "authority_bound": true,
+      "continuity_bound": true,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CONTAINED",
+      "artifact_role": "runtime",
+      "risk_scope": "production_runtime",
+      "production_closure_relevant": true
+    },
+    {
+      "id": "src/lib/revocation-liveness.ts",
+      "type": "authority",
+      "label": "src/lib/revocation-liveness.ts",
+      "file_path": "src/lib/revocation-liveness.ts",
+      "symbol": "revocation-liveness.ts",
+      "mutation_capable": false,
+      "authority_bound": true,
+      "continuity_bound": true,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CONTAINED",
       "artifact_role": "runtime",
       "risk_scope": "production_runtime",
       "production_closure_relevant": true
@@ -4718,6 +4790,24 @@
       "production_closure_relevant": false
     },
     {
+      "id": "docs/distributed-finality-arbitration-canon.md",
+      "type": "authority",
+      "label": "docs/distributed-finality-arbitration-canon.md",
+      "file_path": "docs/distributed-finality-arbitration-canon.md",
+      "symbol": "distributed-finality-arbitration-canon.md",
+      "mutation_capable": true,
+      "authority_bound": true,
+      "continuity_bound": false,
+      "validator_bound": true,
+      "replay_safe": true,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CLOSED",
+      "artifact_role": "doc",
+      "risk_scope": "documentation_only",
+      "production_closure_relevant": false
+    },
+    {
       "id": "docs/distributed-temporal-convergence-closure-analysis.md",
       "type": "authority",
       "label": "docs/distributed-temporal-convergence-closure-analysis.md",
@@ -7143,6 +7233,78 @@
       "proof_generating": true,
       "topology_visible": true,
       "closure_status": "BREAK_GLASS",
+      "artifact_role": "test",
+      "risk_scope": "test_only",
+      "production_closure_relevant": false
+    },
+    {
+      "id": "tests/fate/issue-1340-finality-classification-registry.test.mjs",
+      "type": "authority",
+      "label": "tests/fate/issue-1340-finality-classification-registry.test.mjs",
+      "file_path": "tests/fate/issue-1340-finality-classification-registry.test.mjs",
+      "symbol": "issue-1340-finality-classification-registry.test.mjs",
+      "mutation_capable": true,
+      "authority_bound": true,
+      "continuity_bound": true,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CONTAINED",
+      "artifact_role": "test",
+      "risk_scope": "test_only",
+      "production_closure_relevant": false
+    },
+    {
+      "id": "tests/fate/issue-1342-conflict-set-registry.test.mjs",
+      "type": "authority",
+      "label": "tests/fate/issue-1342-conflict-set-registry.test.mjs",
+      "file_path": "tests/fate/issue-1342-conflict-set-registry.test.mjs",
+      "symbol": "issue-1342-conflict-set-registry.test.mjs",
+      "mutation_capable": true,
+      "authority_bound": true,
+      "continuity_bound": false,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": false,
+      "topology_visible": true,
+      "closure_status": "PARTIAL",
+      "artifact_role": "test",
+      "risk_scope": "test_only",
+      "production_closure_relevant": false
+    },
+    {
+      "id": "tests/fate/issue-1343-quorum-attestation-registry.test.mjs",
+      "type": "authority",
+      "label": "tests/fate/issue-1343-quorum-attestation-registry.test.mjs",
+      "file_path": "tests/fate/issue-1343-quorum-attestation-registry.test.mjs",
+      "symbol": "issue-1343-quorum-attestation-registry.test.mjs",
+      "mutation_capable": true,
+      "authority_bound": true,
+      "continuity_bound": true,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CLOSED",
+      "artifact_role": "test",
+      "risk_scope": "test_only",
+      "production_closure_relevant": false
+    },
+    {
+      "id": "tests/fate/issue-1344-revocation-liveness-registry.test.mjs",
+      "type": "authority",
+      "label": "tests/fate/issue-1344-revocation-liveness-registry.test.mjs",
+      "file_path": "tests/fate/issue-1344-revocation-liveness-registry.test.mjs",
+      "symbol": "issue-1344-revocation-liveness-registry.test.mjs",
+      "mutation_capable": true,
+      "authority_bound": true,
+      "continuity_bound": true,
+      "validator_bound": false,
+      "replay_safe": false,
+      "proof_generating": true,
+      "topology_visible": true,
+      "closure_status": "CONTAINED",
       "artifact_role": "test",
       "risk_scope": "test_only",
       "production_closure_relevant": false
@@ -11423,17 +11585,45 @@
     },
     {
       "from": "src/lib/capability-risk-classification.js",
-      "to": "src/lib/legitimacy-governance.js",
+      "to": "src/lib/conflict-set.ts",
       "relation": "VALIDATES",
       "evidence": "validate -> authority",
       "file_path": "src/lib/capability-risk-classification.js"
     },
     {
+      "from": "src/lib/conflict-set.ts",
+      "to": "src/lib/finality-classification.ts",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "src/lib/conflict-set.ts"
+    },
+    {
+      "from": "src/lib/finality-classification.ts",
+      "to": "src/lib/legitimacy-governance.js",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "src/lib/finality-classification.ts"
+    },
+    {
       "from": "src/lib/legitimacy-governance.js",
+      "to": "src/lib/quorum-attestation.ts",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "src/lib/legitimacy-governance.js"
+    },
+    {
+      "from": "src/lib/quorum-attestation.ts",
+      "to": "src/lib/revocation-liveness.ts",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "src/lib/quorum-attestation.ts"
+    },
+    {
+      "from": "src/lib/revocation-liveness.ts",
       "to": "src/lib/skill-provenance-revocation.js",
       "relation": "DEPENDS_ON_AUTHORITY",
       "evidence": "authority -> validate",
-      "file_path": "src/lib/legitimacy-governance.js"
+      "file_path": "src/lib/revocation-liveness.ts"
     },
     {
       "from": "src/lib/skill-provenance-revocation.js",
@@ -13082,10 +13272,17 @@
     },
     {
       "from": "docs/cryptographic-provenance-hardening.md",
-      "to": "docs/distributed-temporal-convergence-closure-analysis.md",
+      "to": "docs/distributed-finality-arbitration-canon.md",
       "relation": "DEPENDS_ON_AUTHORITY",
       "evidence": "authority -> authority",
       "file_path": "docs/cryptographic-provenance-hardening.md"
+    },
+    {
+      "from": "docs/distributed-finality-arbitration-canon.md",
+      "to": "docs/distributed-temporal-convergence-closure-analysis.md",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "docs/distributed-finality-arbitration-canon.md"
     },
     {
       "from": "docs/distributed-temporal-convergence-closure-analysis.md",
@@ -14027,10 +14224,38 @@
     },
     {
       "from": "tests/fate/issue-1325-governed-deploy-infrastructure.test.mjs",
-      "to": "tests/fate/issue-380-main-branch-protection.test.mjs",
+      "to": "tests/fate/issue-1340-finality-classification-registry.test.mjs",
       "relation": "DEPENDS_ON_AUTHORITY",
       "evidence": "authority -> authority",
       "file_path": "tests/fate/issue-1325-governed-deploy-infrastructure.test.mjs"
+    },
+    {
+      "from": "tests/fate/issue-1340-finality-classification-registry.test.mjs",
+      "to": "tests/fate/issue-1342-conflict-set-registry.test.mjs",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "tests/fate/issue-1340-finality-classification-registry.test.mjs"
+    },
+    {
+      "from": "tests/fate/issue-1342-conflict-set-registry.test.mjs",
+      "to": "tests/fate/issue-1343-quorum-attestation-registry.test.mjs",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "tests/fate/issue-1342-conflict-set-registry.test.mjs"
+    },
+    {
+      "from": "tests/fate/issue-1343-quorum-attestation-registry.test.mjs",
+      "to": "tests/fate/issue-1344-revocation-liveness-registry.test.mjs",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "tests/fate/issue-1343-quorum-attestation-registry.test.mjs"
+    },
+    {
+      "from": "tests/fate/issue-1344-revocation-liveness-registry.test.mjs",
+      "to": "tests/fate/issue-380-main-branch-protection.test.mjs",
+      "relation": "DEPENDS_ON_AUTHORITY",
+      "evidence": "authority -> authority",
+      "file_path": "tests/fate/issue-1344-revocation-liveness-registry.test.mjs"
     },
     {
       "from": "tests/fate/issue-380-main-branch-protection.test.mjs",
@@ -15625,37 +15850,37 @@
   "summary": {
     "closure_status_counts_all": {
       "OPEN": 185,
-      "PARTIAL": 90,
-      "CONTAINED": 132,
-      "CLOSED": 158,
+      "PARTIAL": 92,
+      "CONTAINED": 137,
+      "CLOSED": 160,
       "BREAK_GLASS": 60
     },
     "closure_status_counts_production_relevant": {
       "OPEN": 12,
-      "PARTIAL": 5,
-      "CONTAINED": 13,
+      "PARTIAL": 6,
+      "CONTAINED": 16,
       "CLOSED": 12,
       "BREAK_GLASS": 12
     },
     "artifact_role_counts": {
-      "runtime": 47,
+      "runtime": 51,
       "workflow": 7,
       "script": 0,
       "migration": 0,
-      "test": 236,
+      "test": 240,
       "fixture": 75,
-      "doc": 79,
+      "doc": 80,
       "generated": 1,
       "topology_metadata": 124,
       "config": 0,
       "unknown": 56
     },
     "risk_scope_counts": {
-      "production_runtime": 47,
+      "production_runtime": 51,
       "governance_runtime": 0,
       "ci_workflow": 7,
-      "test_only": 311,
-      "documentation_only": 79,
+      "test_only": 315,
+      "documentation_only": 80,
       "metadata_only": 124,
       "generated_only": 1,
       "unknown": 56
@@ -15665,9 +15890,9 @@
       "workflow": 5,
       "script": 0,
       "migration": 0,
-      "test": 129,
+      "test": 133,
       "fixture": 5,
-      "doc": 67,
+      "doc": 68,
       "generated": 1,
       "topology_metadata": 28,
       "config": 0,
