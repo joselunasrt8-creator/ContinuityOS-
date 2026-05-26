@@ -165,11 +165,11 @@ test('classifyFromPredicates: LOCAL_VALID when base predicates hold but Q/G/X ab
   assert.equal(result, 'LOCAL_VALID')
 })
 
-test('classifyFromPredicates: GLOBAL_VALID when all predicates satisfied and epoch valid', () => {
+test('classifyFromPredicates: GLOBAL_VALID when all predicates satisfied and epoch globally authoritative', () => {
   const result = classifyFromPredicates(
     { V: true, A: true, U: true, P: true, R: true, T: true, C: true, Q: true, G: true, L: true, X: true },
     true,
-    true, // epochValid — required for GLOBAL_VALID
+    'EPOCH_GLOBAL_AUTHORITATIVE',
   )
   assert.equal(result, 'GLOBAL_VALID')
 })
@@ -177,23 +177,23 @@ test('classifyFromPredicates: GLOBAL_VALID when all predicates satisfied and epo
 // CONF-DIST-01 — local valid does not imply global valid
 test('CONF-DIST-01: LOCAL_VALID cannot be promoted to GLOBAL_VALID without convergence predicates', () => {
   // Q=false, G=false, X=false — distributed predicates absent.
-  // epochValid=true does not help: the ceiling is LOCAL_VALID.
+  // EPOCH_GLOBAL_AUTHORITATIVE does not help: the ceiling is LOCAL_VALID.
   const result = classifyFromPredicates(
     { V: true, A: true, U: true, P: true, R: true, T: true, C: true, Q: false, G: false, L: true, X: false },
     true,
-    true, // epochValid is true but Q/G/X absent — must stay LOCAL_VALID
+    'EPOCH_GLOBAL_AUTHORITATIVE', // globally authoritative epoch but Q/G/X absent — must stay LOCAL_VALID
   )
   assert.equal(result, 'LOCAL_VALID')
   assert.notEqual(result, 'GLOBAL_VALID')
 })
 
-test('classifyFromPredicates: CONVERGENCE_VALID when convergence predicates present but epoch not confirmed', () => {
-  // All distributed predicates present (Q, G, L, X) but epochValid=false.
+test('classifyFromPredicates: CONVERGENCE_VALID when convergence predicates present but no globally authoritative epoch', () => {
+  // All distributed predicates present (Q, G, L, X) but no epoch provided.
   // Cannot yet become GLOBAL_VALID; sits at the required intermediate state.
   const result = classifyFromPredicates(
     { V: true, A: true, U: true, P: true, R: true, T: true, C: true, Q: true, G: true, L: true, X: true },
     true,
-    false, // epochValid not confirmed — CONVERGENCE_VALID is the ceiling
+    null, // no epoch status — CONVERGENCE_VALID is the ceiling
   )
   assert.equal(result, 'CONVERGENCE_VALID')
   assert.notEqual(result, 'GLOBAL_VALID')
@@ -202,23 +202,23 @@ test('classifyFromPredicates: CONVERGENCE_VALID when convergence predicates pres
 test('classifyFromPredicates: CONVERGENCE_VALID is distinct from LOCAL_VALID', () => {
   const localValid = classifyFromPredicates(
     { V: true, A: true, U: true, P: true, R: true, T: true, C: true, Q: false, G: false, L: true, X: false },
-    true, false,
+    true, null,
   )
   const convergenceValid = classifyFromPredicates(
     { V: true, A: true, U: true, P: true, R: true, T: true, C: true, Q: true, G: true, L: true, X: true },
-    true, false,
+    true, null,
   )
   assert.equal(localValid, 'LOCAL_VALID')
   assert.equal(convergenceValid, 'CONVERGENCE_VALID')
   assert.notEqual(localValid, convergenceValid)
 })
 
-test('classifyFromPredicates: epochValid default is false — GLOBAL_VALID not reached without explicit confirmation', () => {
-  // No epochValid argument — default must not grant GLOBAL_VALID implicitly.
+test('classifyFromPredicates: epochStatus default is null — GLOBAL_VALID not reached without explicit epoch confirmation', () => {
+  // No epochStatus argument — default (null) must not grant GLOBAL_VALID implicitly.
   const result = classifyFromPredicates(
     { V: true, A: true, U: true, P: true, R: true, T: true, C: true, Q: true, G: true, L: true, X: true },
     true,
-    // epochValid omitted — should default to false
+    // epochStatus omitted — should default to null (CONVERGENCE_VALID ceiling)
   )
   assert.equal(result, 'CONVERGENCE_VALID')
   assert.notEqual(result, 'GLOBAL_VALID')

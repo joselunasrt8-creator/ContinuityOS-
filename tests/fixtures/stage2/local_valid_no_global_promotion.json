@@ -23,9 +23,9 @@
     "X": false
   },
   "topology_present": true,
-  "epoch_valid": true,
+  "epoch_status": "EPOCH_GLOBAL_AUTHORITATIVE",
   "expected_classification": "LOCAL_VALID",
   "forbidden_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
-  "_classification_function": "classifyFromPredicates(predicates, topologyPresent=true, epochValid=true)",
+  "_classification_function": "classifyFromPredicates(predicates, topologyPresent=true, epochStatus='EPOCH_GLOBAL_AUTHORITATIVE')",
   "_module": "src/lib/finality-classification.ts"
 }

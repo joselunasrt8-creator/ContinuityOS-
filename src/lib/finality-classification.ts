@@ -1,4 +1,9 @@
 import { sha256Hex, canonicalize } from '../canonical.js'
+import {
+  type EpochFinalityStatus,
+  isEpochBlocking,
+  isEpochGloballyAuthoritative,
+} from './epoch-substrate.js'
 
 // Evidence-only — classification ≠ execution authority
 export const creates_authority = false as const
@@ -89,29 +94,37 @@ export function evidenceFlagsFromPredicates(p: PredicateSnapshot): {
 // Derives the expected classification from a predicate snapshot.
 // Follows the canonical state machine; does not query D1.
 //
-// epochValid is a stub for Slice C (epoch registry coupling). Default false
-// ensures no classification silently inherits epoch validity it hasn't earned.
+// epochStatus couples the epoch registry to finality classification:
+//   - null            → no epoch constraint (CONVERGENCE_VALID ceiling, not GLOBAL_VALID)
+//   - EPOCH_GLOBAL_AUTHORITATIVE → allows GLOBAL_VALID
+//   - EPOCH_STALE_VISIBLE        → forces STALE_VISIBLE (epoch is stale, object is stale)
+//   - EPOCH_PARTITION_SUSPENDED  → forces PARTITION_SUSPENDED
+//   - blocking states            → forces NULL (AMBIGUOUS, CONFLICTED, REVOKED, NULL)
 //
 // LOCAL_VALID → GLOBAL_VALID transition is forbidden without passing through
 // CONVERGENCE_VALID: convergence evidence (Q, G, L, X) must all be present,
-// and epoch binding must be confirmed before GLOBAL_VALID is reachable.
+// and epoch must be EPOCH_GLOBAL_AUTHORITATIVE before GLOBAL_VALID is reachable.
 export function classifyFromPredicates(
   p: PredicateSnapshot,
   topologyPresent: boolean,
-  epochValid: boolean = false,
+  epochStatus: EpochFinalityStatus | null = null,
 ): FinalityClassification {
   if (!topologyPresent) return 'PARTITION_SUSPENDED'
+  // Epoch state takes precedence: stale or blocking epochs override predicate logic.
+  if (epochStatus === 'EPOCH_PARTITION_SUSPENDED') return 'PARTITION_SUSPENDED'
+  if (epochStatus === 'EPOCH_STALE_VISIBLE') return 'STALE_VISIBLE'
+  if (epochStatus !== null && isEpochBlocking(epochStatus)) return 'NULL'
   const base = p.V && p.A && p.U && p.P && p.R && p.T && p.C
   if (!base) return 'NULL'
   if (p.Q && p.G && p.L && p.X) {
-    // Convergence evidence is present. GLOBAL_VALID requires epoch binding;
-    // without it the object sits at CONVERGENCE_VALID — the required intermediate.
-    if (epochValid) return 'GLOBAL_VALID'
+    // Convergence evidence present. Only a globally authoritative epoch grants GLOBAL_VALID;
+    // without it the object is at CONVERGENCE_VALID — the required intermediate state.
+    if (epochStatus !== null && isEpochGloballyAuthoritative(epochStatus)) return 'GLOBAL_VALID'
     return 'CONVERGENCE_VALID'
   }
   // Distributed predicates (Q, G, X) are absent: LOCAL_VALID is the ceiling
-  // regardless of topology presence or epochValid. The caller cannot reach
-  // GLOBAL_VALID from here without first acquiring convergence evidence.
+  // regardless of epoch status. The caller cannot reach GLOBAL_VALID from here
+  // without first acquiring convergence evidence.
   if (p.L) return 'LOCAL_VALID'
   return 'STALE_VISIBLE'
 }

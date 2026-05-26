@@ -122,12 +122,17 @@
     {
       "check_id": "CONF-DIST-11",
       "label": "epoch_mismatch_prevents_convergence_valid",
-      "description": "Epoch mismatch between classification and epoch registry must prevent CONVERGENCE_VALID. Result must be NULL or STALE_VISIBLE.",
+      "description": "Epoch mismatch between classification and epoch registry must prevent CONVERGENCE_VALID. Stale epoch (EPOCH_STALE_VISIBLE) forces STALE_VISIBLE; blocking epochs (EPOCH_AMBIGUOUS, EPOCH_CONFLICTED, EPOCH_REVOKED, EPOCH_NULL) force NULL; EPOCH_PARTITION_SUSPENDED forces PARTITION_SUSPENDED.",
       "fixture": "tests/fixtures/stage2/epoch_mismatch.json",
-      "expected_result": "NULL",
-      "required_module": "src/lib/epoch-substrate.ts",
+      "test": "tests/fate/stage2-conf-dist-11.test.mjs",
+      "expected_result": "STALE_VISIBLE",
+      "forbidden_results": ["CONVERGENCE_VALID", "GLOBAL_VALID"],
+      "classification_layer": "classifyFromPredicates",
+      "required_module": "src/lib/finality-classification.ts",
+      "required_migration": "migrations/0054_epoch_settlement_coupling.sql",
+      "db_guard": "er_stale_downgrade",
       "related_issue": "#1418",
-      "status": "PENDING — Slice C"
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-12",

@@ -1,0 +1,40 @@
+{
+  "_fixture_id": "CONF-DIST-11",
+  "_description": "Object with full convergence predicates (Q=true, G=true, L=true, X=true) but whose epoch is EPOCH_STALE_VISIBLE (stale — superseded by a newer canonical epoch). Classification must be STALE_VISIBLE, not CONVERGENCE_VALID. Epoch mismatch prevents any promotion above STALE_VISIBLE.",
+  "_expected_outcome": "STALE_VISIBLE",
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "_related_issue": "#1418",
+  "_invariant": "Epoch mismatch between a classification attempt and the epoch registry must prevent CONVERGENCE_VALID. A stale epoch (EPOCH_STALE_VISIBLE) forces classification to STALE_VISIBLE regardless of predicate quality. The object remains observable but is not execution-eligible.",
+  "_guard": "classifyFromPredicates enforces: epochStatus='EPOCH_STALE_VISIBLE' forces return 'STALE_VISIBLE' before predicate logic runs. Convergence predicates (Q/G/L/X) cannot override a stale epoch.",
+  "_db_guard": "Migration 0054 trigger er_stale_downgrade automatically inserts STALE_VISIBLE supersession records when an epoch advances to EPOCH_STALE_VISIBLE or EPOCH_NULL.",
+  "_null_alternative": "If using a hard-blocking epoch status (EPOCH_AMBIGUOUS, EPOCH_CONFLICTED, EPOCH_REVOKED, EPOCH_NULL), classifyFromPredicates returns NULL. Both NULL and STALE_VISIBLE prevent CONVERGENCE_VALID.",
+  "scenario": "epoch_mismatch",
+  "predicate_snapshot": {
+    "V": true,
+    "A": true,
+    "U": true,
+    "P": true,
+    "R": true,
+    "T": true,
+    "C": true,
+    "Q": true,
+    "G": true,
+    "L": true,
+    "X": true
+  },
+  "topology_present": true,
+  "epoch_status": "EPOCH_STALE_VISIBLE",
+  "expected_classification": "STALE_VISIBLE",
+  "forbidden_classifications": ["CONVERGENCE_VALID", "GLOBAL_VALID"],
+  "_classification_function": "classifyFromPredicates(predicates, topologyPresent=true, epochStatus='EPOCH_STALE_VISIBLE')",
+  "_module": "src/lib/finality-classification.ts",
+  "_blocking_epoch_statuses": {
+    "EPOCH_STALE_VISIBLE": "STALE_VISIBLE",
+    "EPOCH_PARTITION_SUSPENDED": "PARTITION_SUSPENDED",
+    "EPOCH_AMBIGUOUS": "NULL",
+    "EPOCH_CONFLICTED": "NULL",
+    "EPOCH_REVOKED": "NULL",
+    "EPOCH_NULL": "NULL"
+  }
+}

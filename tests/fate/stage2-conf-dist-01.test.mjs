@@ -26,38 +26,38 @@ test('CONF-DIST-01: fixture expected outcome is LOCAL_VALID', () => {
   assert.ok(fixture.forbidden_classifications.includes('GLOBAL_VALID'))
 })
 
-test('CONF-DIST-01: LOCAL_VALID when Q, G, X absent — topology present, epoch valid', () => {
+test('CONF-DIST-01: LOCAL_VALID when Q, G, X absent — topology present, epoch globally authoritative', () => {
   const p = fixture.predicate_snapshot
-  const result = classifyFromPredicates(p, fixture.topology_present, fixture.epoch_valid)
+  const result = classifyFromPredicates(p, fixture.topology_present, fixture.epoch_status)
   assert.equal(result, fixture.expected_classification)
   assert.equal(result, 'LOCAL_VALID')
 })
 
 test('CONF-DIST-01: GLOBAL_VALID is not reachable from predicates with Q=false', () => {
   const p = { ...fixture.predicate_snapshot, Q: false }
-  const result = classifyFromPredicates(p, true, true)
+  const result = classifyFromPredicates(p, true, 'EPOCH_GLOBAL_AUTHORITATIVE')
   assert.notEqual(result, 'GLOBAL_VALID')
 })
 
 test('CONF-DIST-01: GLOBAL_VALID is not reachable from predicates with G=false', () => {
   const p = { ...fixture.predicate_snapshot, G: false }
-  const result = classifyFromPredicates(p, true, true)
+  const result = classifyFromPredicates(p, true, 'EPOCH_GLOBAL_AUTHORITATIVE')
   assert.notEqual(result, 'GLOBAL_VALID')
 })
 
 test('CONF-DIST-01: GLOBAL_VALID is not reachable from predicates with X=false', () => {
   const p = { ...fixture.predicate_snapshot, X: false }
-  const result = classifyFromPredicates(p, true, true)
+  const result = classifyFromPredicates(p, true, 'EPOCH_GLOBAL_AUTHORITATIVE')
   assert.notEqual(result, 'GLOBAL_VALID')
 })
 
-test('CONF-DIST-01: epochValid=true alone does not promote LOCAL_VALID to GLOBAL_VALID', () => {
-  // epoch validity is necessary but not sufficient — convergence evidence required
+test('CONF-DIST-01: EPOCH_GLOBAL_AUTHORITATIVE alone does not promote LOCAL_VALID to GLOBAL_VALID', () => {
+  // globally authoritative epoch is necessary but not sufficient — convergence evidence required
   const localPredicates = {
     V: true, A: true, U: true, P: true, R: true, T: true, C: true,
     Q: false, G: false, L: true, X: false,
   }
-  const result = classifyFromPredicates(localPredicates, true, true)
+  const result = classifyFromPredicates(localPredicates, true, 'EPOCH_GLOBAL_AUTHORITATIVE')
   assert.equal(result, 'LOCAL_VALID')
   assert.notEqual(result, 'GLOBAL_VALID')
   assert.notEqual(result, 'CONVERGENCE_VALID')
@@ -68,18 +68,18 @@ test('CONF-DIST-01: topology presence alone does not promote LOCAL_VALID to GLOB
     V: true, A: true, U: true, P: true, R: true, T: true, C: true,
     Q: false, G: false, L: true, X: false,
   }
-  const result = classifyFromPredicates(localPredicates, true, false)
+  const result = classifyFromPredicates(localPredicates, true, null)
   assert.equal(result, 'LOCAL_VALID')
   assert.notEqual(result, 'GLOBAL_VALID')
 })
 
-test('CONF-DIST-01: GLOBAL_VALID requires all of Q, G, L, X and epochValid=true', () => {
+test('CONF-DIST-01: GLOBAL_VALID requires all of Q, G, L, X and EPOCH_GLOBAL_AUTHORITATIVE', () => {
   const convergencePredicates = {
     V: true, A: true, U: true, P: true, R: true, T: true, C: true,
     Q: true, G: true, L: true, X: true,
   }
-  const withEpoch = classifyFromPredicates(convergencePredicates, true, true)
-  const withoutEpoch = classifyFromPredicates(convergencePredicates, true, false)
+  const withEpoch = classifyFromPredicates(convergencePredicates, true, 'EPOCH_GLOBAL_AUTHORITATIVE')
+  const withoutEpoch = classifyFromPredicates(convergencePredicates, true, null)
   assert.equal(withEpoch, 'GLOBAL_VALID')
   assert.equal(withoutEpoch, 'CONVERGENCE_VALID') // intermediate — not yet GLOBAL_VALID
 })
