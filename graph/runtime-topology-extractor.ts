@@ -37,9 +37,52 @@ function classifyClosure(filePath:string, content:string): ClosureStatus {
   const lower = `${filePath}\n${content}`.toLowerCase()
   if (lower.includes('break_glass')) return 'BREAK_GLASS'
   if (lower.includes('fail-closed') || lower.includes('non-bypassability') || lower.includes('cannot')) return 'CLOSED'
-  if (lower.includes('mutation') || lower.includes('execute') || lower.includes('deploy')) return 'OPEN'
   if (lower.includes('validate') || lower.includes('proof') || lower.includes('replay')) return 'CONTAINED'
+  if (lower.includes('mutation') || lower.includes('execute') || lower.includes('deploy')) return 'OPEN'
   return 'PARTIAL'
+}
+
+function extractWorkflowReplayFeatures(lower:string): { replayIdentity:boolean; lineageBinding:boolean; proofProvenanceLink:boolean } {
+  const replayIdentity = [
+    'workflow_run.id',
+    'decision_id',
+    'nonce',
+    'duplicate',
+    'replay',
+  ].some((token) => lower.includes(token))
+
+  const lineageBinding = [
+    'github.sha',
+    'github.ref',
+    'lineage',
+    'rollback',
+    'constitutional',
+    'sco',
+  ].some((token) => lower.includes(token))
+
+  const proofProvenanceLink = [
+    'proof',
+    'provenance',
+    'attest',
+    'decision_id',
+  ].some((token) => lower.includes(token))
+
+  return { replayIdentity, lineageBinding, proofProvenanceLink }
+}
+
+function replaySafeFromSignals(lower:string, role: ArtifactRole): boolean {
+  const rejectionSignals = ['reject', 'block', 'invalid', 'mismatch', 'stale']
+  const replaySignals = ['replay', 'duplicate', 'nonce', 'workflow_run.id', 'decision_id']
+  const lineageSignals = ['lineage', 'rollback', 'provenance', 'github.sha']
+  const hasRejection = rejectionSignals.some((token) => lower.includes(token))
+  const hasReplaySemantics = replaySignals.some((token) => lower.includes(token))
+  const hasLineageSemantics = lineageSignals.some((token) => lower.includes(token))
+
+  if (role === 'workflow') {
+    const wf = extractWorkflowReplayFeatures(lower)
+    return (wf.replayIdentity && hasRejection) || (wf.lineageBinding && wf.proofProvenanceLink && hasReplaySemantics)
+  }
+  return hasReplaySemantics && (hasRejection || hasLineageSemantics || lower.includes('safe'))
 }
 
 function classifyArtifactRole(filePath: string): ArtifactRole {
@@ -116,7 +159,7 @@ export function extractRuntimeTopology(repoRoot = process.cwd()): RuntimeTopolog
       authority_bound: lower.includes('authority'),
       continuity_bound: lower.includes('continuity'),
       validator_bound: lower.includes('validate') || lower.includes('validator'),
-      replay_safe: lower.includes('replay') && (lower.includes('block') || lower.includes('reject') || lower.includes('safe')),
+      replay_safe: replaySafeFromSignals(lower, artifact_role),
       proof_generating: lower.includes('proof'),
       topology_visible: true,
       closure_status: classifyClosure(rel, content),

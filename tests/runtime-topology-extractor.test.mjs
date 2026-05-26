@@ -82,3 +82,31 @@ test('summary includes all and production-relevant closure counts', () => {
   assert.equal(totalAll, out.nodes.length)
   assert.ok(totalRelevant <= totalAll)
 })
+
+
+test('workflow replay semantics are detected without authority escalation', () => {
+  const out = extractRuntimeTopology(process.cwd())
+  const byPath = new Map(out.nodes.map((n) => [n.file_path, n]))
+
+  const governed = byPath.get('.github/workflows/governed-deploy.yml')
+  const prepare = byPath.get('.github/workflows/prepare-governed-deploy.yml')
+  const constitutional = byPath.get('.github/workflows/constitutional-integrity.yml')
+  const sco = byPath.get('.github/workflows/sco-candidate.yml')
+
+  for (const node of [governed, prepare, constitutional, sco]) {
+    assert.ok(node)
+    assert.equal(node.artifact_role, 'workflow')
+    assert.equal(node.topology_visible, true)
+  }
+
+  const replaySafeCount = [governed, prepare, constitutional, sco].filter((node) => node?.replay_safe).length
+  assert.ok(replaySafeCount >= 3)
+})
+
+test('closure precedence favors replay/validation containment over lexical open', () => {
+  const out = extractRuntimeTopology(process.cwd())
+  const byPath = new Map(out.nodes.map((n) => [n.file_path, n]))
+  const governed = byPath.get('.github/workflows/governed-deploy.yml')
+  assert.ok(governed)
+  assert.equal(governed.closure_status, 'CONTAINED')
+})
