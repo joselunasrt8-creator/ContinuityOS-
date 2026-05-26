@@ -69,6 +69,16 @@ type GovernCandidate = {
   target: Record<string, unknown>
   finality: Record<string, unknown>
 }
+type GovernedToolEnvelope = {
+  candidate_hash: string
+  nonce_binding: string
+  policy_digest: string
+  topology_digest: string
+  lineage_pointers: { decision_id: string, continuity_id: string, authority_id?: string }
+  timestamp: string
+  non_operative: true
+  tool_surface_descriptor: { route: string, workflow: string, executable: boolean }
+}
 
 type GovernResult = "VALID_CANDIDATE" | "NULL"
 
@@ -82,6 +92,15 @@ function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCand
   if (!isPlainRecord(input.target)) return { ok: false, reason: "missing_target" }
   if (!isPlainRecord(input.finality)) return { ok: false, reason: "missing_finality" }
   return { ok: true, candidate: { intent: input.intent, scope: input.scope, target: input.target, finality: input.finality } }
+}
+async function verifyGovernedToolEnvelopeLinkage(env: Env, decision_id: string, route: string): Promise<{ ok: true, envelope_id: string } | { ok: false, reason: string }> {
+  const authority = await env.DB.prepare(`SELECT governed_tool_envelope_id FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
+  const envelope_id = String(authority?.governed_tool_envelope_id || "")
+  if (!envelope_id) return { ok: false, reason: "governed_tool_envelope_missing" }
+  const envelope = await env.DB.prepare(`SELECT * FROM governed_tool_envelope_registry WHERE envelope_id=?1`).bind(envelope_id).first<any>()
+  if (!envelope) return { ok: false, reason: "governed_tool_envelope_missing" }
+  if (String(envelope.non_operative || "") !== "false" && route !== "/govern") return { ok: false, reason: "governed_tool_envelope_non_operative" }
+  return { ok: true, envelope_id }
 }
 type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_SCHEMA_INITIALIZED"
@@ -309,8 +328,9 @@ const EXTERNAL_CONFORMANCE_VERIFICATION_REGISTRY = "external_conformance_verific
 const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   session_registry: ["session_id", "identity_id", "owner", "trust_tier", "continuity_status", "created_at", "expires_at"],
   continuity_registry: ["continuity_id", "identity_id", "session_id", "parent_continuity_id", "continuity_hash", "canonical_continuity", "status", "issued_at", "expires_at", "revoked_at"],
-  authority_registry: ["authority_id", "decision_id", "session_id", "owner", "intent", "scope", "constraints", "expiry", "status", "created_at", "continuity_id", "identity_id", "delegated_authority_id", "parent_authority_id", "delegation_depth", "delegation_scope_subset", "delegation_expiry", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash"],
-  aeo_registry: ["aeo_id", "authority_id", "decision_id", "canonical_aeo", "validated_object_hash", "status", "created_at", "continuity_id", "delegated_authority_id", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "lineage_stage", "lineage_origin_hash"],
+  authority_registry: ["authority_id", "decision_id", "session_id", "owner", "intent", "scope", "constraints", "expiry", "status", "created_at", "continuity_id", "identity_id", "delegated_authority_id", "parent_authority_id", "delegation_depth", "delegation_scope_subset", "delegation_expiry", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "governed_tool_envelope_id"],
+  aeo_registry: ["aeo_id", "authority_id", "decision_id", "canonical_aeo", "validated_object_hash", "status", "created_at", "continuity_id", "delegated_authority_id", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "lineage_stage", "lineage_origin_hash", "governed_tool_envelope_id"],
+  governed_tool_envelope_registry: ["envelope_id", "candidate_hash", "nonce_binding", "policy_digest", "topology_digest", "lineage_pointers", "timestamp", "non_operative", "tool_surface_descriptor", "created_at"],
   preo_registry: ["preo_id", "decision_id", "authority_id", "continuity_id", "reviewed_hash", "reviewed_tree_hash", "merge_commit_sha", "canonical_preo", "status", "created_at"],
   validation_registry: ["validation_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "environment", "result", "reason", "status", "created_at", "continuity_id", "delegated_authority_id", "delegated_replay_chain_hash", "parent_compilation_hash", "workflow_integrity_hash", "lineage_stage", "lineage_origin_hash"],
   execution_registry: ["execution_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "status", "created_at", "continuity_id", "repository", "branch", "pull_request_id", "merge_commit_sha", "source_tree_hash", "workflow_run_id", "workflow_sha", "workflow_integrity_hash", "delegated_authority_id", "delegated_replay_chain_hash", "delegation_lineage_hash", "delegation_root_hash", "parent_validation_hash", "lineage_stage", "lineage_origin_hash"],
@@ -1248,9 +1268,9 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_session_registry_status_expiry ON session_registry(continuity_status, expires_at)`,
       `CREATE TABLE IF NOT EXISTS continuity_registry (continuity_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL, session_id TEXT NOT NULL, parent_continuity_id TEXT, continuity_hash TEXT NOT NULL, canonical_continuity TEXT NOT NULL, status TEXT NOT NULL, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT, UNIQUE(continuity_hash))`,
       `CREATE INDEX IF NOT EXISTS idx_continuity_registry_session_identity ON continuity_registry(session_id, identity_id, status, expires_at)`,
-      `CREATE TABLE IF NOT EXISTS authority_registry (authority_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL UNIQUE, session_id TEXT NOT NULL, owner TEXT NOT NULL, intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, expiry TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, identity_id TEXT, delegated_authority_id TEXT, parent_authority_id TEXT, delegation_depth TEXT, delegation_scope_subset TEXT, delegation_expiry TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT)`,
+      `CREATE TABLE IF NOT EXISTS authority_registry (authority_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL UNIQUE, session_id TEXT NOT NULL, owner TEXT NOT NULL, intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, expiry TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, identity_id TEXT, delegated_authority_id TEXT, parent_authority_id TEXT, delegation_depth TEXT, delegation_scope_subset TEXT, delegation_expiry TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT, governed_tool_envelope_id TEXT)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_authority_registry_decision_unique ON authority_registry(decision_id)`,
-      `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, workflow_integrity_hash TEXT, delegated_authority_id TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT, lineage_stage TEXT, lineage_origin_hash TEXT)`,
+      `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, workflow_integrity_hash TEXT, delegated_authority_id TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT, lineage_stage TEXT, lineage_origin_hash TEXT, governed_tool_envelope_id TEXT)`,
       `CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_hash ON aeo_registry(decision_id, validated_object_hash)`,
       `CREATE TABLE IF NOT EXISTS preo_registry (preo_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, authority_id TEXT NOT NULL, continuity_id TEXT NOT NULL, reviewed_hash TEXT NOT NULL, reviewed_tree_hash TEXT, merge_commit_sha TEXT, canonical_preo TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(decision_id, reviewed_hash))`,
       `CREATE INDEX IF NOT EXISTS idx_preo_registry_decision_hash ON preo_registry(decision_id, reviewed_hash)`,
@@ -1265,6 +1285,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_proof_registry_execution_decision_hash ON proof_registry(execution_id, decision_id, validated_object_hash)`,
             `CREATE TABLE IF NOT EXISTS proof_registry_duplicate_archive (archive_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL, archived_at TEXT NOT NULL, archive_reason TEXT NOT NULL, canonical_proof_id TEXT NOT NULL, UNIQUE(proof_id))`,
       `CREATE TABLE IF NOT EXISTS proof_quarantine_registry (quarantine_id TEXT PRIMARY KEY, proof_id TEXT NOT NULL, lineage_hash TEXT NOT NULL, quarantine_reason TEXT NOT NULL, canonical_proof_selected TEXT NOT NULL, duplicate_proof_archived TEXT NOT NULL, quarantine_generated_at TEXT NOT NULL, replay_neutral TEXT NOT NULL CHECK (replay_neutral='true'), evidence_only TEXT NOT NULL CHECK (evidence_only='true'))`,
+      `CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS invocation_registry (decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, PRIMARY KEY(decision_id, validated_object_hash, invocation_nonce))`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_invocation_registry_nonce_once ON invocation_registry(decision_id, validated_object_hash, invocation_nonce)`,
       `CREATE TABLE IF NOT EXISTS execution_snapshot_registry (snapshot_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, continuity_id TEXT NOT NULL, authority_id TEXT NOT NULL, repository_tree_hash TEXT NOT NULL, workflow_hash TEXT NOT NULL, governance_hash TEXT NOT NULL, topology_hash TEXT NOT NULL, runtime_surface_hash TEXT NOT NULL, schema_set_hash TEXT NOT NULL, workflow_identity TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, replay_epoch TEXT NOT NULL, status TEXT NOT NULL, execution_id TEXT, proof_id TEXT, created_at TEXT NOT NULL, UNIQUE(decision_id, validated_object_hash, invocation_nonce), UNIQUE(execution_id), UNIQUE(proof_id))`,
@@ -7557,6 +7578,8 @@ export default {
       const session = await activeSession(env, session_id)
       if (!session) return rejectWithTelemetry(env, { status: "NULL", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/authority", session_id }, drift_class: "authority_drift" })
       const decision_id = String(b.decision_id || crypto.randomUUID())
+      const governed_tool_envelope_id = String(b.governed_tool_envelope_id || "")
+      if (!governed_tool_envelope_id) return rejectWithTelemetry(env, { status: "NULL", reason: "governed_tool_envelope_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/authority", indicator: "governed_tool_envelope_missing" }, drift_class: "authority_drift" })
       const continuity_id = String(b.continuity_id || "")
       if (!continuity_id) return rejectWithTelemetry(env, { status: "NULL", reason: "missing_continuity_id" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/authority", session_id }, drift_class: "authority_drift" })
       const continuity = await activeContinuity(env, continuity_id, session, decision_id)
@@ -7581,7 +7604,7 @@ export default {
         rec.delegated_replay_chain_hash = delegated.object.delegated_replay_chain_hash
         rec.scope = canonicalize({ ...baseScope, delegated_authority_id: rec.delegated_authority_id, parent_authority_id: rec.parent_authority_id, delegation_depth: rec.delegation_depth, delegation_scope_subset: delegated.object.delegation_scope_subset, delegation_expiry: rec.delegation_expiry, delegation_lineage_hash: rec.delegation_lineage_hash, delegation_root_hash: rec.delegation_root_hash, delegated_replay_chain_hash: rec.delegated_replay_chain_hash })
       }
-      await env.DB.prepare(`INSERT INTO authority_registry (authority_id,decision_id,identity_id,session_id,continuity_id,owner,intent,scope,constraints,expiry,status,created_at,delegated_authority_id,parent_authority_id,delegation_depth,delegation_scope_subset,delegation_expiry,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)`).bind(rec.authority_id,rec.decision_id,rec.identity_id,rec.session_id,rec.continuity_id,rec.owner,rec.intent,rec.scope,rec.constraints,rec.expiry,rec.status,rec.created_at,rec.delegated_authority_id || "",rec.parent_authority_id || "",rec.delegation_depth || "",rec.delegation_scope_subset || "",rec.delegation_expiry || "",rec.delegation_lineage_hash || "",rec.delegation_root_hash || "",rec.delegated_replay_chain_hash || "").run()
+      await env.DB.prepare(`INSERT INTO authority_registry (authority_id,decision_id,identity_id,session_id,continuity_id,owner,intent,scope,constraints,expiry,status,created_at,delegated_authority_id,parent_authority_id,delegation_depth,delegation_scope_subset,delegation_expiry,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash,governed_tool_envelope_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)`).bind(rec.authority_id,rec.decision_id,rec.identity_id,rec.session_id,rec.continuity_id,rec.owner,rec.intent,rec.scope,rec.constraints,rec.expiry,rec.status,rec.created_at,rec.delegated_authority_id || "",rec.parent_authority_id || "",rec.delegation_depth || "",rec.delegation_scope_subset || "",rec.delegation_expiry || "",rec.delegation_lineage_hash || "",rec.delegation_root_hash || "",rec.delegated_replay_chain_hash || "", governed_tool_envelope_id).run()
       if (delegated.object) await appendDelegatedAuthorityObject(env, delegated.object, rec.created_at)
       await emitTelemetry(env, { event_type: "AUTHORITY_CREATED", decision_id: rec.decision_id, authority_id: rec.authority_id, severity: "INFO", payload: { route: "/authority", session_id, continuity_id, authority_status: "ACTIVE", delegated_authority_id: rec.delegated_authority_id || null } })
       return json(rec)
@@ -7591,6 +7614,8 @@ export default {
       try {
         const b = await body(request)
         const decision_id = String(b.decision_id || "")
+        const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/compile")
+        if (!envelopeLink.ok) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
         const compileSnapshot = executionSnapshotFrom(b)
         const missingCompileSnapshotFields = missingExecutionSnapshotFields(compileSnapshot)
         if (!decision_id) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/compile", indicator: "missing_decision_id" }, drift_class: "registry_drift" })
@@ -7655,7 +7680,7 @@ export default {
         const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash, ...compileSnapshot }))
         const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash, authority, required: requirePreoLineage })
         if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
-        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,status,created_at,workflow_integrity_hash,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash) VALUES (?1,?2,?3,?4,?5,?6,'COMPILED',?7,?8,?9,?10,?11,?12)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, new Date().toISOString(), String(compileSnapshot.workflow_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || "")).run()
+        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,status,created_at,workflow_integrity_hash,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash,governed_tool_envelope_id) VALUES (?1,?2,?3,?4,?5,?6,'COMPILED',?7,?8,?9,?10,?11,?12,?13)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, new Date().toISOString(), String(compileSnapshot.workflow_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || ""), String(authority.governed_tool_envelope_id || "")).run()
         await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash, validated_execution_snapshot } })
         return json({ status: "COMPILED", decision_id, validated_object_hash, validated_execution_snapshot, canonical_aeo: JSON.parse(canonical_aeo_json) })
       } catch (error: any) {
@@ -7686,6 +7711,7 @@ export default {
       }
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
       if (result === "VALID_CANDIDATE") {
         const nonceInsert = await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry (nonce, candidate_hash, created_at) VALUES (?1,?2,?3)`).bind(nonce, candidate_hash, timestamp).run()
         if ((nonceInsert.meta?.changes || 0) === 0) {
@@ -7695,12 +7721,27 @@ export default {
       }
       const evidence_id = await sha256Hex(canonicalize({ candidate_hash, nonce, timestamp, result, reason }))
       await env.DB.prepare(`INSERT OR IGNORE INTO govern_evidence_registry (evidence_id, candidate_hash, nonce, result, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6)`).bind(evidence_id, candidate_hash, nonce, result, reason || null, timestamp).run()
+      const envelope: GovernedToolEnvelope = {
+        candidate_hash,
+        nonce_binding: nonce,
+        policy_digest: await sha256Hex(canonicalize({ intent: candidate.intent, finality: candidate.finality })),
+        topology_digest: await sha256Hex(canonicalize({ scope: candidate.scope, target: candidate.target, route: "/govern" })),
+        lineage_pointers: { decision_id: String((body as any)?.decision_id || ""), continuity_id: String((body as any)?.continuity_id || "") },
+        timestamp,
+        non_operative: true,
+        tool_surface_descriptor: { route: "/govern", workflow: GOVERNED_WORKFLOW, executable: false },
+      }
+      const envelope_id = await sha256Hex(canonicalize(envelope))
+      await env.DB.prepare(`INSERT OR IGNORE INTO governed_tool_envelope_registry (envelope_id,candidate_hash,nonce_binding,policy_digest,topology_digest,lineage_pointers,timestamp,non_operative,tool_surface_descriptor,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'true',?8,?9)`)
+        .bind(envelope_id, envelope.candidate_hash, envelope.nonce_binding, envelope.policy_digest, envelope.topology_digest, canonicalize(envelope.lineage_pointers), envelope.timestamp, canonicalize(envelope.tool_surface_descriptor), timestamp).run()
       try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true } }) } catch {}
-      return json({ status: result, evidence: { candidate_hash, nonce, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
+      return json({ status: result, envelope_id, evidence: { candidate_hash, nonce, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {
       const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const environment = b.environment; const session_id = String(b.session_id || "")
+      const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/validate")
+      if (!envelopeLink.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/validate", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/validate" }, drift_class: "hash_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/validate", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "WARN", payload: { route: "/validate", validated_object_hash }, drift_class: "replay_drift" })
@@ -7752,6 +7793,7 @@ export default {
       if (!validationLineageVerification.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: validationLineageVerification.reason }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", indicator: validationLineageVerification.reason }, drift_class: "hash_drift" })
       await env.DB.prepare(`INSERT INTO validation_registry (validation_id,session_id,continuity_id,decision_id,validated_object_hash,invocation_nonce,environment,result,reason,status,created_at,delegated_authority_id,delegated_replay_chain_hash,parent_compilation_hash,workflow_integrity_hash,lineage_stage,lineage_origin_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,'VALID',NULL,'VALID',?8,?9,?10,?11,?12,'validate',?13)`).bind(crypto.randomUUID(),session_id,String(authority.continuity_id || ""),decision_id,validated_object_hash,invocation_nonce,String(environment||""),new Date().toISOString(),String(authority.delegated_authority_id || ""),String(authority.delegated_replay_chain_hash || ""),parent_compilation_hash,String(compiled.workflow_integrity_hash || ""),validationLineageOriginHash).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='RESERVED' WHERE decision_id=?1 AND status IN ('ACTIVE','VALIDATED','RESERVED')`).bind(decision_id).run()
+      await env.DB.prepare(`UPDATE governed_tool_envelope_registry SET non_operative='false' WHERE envelope_id=(SELECT governed_tool_envelope_id FROM authority_registry WHERE decision_id=?1)`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/validate", validated_object_hash, invocation_nonce, authority_status: "RESERVED" } })
       await emitInstallBaseTelemetryEvidenceBestEffort(env, { event_type: "validated_execution", decision_id, authority_id: String(authority.authority_id || ""), lineage_origin_hash: validationLineageOriginHash, lineage_origin_match: "MATCH", payload: { event_type: "validated_execution", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
       const _topology_present = false // topology infrastructure pending (#1346+); fail-closed
@@ -7762,6 +7804,8 @@ export default {
 
     if (url.pathname === "/execute" && request.method === "POST") {
       const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b); const executionSnapshot = executionSnapshotFrom(b)
+      const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/execute")
+      if (!envelopeLink.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
       await emitTelemetry(env, { event_type: "EXECUTION_STARTED", decision_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce } })
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/execute" }, drift_class: "execution_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
@@ -7862,6 +7906,8 @@ export default {
       const provenance = deploymentProvenanceFrom(b)
       const execution_id = String(b.execution_id || "")
       const decision_id = String(b.decision_id || "")
+      const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/proof")
+      if (!envelopeLink.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/proof", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
       const validated_object_hash = String(b.validated_object_hash || "")
       const invocation_nonce = String(b.invocation_nonce || "")
       const session_id = String(b.session_id || "")
