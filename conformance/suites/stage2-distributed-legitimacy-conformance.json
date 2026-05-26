@@ -42,10 +42,14 @@
       "label": "replay_consumed_in_partition_remains_consumed_after_healing",
       "description": "Nonce consumed during a partition must remain consumed after partition healing. Anti-entropy repair must not un-consume a nonce.",
       "fixture": "tests/fixtures/stage2/replay_consumed_partition_heal.json",
+      "test": "tests/fate/stage2-conf-dist-03.test.mjs",
       "expected_result": "NULL",
-      "required_module": "src/distributed-replay-convergence.ts",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "REPLAY_SAFE"],
+      "classification_layer": "antiEntropyReplayRepair",
+      "required_module": "src/lib/replay-convergence.ts",
       "related_issue": "#1347",
-      "status": "PENDING — Slice F"
+      "slice": "F",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-04",
@@ -174,10 +178,14 @@
       "label": "partition_healing_does_not_restore_replay_eligibility",
       "description": "Partition healing must not restore consumed replay eligibility. Nonces consumed on either side of a partition remain permanently consumed.",
       "fixture": "tests/fixtures/stage2/partition_heal_no_replay_restore.json",
+      "test": "tests/fate/stage2-conf-dist-15.test.mjs",
       "expected_result": "NULL",
-      "required_module": "src/distributed-replay-convergence.ts",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "REPLAY_SAFE"],
+      "classification_layer": "mergeConsumedReplayState + classifyReplayConflict",
+      "required_module": "src/lib/replay-convergence.ts",
       "related_issue": "#1347",
-      "status": "PENDING — Slice F"
+      "slice": "F",
+      "status": "IMPLEMENTED"
     }
   ]
 }

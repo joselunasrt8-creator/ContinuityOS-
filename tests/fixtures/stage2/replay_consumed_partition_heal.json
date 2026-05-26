@@ -1,0 +1,32 @@
+{
+  "_fixture_id": "CONF-DIST-03",
+  "_description": "Nonce consumed during a network partition must remain consumed after partition healing. Anti-entropy repair propagates the consumed state to the unaware partition but must not unconsume the nonce.",
+  "_expected_outcome": "NULL",
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "_related_issue": "#1347",
+  "_invariant": "consumed replay eligibility must remain consumed. Anti-entropy repair may propagate consumed state but must never unconsume a nonce. A replay attempt on a post-heal consumed nonce produces REPLAY_RESURRECTION → NULL.",
+  "_guard": "antiEntropyReplayRepair: merges partition evidence (additive-only); when nonce is consumed in merged set and partition_healed=true, conflict_class=REPLAY_RESURRECTION, classification=NULL. restores_replay is always false.",
+  "_anti_entropy_rule": "anti-entropy repair may propagate consumed state but must never unconsume a nonce",
+  "scenario": "replay_consumed_partition_heal",
+  "invocation_nonce": "nonce-partition-consumed-001",
+  "decision_id": "decision-partition-001",
+  "partition_a_evidence": [
+    {
+      "invocation_nonce": "nonce-partition-consumed-001",
+      "decision_id": "decision-partition-001",
+      "consumed_at": "2026-05-24T10:00:00.000Z",
+      "shard_id": "partition-A",
+      "causal_index": 1
+    }
+  ],
+  "partition_b_evidence": [],
+  "partition_healed": true,
+  "replay_attempt_after_heal": true,
+  "expected_result": "NULL",
+  "expected_conflict_class": "REPLAY_RESURRECTION",
+  "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "REPLAY_SAFE"],
+  "_classification_function": "antiEntropyReplayRepair({ decision_id, invocation_nonce, partition_a_evidence, partition_b_evidence, partition_healed: true })",
+  "_module": "src/lib/replay-convergence.ts",
+  "_supporting_issues": ["#1418", "#1442", "#1340", "#1440"]
+}

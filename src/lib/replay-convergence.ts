@@ -4,6 +4,137 @@ import { sha256Hex, canonicalize } from '../canonical.js'
 export const creates_authority = false as const
 export const replay_neutral = true as const
 
+// ── Replay conflict classes ────────────────────────────────────────────────────
+// Each class maps deterministically to NULL | AMBIGUOUS | STALE_VISIBLE | PARTITION_SUSPENDED.
+// Never GLOBAL_VALID.
+export type ReplayConflictClass =
+  | 'DUPLICATE_NONCE_OBSERVED'
+  | 'PARTITION_REPLAY_DIVERGENCE'
+  | 'STALE_PROOF_REUSE'
+  | 'DETACHED_REPLAY_LINEAGE'
+  | 'REPLAY_CHRONOLOGY_CONFLICT'
+  | 'REPLAY_ANTI_ENTROPY_REQUIRED'
+  | 'REPLAY_CONVERGENCE_NULL'
+  | 'REPLAY_RESURRECTION'
+
+export type ReplayConflictClassification = 'NULL' | 'AMBIGUOUS' | 'STALE_VISIBLE' | 'PARTITION_SUSPENDED'
+
+// Deterministic mapping: conflict class → terminal classification.
+// consumed replay eligibility must remain consumed — no path to GLOBAL_VALID.
+export const REPLAY_CONFLICT_CLASS_MAP: Readonly<Record<ReplayConflictClass, ReplayConflictClassification>> = Object.freeze({
+  DUPLICATE_NONCE_OBSERVED: 'NULL',
+  PARTITION_REPLAY_DIVERGENCE: 'PARTITION_SUSPENDED',
+  STALE_PROOF_REUSE: 'STALE_VISIBLE',
+  DETACHED_REPLAY_LINEAGE: 'NULL',
+  REPLAY_CHRONOLOGY_CONFLICT: 'AMBIGUOUS',
+  REPLAY_ANTI_ENTROPY_REQUIRED: 'PARTITION_SUSPENDED',
+  REPLAY_CONVERGENCE_NULL: 'NULL',
+  REPLAY_RESURRECTION: 'NULL',
+})
+
+export interface ReplayConflictResult {
+  readonly classification: ReplayConflictClassification
+  readonly conflict_class: ReplayConflictClass
+  readonly consumed_set: readonly string[]
+  readonly evidence_refs: readonly string[]
+  readonly creates_authority: false
+  readonly restores_replay: false
+}
+
+// Classifies a replay conflict deterministically.
+// restores_replay is always false — consumed state is permanent.
+export function classifyReplayConflict(
+  conflict_class: ReplayConflictClass,
+  consumed_nonces: readonly string[],
+  evidence_refs: readonly string[],
+): ReplayConflictResult {
+  return Object.freeze({
+    classification: REPLAY_CONFLICT_CLASS_MAP[conflict_class],
+    conflict_class,
+    consumed_set: Object.freeze([...consumed_nonces]),
+    evidence_refs: Object.freeze([...evidence_refs]),
+    creates_authority: false,
+    restores_replay: false,
+  })
+}
+
+// ── Anti-entropy replay repair ─────────────────────────────────────────────────
+// Pure evidence-only logic that compares replay state across partitions.
+// Anti-entropy repair may propagate consumed state but must never unconsume a nonce.
+
+export interface AntiEntropyReplayRepairInput {
+  readonly decision_id: string
+  readonly invocation_nonce: string
+  readonly partition_a_evidence: readonly NonceConsumptionEvidence[]
+  readonly partition_b_evidence: readonly NonceConsumptionEvidence[]
+  readonly partition_healed: boolean
+}
+
+export interface AntiEntropyReplayRepairResult {
+  readonly classification: ReplayConflictClassification
+  readonly conflict_class: ReplayConflictClass
+  readonly consumed_set: readonly string[]
+  readonly evidence_refs: readonly string[]
+  readonly creates_authority: false
+  readonly restores_replay: false
+  readonly nonce_permanently_consumed: boolean
+}
+
+// Anti-entropy repair: merges evidence from both partitions and classifies the nonce state.
+//
+// Rules:
+// - Merge is additive only: consumed nonces remain consumed after merge.
+// - If nonce consumed in merged set AND partition healed → REPLAY_RESURRECTION → NULL.
+//   (Replay attempt post-healing on consumed nonce cannot succeed.)
+// - If nonce consumed in merged set but partition not yet healed → PARTITION_REPLAY_DIVERGENCE → PARTITION_SUSPENDED.
+// - If nonce not consumed anywhere → REPLAY_ANTI_ENTROPY_REQUIRED → PARTITION_SUSPENDED.
+//
+// Invariant: restores_replay is always false. Anti-entropy cannot unconsume a nonce.
+export function antiEntropyReplayRepair(
+  input: AntiEntropyReplayRepairInput,
+): AntiEntropyReplayRepairResult {
+  const merged = mergeConsumptionEvidence(input.partition_a_evidence, input.partition_b_evidence)
+  const nonce_permanently_consumed = isNonceConsumedGlobally(input.invocation_nonce, merged)
+
+  let conflict_class: ReplayConflictClass
+  if (nonce_permanently_consumed) {
+    // Consumed on any partition → permanently consumed; post-heal replay attempt = resurrection
+    conflict_class = input.partition_healed ? 'REPLAY_RESURRECTION' : 'PARTITION_REPLAY_DIVERGENCE'
+  } else {
+    // Nonce not seen in any partition evidence → anti-entropy still required
+    conflict_class = 'REPLAY_ANTI_ENTROPY_REQUIRED'
+  }
+
+  const classification = REPLAY_CONFLICT_CLASS_MAP[conflict_class]
+  const consumed_set = Object.freeze(merged.map((e) => e.invocation_nonce))
+  const evidence_refs = Object.freeze(
+    merged.map((e) => buildNonceConsumptionId(e.invocation_nonce, e.decision_id, e.consumed_at)),
+  )
+
+  return Object.freeze({
+    classification,
+    conflict_class,
+    consumed_set,
+    evidence_refs,
+    creates_authority: false,
+    restores_replay: false,
+    nonce_permanently_consumed,
+  })
+}
+
+// ── Partition-heal consumed set merge ─────────────────────────────────────────
+// union(consumed_nonces across partitions) = permanently consumed replay set.
+// Healing never removes evidence; consumed nonces remain consumed across partition cycles.
+export function mergeConsumedReplayState(
+  partition_sets: readonly (readonly NonceConsumptionEvidence[])[],
+): readonly NonceConsumptionEvidence[] {
+  let merged: NonceConsumptionEvidence[] = []
+  for (const partition of partition_sets) {
+    merged = mergeConsumptionEvidence(merged, partition)
+  }
+  return Object.freeze(merged)
+}
+
 // Canonical distributed replay convergence states.
 // REPLAY_SAFE:               Nonce not consumed anywhere in observed topology.
 // REPLAY_CONSUMED:           Nonce consumed; UNUSED=false globally; no re-use permitted.

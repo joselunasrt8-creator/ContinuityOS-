@@ -1,0 +1,34 @@
+{
+  "_fixture_id": "CONF-DIST-15",
+  "_description": "Partition healing must not restore consumed replay eligibility. Nonces consumed on either side of a partition remain permanently consumed. union(consumed_nonces across partitions) = permanently consumed replay set.",
+  "_expected_outcome": "NULL",
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "_related_issue": "#1347",
+  "_invariant": "partition healing does not restore replay eligibility. consumed replay eligibility must remain consumed. The union of consumed nonce sets across all partitions is the permanently consumed replay set and cannot be reduced by reconciliation or healing.",
+  "_guard": "mergeConsumedReplayState: union of all partition evidence sets, additive-only. isNonceConsumedGlobally on merged set returns true. classifyReplayConflict('REPLAY_RESURRECTION', ...) returns NULL. restores_replay is always false.",
+  "_partition_rule": "union(consumed_nonces across partitions) = permanently consumed replay set",
+  "scenario": "partition_heal_no_replay_restore",
+  "invocation_nonce": "nonce-partition-heal-no-restore-001",
+  "decision_id": "decision-partition-heal-001",
+  "partition_sets": [
+    [
+      {
+        "invocation_nonce": "nonce-partition-heal-no-restore-001",
+        "decision_id": "decision-partition-heal-001",
+        "consumed_at": "2026-05-24T09:00:00.000Z",
+        "shard_id": "shard-x",
+        "causal_index": 1
+      }
+    ],
+    []
+  ],
+  "partition_healed": true,
+  "replay_attempt_after_heal": true,
+  "expected_result": "NULL",
+  "expected_conflict_class": "REPLAY_RESURRECTION",
+  "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "REPLAY_SAFE"],
+  "_classification_function": "mergeConsumedReplayState(partition_sets) → isNonceConsumedGlobally → classifyReplayConflict('REPLAY_RESURRECTION', consumed_set, evidence_refs)",
+  "_module": "src/lib/replay-convergence.ts",
+  "_supporting_issues": ["#1418", "#1442", "#1340", "#1440"]
+}
