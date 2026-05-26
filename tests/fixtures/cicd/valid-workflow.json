@@ -1,0 +1,44 @@
+{
+  "_fixture_id": "CONF-CICD-01",
+  "_description": "Conformant AEO, active authority, unused nonce — full VALID path",
+  "_expected_outcome": "VALID",
+  "_expected_proof_status": "PROVEN",
+  "_non_operative": true,
+  "aeo": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-valid-00000001",
+      "authority_id": "auth-cicd-fixture-valid-00000001",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-valid-00000001",
+    "constraints": {
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "invocation_nonce": "nonce-fixture-valid-unused-00000001",
+  "replay_consumed": false
+}

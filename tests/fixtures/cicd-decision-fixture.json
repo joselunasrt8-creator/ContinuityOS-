@@ -1,0 +1,28 @@
+{
+  "decision_id": "dec-cicd-v1-stage1-example-00000000",
+  "intent": "deploy_production_worker",
+  "scope": {
+    "environment": "production",
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "branch": "main"
+  },
+  "target": {
+    "system": "cloudflare_worker",
+    "action": "wrangler_deploy"
+  },
+  "finality": {
+    "proof_required": true,
+    "proof_type": "governed_deploy_proof",
+    "registry_required": true
+  },
+  "approved_by": "FIXTURE_ONLY_NON_OPERATIVE",
+  "status": "ACTIVE",
+  "constraints": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "branch": "main",
+    "workflow": "governed-deploy.yml",
+    "max_executions": 1
+  },
+  "expires_at": "FIXTURE_ONLY_NON_OPERATIVE",
+  "timestamp": "FIXTURE_ONLY_NON_OPERATIVE"
+}

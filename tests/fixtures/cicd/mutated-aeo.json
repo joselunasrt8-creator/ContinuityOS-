@@ -1,0 +1,70 @@
+{
+  "_fixture_id": "CONF-CICD-05",
+  "_description": "AEO mutated after /compile — provided validated_object_hash does not match recomputed hash",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "hash_mismatch",
+  "_non_operative": true,
+  "aeo_as_compiled": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-mutated-00000005",
+      "authority_id": "auth-cicd-fixture-mutated-00000005",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "aeo_as_submitted": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-mutated-00000005",
+      "authority_id": "auth-cicd-fixture-mutated-00000005",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy_MUTATED"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-mutated-00000005",
+    "constraints": {
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "invocation_nonce": "nonce-fixture-mutated-00000005",
+  "replay_consumed": false,
+  "_note": "aeo_as_compiled hash != aeo_as_submitted hash; /validate must return NULL/hash_mismatch"
+}

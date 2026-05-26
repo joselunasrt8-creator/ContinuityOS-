@@ -1,5 +1,5 @@
 {
-  "intent": "governed_production_deploy",
+  "intent": "deploy_production_worker",
   "scope": {
     "environment": "production",
     "repo": "joselunasrt8-creator/mindshift-demo",
@@ -7,8 +7,8 @@
     "workflow": "governed-deploy.yml"
   },
   "validation": {
-    "decision_id": "decision-fixture-001",
-    "authority_id": "auth-fixture-001",
+    "decision_id": "dec-cicd-v1-stage1-example-00000000",
+    "authority_id": "auth-cicd-v1-stage1-example-00000000",
     "require_active_authority": true,
     "require_exact_object_hash": true,
     "require_session_continuity": true

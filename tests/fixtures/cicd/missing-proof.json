@@ -1,0 +1,45 @@
+{
+  "_fixture_id": "CONF-CICD-06",
+  "_description": "AEO has finality.proof_required=false — workflow guard must exit NULL before /execute",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "proof_required_not_set",
+  "_non_operative": true,
+  "aeo": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-no-proof-00000006",
+      "authority_id": "auth-cicd-fixture-no-proof-00000006",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": false,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-no-proof-00000006",
+    "constraints": {
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "invocation_nonce": "nonce-fixture-no-proof-00000006",
+  "replay_consumed": false,
+  "_enforcement": "Workflow guard step reads proof_required from compile response; exits NULL if not true"
+}

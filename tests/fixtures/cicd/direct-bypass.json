@@ -1,0 +1,31 @@
+{
+  "_fixture_id": "CONF-CICD-07",
+  "_description": "Direct deploy command invoked outside governed workflow — must exit 1 immediately",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "direct_deploy_bypass",
+  "_non_operative": true,
+  "_test_method": "run `npm run deploy` and assert exit code 1; wrangler must not be called",
+  "bypass_paths": [
+    {
+      "bypass_id": "npm_run_deploy",
+      "command": "npm run deploy",
+      "classification": "ENFORCED",
+      "mechanism": "package.json deploy script exits 1",
+      "expected_exit_code": 1
+    },
+    {
+      "bypass_id": "direct_wrangler_deploy",
+      "command": "wrangler deploy",
+      "classification": "TOKEN_LEVEL",
+      "mechanism": "Cloudflare API token scope (OPEN — not enforced at code level)",
+      "expected_exit_code": null
+    },
+    {
+      "bypass_id": "governed_deploy_wrapper_without_context",
+      "command": "node scripts/governed-deploy.ts artifact.json npx wrangler deploy",
+      "classification": "ENFORCED",
+      "mechanism": "governed-deploy.ts checks MINDSHIFT_GOVERNED_DEPLOY_CONTEXT env var",
+      "expected_exit_code": 1
+    }
+  ]
+}
