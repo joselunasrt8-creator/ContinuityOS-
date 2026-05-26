@@ -119,6 +119,59 @@ test('validateDeployPredicates ok:true when all predicates pass', () => {
   assert.equal(result.ok, true)
 })
 
+test('BREAK_GLASS_DEPLOY without explicit lineage binding fails closed with deterministic reason', () => {
+  const result = validateDeployPredicates({
+    ...validPredicateParams,
+    riskClass: 'BREAK_GLASS_DEPLOY',
+    breakGlassLineageBound: false,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.reason, 'break_glass_unbound')
+})
+
+test('BREAK_GLASS_DEPLOY replay attempt is blocked and remains non-canonical', () => {
+  const result = validateDeployPredicates({
+    ...validPredicateParams,
+    riskClass: 'BREAK_GLASS_DEPLOY',
+    breakGlassLineageBound: true,
+    breakGlassReplayDetected: true,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.reason, 'break_glass_replay_blocked')
+})
+
+test('BREAK_GLASS_DEPLOY with explicit bound lineage does not promote authority and remains predicate-gated', () => {
+  const result = validateDeployPredicates({
+    ...validPredicateParams,
+    riskClass: 'BREAK_GLASS_DEPLOY',
+    breakGlassLineageBound: true,
+    breakGlassReplayDetected: false,
+  })
+  assert.equal(result.ok, true)
+})
+
+test('PRODUCTION_DEPLOY behavior remains unchanged by BREAK_GLASS guard fields', () => {
+  const baseline = validateDeployPredicates(validPredicateParams)
+  const withBreakGlassFields = validateDeployPredicates({
+    ...validPredicateParams,
+    riskClass: 'PRODUCTION_DEPLOY',
+    breakGlassLineageBound: false,
+    breakGlassReplayDetected: true,
+  })
+  assert.deepEqual(withBreakGlassFields, baseline)
+})
+
+test('PREVIEW_DEPLOY behavior remains unchanged by BREAK_GLASS guard fields', () => {
+  const baseline = validateDeployPredicates(validPredicateParams)
+  const withBreakGlassFields = validateDeployPredicates({
+    ...validPredicateParams,
+    riskClass: 'PREVIEW_DEPLOY',
+    breakGlassLineageBound: false,
+    breakGlassReplayDetected: true,
+  })
+  assert.deepEqual(withBreakGlassFields, baseline)
+})
+
 test('validateDeployPredicates ok:false when authority expired', () => {
   const result = validateDeployPredicates({
     ...validPredicateParams,

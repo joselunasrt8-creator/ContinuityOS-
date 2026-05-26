@@ -94,6 +94,9 @@ export function buildDeployAEO(atao: DeployATAO): CanonicalAEO | null {
 // Evaluates all deploy validator predicates.
 // Fails closed: returns ok:false at the first failing predicate.
 export function validateDeployPredicates(params: {
+  readonly riskClass?: DeployRiskClass
+  readonly breakGlassLineageBound?: boolean
+  readonly breakGlassReplayDetected?: boolean
   readonly authorityStatus: string
   readonly authorityExpiry: string | null | undefined
   readonly continuityStatus: string
@@ -104,6 +107,7 @@ export function validateDeployPredicates(params: {
   readonly workflowMatch: boolean
   readonly scopeMatch: boolean
 }): DeployValidatorResult {
+  const isBreakGlassDeploy = params.riskClass === 'BREAK_GLASS_DEPLOY'
   const predicates: DeployValidatorPredicates = {
     authority_valid: params.authorityStatus === 'ACTIVE' && !isExpiredAt(params.authorityExpiry),
     continuity_valid: params.continuityStatus === 'ACTIVE',
@@ -115,6 +119,12 @@ export function validateDeployPredicates(params: {
     scope_constraints_met: params.scopeMatch && params.workflowMatch,
   }
 
+  if (isBreakGlassDeploy && params.breakGlassLineageBound !== true) {
+    return { ok: false, reason: 'break_glass_unbound', predicates }
+  }
+  if (isBreakGlassDeploy && params.breakGlassReplayDetected === true) {
+    return { ok: false, reason: 'break_glass_replay_blocked', predicates }
+  }
   if (!predicates.authority_valid) return { ok: false, reason: 'authority_invalid_or_expired', predicates }
   if (!predicates.continuity_valid) return { ok: false, reason: 'invalid_continuity', predicates }
   if (!predicates.nonce_unique) return { ok: false, reason: 'nonce_used', predicates }
