@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-MindShift is evolving rapidly and security support applies only to actively maintained canonical runtime branches.
+ContinuityOS is evolving rapidly and security support applies only to actively maintained canonical runtime branches.
 
 | Version | Supported |
 | ------- | ---------- |
@@ -14,7 +14,10 @@ MindShift is evolving rapidly and security support applies only to actively main
 
 # Security Philosophy
 
-MindShift is execution legitimacy infrastructure.
+ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
+
+MindShift remains the canon and research umbrella.
+ContinuityOS is the runtime substrate.
 
 Security is not treated as:
 - perimeter defense only
@@ -23,11 +26,15 @@ Security is not treated as:
 
 The system is designed around:
 
-text id="wz7f8m" deterministic validation + non-bypassable execution boundaries + replay resistance + exact-object discipline + proof persistence 
+```text
+deterministic validation + non-bypassable execution boundaries + replay resistance + exact-object discipline + proof persistence
+```
 
 Core invariant:
 
-text id="j9t4vx" If no valid object exists → nothing happens 
+```text
+If no valid object exists → nothing happens
+```
 
 ---
 
@@ -104,17 +111,23 @@ The objective is:
 
 # Security Model
 
-MindShift assumes:
+ContinuityOS assumes:
 
-text id="s4j2pk" capability ≠ authority 
+```text
+capability ≠ authority
+```
 
 and:
 
-text id="r8n1vz" proposal ≠ execution legitimacy 
+```text
+proposal ≠ execution legitimacy
+```
 
 Security therefore depends on preserving:
 
-text id="z1m8qe" /authority → /compile → /validate → /execute → /proof 
+```text
+/session → /continuity → /authority → /compile → /validate → /execute → /proof
+```
 
 as the only valid path to state change.
 
@@ -122,4 +135,6 @@ as the only valid path to state change.
 
 # Final Principle
 
-text id="y5c2wr" No bypass path = runtime integrity 
+```text
+No bypass path = runtime integrity
+```

@@ -1,18 +1,18 @@
-# Contributing to MindShift
+# Contributing to ContinuityOS
 
-Thank you for contributing to MindShift.
+Thank you for contributing to ContinuityOS.
 
-MindShift is not traditional application software.
+ContinuityOS is not traditional application software.
 
-MindShift is:
-
-text Execution Ontology Infrastructure 
+ContinuityOS is runtime infrastructure derived from the MindShift canon.
 
 Its purpose is to govern whether state-changing actions are allowed to exist before execution occurs.
 
 Core invariant:
 
-text If no valid object exists → nothing happens 
+```text
+If no valid object exists → nothing happens
+```
 
 ---
 
@@ -34,7 +34,9 @@ Contributions that weaken these properties will not be accepted.
 
 # Canonical Runtime Flow
 
-text /authority → /compile → /validate → /execute → /proof 
+```text
+/session → /continuity → /authority → /compile → /validate → /execute → /proof
+```
 
 All state-changing execution surfaces must route through this lifecycle.
 
@@ -44,13 +46,17 @@ Direct execution paths are considered invalid architecture.
 
 # Contribution Philosophy
 
-MindShift values:
+ContinuityOS values:
 
-text working structure > claims 
+```text
+working structure > claims
+```
 
 and:
 
-text proof > assumptions 
+```text
+proof > assumptions
+```
 
 The project prioritizes:
 - correctness
@@ -70,7 +76,7 @@ over:
 
 Examples:
 
-- validator hardening
+- ContinuityOS validator hardening
 - replay protection improvements
 - deterministic canonicalization
 - proof persistence
@@ -104,10 +110,11 @@ Do NOT introduce:
 
 Canonical invariant:
 
-text validated_object == executed_object 
+```text
+validated_object == executed_object
+```
 
 Mutation after validation is considered a boundary violation.
-
 
 ---
 
@@ -117,7 +124,9 @@ Codex-assisted closure work must follow the repository execution protocol in `do
 
 Required closure invariant:
 
-text one issue → one branch → one PR → one invariant → one FATE expansion
+```text
+one issue → one branch → one PR → one invariant → one FATE expansion
+```
 
 Codex PRs must:
 
@@ -153,7 +162,7 @@ Where appropriate:
 
 # Testing
 
-MindShift uses deterministic runtime verification principles inspired by infrastructure projects such as FFmpeg FATE.
+ContinuityOS uses deterministic runtime verification principles inspired by infrastructure projects such as FFmpeg FATE.
 
 Expected validation areas include:
 
@@ -168,9 +177,8 @@ Expected validation areas include:
 
 # Governance
 
-MindShift is evolving toward:
-
-text open legitimacy standards + managed governance infrastructure 
+MindShift remains the canon and research umbrella.
+ContinuityOS is the runtime substrate.
 
 The repository is public to support:
 - transparency
@@ -198,16 +206,21 @@ please disclose responsibly through a private security report before public disc
 
 # Architectural Direction
 
-MindShift does not attempt to replace intelligence.
+ContinuityOS does not attempt to replace intelligence.
 
-MindShift governs legitimacy before execution.
+ContinuityOS governs legitimacy before execution.
 
 Compressed:
 
-text AI scales cognition MindShift scales legitimacy 
+```text
+AI scales cognition
+ContinuityOS scales legitimacy
+```
 
 ---
 
 # Final Principle
 
-text No structure → no legitimacy → no execution 
+```text
+No structure → no legitimacy → no execution
+```

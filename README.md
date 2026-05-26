@@ -1,8 +1,13 @@
-# MindShift
+# ContinuityOS
 
-MindShift is execution legitimacy infrastructure for AI-assisted systems.
+ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
 
-MindShift governs whether state-changing actions are permitted to exist before execution occurs.
+ContinuityOS is the runtime infrastructure project derived from the MindShift canon.
+
+MindShift remains the canon and research umbrella.
+ContinuityOS is the runtime substrate.
+
+ContinuityOS governs whether state-changing actions are permitted to exist before execution occurs.
 
 Core invariant:
 
@@ -16,7 +21,9 @@ If no valid object exists
 # Canonical Runtime Flow
 
 ```text
-/authority
+/session
+→ /continuity
+→ /authority
 → /compile
 → /validate
 → /execute
@@ -29,7 +36,7 @@ All state-changing execution surfaces are expected to route through this lifecyc
 
 # Core Principles
 
-MindShift is built around:
+ContinuityOS runtime is built around:
 
 - deterministic validation
 - exact-object discipline
@@ -67,7 +74,7 @@ Direct mutation paths that bypass review/governance are considered invalid archi
 
 # Contribution Model
 
-MindShift accepts bounded, reviewable contributions that preserve canonical invariants.
+ContinuityOS accepts bounded, reviewable contributions that preserve canonical invariants.
 
 See:
 
@@ -82,7 +89,7 @@ See:
 Canonical external statement:
 
 ```text
-MindShift is execution legitimacy infrastructure for AI-assisted systems.
+ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
 ```
 
 Execution gate:
@@ -91,8 +98,7 @@ Execution gate:
 VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID
 ```
 
-MindShift does not replace intelligence. It enforces legitimacy before execution.
+ContinuityOS does not replace intelligence. It enforces legitimacy before execution.
 
-
-
-
+MindShift discovered the canon.
+ContinuityOS operationalizes it.
