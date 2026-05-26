@@ -561,7 +561,9 @@ The reconciliation state machine produces classifications, not authority. No sta
 
 **Anchor issue:** #1340
 
-**Supporting issues:** #1418, #1338, #1346
+**Supporting issues:** #1418, #1347, #1348, #1405, #1440, #1441, #1442, #1443
+
+**Causal-clock context (not primary for Slice B):** #1338, #1346
 
 **Scope:**  
 - Harden `src/lib/finality-classification.ts` to enforce LOCAL_VALID ≠ GLOBAL_VALID without topology evidence
@@ -569,7 +571,7 @@ The reconciliation state machine produces classifications, not authority. No sta
 - Add epoch-binding check stub (for Slice C coupling)
 - Add CONF-DIST-01 fixture: `tests/fixtures/stage2/local_valid_no_global_promotion.json`
 - Add test asserting GLOBAL_VALID cannot be reached without topology evidence
-- New migration for CONVERGENCE_VALID column if not in `0048`
+- New migration (0053) adding CONVERGENCE_VALID to classification CHECK constraint and GLOBAL_VALID → must-supersede-CONVERGENCE_VALID trigger
 
 **Non-goals:**  
 No quorum evidence model, no reconciliation state machine, no distributed replay rules, no authority creation, no production deployment, no claim that distributed convergence is complete
@@ -611,7 +613,7 @@ No quorum evidence model, no reconciliation state machine, no distributed replay
 
 **Recommended anchor issue:** #1340
 
-**Recommended supporting issues:** #1418, #1338, #1346
+**Recommended supporting issues:** #1418, #1347, #1348, #1405, #1440, #1441, #1442, #1443
 
 **Recommended new issues:**
 1. ValidatorAttestationEnvelope Definition and Non-Authority Attestation Constraints

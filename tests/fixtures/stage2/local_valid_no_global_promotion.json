@@ -1,0 +1,31 @@
+{
+  "_fixture_id": "CONF-DIST-01",
+  "_description": "LOCAL_VALID object with absent distributed predicates (Q=false, G=false, X=false) must not be promoted to GLOBAL_VALID, even when topology is present and epoch is valid.",
+  "_expected_outcome": "LOCAL_VALID",
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "_related_issue": "#1340",
+  "_invariant": "local correctness ≠ distributed legitimacy coherence. LOCAL_VALID does not imply GLOBAL_VALID. Absent quorum evidence (Q=false), global consensus evidence (G=false), and cryptographic integrity evidence (X=false), the classification ceiling is LOCAL_VALID regardless of topology presence or epoch validity.",
+  "_guard": "classifyFromPredicates enforces: (Q && G && L && X) is required to reach CONVERGENCE_VALID or GLOBAL_VALID. With Q=false, G=false, X=false the function returns LOCAL_VALID unconditionally.",
+  "_db_guard": "Migration 0053 trigger fcr_global_valid_requires_convergence_supersession enforces that any GLOBAL_VALID insert must supersede a CONVERGENCE_VALID record. A LOCAL_VALID record cannot be directly superseded by GLOBAL_VALID.",
+  "scenario": "local_valid_no_global_promotion",
+  "predicate_snapshot": {
+    "V": true,
+    "A": true,
+    "U": true,
+    "P": true,
+    "R": true,
+    "T": true,
+    "C": true,
+    "Q": false,
+    "G": false,
+    "L": true,
+    "X": false
+  },
+  "topology_present": true,
+  "epoch_valid": true,
+  "expected_classification": "LOCAL_VALID",
+  "forbidden_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+  "_classification_function": "classifyFromPredicates(predicates, topologyPresent=true, epochValid=true)",
+  "_module": "src/lib/finality-classification.ts"
+}
