@@ -1,0 +1,45 @@
+{
+  "_fixture_id": "CONF-CICD-02",
+  "_description": "Branch in AEO scope does not match trigger ref_name",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "scope_mismatch",
+  "_non_operative": true,
+  "aeo": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "feature/wrong-branch",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-wrong-branch-00000002",
+      "authority_id": "auth-cicd-fixture-wrong-branch-00000002",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-wrong-branch-00000002",
+    "constraints": {
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "feature/wrong-branch",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "trigger_ref_name": "main",
+  "invocation_nonce": "nonce-fixture-wrong-branch-00000002",
+  "replay_consumed": false
+}

@@ -1,0 +1,25 @@
+{
+  "_fixture_id": "CONF-CICD-14",
+  "_description": "Validator (Worker) returns 5xx — workflow must fail closed; deploy must not be reached",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "validator_unavailable",
+  "_non_operative": true,
+  "mock_behavior": {
+    "endpoint": "/validate",
+    "simulated_response_code": 503,
+    "simulated_body": "{\"error\": \"Service Unavailable\"}",
+    "fail_closed": true
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-validator-fail-00000014",
+    "constraints": {
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "invocation_nonce": "nonce-fixture-validator-fail-00000014",
+  "_enforcement": "curl non-2xx causes workflow step to fail; deploy step is never reached"
+}

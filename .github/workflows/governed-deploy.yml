@@ -292,6 +292,12 @@ jobs:
             exit 1
           fi
 
+          PROOF_REQUIRED=$(jq -r '.proof_required // .finality.proof_required // empty' compile.json)
+          if [ "$PROOF_REQUIRED" != "true" ]; then
+            echo "NULL — AEO finality.proof_required must be true; deploy without proof requirement is forbidden"
+            exit 1
+          fi
+
       - name: Save validate response
         run: |
           set -euo pipefail
@@ -545,6 +551,12 @@ jobs:
             exit 1
           fi
 
+          PROOF_AEO_HASH=$(jq -r '.proof.aeo_hash // .aeo_hash // empty' proof.json)
+          if [ -z "$PROOF_AEO_HASH" ] || [ "$PROOF_AEO_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — Proof aeo_hash does not match validated_object_hash; lineage violation"
+            cat proof.json
+            exit 1
+          fi
 
       - name: Build governed deploy legitimacy artifact
         run: |

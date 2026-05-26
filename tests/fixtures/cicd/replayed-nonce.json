@@ -1,0 +1,45 @@
+{
+  "_fixture_id": "CONF-CICD-04",
+  "_description": "Same invocation_nonce submitted twice — second invocation must return NULL/replay_detected",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "replay_detected",
+  "_non_operative": true,
+  "aeo": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-replay-00000004",
+      "authority_id": "auth-cicd-fixture-replay-00000004",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-replay-00000004",
+    "constraints": {
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "invocation_nonce": "nonce-fixture-replayed-00000004",
+  "replay_consumed": true,
+  "_enforcement": "invocation_registry UNIQUE(decision_id, validated_object_hash, invocation_nonce) blocks INSERT"
+}

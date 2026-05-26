@@ -1,0 +1,45 @@
+{
+  "_fixture_id": "CONF-CICD-03",
+  "_description": "Repo in authority/continuity constraints does not match github.repository",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "scope_mismatch",
+  "_non_operative": true,
+  "aeo": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "attacker/wrong-repo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-wrong-repo-00000003",
+      "authority_id": "auth-cicd-fixture-wrong-repo-00000003",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "authority": {
+    "status": "ACTIVE",
+    "decision_id": "dec-cicd-fixture-wrong-repo-00000003",
+    "constraints": {
+      "repo": "attacker/wrong-repo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml",
+      "max_executions": 1
+    }
+  },
+  "trigger_repo": "joselunasrt8-creator/mindshift-demo",
+  "invocation_nonce": "nonce-fixture-wrong-repo-00000003",
+  "replay_consumed": false
+}

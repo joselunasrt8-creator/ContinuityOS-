@@ -1,0 +1,45 @@
+{
+  "suite_id": "cicd_replay_enforcement_v1",
+  "description": "Certifies that governed CI/CD execution surfaces enforce single-use invocation_nonce semantics and reject hash-mutated objects. Implements CONF-CICD-04 and CONF-CICD-05.",
+  "observability_only": false,
+  "runtime_mutation_capable": false,
+  "replay_neutral": true,
+  "state_consumption_allowed": false,
+  "checks": [
+    {
+      "check_id": "CONF-CICD-04",
+      "label": "replay_nonce_rejected",
+      "description": "Second /execute call with same invocation_nonce must return NULL/replay_detected. The invocation_registry UNIQUE constraint enforces this at the DB level.",
+      "kind": "scenario_expected_result",
+      "scenario": "replayed-nonce",
+      "expected_result": "NULL",
+      "expected_null_reason": "replay_detected",
+      "enforcement_mechanism": "invocation_registry UNIQUE(decision_id, validated_object_hash, invocation_nonce)"
+    },
+    {
+      "check_id": "CONF-CICD-05",
+      "label": "mutated_aeo_hash_rejected",
+      "description": "If the AEO is mutated after /compile, the hash provided to /validate will not match the recomputed hash. /validate must return NULL/hash_mismatch.",
+      "kind": "scenario_expected_result",
+      "scenario": "mutated-aeo",
+      "expected_result": "NULL",
+      "expected_null_reason": "hash_mismatch",
+      "enforcement_mechanism": "validated_object_hash compared against /compile output; any drift triggers hash_mismatch"
+    },
+    {
+      "check_id": "CONF-CICD-04b",
+      "label": "consumed_nonce_not_restorable",
+      "description": "A consumed invocation_nonce cannot be restored through reconciliation, retry, or authority state reset.",
+      "kind": "mutation_forbidden",
+      "forbidden_operations": ["DELETE FROM invocation_registry", "UPDATE invocation_registry"],
+      "append_only_table": "invocation_registry"
+    },
+    {
+      "check_id": "CONF-CICD-05b",
+      "label": "hash_stability_under_key_reordering",
+      "description": "Canonical serialization must produce the same hash regardless of JSON key ordering in the input AEO.",
+      "kind": "determinism_assertion",
+      "assertion": "canonicalize(aeo_with_keys_sorted) == canonicalize(aeo_with_keys_reversed)"
+    }
+  ]
+}

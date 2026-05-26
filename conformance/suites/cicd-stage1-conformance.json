@@ -1,0 +1,166 @@
+{
+  "suite_id": "cicd_stage1_conformance_v1",
+  "description": "Stage 1 Governed CI/CD conformance suite. Covers all VALID and NULL paths for the locked github_governed_deploy_workflow surface. CONF-CICD-01 through CONF-CICD-15.",
+  "surface": "github_governed_deploy_workflow",
+  "planning_artifact": "docs/stage1-locked-surface-plan-cicd-v1.md",
+  "observability_only": false,
+  "runtime_mutation_capable": false,
+  "replay_neutral": true,
+  "non_operative": true,
+  "checks": [
+    {
+      "check_id": "CONF-CICD-01",
+      "label": "valid_end_to_end",
+      "description": "Conformant AEO, active authority, unused nonce — full VALID path produces proof_id with status=PROVEN.",
+      "scenario": "valid-workflow",
+      "fixture": "tests/fixtures/cicd/valid-workflow.json",
+      "expected_result": "VALID",
+      "expected_proof_status": "PROVEN",
+      "required_fields": ["proof_id", "status"]
+    },
+    {
+      "check_id": "CONF-CICD-02",
+      "label": "wrong_branch_rejected",
+      "description": "Branch in AEO scope does not match github.ref_name — must exit NULL at guard step or /validate returns NULL/scope_mismatch.",
+      "scenario": "wrong-branch",
+      "fixture": "tests/fixtures/cicd/wrong-branch.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "scope_mismatch",
+      "null_detection_point": "validate_or_guard"
+    },
+    {
+      "check_id": "CONF-CICD-03",
+      "label": "wrong_repo_rejected",
+      "description": "Repo in authority/continuity constraints does not match github.repository — NULL/scope_mismatch.",
+      "scenario": "wrong-repo",
+      "fixture": "tests/fixtures/cicd/wrong-repo.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "scope_mismatch",
+      "null_detection_point": "continuity_or_validate"
+    },
+    {
+      "check_id": "CONF-CICD-04",
+      "label": "replay_nonce_rejected",
+      "description": "Same invocation_nonce invoked twice. Second /execute must return NULL/replay_detected. invocation_registry UNIQUE constraint enforces this at DB level.",
+      "scenario": "replayed-nonce",
+      "fixture": "tests/fixtures/cicd/replayed-nonce.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "replay_detected",
+      "null_detection_point": "execute",
+      "enforcement_mechanism": "invocation_registry UNIQUE(decision_id, validated_object_hash, invocation_nonce)"
+    },
+    {
+      "check_id": "CONF-CICD-05",
+      "label": "mutated_aeo_hash_rejected",
+      "description": "AEO mutated after /compile — provided validated_object_hash does not match recomputed hash. /validate returns NULL/hash_mismatch.",
+      "scenario": "mutated-aeo",
+      "fixture": "tests/fixtures/cicd/mutated-aeo.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "hash_mismatch",
+      "null_detection_point": "validate"
+    },
+    {
+      "check_id": "CONF-CICD-06",
+      "label": "proof_required_false_rejected",
+      "description": "AEO finality.proof_required=false — workflow guard must exit NULL before /execute is reached.",
+      "scenario": "missing-proof",
+      "fixture": "tests/fixtures/cicd/missing-proof.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "proof_required_not_set",
+      "null_detection_point": "compile_guard",
+      "enforcement_mechanism": "Workflow guard reads proof_required from compile response; exits NULL if not true"
+    },
+    {
+      "check_id": "CONF-CICD-07",
+      "label": "direct_deploy_bypass_blocked",
+      "description": "npm run deploy exits 1 immediately. wrangler is never called. Testable without live credentials.",
+      "scenario": "direct-bypass",
+      "fixture": "tests/fixtures/cicd/direct-bypass.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "direct_deploy_bypass",
+      "test_method": "execute `npm run deploy` in repo root; assert exit code 1",
+      "enforcement_mechanism": "package.json deploy script: exits 1"
+    },
+    {
+      "check_id": "CONF-CICD-08",
+      "label": "proof_aeo_hash_invariant",
+      "description": "proof.aeo_hash must equal validated_object_hash. Any drift is a lineage violation.",
+      "scenario": "valid-workflow",
+      "fixture": "tests/fixtures/cicd/valid-workflow.json",
+      "expected_result": "VALID",
+      "additional_assertion": "proof.aeo_hash == validated_object_hash",
+      "invariant": "proof.aeo_hash === validated_object_hash"
+    },
+    {
+      "check_id": "CONF-CICD-09",
+      "label": "expired_authority_rejected",
+      "description": "Authority for decision_id has expires_at in the past — /validate returns NULL/authority_expired.",
+      "scenario": "expired-authority",
+      "expected_result": "NULL",
+      "expected_null_reason": "authority_expired",
+      "null_detection_point": "authority_or_validate"
+    },
+    {
+      "check_id": "CONF-CICD-10",
+      "label": "revoked_authority_rejected",
+      "description": "Authority status=REVOKED or parent continuity revoked — /validate returns NULL/authority_revoked.",
+      "scenario": "revoked-authority",
+      "expected_result": "NULL",
+      "expected_null_reason": "authority_revoked",
+      "null_detection_point": "authority"
+    },
+    {
+      "check_id": "CONF-CICD-11",
+      "label": "non_workflow_dispatch_rejected",
+      "description": "Workflow triggered by push, schedule, or workflow_run (not workflow_dispatch) — guard step exits NULL.",
+      "scenario": "non-workflow-dispatch",
+      "expected_result": "NULL",
+      "expected_null_reason": "non_workflow_dispatch",
+      "null_detection_point": "guard_step",
+      "enforcement_mechanism": "Workflow guard: `if [ \"${{ github.event_name }}\" != \"workflow_dispatch\" ]; then exit 1`"
+    },
+    {
+      "check_id": "CONF-CICD-12",
+      "label": "indirect_dispatch_rejected",
+      "description": "Workflow dispatched from another workflow (caller_workflow_ref does not match governed-deploy.yml) — guard exits NULL.",
+      "scenario": "indirect-dispatch",
+      "expected_result": "NULL",
+      "expected_null_reason": "workflow_dispatch_mismatch",
+      "null_detection_point": "guard_step",
+      "enforcement_mechanism": "Workflow guard: caller_workflow_ref must match */.github/workflows/governed-deploy.yml@*"
+    },
+    {
+      "check_id": "CONF-CICD-13",
+      "label": "missing_decision_id_rejected",
+      "description": "decision_id input is absent — guard step exits NULL/missing_variable.",
+      "scenario": "missing-decision-id",
+      "fixture": null,
+      "expected_result": "NULL",
+      "expected_null_reason": "missing_variable",
+      "null_detection_point": "guard_step",
+      "enforcement_mechanism": "Workflow guard iterates required variables and exits 1 on empty"
+    },
+    {
+      "check_id": "CONF-CICD-14",
+      "label": "validator_unavailable_fail_closed",
+      "description": "Worker returns 5xx on /validate — curl non-2xx causes workflow step to fail; deploy is never reached.",
+      "scenario": "validator-failure",
+      "fixture": "tests/fixtures/cicd/validator-failure.json",
+      "expected_result": "NULL",
+      "expected_null_reason": "validator_unavailable",
+      "null_detection_point": "validate_step_http_error",
+      "enforcement_mechanism": "set -euo pipefail; curl non-2xx → step fails; deploy step unreachable"
+    },
+    {
+      "check_id": "CONF-CICD-15",
+      "label": "aeo_extra_fields_rejected",
+      "description": "AEO submitted with fields beyond the required five (intent, scope, validation, target, finality). Schema has additionalProperties: false.",
+      "scenario": "aeo-extra-fields",
+      "fixture": null,
+      "expected_result": "NULL",
+      "expected_null_reason": "schema_violation",
+      "null_detection_point": "compile_or_validate",
+      "enforcement_mechanism": "schemas/aeo.schema.json: additionalProperties: false; /compile rejects or strips extra fields"
+    }
+  ]
+}

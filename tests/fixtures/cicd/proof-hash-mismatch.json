@@ -1,0 +1,40 @@
+{
+  "_fixture_id": "CONF-CICD-08",
+  "_description": "Proof artifact aeo_hash does not match validated_object_hash — must return NULL",
+  "_expected_outcome": "NULL",
+  "_expected_null_reason": "proof_hash_mismatch",
+  "_non_operative": true,
+  "aeo": {
+    "intent": "deploy_production_worker",
+    "scope": {
+      "environment": "production",
+      "repo": "joselunasrt8-creator/mindshift-demo",
+      "branch": "main",
+      "workflow": "governed-deploy.yml"
+    },
+    "validation": {
+      "decision_id": "dec-cicd-fixture-proof-hash-00000008",
+      "authority_id": "auth-cicd-fixture-proof-hash-00000008",
+      "require_active_authority": true,
+      "require_exact_object_hash": true,
+      "require_session_continuity": true
+    },
+    "target": {
+      "system": "cloudflare_worker",
+      "action": "wrangler_deploy"
+    },
+    "finality": {
+      "proof_required": true,
+      "proof_type": "governed_deploy_proof",
+      "registry_required": true
+    }
+  },
+  "mock_proof_response": {
+    "status": "PROVEN",
+    "proof_id": "proof-fixture-hash-mismatch-00000008",
+    "aeo_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "_note": "aeo_hash is deliberately wrong — workflow assertion must catch this and exit NULL"
+  },
+  "invocation_nonce": "nonce-fixture-proof-hash-00000008",
+  "_enforcement": "Workflow 'Assert proof response is canonical' step checks proof.aeo_hash == VALIDATED_OBJECT_HASH"
+}
