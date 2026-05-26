@@ -82,6 +82,9 @@ jobs:
           sort -u mutation_classes.txt -o mutation_classes.txt
           sort -u target_surfaces.txt -o target_surfaces.txt
 
+
+          SCO_REPLAY_ID="$(printf '%s' "${{ github.repository }}|${{ github.workflow }}|${{ github.run_id }}|${{ github.run_attempt }}|${{ github.event.pull_request.head.sha }}|${{ github.event.pull_request.base.sha }}" | sha256sum | awk '{print $1}')"
+
           jq -n \
             --arg sco_id "SCO-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}" \
             --argjson pr_number "${{ github.event.pull_request.number }}" \
@@ -89,6 +92,10 @@ jobs:
             --arg base_branch "${{ github.base_ref }}" \
             --arg head_branch "${{ github.head_ref }}" \
             --arg head_sha "${{ github.event.pull_request.head.sha }}" \
+            --arg replay_id "$SCO_REPLAY_ID" \
+            --arg workflow_run_id "${{ github.run_id }}" \
+            --arg workflow_run_attempt "${{ github.run_attempt }}" \
+            --arg workflow_ref "${{ github.ref }}" \
             --arg requires_sco "$REQUIRES_SCO" \
             --arg risk_class "$RISK_CLASS" \
             --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -103,6 +110,10 @@ jobs:
               base_branch: $base_branch,
               head_branch: $head_branch,
               head_sha: $head_sha,
+              replay_id: $replay_id,
+              workflow_run_id: $workflow_run_id,
+              workflow_run_attempt: $workflow_run_attempt,
+              workflow_ref: $workflow_ref,
               changed_files: $changed_files[0],
               governed_files: $governed_files[0],
               mutation_classes: $mutation_classes[0],
