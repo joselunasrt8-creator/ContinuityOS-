@@ -61,6 +61,28 @@ function verifyLineageOrigin(input: {
 }
 
 
+
+
+type GovernCandidate = {
+  intent: string
+  scope: Record<string, unknown>
+  target: Record<string, unknown>
+  finality: Record<string, unknown>
+}
+
+type GovernResult = "VALID_CANDIDATE" | "NULL"
+
+function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCandidate } | { ok: false, reason: string } {
+  if (!isPlainRecord(input)) return { ok: false, reason: "invalid_candidate" }
+  const keys = Object.keys(input)
+  const allowed = ["intent", "scope", "target", "finality"]
+  if (keys.some((key) => !allowed.includes(key))) return { ok: false, reason: "strict_mode_extra_top_level_field" }
+  if (typeof input.intent !== "string" || input.intent.length === 0) return { ok: false, reason: "missing_intent" }
+  if (!isPlainRecord(input.scope)) return { ok: false, reason: "missing_scope" }
+  if (!isPlainRecord(input.target)) return { ok: false, reason: "missing_target" }
+  if (!isPlainRecord(input.finality)) return { ok: false, reason: "missing_finality" }
+  return { ok: true, candidate: { intent: input.intent, scope: input.scope, target: input.target, finality: input.finality } }
+}
 type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_SCHEMA_INITIALIZED"
   | "BOOTSTRAP_MIGRATIONS_VALIDATED"
@@ -129,6 +151,7 @@ const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/com
 const EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/authority", "/compile", "/validate", "/execute", "/proof"] as const)
 const NON_EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/session", "/continuity"] as const)
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
+const OPENCLAW_GOVERN_ROUTE = "/govern" as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
@@ -7250,8 +7273,9 @@ export default {
     if (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) && !(TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) && url.pathname !== RUNTIME_SOVEREIGNTY_ROUTE && url.pathname !== EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && ![BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any)) return json({ status: "NULL", route: url.pathname, reason: "observability_only" }, request.method === "GET" ? 200 : 405)
 
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
+    const governedCandidateRoute = url.pathname === OPENCLAW_GOVERN_ROUTE
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
@@ -7362,7 +7386,7 @@ export default {
       return json({ status: "PREO_VALID", decision_id, preo_id, reviewed_hash, reviewed_tree_hash, merge_commit_sha, pull_request_id })
     }
 
-    if (request.method === "POST" && !canonicalRuntimeRoute) {
+    if (request.method === "POST" && !canonicalRuntimeRoute && !governedCandidateRoute) {
       if (!governanceEvidenceRoute) {
         await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
         return json({ status: "NULL", reason: "not_found" }, 404)
@@ -7643,6 +7667,36 @@ export default {
           reason: "compile_exception"
         })
       }
+    }
+
+
+    if (url.pathname === "/govern" && request.method === "POST") {
+      const body = await request.json().catch(() => null)
+      const nonce = String(request.headers.get("X-Nonce") || "")
+      const parsed = parseGovernCandidate(body)
+      const candidate = parsed.ok ? parsed.candidate : { intent: "", scope: {}, target: {}, finality: {} }
+      const candidate_canonical = canonicalize(candidate)
+      const candidate_hash = await sha256Hex(candidate_canonical)
+      const timestamp = new Date().toISOString()
+      let result: GovernResult = parsed.ok ? "VALID_CANDIDATE" : "NULL"
+      let reason = parsed.ok ? "" : parsed.reason
+      if (!nonce) {
+        result = "NULL"
+        reason = "missing_nonce"
+      }
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
+      if (result === "VALID_CANDIDATE") {
+        const nonceInsert = await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry (nonce, candidate_hash, created_at) VALUES (?1,?2,?3)`).bind(nonce, candidate_hash, timestamp).run()
+        if ((nonceInsert.meta?.changes || 0) === 0) {
+          result = "NULL"
+          reason = "nonce_replay"
+        }
+      }
+      const evidence_id = await sha256Hex(canonicalize({ candidate_hash, nonce, timestamp, result, reason }))
+      await env.DB.prepare(`INSERT OR IGNORE INTO govern_evidence_registry (evidence_id, candidate_hash, nonce, result, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6)`).bind(evidence_id, candidate_hash, nonce, result, reason || null, timestamp).run()
+      try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true } }) } catch {}
+      return json({ status: result, evidence: { candidate_hash, nonce, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {
