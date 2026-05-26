@@ -200,7 +200,7 @@ test('valid_result_contract_remains_compatible: validator valid result has no re
 
 test('valid_result_contract_remains_compatible: execute canonical success path remains intact', () => {
   assert.match(source, /return json\(\{ status:"EXECUTED", session_id, execution_id \}\)/, 'execute success path must be unchanged')
-  assert.match(source, /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce \}\)/, 'validate success path must be unchanged')
+  assert.match(source, /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, classification_evidence:/, 'validate success path must include classification_evidence')
 })
 
 // ── Telemetry semantic consistency ──────────────────────────────────────────

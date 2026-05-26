@@ -1,5 +1,6 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
 import type { CanonicalAEO } from "./lib/aeo-governance.ts"
+import { classifyFromPredicates } from "./lib/finality-classification.js"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -7699,7 +7700,10 @@ export default {
       await env.DB.prepare(`UPDATE authority_registry SET status='RESERVED' WHERE decision_id=?1 AND status IN ('ACTIVE','VALIDATED','RESERVED')`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/validate", validated_object_hash, invocation_nonce, authority_status: "RESERVED" } })
       await emitInstallBaseTelemetryEvidenceBestEffort(env, { event_type: "validated_execution", decision_id, authority_id: String(authority.authority_id || ""), lineage_origin_hash: validationLineageOriginHash, lineage_origin_match: "MATCH", payload: { event_type: "validated_execution", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
-      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce })
+      const _topology_present = false // topology infrastructure pending (#1346+); fail-closed
+      const _predicate_snapshot = { V: true, A: true, U: true, P: true, R: true, T: false, C: true, Q: false, G: false, L: false, X: false }
+      const _classification = classifyFromPredicates(_predicate_snapshot, _topology_present)
+      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present } })
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
