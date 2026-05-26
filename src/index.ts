@@ -25,6 +25,70 @@ function canonicalLineageHash(input: { lineage_stage: LineageStage, decision_id:
   })
 }
 
+
+
+const HIGH_RISK_TOOL_CLASSES = new Set(["deploy_runtime","shell_exec","database_write","identity_mutation","authority_mutation","workflow_mutation"])
+
+type CognitionLineageRecord = {
+  cognition_lineage_id: string
+  cognition_lineage_hash: string
+  decision_id: string
+  validated_object_hash: string
+  continuity_id: string
+  authority_lineage_hash: string
+  govern_envelope_hash: string
+  tool_class: string
+}
+
+async function buildCognitionLineageRecord(input: {
+  decision_id: string
+  validated_object_hash: string
+  continuity_id: string
+  authority_lineage_hash: string
+  govern_envelope_hash: string
+  tool_class: string
+  provenance: Record<string, unknown>
+  transform_steps: readonly string[]
+}): Promise<CognitionLineageRecord> {
+  const inputShapingProvenance = canonicalRecord({
+    repository: String(input.provenance.repository || ""),
+    branch: String(input.provenance.branch || ""),
+    pull_request_id: String(input.provenance.pull_request_id || ""),
+    merge_commit_sha: String(input.provenance.merge_commit_sha || ""),
+    source_tree_hash: String(input.provenance.source_tree_hash || ""),
+    workflow_run_id: String(input.provenance.workflow_run_id || ""),
+    workflow_sha: String(input.provenance.workflow_sha || "")
+  })
+  const digestChain: string[] = []
+  let parent = await sha256Hex(canonicalize(inputShapingProvenance))
+  for (const step of input.transform_steps) {
+    parent = await sha256Hex(canonicalize({ parent, step }))
+    digestChain.push(parent)
+  }
+  const cognitionLineage = canonicalize({
+    lineage_type: "COGNITION_LINEAGE_EVIDENCE",
+    input_shaping_provenance: inputShapingProvenance,
+    transformation_steps: [...input.transform_steps],
+    deterministic_digest_chain: digestChain,
+    terminal_digest: parent,
+    decision_id: input.decision_id,
+    validated_object_hash: input.validated_object_hash,
+    continuity_id: input.continuity_id,
+    authority_lineage_hash: input.authority_lineage_hash,
+    govern_envelope_hash: input.govern_envelope_hash,
+    tool_class: input.tool_class
+  })
+  return {
+    cognition_lineage_id: crypto.randomUUID(),
+    cognition_lineage_hash: await sha256Hex(cognitionLineage),
+    decision_id: input.decision_id,
+    validated_object_hash: input.validated_object_hash,
+    continuity_id: input.continuity_id,
+    authority_lineage_hash: input.authority_lineage_hash,
+    govern_envelope_hash: input.govern_envelope_hash,
+    tool_class: input.tool_class
+  }
+}
 function verifyLineageOrigin(input: {
   stage: Exclude<LineageStage, "compile">
   decision_id: string
@@ -7724,6 +7788,25 @@ export default {
         if (compiledForOtherLineage) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash, expected_decision_id: decision_id, provided_decision_id: String(compiledForOtherLineage.decision_id || ""), indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       }
+      const tool_class = String(b.tool_class || b.execution_surface || "")
+      const govern_envelope_hash = String(b.govern_envelope_hash || b.governance_hash || "")
+      const authority_lineage_hash = await sha256Hex(canonicalize({
+        authority_id: String(authority.authority_id || ""),
+        decision_id,
+        continuity_id: String(authority.continuity_id || ""),
+        delegated_authority_id: String(authority.delegated_authority_id || ""),
+        delegation_lineage_hash: String(authority.delegation_lineage_hash || ""),
+        delegation_root_hash: String(authority.delegation_root_hash || ""),
+        delegated_replay_chain_hash: String(authority.delegated_replay_chain_hash || "")
+      }))
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS cognition_lineage_registry (cognition_lineage_id TEXT PRIMARY KEY, cognition_lineage_hash TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, continuity_id TEXT NOT NULL, authority_lineage_hash TEXT NOT NULL, govern_envelope_hash TEXT NOT NULL, tool_class TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('ACTIVE','NULL')), created_at TEXT NOT NULL, UNIQUE(decision_id, validated_object_hash, cognition_lineage_hash))`).run()
+      const requireCognitionLineageContinuity = HIGH_RISK_TOOL_CLASSES.has(tool_class)
+      if (requireCognitionLineageContinuity && !tool_class) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"cognition_lineage_ambiguous" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/validate", indicator: "missing_or_ambiguous_tool_class_for_high_risk_policy" }, drift_class: "authority_drift" })
+      if (requireCognitionLineageContinuity && !govern_envelope_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"cognition_lineage_missing" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/validate", indicator: "missing_govern_envelope_hash" }, drift_class: "authority_drift" })
+      if (requireCognitionLineageContinuity) {
+        const previousLineage = await env.DB.prepare(`SELECT cognition_lineage_hash FROM cognition_lineage_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='ACTIVE' LIMIT 1`).bind(decision_id, validated_object_hash).first<any>()
+        if (previousLineage && String(previousLineage.cognition_lineage_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"cognition_lineage_ambiguous" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/validate", indicator: "duplicate_or_ambiguous_cognition_lineage" }, drift_class: "replay_drift" })
+      }
       let compiledAeo: any
       try { compiledAeo = JSON.parse(String(compiled.canonical_aeo || "{}")) } catch { compiledAeo = null }
       const compiledCanonicalAeo = toCanonicalAeo(compiledAeo)
@@ -7751,6 +7834,17 @@ export default {
       const validationLineageVerification = verifyLineageOrigin({ stage: "validate", decision_id, validated_object_hash, lineage_stage: "validate", lineage_origin_hash: validationLineageOriginHash, parent_compilation_hash, compiled_hash: parent_compilation_hash })
       if (!validationLineageVerification.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: validationLineageVerification.reason }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", indicator: validationLineageVerification.reason }, drift_class: "hash_drift" })
       await env.DB.prepare(`INSERT INTO validation_registry (validation_id,session_id,continuity_id,decision_id,validated_object_hash,invocation_nonce,environment,result,reason,status,created_at,delegated_authority_id,delegated_replay_chain_hash,parent_compilation_hash,workflow_integrity_hash,lineage_stage,lineage_origin_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,'VALID',NULL,'VALID',?8,?9,?10,?11,?12,'validate',?13)`).bind(crypto.randomUUID(),session_id,String(authority.continuity_id || ""),decision_id,validated_object_hash,invocation_nonce,String(environment||""),new Date().toISOString(),String(authority.delegated_authority_id || ""),String(authority.delegated_replay_chain_hash || ""),parent_compilation_hash,String(compiled.workflow_integrity_hash || ""),validationLineageOriginHash).run()
+      const cognitionLineage = await buildCognitionLineageRecord({
+        decision_id,
+        validated_object_hash,
+        continuity_id: String(authority.continuity_id || ""),
+        authority_lineage_hash,
+        govern_envelope_hash,
+        tool_class,
+        provenance: deploymentProvenanceFrom(b),
+        transform_steps: ["ingest_input", "canonicalize_scope", "compile_hash_bind", "validate_lineage_continuity"]
+      })
+      await env.DB.prepare(`INSERT OR IGNORE INTO cognition_lineage_registry (cognition_lineage_id,cognition_lineage_hash,decision_id,validated_object_hash,continuity_id,authority_lineage_hash,govern_envelope_hash,tool_class,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'ACTIVE',?9)`).bind(cognitionLineage.cognition_lineage_id,cognitionLineage.cognition_lineage_hash,cognitionLineage.decision_id,cognitionLineage.validated_object_hash,cognitionLineage.continuity_id,cognitionLineage.authority_lineage_hash,cognitionLineage.govern_envelope_hash,cognitionLineage.tool_class,new Date().toISOString()).run()
       await env.DB.prepare(`UPDATE authority_registry SET status='RESERVED' WHERE decision_id=?1 AND status IN ('ACTIVE','VALIDATED','RESERVED')`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/validate", validated_object_hash, invocation_nonce, authority_status: "RESERVED" } })
       await emitInstallBaseTelemetryEvidenceBestEffort(env, { event_type: "validated_execution", decision_id, authority_id: String(authority.authority_id || ""), lineage_origin_hash: validationLineageOriginHash, lineage_origin_match: "MATCH", payload: { event_type: "validated_execution", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
