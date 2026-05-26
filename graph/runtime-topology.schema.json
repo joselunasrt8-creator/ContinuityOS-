@@ -3,7 +3,7 @@
   "$id": "https://mindshift.local/graph/runtime-topology.schema.json",
   "title": "MindShift Runtime Topology",
   "type": "object",
-  "required": ["generated_at", "nodes", "edges"],
+  "required": ["generated_at", "nodes", "edges", "summary"],
   "additionalProperties": false,
   "properties": {
     "generated_at": { "type": "string" },
@@ -12,7 +12,7 @@
       "items": {
         "type": "object",
         "required": [
-          "id","type","label","file_path","symbol","mutation_capable","authority_bound","continuity_bound","validator_bound","replay_safe","proof_generating","topology_visible","closure_status"
+          "id","type","label","file_path","symbol","mutation_capable","authority_bound","continuity_bound","validator_bound","replay_safe","proof_generating","topology_visible","closure_status","artifact_role","risk_scope","production_closure_relevant"
         ],
         "additionalProperties": false,
         "properties": {
@@ -28,7 +28,10 @@
           "replay_safe": { "type": "boolean" },
           "proof_generating": { "type": "boolean" },
           "topology_visible": { "type": "boolean" },
-          "closure_status": { "type": "string", "enum": ["OPEN", "PARTIAL", "CONTAINED", "CLOSED", "BREAK_GLASS"] }
+          "closure_status": { "type": "string", "enum": ["OPEN", "PARTIAL", "CONTAINED", "CLOSED", "BREAK_GLASS"] },
+          "artifact_role": { "type": "string", "enum": ["runtime", "workflow", "script", "migration", "test", "fixture", "doc", "generated", "topology_metadata", "config", "unknown"] },
+          "risk_scope": { "type": "string", "enum": ["production_runtime", "governance_runtime", "ci_workflow", "test_only", "documentation_only", "metadata_only", "generated_only", "unknown"] },
+          "production_closure_relevant": { "type": "boolean" }
         }
       }
     },
@@ -50,6 +53,18 @@
           "evidence": { "type": "string" },
           "file_path": { "type": "string", "minLength": 1 }
         }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["closure_status_counts_all", "closure_status_counts_production_relevant", "artifact_role_counts", "risk_scope_counts", "mutation_surface_counts_by_role"],
+      "additionalProperties": false,
+      "properties": {
+        "closure_status_counts_all": { "type": "object" },
+        "closure_status_counts_production_relevant": { "type": "object" },
+        "artifact_role_counts": { "type": "object" },
+        "risk_scope_counts": { "type": "object" },
+        "mutation_surface_counts_by_role": { "type": "object" }
       }
     }
   }
