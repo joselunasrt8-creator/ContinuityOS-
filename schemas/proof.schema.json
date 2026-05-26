@@ -88,6 +88,33 @@
     },
     "execution_lineage": {
       "type": "object"
+    },
+    "finality_metadata": {
+      "type": "object",
+      "description": "Optional proof finality metadata. Evidence-only: finality_metadata ≠ authority.",
+      "additionalProperties": true,
+      "properties": {
+        "finality_classification": {
+          "type": "string",
+          "enum": [
+            "LOCAL_VALID",
+            "CONVERGENCE_VALID",
+            "GLOBAL_VALID",
+            "AMBIGUOUS",
+            "STALE_VISIBLE",
+            "PARTITION_SUSPENDED",
+            "NULL"
+          ]
+        },
+        "topology_snapshot_hash": { "type": "string" },
+        "epoch_id": { "type": "string" },
+        "downgrade_events": { "type": "array" },
+        "upgrade_events": { "type": "array" },
+        "detached": { "type": "boolean" },
+        "detach_reason": { "type": "string" },
+        "creates_authority": { "type": "boolean", "const": false },
+        "restores_replay": { "type": "boolean", "const": false }
+      }
     }
   }
 }

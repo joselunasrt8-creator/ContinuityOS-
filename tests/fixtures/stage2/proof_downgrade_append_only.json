@@ -1,0 +1,31 @@
+{
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "check_id": "CONF-DIST-14",
+  "label": "proof_downgrade_upgrade_is_append_only",
+  "scenario": "proof_downgrade_append_only",
+  "anchor_issue": "#1414",
+  "supporting_issues": ["#1418", "#1442", "#1340"],
+  "proof_id": "proof_append_only_001",
+  "initial_classification": "LOCAL_VALID",
+  "expected_result": "APPEND_ONLY_ENFORCED",
+  "creates_authority": false,
+  "restores_replay": false,
+  "downgrade_event": {
+    "event_id": "pde_test_001",
+    "proof_id": "proof_append_only_001",
+    "from_classification": "LOCAL_VALID",
+    "to_classification": "PARTITION_SUSPENDED",
+    "reason_code": "partition_detected",
+    "timestamp_utc": "2026-05-26T00:00:00Z"
+  },
+  "upgrade_event": {
+    "event_id": "pue_test_001",
+    "proof_id": "proof_append_only_001",
+    "from_classification": "PARTITION_SUSPENDED",
+    "to_classification": "LOCAL_VALID",
+    "reason_code": "partition_healed_evidence_confirmed",
+    "timestamp_utc": "2026-05-26T01:00:00Z"
+  },
+  "_note": "Proof downgrade and upgrade events must be recorded as immutable append-only entries. Prior events must not be overwritten. Append returns new list; never mutates existing."
+}

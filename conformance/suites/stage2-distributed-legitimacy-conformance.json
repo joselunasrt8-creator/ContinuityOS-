@@ -32,10 +32,15 @@
       "label": "partition_local_proof_downgraded",
       "description": "Proof valid within a partition must be downgraded to PARTITION_SUSPENDED on partition detection.",
       "fixture": "tests/fixtures/stage2/partition_proof_downgrade.json",
+      "test": "tests/fate/stage2-conf-dist-02.test.mjs",
       "expected_result": "PARTITION_SUSPENDED",
-      "required_module": "runtime/control_graph_proof.ts",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "LOCAL_VALID"],
+      "classification_layer": "classifyProofFinality",
+      "required_module": "src/lib/proof-finality-metadata.ts",
+      "required_migration": "migrations/0056_proof_finality_metadata_events.sql",
       "related_issue": "#1418",
-      "status": "PENDING — Slice G"
+      "slice": "G",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-03",
@@ -92,10 +97,15 @@
       "label": "detached_proof_cannot_finalize",
       "description": "A proof with no reconstructable continuity lineage must return NULL. Detached proof existence does not confer finality.",
       "fixture": "tests/fixtures/stage2/detached_proof.json",
+      "test": "tests/fate/stage2-conf-dist-07.test.mjs",
       "expected_result": "NULL",
-      "required_module": "runtime/control_graph_proof.ts",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "LOCAL_VALID", "PARTITION_SUSPENDED"],
+      "classification_layer": "classifyProofFinality + isProofDetached",
+      "required_module": "src/lib/proof-finality-metadata.ts",
+      "required_migration": "migrations/0056_proof_finality_metadata_events.sql",
       "related_issue": "#1414",
-      "status": "PENDING — Slice G"
+      "slice": "G",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-08",
@@ -168,10 +178,15 @@
       "label": "proof_downgrade_upgrade_is_append_only",
       "description": "Proof downgrade and upgrade events must be recorded as immutable append-only entries. No overwrite of prior events.",
       "fixture": "tests/fixtures/stage2/proof_downgrade_append_only.json",
+      "test": "tests/fate/stage2-conf-dist-14.test.mjs",
       "expected_result": "APPEND_ONLY_ENFORCED",
-      "required_module": "runtime/control_graph_proof.ts",
+      "classification_layer": "appendProofDowngradeEvent + appendProofUpgradeEvent",
+      "required_module": "src/lib/proof-finality-metadata.ts",
+      "required_migration": "migrations/0056_proof_finality_metadata_events.sql",
+      "db_guard": "pde_no_update + pde_no_delete + pue_no_update + pue_no_delete",
       "related_issue": "#1414",
-      "status": "PENDING — Slice G"
+      "slice": "G",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-15",
