@@ -61,10 +61,15 @@
       "label": "stale_lineage_collapses_to_stale_visible",
       "description": "Lineage whose epoch has advanced without renewal must collapse to STALE_VISIBLE and not remain active.",
       "fixture": "tests/fixtures/stage2/stale_lineage_collapse.json",
+      "test": "tests/fate/stage2-conf-dist-04.test.mjs",
       "expected_result": "STALE_VISIBLE",
-      "required_module": "runtime/control_graph_reconciliation.ts",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "CONVERGED", "FINALIZED"],
+      "classification_layer": "classifyReconciliationState + collapseStaleLineage",
+      "required_module": "src/lib/reconciliation-state-machine.ts",
+      "required_migration": "migrations/0058_reconciliation_state_machine_events.sql",
       "related_issue": "#1415",
-      "status": "PENDING — Slice H"
+      "slice": "H",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-05",
@@ -117,10 +122,15 @@
       "label": "reconciliation_cannot_create_authority",
       "description": "Reconciliation state machine transitions must not produce execution eligibility or authority. reconciliation ≠ authority.",
       "fixture": "tests/fixtures/stage2/reconciliation_no_authority.json",
+      "test": "tests/fate/stage2-conf-dist-08.test.mjs",
       "expected_result": "NO_AUTHORITY",
-      "required_module": "runtime/reconciliation/cross-registry-reconciliation-engine.js",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "classification_layer": "classifyReconciliationState + transitionReconciliationState",
+      "required_module": "src/lib/reconciliation-state-machine.ts",
+      "required_migration": "migrations/0058_reconciliation_state_machine_events.sql",
       "related_issue": "#1405",
-      "status": "PENDING — Slice H"
+      "slice": "H",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-09",
@@ -166,12 +176,18 @@
     {
       "check_id": "CONF-DIST-12",
       "label": "revocation_liveness_downgrade_propagates",
-      "description": "Revocation liveness event must propagate a downgrade to STALE_VISIBLE across all topology nodes.",
+      "description": "Revocation liveness event must propagate a downgrade to STALE_VISIBLE or REVOKED across all topology nodes. Revoked legitimacy cannot remain executable. Stale revocation visibility cannot preserve execution eligibility.",
       "fixture": "tests/fixtures/stage2/revocation_liveness_downgrade.json",
-      "expected_result": "STALE_VISIBLE",
-      "required_module": "migrations/0051_revocation_liveness_registry.sql runtime",
+      "test": "tests/fate/stage2-conf-dist-12.test.mjs",
+      "expected_result": "STALE_VISIBLE or REVOKED non-executable",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "CONVERGED", "FINALIZED"],
+      "classification_layer": "propagateRevocationLivenessDowngrade + classifyReconciliationState",
+      "required_module": "src/lib/reconciliation-state-machine.ts",
+      "required_migration": "migrations/0058_reconciliation_state_machine_events.sql",
+      "db_guard": "rde_no_authority_creation + rde_no_replay_restoration",
       "related_issue": "#1443",
-      "status": "PENDING — Slice H"
+      "slice": "H",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-13",

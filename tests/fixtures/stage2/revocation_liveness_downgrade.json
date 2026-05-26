@@ -1,0 +1,35 @@
+{
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "check_id": "CONF-DIST-12",
+  "label": "revocation_liveness_downgrade_propagates",
+  "scenario": "revocation_liveness_downgrade",
+  "anchor_issue": "#1443",
+  "supporting_issues": ["#1405", "#1339", "#1442"],
+  "reconciliation_id": "reconciliation_revocation_liveness_001",
+  "revocation_evidence_ref": "revocation_liveness_ref_001",
+  "current_state": "CONVERGED",
+  "within_sla": true,
+  "expected_reconciliation_state": "REVOKED",
+  "expected_classification": "REVOKED_NON_EXECUTABLE",
+  "forbidden_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID", "CONVERGED", "FINALIZED"],
+  "expected_executable": false,
+  "creates_authority": false,
+  "restores_replay": false,
+  "stale_revocation_scenario": {
+    "current_state": "CONVERGED",
+    "within_sla": false,
+    "expected_reconciliation_state": "STALE_VISIBLE",
+    "expected_classification": "STALE_VISIBLE",
+    "expected_executable": false,
+    "_note": "Stale revocation visibility (outside SLA) collapses to STALE_VISIBLE — also non-executable."
+  },
+  "expected_downgrade_event": {
+    "reason_code": "REVOCATION_LIVENESS_DOWNGRADE",
+    "from_state": "CONVERGED",
+    "to_state": "REVOKED",
+    "creates_authority": false,
+    "restores_replay": false
+  },
+  "_note": "Revocation liveness event must propagate a downgrade across all topology nodes. Revoked legitimacy cannot remain executable. Stale revocation visibility cannot preserve execution eligibility. Propagation evidence is append-only."
+}
