@@ -49,6 +49,8 @@ jobs:
           done < changed_files.txt
 
           echo "constitutional_drift=$CONSTITUTIONAL_DRIFT" >> "$GITHUB_OUTPUT"
+          DRIFT_REPLAY_ID="$(printf '%s' "${{ github.repository }}|${{ github.workflow }}|${{ github.run_id }}|${{ github.run_attempt }}|${{ github.sha }}|${{ github.ref }}" | sha256sum | awk '{print $1}')"
+          echo "drift_replay_id=$DRIFT_REPLAY_ID" >> "$GITHUB_OUTPUT"
 
           if [[ "$CONSTITUTIONAL_DRIFT" == "true" ]]; then
             echo "Constitutional drift detected."
@@ -197,3 +199,4 @@ jobs:
         run: |
           echo "Constitutional integrity preserved."
           echo "PR classification: ${{ steps.pr_classification.outputs.pr_class }}"
+          echo "Replay identity: ${{ steps.constitutional_drift.outputs.drift_replay_id }}"

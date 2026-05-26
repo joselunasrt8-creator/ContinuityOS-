@@ -37,6 +37,11 @@ jobs:
       DEPLOY_BRANCH: ${{ github.ref_name }}
       DEPLOY_WORKFLOW: governed-deploy.yml
       CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
 
     steps:
       - name: HARD FAIL — Missing critical inputs or secrets
@@ -74,7 +79,19 @@ jobs:
             exit 1
           fi
 
+          if [ "$DEPLOY_BRANCH" != "$WORKFLOW_REF_NAME" ]; then
+            echo "NULL — Branch/ref_name mismatch"
+            exit 1
+          fi
+
+          REPLAY_ID="$(printf '%s' "${GITHUB_REPOSITORY}|${DEPLOY_WORKFLOW}|${WORKFLOW_RUN_ID}|${WORKFLOW_RUN_ATTEMPT}|${WORKFLOW_SHA}|${WORKFLOW_REF}|${DECISION_ID}|${VALIDATED_OBJECT_HASH}|${INVOCATION_NONCE}" | sha256sum | awk '{print $1}')"
+          LINEAGE_BINDING_ID="$(printf '%s' "${DECISION_ID}|${VALIDATED_OBJECT_HASH}|${INVOCATION_NONCE}|${WORKFLOW_SHA}|${WORKFLOW_REF}" | sha256sum | awk '{print $1}')"
+          EVIDENCE_ARTIFACT_PREFIX="gd-${WORKFLOW_RUN_ID}-${WORKFLOW_RUN_ATTEMPT}-${WORKFLOW_SHA}"
+
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+          echo "REPLAY_ID=$REPLAY_ID" >> "$GITHUB_ENV"
+          echo "LINEAGE_BINDING_ID=$LINEAGE_BINDING_ID" >> "$GITHUB_ENV"
+          echo "EVIDENCE_ARTIFACT_PREFIX=$EVIDENCE_ARTIFACT_PREFIX" >> "$GITHUB_ENV"
 
       - name: Save session response
         run: |
@@ -84,14 +101,14 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/session" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
-            -d "$(jq -n --arg identity_id "github_actions:$GITHUB_REPOSITORY:$GITHUB_RUN_ID" '{identity_id: $identity_id}')")
+            -d "$(jq -n --arg identity_id "github_actions:${GITHUB_REPOSITORY}:${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}:${WORKFLOW_SHA}:${REPLAY_ID}" '{identity_id: $identity_id}')")
 
           echo "SESSION_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
 
       - name: Upload session artifact
         uses: actions/upload-artifact@v4
         with:
-          name: session
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-session-${{ env.REPLAY_ID }}
           path: session.json
 
       - name: Assert session response is canonical
@@ -138,7 +155,7 @@ jobs:
       - name: Upload continuity artifact
         uses: actions/upload-artifact@v4
         with:
-          name: continuity
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-continuity-${{ env.REPLAY_ID }}
           path: continuity.json
 
       - name: Assert continuity response is canonical
@@ -194,7 +211,7 @@ jobs:
       - name: Upload authority artifact
         uses: actions/upload-artifact@v4
         with:
-          name: authority
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-authority-${{ env.REPLAY_ID }}
           path: authority.json
 
       - name: Assert authority response is canonical
@@ -247,7 +264,7 @@ jobs:
       - name: Upload compile artifact
         uses: actions/upload-artifact@v4
         with:
-          name: compile
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-compile-${{ env.REPLAY_ID }}
           path: compile.json
 
       - name: Assert compile response is canonical
@@ -299,7 +316,7 @@ jobs:
       - name: Upload validate artifact
         uses: actions/upload-artifact@v4
         with:
-          name: validate
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-validate-${{ env.REPLAY_ID }}
           path: validate.json
 
       - name: Assert validate response is canonical
@@ -374,7 +391,7 @@ jobs:
       - name: Upload execute artifact
         uses: actions/upload-artifact@v4
         with:
-          name: execute
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-execute-${{ env.REPLAY_ID }}
           path: execute.json
 
       - name: Assert execute response is canonical
@@ -423,7 +440,7 @@ jobs:
       - name: Upload replay artifact
         uses: actions/upload-artifact@v4
         with:
-          name: replay
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-replay-${{ env.REPLAY_ID }}
           path: replay.json
 
       - name: Assert replay protection response is canonical
@@ -484,7 +501,7 @@ jobs:
       - name: Upload proof artifact
         uses: actions/upload-artifact@v4
         with:
-          name: proof
+          name: ${{ env.EVIDENCE_ARTIFACT_PREFIX }}-proof-${{ env.REPLAY_ID }}
           path: proof.json
 
       - name: Assert proof response is canonical
@@ -506,12 +523,34 @@ jobs:
             exit 1
           fi
 
+          PROOF_RUN_ID=$(jq -r ' .proof.run_id // .run_id // empty' proof.json)
+          PROOF_COMMIT_SHA=$(jq -r ' .proof.commit_sha // .commit_sha // empty' proof.json)
+          PROOF_WORKFLOW=$(jq -r ' .proof.workflow // .workflow // empty' proof.json)
+
+          if [ -n "$PROOF_RUN_ID" ] && [ "$PROOF_RUN_ID" != "$WORKFLOW_RUN_ID" ]; then
+            echo "NULL — Proof run lineage mismatch"
+            cat proof.json
+            exit 1
+          fi
+
+          if [ -n "$PROOF_COMMIT_SHA" ] && [ "$PROOF_COMMIT_SHA" != "$WORKFLOW_SHA" ]; then
+            echo "NULL — Proof commit lineage mismatch"
+            cat proof.json
+            exit 1
+          fi
+
+          if [ -n "$PROOF_WORKFLOW" ] && [ "$PROOF_WORKFLOW" != "$DEPLOY_WORKFLOW" ]; then
+            echo "NULL — Proof workflow lineage mismatch"
+            cat proof.json
+            exit 1
+          fi
+
 
       - name: Build governed deploy legitimacy artifact
         run: |
           set -euo pipefail
 
-          jq -n             --arg session_id "$SESSION_ID"             --arg decision_id "$DECISION_ID"             --arg invocation_nonce "$INVOCATION_NONCE"             --arg preo_status "VALID"             --arg continuity_status "VALID"             --arg validator_status "APPROVED"             --arg authority_status "ACTIVE"             --arg authority_expiry "$AUTHORITY_EXPIRY"             --arg proof_status "VALID"             --arg proof_binding_hash "$VALIDATED_OBJECT_HASH"             --arg proof_id "$PROOF_ID"             --arg validated_object_hash "$VALIDATED_OBJECT_HASH"             --arg deployment_hash "$VALIDATED_OBJECT_HASH"             --arg repo "$DEPLOY_REPO"             --arg branch "$DEPLOY_BRANCH"             --arg workflow "$DEPLOY_WORKFLOW"             --arg commit_sha "${{ github.sha }}"             '{session_id:$session_id,decision_id:$decision_id,invocation_nonce:$invocation_nonce,preo:{status:$preo_status},continuity:{status:$continuity_status,orphaned:false},validator:{status:$validator_status,approved:true},replay:{status:"INVALID",reused:false},authority:{status:$authority_status,expires_at:$authority_expiry},proof:{status:$proof_status,binding_hash:$proof_binding_hash,proof_id:$proof_id},validated_object_hash:$validated_object_hash,deployment_hash:$deployment_hash,deployment_target:{repo:$repo,branch:$branch,workflow:$workflow,commit:$commit_sha}}' > governed-deploy-artifact.json
+          jq -n             --arg session_id "$SESSION_ID"             --arg decision_id "$DECISION_ID"             --arg invocation_nonce "$INVOCATION_NONCE"             --arg preo_status "VALID"             --arg continuity_status "VALID"             --arg validator_status "APPROVED"             --arg authority_status "ACTIVE"             --arg authority_expiry "$AUTHORITY_EXPIRY"             --arg proof_status "VALID"             --arg proof_binding_hash "$VALIDATED_OBJECT_HASH"             --arg proof_id "$PROOF_ID"             --arg validated_object_hash "$VALIDATED_OBJECT_HASH"             --arg deployment_hash "$VALIDATED_OBJECT_HASH"             --arg repo "$DEPLOY_REPO"             --arg branch "$DEPLOY_BRANCH"             --arg workflow "$DEPLOY_WORKFLOW"             --arg commit_sha "${{ github.sha }}"             --arg replay_id "$REPLAY_ID"             --arg lineage_binding_id "$LINEAGE_BINDING_ID"             --arg workflow_run_id "$WORKFLOW_RUN_ID"             --arg workflow_run_attempt "$WORKFLOW_RUN_ATTEMPT"             --arg workflow_ref "$WORKFLOW_REF"             '{session_id:$session_id,decision_id:$decision_id,invocation_nonce:$invocation_nonce,replay_id:$replay_id,lineage_binding_id:$lineage_binding_id,preo:{status:$preo_status},continuity:{status:$continuity_status,orphaned:false},validator:{status:$validator_status,approved:true},replay:{status:"INVALID",reused:false},authority:{status:$authority_status,expires_at:$authority_expiry},proof:{status:$proof_status,binding_hash:$proof_binding_hash,proof_id:$proof_id},validated_object_hash:$validated_object_hash,deployment_hash:$deployment_hash,deployment_target:{repo:$repo,branch:$branch,workflow:$workflow,commit:$commit_sha,run_id:$workflow_run_id,run_attempt:$workflow_run_attempt,ref:$workflow_ref}}' > governed-deploy-artifact.json
 
       - name: Execute production deploy through governed wrapper only
         env:

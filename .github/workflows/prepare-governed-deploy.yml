@@ -21,6 +21,11 @@ jobs:
       DEPLOY_REPO: ${{ github.repository }}
       DEPLOY_BRANCH: ${{ github.ref_name }}
       CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
 
     steps:
       - name: HARD FAIL — Missing critical secrets
@@ -58,6 +63,13 @@ jobs:
             exit 1
           fi
 
+          if [ "$DEPLOY_BRANCH" != "$WORKFLOW_REF_NAME" ]; then
+            echo "NULL — Branch/ref_name mismatch"
+            exit 1
+          fi
+
+          PREPARE_REPLAY_ID="$(printf '%s' "${GITHUB_REPOSITORY}|${PREPARE_WORKFLOW}|${WORKFLOW_RUN_ID}|${WORKFLOW_RUN_ATTEMPT}|${WORKFLOW_SHA}|${WORKFLOW_REF}" | sha256sum | awk '{print $1}')"
+          echo "PREPARE_REPLAY_ID=$PREPARE_REPLAY_ID" >> "$GITHUB_ENV"
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
       - name: SESSION — Create active deploy session
@@ -68,7 +80,7 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/session" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
-            -d "$(jq -n --arg identity_id "github_actions:$DEPLOY_REPO:$GITHUB_RUN_ID" '{identity_id:$identity_id}')")
+            -d "$(jq -n --arg identity_id "github_actions:${DEPLOY_REPO}:${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}:${WORKFLOW_SHA}:${PREPARE_REPLAY_ID}" '{identity_id:$identity_id}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
             echo "NULL — Session endpoint error"
@@ -231,5 +243,6 @@ jobs:
             printf 'decision_id=%s\n' "$DECISION_ID"
             printf 'validated_object_hash=%s\n' "$VALIDATED_OBJECT_HASH"
             printf 'invocation_nonce=%s\n' "$INVOCATION_NONCE"
+          printf 'prepare_replay_id=%s\n' "$PREPARE_REPLAY_ID"
             printf '%s\n' '```'
           } >> "$GITHUB_STEP_SUMMARY"
