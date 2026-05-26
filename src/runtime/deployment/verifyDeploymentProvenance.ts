@@ -17,6 +17,7 @@ export type DeploymentProvenanceFailureReason =
   | "missing_deployment_timestamp"
   | "missing_environment_classification"
   | "missing_deployment_proof_id"
+  | "missing_provenance_id"
   | "replayed_deployment_provenance"
 
 export type DeploymentProvenanceVerification =
@@ -31,6 +32,7 @@ export function verifyDeploymentProvenance(record: Partial<DeploymentProvenanceR
   if (!String(record.deployment_timestamp || "").trim()) return { ok: false, reason: "missing_deployment_timestamp" }
   if (!String(record.environment_classification || "").trim()) return { ok: false, reason: "missing_environment_classification" }
   if (!String(record.deployment_proof_id || "").trim()) return { ok: false, reason: "missing_deployment_proof_id" }
+  if (!String(record.provenance_id || "").trim()) return { ok: false, reason: "missing_provenance_id" }
   return { ok: true }
 }
 
@@ -43,6 +45,7 @@ export function provenanceIsReplayed(
     String(existing.workflow_hash || "") === String(candidate.workflow_hash || "") &&
     String(existing.artifact_hash || "") === String(candidate.artifact_hash || "") &&
     String(existing.commit_sha || "") === String(candidate.commit_sha || "") &&
-    String(existing.deployment_proof_id || "") === String(candidate.deployment_proof_id || "")
+    String(existing.deployment_proof_id || "") === String(candidate.deployment_proof_id || "") &&
+    String(existing.provenance_id || "") === String(candidate.provenance_id || "")
   )
 }

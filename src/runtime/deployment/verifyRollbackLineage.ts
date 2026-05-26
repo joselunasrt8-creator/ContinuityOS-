@@ -12,6 +12,7 @@ export type RollbackLineageInput = {
 
 export type RollbackLineageFailureReason =
   | "missing_prior_deployment_proof"
+  | "missing_prior_workflow_hash"
   | "rollback_artifact_mismatch"
   | "rollback_commit_sha_mismatch"
   | "rollback_lineage_drift"
@@ -40,6 +41,9 @@ export function verifyRollbackLineage(input: RollbackLineageInput): RollbackLine
   if (!String(input.prior_deployment_proof_id || "").trim()) {
     return { ok: false, reason: "missing_prior_deployment_proof" }
   }
+  if (!String(input.prior_workflow_hash || "").trim()) {
+    return { ok: false, reason: "missing_prior_workflow_hash" }
+  }
   if (
     !String(input.rollback_artifact_hash || "").trim() ||
     !String(input.rollback_workflow_hash || "").trim() ||
@@ -48,6 +52,9 @@ export function verifyRollbackLineage(input: RollbackLineageInput): RollbackLine
     return { ok: false, reason: "invalid_rollback_target" }
   }
 
+  if (String(input.rollback_workflow_hash) !== String(input.prior_workflow_hash)) {
+    return { ok: false, reason: "invalid_rollback_target" }
+  }
   if (String(input.rollback_artifact_hash) !== String(input.prior_artifact_hash)) {
     return { ok: false, reason: "rollback_artifact_mismatch" }
   }

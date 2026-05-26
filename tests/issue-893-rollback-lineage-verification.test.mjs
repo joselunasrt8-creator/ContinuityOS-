@@ -214,3 +214,14 @@ test('rollback with valid prior proof and matching lineage succeeds deterministi
   assert.equal(result.ok, true)
   assert.ok(result.ok && result.rollback_lineage_hash === expectedHash)
 })
+
+
+test('rollback rejects missing prior workflow lineage anchor', () => {
+  const result = verifyRollbackLineage(validRollbackInput({ prior_workflow_hash: '' }))
+  assert.deepEqual(result, { ok: false, reason: 'missing_prior_workflow_hash' })
+})
+
+test('rollback workflow mismatch is invalid rollback target', () => {
+  const result = verifyRollbackLineage(validRollbackInput({ rollback_workflow_hash: 'wf-other' }))
+  assert.deepEqual(result, { ok: false, reason: 'invalid_rollback_target' })
+})

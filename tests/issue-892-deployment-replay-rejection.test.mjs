@@ -82,6 +82,7 @@ test('deterministic NULL behavior: all rejection paths return ok: false with rea
     [validCandidate({ commit_sha: '' }), 'missing_commit_sha'],
     [validCandidate({ deployment_environment: '' }), 'missing_deployment_environment'],
     [validCandidate({ provenance_lineage_hash: '' }), 'missing_provenance_lineage'],
+    [validCandidate({ deployment_proof_id: '' }), 'missing_deployment_proof_id'],
     [validCandidate({ workflow_hash: 'stale' }), 'stale_workflow_deployment'],
     [validCandidate({ artifact_hash: 'mismatch' }), 'artifact_hash_mismatch'],
     [validCandidate({ commit_sha: 'mismatch' }), 'commit_sha_mismatch'],
@@ -155,4 +156,12 @@ test('provenance validation fails closed: missing fields return NULL reason', ()
     assert.equal(r.ok, false)
     assert.ok(r.reason.startsWith('missing_'), `expected missing_ reason for ${field}, got ${r.reason}`)
   }
+})
+
+
+test('deployment proof id replay is rejected even without prior binding hash', () => {
+  const prior = priorProof({ proof_binding_hash: '', deployment_proof_id: 'proof-stable' })
+  const candidate = validCandidate({ deployment_proof_id: 'proof-stable' })
+  const result = verifyDeploymentProof({ candidate, prior_proof: prior })
+  assert.deepEqual(result, { ok: false, reason: 'replayed_deployment_proof' })
 })

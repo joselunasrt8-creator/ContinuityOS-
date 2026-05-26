@@ -83,7 +83,7 @@ test('verifyDeploymentProvenance rejects missing deployment_proof_id', () => {
 })
 
 test('production deployment requires all provenance fields present', () => {
-  const required = ['commit_sha', 'workflow_hash', 'artifact_hash', 'deploy_actor', 'deployment_timestamp', 'environment_classification', 'deployment_proof_id']
+  const required = ['commit_sha', 'workflow_hash', 'artifact_hash', 'deploy_actor', 'deployment_timestamp', 'environment_classification', 'deployment_proof_id', 'provenance_id']
   for (const field of required) {
     const record = validRecord({ [field]: '' })
     const result = verifyDeploymentProvenance(record)
@@ -175,4 +175,11 @@ test('deployment provenance registry is immutable after initial insert', { skip:
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+
+test('provenance replay requires provenance_id stability', () => {
+  const base = validRecord({ provenance_id: 'prov-stable' })
+  assert.equal(provenanceIsReplayed(base, { ...base, provenance_id: 'prov-other' }), false)
+  assert.equal(provenanceIsReplayed(base, { ...base }), true)
 })

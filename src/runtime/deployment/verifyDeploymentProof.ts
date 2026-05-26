@@ -14,6 +14,7 @@ export type DeploymentProofFailureReason =
   | "missing_commit_sha"
   | "missing_deployment_environment"
   | "missing_provenance_lineage"
+  | "missing_deployment_proof_id"
   | "proof_binding_hash_mismatch"
   | "replayed_deployment_proof"
   | "stale_workflow_deployment"
@@ -51,6 +52,7 @@ export function verifyDeploymentProof(input: {
   if (!String(candidate.commit_sha || "").trim()) return { ok: false, reason: "missing_commit_sha" }
   if (!String(candidate.deployment_environment || "").trim()) return { ok: false, reason: "missing_deployment_environment" }
   if (!String(candidate.provenance_lineage_hash || "").trim()) return { ok: false, reason: "missing_provenance_lineage" }
+  if (!String(candidate.deployment_proof_id || "").trim()) return { ok: false, reason: "missing_deployment_proof_id" }
 
   if (input.prior_proof) {
     const prior = input.prior_proof
@@ -62,6 +64,12 @@ export function verifyDeploymentProof(input: {
     }
     if (String(prior.commit_sha || "") && String(prior.commit_sha || "") !== String(candidate.commit_sha || "")) {
       return { ok: false, reason: "commit_sha_mismatch" }
+    }
+    if (
+      String(prior.deployment_proof_id || "") &&
+      String(prior.deployment_proof_id || "") === String(candidate.deployment_proof_id || "")
+    ) {
+      return { ok: false, reason: "replayed_deployment_proof" }
     }
     if (
       String(prior.proof_binding_hash || "") &&
