@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/graph/runtime-topology.schema.json",
+  "title": "MindShift Runtime Topology",
+  "type": "object",
+  "required": ["generated_at", "nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "generated_at": { "type": "string" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id","type","label","file_path","symbol","mutation_capable","authority_bound","continuity_bound","validator_bound","replay_safe","proof_generating","topology_visible","closure_status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "file_path": { "type": "string", "minLength": 1 },
+          "symbol": { "type": "string", "minLength": 1 },
+          "mutation_capable": { "type": "boolean" },
+          "authority_bound": { "type": "boolean" },
+          "continuity_bound": { "type": "boolean" },
+          "validator_bound": { "type": "boolean" },
+          "replay_safe": { "type": "boolean" },
+          "proof_generating": { "type": "boolean" },
+          "topology_visible": { "type": "boolean" },
+          "closure_status": { "type": "string", "enum": ["OPEN", "PARTIAL", "CONTAINED", "CLOSED", "BREAK_GLASS"] }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "relation", "evidence", "file_path"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "CALLS","VALIDATES","WRITES_PROOF","CONSUMES_NONCE","DEPENDS_ON_AUTHORITY","DEPENDS_ON_CONTINUITY","RECONCILES_WITH","CLASSIFIES_FINALITY","MUTATES_STATE","REFERENCES_REGISTRY"
+            ]
+          },
+          "evidence": { "type": "string" },
+          "file_path": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
