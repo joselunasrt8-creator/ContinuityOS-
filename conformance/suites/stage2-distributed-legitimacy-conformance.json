@@ -1,0 +1,173 @@
+{
+  "suite_id": "stage2_distributed_legitimacy_conformance_v1",
+  "description": "Stage 2 Distributed Legitimacy Enforcement conformance suite. Covers CONF-DIST-01 through CONF-DIST-15. Extended incrementally as each Stage 2 implementation slice is completed. Classification evidence ≠ execution authority.",
+  "planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "stage": 2,
+  "observability_only": false,
+  "runtime_mutation_capable": false,
+  "replay_neutral": true,
+  "non_operative": true,
+  "raw_production_apply_path": "DENIED",
+  "anchor_issue": "#1340",
+  "supporting_issues": ["#1418", "#1347", "#1348", "#1405", "#1440", "#1441", "#1442", "#1443"],
+  "checks": [
+    {
+      "check_id": "CONF-DIST-01",
+      "label": "local_valid_does_not_imply_global_valid",
+      "description": "LOCAL_VALID object with absent distributed predicates (Q=false, G=false, X=false) must not be promoted to GLOBAL_VALID, even when topology is present and epoch is valid. local correctness ≠ distributed legitimacy coherence.",
+      "scenario": "local_valid_no_global_promotion",
+      "fixture": "tests/fixtures/stage2/local_valid_no_global_promotion.json",
+      "test": "tests/fate/stage2-conf-dist-01.test.mjs",
+      "expected_result": "LOCAL_VALID",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "classification_layer": "classifyFromPredicates",
+      "required_module": "src/lib/finality-classification.ts",
+      "required_migration": "migrations/0053_finality_classification_convergence_valid.sql",
+      "db_guard": "fcr_global_valid_requires_convergence_supersession",
+      "related_issue": "#1340",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "check_id": "CONF-DIST-02",
+      "label": "partition_local_proof_downgraded",
+      "description": "Proof valid within a partition must be downgraded to PARTITION_SUSPENDED on partition detection.",
+      "fixture": "tests/fixtures/stage2/partition_proof_downgrade.json",
+      "expected_result": "PARTITION_SUSPENDED",
+      "required_module": "runtime/control_graph_proof.ts",
+      "related_issue": "#1418",
+      "status": "PENDING — Slice G"
+    },
+    {
+      "check_id": "CONF-DIST-03",
+      "label": "replay_consumed_in_partition_remains_consumed_after_healing",
+      "description": "Nonce consumed during a partition must remain consumed after partition healing. Anti-entropy repair must not un-consume a nonce.",
+      "fixture": "tests/fixtures/stage2/replay_consumed_partition_heal.json",
+      "expected_result": "NULL",
+      "required_module": "src/distributed-replay-convergence.ts",
+      "related_issue": "#1347",
+      "status": "PENDING — Slice F"
+    },
+    {
+      "check_id": "CONF-DIST-04",
+      "label": "stale_lineage_collapses_to_stale_visible",
+      "description": "Lineage whose epoch has advanced without renewal must collapse to STALE_VISIBLE and not remain active.",
+      "fixture": "tests/fixtures/stage2/stale_lineage_collapse.json",
+      "expected_result": "STALE_VISIBLE",
+      "required_module": "runtime/control_graph_reconciliation.ts",
+      "related_issue": "#1415",
+      "status": "PENDING — Slice H"
+    },
+    {
+      "check_id": "CONF-DIST-05",
+      "label": "conflicting_proof_roots_create_conflicted",
+      "description": "Two or more proofs claiming the same execution surface with different roots must produce CONFLICTED classification.",
+      "fixture": "tests/fixtures/stage2/conflicting_proof_roots.json",
+      "expected_result": "CONFLICTED",
+      "required_module": "src/lib/conflict-set.ts",
+      "related_issue": "#1348",
+      "status": "PENDING — Slice E"
+    },
+    {
+      "check_id": "CONF-DIST-06",
+      "label": "quorum_disagreement_prevents_global_valid",
+      "description": "Validator quorum disagreement must prevent GLOBAL_VALID classification. Result must be AMBIGUOUS or CONFLICTED.",
+      "fixture": "tests/fixtures/stage2/quorum_disagreement.json",
+      "expected_result": "AMBIGUOUS",
+      "forbidden_results": ["GLOBAL_VALID"],
+      "required_module": "src/lib/quorum-attestation.ts",
+      "related_issue": "#1440",
+      "status": "PENDING — Slice D"
+    },
+    {
+      "check_id": "CONF-DIST-07",
+      "label": "detached_proof_cannot_finalize",
+      "description": "A proof with no reconstructable continuity lineage must return NULL. Detached proof existence does not confer finality.",
+      "fixture": "tests/fixtures/stage2/detached_proof.json",
+      "expected_result": "NULL",
+      "required_module": "runtime/control_graph_proof.ts",
+      "related_issue": "#1414",
+      "status": "PENDING — Slice G"
+    },
+    {
+      "check_id": "CONF-DIST-08",
+      "label": "reconciliation_cannot_create_authority",
+      "description": "Reconciliation state machine transitions must not produce execution eligibility or authority. reconciliation ≠ authority.",
+      "fixture": "tests/fixtures/stage2/reconciliation_no_authority.json",
+      "expected_result": "NO_AUTHORITY",
+      "required_module": "runtime/reconciliation/cross-registry-reconciliation-engine.js",
+      "related_issue": "#1405",
+      "status": "PENDING — Slice H"
+    },
+    {
+      "check_id": "CONF-DIST-09",
+      "label": "topology_invisibility_returns_null_or_ambiguous",
+      "description": "When topology is not visible, classification must return NULL or AMBIGUOUS — never GLOBAL_VALID.",
+      "fixture": "tests/fixtures/stage2/topology_invisible.json",
+      "expected_result": "AMBIGUOUS",
+      "forbidden_results": ["GLOBAL_VALID", "LOCAL_VALID"],
+      "required_module": "src/runtime-topology-intelligence.ts",
+      "related_issue": "#1352",
+      "status": "PENDING — Slice I"
+    },
+    {
+      "check_id": "CONF-DIST-10",
+      "label": "settlement_preserves_losing_branch_evidence",
+      "description": "Conflict-set settlement must preserve all competing root evidence. Losing branches must remain in the registry as STALE_VISIBLE.",
+      "fixture": "tests/fixtures/stage2/settlement_losing_branch.json",
+      "expected_result": "STALE_VISIBLE",
+      "required_module": "src/lib/conflict-set.ts",
+      "related_issue": "#1348",
+      "status": "PENDING — Slice E"
+    },
+    {
+      "check_id": "CONF-DIST-11",
+      "label": "epoch_mismatch_prevents_convergence_valid",
+      "description": "Epoch mismatch between classification and epoch registry must prevent CONVERGENCE_VALID. Result must be NULL or STALE_VISIBLE.",
+      "fixture": "tests/fixtures/stage2/epoch_mismatch.json",
+      "expected_result": "NULL",
+      "required_module": "src/lib/epoch-substrate.ts",
+      "related_issue": "#1418",
+      "status": "PENDING — Slice C"
+    },
+    {
+      "check_id": "CONF-DIST-12",
+      "label": "revocation_liveness_downgrade_propagates",
+      "description": "Revocation liveness event must propagate a downgrade to STALE_VISIBLE across all topology nodes.",
+      "fixture": "tests/fixtures/stage2/revocation_liveness_downgrade.json",
+      "expected_result": "STALE_VISIBLE",
+      "required_module": "migrations/0051_revocation_liveness_registry.sql runtime",
+      "related_issue": "#1443",
+      "status": "PENDING — Slice H"
+    },
+    {
+      "check_id": "CONF-DIST-13",
+      "label": "causal_ordering_ambiguity_prevents_finality",
+      "description": "When causal ordering of legitimacy events is ambiguous, classification must return AMBIGUOUS — not CONVERGENCE_VALID.",
+      "fixture": "tests/fixtures/stage2/causal_ambiguity.json",
+      "expected_result": "AMBIGUOUS",
+      "required_module": "src/lib/causal-legitimacy-clock.ts",
+      "related_issue": "#1338",
+      "status": "PENDING — Slice J"
+    },
+    {
+      "check_id": "CONF-DIST-14",
+      "label": "proof_downgrade_upgrade_is_append_only",
+      "description": "Proof downgrade and upgrade events must be recorded as immutable append-only entries. No overwrite of prior events.",
+      "fixture": "tests/fixtures/stage2/proof_downgrade_append_only.json",
+      "expected_result": "APPEND_ONLY_ENFORCED",
+      "required_module": "runtime/control_graph_proof.ts",
+      "related_issue": "#1414",
+      "status": "PENDING — Slice G"
+    },
+    {
+      "check_id": "CONF-DIST-15",
+      "label": "partition_healing_does_not_restore_replay_eligibility",
+      "description": "Partition healing must not restore consumed replay eligibility. Nonces consumed on either side of a partition remain permanently consumed.",
+      "fixture": "tests/fixtures/stage2/partition_heal_no_replay_restore.json",
+      "expected_result": "NULL",
+      "required_module": "src/distributed-replay-convergence.ts",
+      "related_issue": "#1347",
+      "status": "PENDING — Slice F"
+    }
+  ]
+}
