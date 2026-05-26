@@ -71,6 +71,25 @@ type GovernCandidate = {
 }
 
 type GovernResult = "VALID_CANDIDATE" | "NULL"
+type GovernLineageRejectionReason =
+  | "govern_lineage_missing"
+  | "govern_lineage_ambiguous"
+  | "govern_lineage_mismatch"
+
+function openClawGovernRouteRequested(input: Record<string, unknown>): boolean {
+  return input.govern_routed === true
+    || String(input.govern_evidence_id || "").trim().length > 0
+    || String(input.govern_candidate_hash || "").trim().length > 0
+    || String(input.govern_nonce || "").trim().length > 0
+    || String(input.govern_envelope_hash || "").trim().length > 0
+}
+
+async function ensureGovernEvidenceSchema(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
+  if (!(await hasColumn(env, "govern_evidence_registry", "nonce_binding_hash"))) await env.DB.prepare(`ALTER TABLE govern_evidence_registry ADD COLUMN nonce_binding_hash TEXT`).run()
+  if (!(await hasColumn(env, "govern_evidence_registry", "envelope_hash"))) await env.DB.prepare(`ALTER TABLE govern_evidence_registry ADD COLUMN envelope_hash TEXT`).run()
+}
 
 function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCandidate } | { ok: false, reason: string } {
   if (!isPlainRecord(input)) return { ok: false, reason: "invalid_candidate" }
@@ -7684,8 +7703,9 @@ export default {
         result = "NULL"
         reason = "missing_nonce"
       }
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
+      await ensureGovernEvidenceSchema(env)
+      const nonce_binding_hash = await sha256Hex(canonicalize({ nonce, candidate_hash }))
+      const envelope_hash = await sha256Hex(canonicalize({ evidence_id: "", candidate_hash, nonce, result, reason, timestamp, nonce_binding_hash }))
       if (result === "VALID_CANDIDATE") {
         const nonceInsert = await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry (nonce, candidate_hash, created_at) VALUES (?1,?2,?3)`).bind(nonce, candidate_hash, timestamp).run()
         if ((nonceInsert.meta?.changes || 0) === 0) {
@@ -7693,10 +7713,10 @@ export default {
           reason = "nonce_replay"
         }
       }
-      const evidence_id = await sha256Hex(canonicalize({ candidate_hash, nonce, timestamp, result, reason }))
-      await env.DB.prepare(`INSERT OR IGNORE INTO govern_evidence_registry (evidence_id, candidate_hash, nonce, result, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6)`).bind(evidence_id, candidate_hash, nonce, result, reason || null, timestamp).run()
+      const evidence_id = await sha256Hex(canonicalize({ candidate_hash, nonce, timestamp, result, reason, nonce_binding_hash, envelope_hash }))
+      await env.DB.prepare(`INSERT OR IGNORE INTO govern_evidence_registry (evidence_id, candidate_hash, nonce, result, reason, nonce_binding_hash, envelope_hash, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)`).bind(evidence_id, candidate_hash, nonce, result, reason || null, nonce_binding_hash, envelope_hash, timestamp).run()
       try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true } }) } catch {}
-      return json({ status: result, evidence: { candidate_hash, nonce, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
+      return json({ status: result, evidence: { evidence_id, candidate_hash, nonce, nonce_binding_hash, envelope_hash, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {
@@ -7946,6 +7966,24 @@ export default {
       }
       const continuity = await activeContinuity(env, String(execution.continuity_id || ""), session, decision_id)
       if (!continuity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"invalid_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lineage_invalid" }, drift_class: "proof_drift" })
+      let governLineage: null | { evidence_id: string, candidate_hash: string, nonce: string, nonce_binding_hash: string, envelope_hash: string, result: string } = null
+      if (openClawGovernRouteRequested(b)) {
+        await ensureGovernEvidenceSchema(env)
+        const governEvidenceId = String(b.govern_evidence_id || "").trim()
+        const governCandidateHash = String(b.govern_candidate_hash || "").trim()
+        const governNonce = String(b.govern_nonce || "").trim()
+        const governEnvelopeHash = String(b.govern_envelope_hash || "").trim()
+        if (!governEvidenceId && !governCandidateHash && !governNonce && !governEnvelopeHash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"govern_lineage_missing" satisfies GovernLineageRejectionReason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "govern_lineage_missing" }, drift_class: "proof_lineage_drift" })
+        const rows = await env.DB.prepare(`SELECT evidence_id,candidate_hash,nonce,nonce_binding_hash,envelope_hash,result FROM govern_evidence_registry WHERE result='VALID_CANDIDATE' AND (?1='' OR evidence_id=?1) AND (?2='' OR candidate_hash=?2) AND (?3='' OR nonce=?3) AND (?4='' OR envelope_hash=?4) ORDER BY created_at DESC, evidence_id ASC LIMIT 2`).bind(governEvidenceId, governCandidateHash, governNonce, governEnvelopeHash).all<any>()
+        const matches = Array.isArray(rows?.results) ? rows.results : []
+        if (matches.length === 0) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"govern_lineage_missing" satisfies GovernLineageRejectionReason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "govern_lineage_missing", govern_evidence_id: governEvidenceId || null }, drift_class: "proof_lineage_drift" })
+        if (matches.length !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"govern_lineage_ambiguous" satisfies GovernLineageRejectionReason }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "govern_lineage_ambiguous", match_count: matches.length }, drift_class: "proof_lineage_drift" })
+        const selected = matches[0]
+        const expectedBinding = await sha256Hex(canonicalize({ nonce: String(selected.nonce || ""), candidate_hash: String(selected.candidate_hash || "") }))
+        if (String(selected.nonce_binding_hash || "") !== expectedBinding) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"govern_lineage_mismatch" satisfies GovernLineageRejectionReason }, { event_type: "HASH_MISMATCH", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "govern_nonce_binding_hash_mismatch", govern_evidence_id: String(selected.evidence_id || "") }, drift_class: "proof_lineage_drift" })
+        if (String(validation.validated_object_hash || "") !== validated_object_hash || String(execution.validated_object_hash || "") !== validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"govern_lineage_mismatch" satisfies GovernLineageRejectionReason }, { event_type: "HASH_MISMATCH", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "govern_validated_object_lineage_mismatch", expected_validated_object_hash: validated_object_hash, execution_validated_object_hash: String(execution.validated_object_hash || ""), validation_validated_object_hash: String(validation.validated_object_hash || "") }, drift_class: "proof_lineage_drift" })
+        governLineage = { evidence_id: String(selected.evidence_id || ""), candidate_hash: String(selected.candidate_hash || ""), nonce: String(selected.nonce || ""), nonce_binding_hash: String(selected.nonce_binding_hash || ""), envelope_hash: String(selected.envelope_hash || ""), result: String(selected.result || "") }
+      }
       const currentContinuityIdentity = await resolveCurrentContinuityIdentity(env, session)
       if (!currentContinuityIdentity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_continuity_identity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "missing_current_continuity_identity" }, drift_class: "proof_drift" })
       if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_execution_continuity_identity" }, drift_class: "proof_drift" })
@@ -8017,7 +8055,7 @@ export default {
         delegated_replay_chain_hash: String(execution.delegated_replay_chain_hash || "")
       })
       const parent_execution_hash = await sha256Hex(canonicalize({ execution_id, decision_id, validated_object_hash, invocation_nonce: String(execution.invocation_nonce || "") }))
-      const executionClosureHash = await sha256Hex(canonicalize({ execution_id, decision_id, validated_object_hash, invocation_nonce, execution_snapshot_hash: await sha256Hex(canonicalize(executionSnapshot)), workflow_identity: String(executionSnapshot.workflow_identity || "") }))
+      const executionClosureHash = await sha256Hex(canonicalize({ execution_id, decision_id, validated_object_hash, invocation_nonce, execution_snapshot_hash: await sha256Hex(canonicalize(executionSnapshot)), workflow_identity: String(executionSnapshot.workflow_identity || ""), govern_evidence_hash: String(governLineage?.candidate_hash || ""), govern_nonce_binding_hash: String(governLineage?.nonce_binding_hash || ""), govern_envelope_hash: String(governLineage?.envelope_hash || "") }))
       const proofLineageOriginHash = canonicalLineageHash({ lineage_stage: "proof", decision_id, validated_object_hash, parent_hash: parent_execution_hash })
       if (!String(validation.workflow_integrity_hash || "") || !String(execution.workflow_integrity_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"workflow_integrity_drift" }, { event_type: "HASH_MISMATCH", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "missing_workflow_integrity_lineage" }, drift_class: "workflow_source_drift" })
       if (String(executionSnapshot.workflow_hash || "") !== String(validation.workflow_integrity_hash || "") || String(executionSnapshot.workflow_hash || "") !== String(execution.workflow_integrity_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"workflow_integrity_drift" }, { event_type: "HASH_MISMATCH", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "workflow_integrity_drift", expected_validation_workflow_integrity_hash: String(validation.workflow_integrity_hash || ""), expected_execution_workflow_integrity_hash: String(execution.workflow_integrity_hash || ""), provided_workflow_integrity_hash: String(executionSnapshot.workflow_hash || "") }, drift_class: "workflow_source_drift" })
@@ -8034,7 +8072,7 @@ export default {
               AND EXISTS (SELECT 1 FROM validation_registry WHERE decision_id=?4 AND validated_object_hash=?5 AND invocation_nonce=?25 AND session_id=?2 AND continuity_id=a.continuity_id AND status='VALID' AND result='VALID')
               AND s.continuity_status='ACTIVE' AND s.expires_at>?13`).bind(proof_id,session_id,execution_id,decision_id,validated_object_hash,authorityLineage,executionLineage,String(b.surface||""),provenance.workflow_run_id,provenance.workflow_sha,String(b.workflow||GOVERNED_WORKFLOW),String(b.environment||""),created_at,String(execution.continuity_id || ""),provenance.repository,provenance.branch,provenance.pull_request_id,provenance.merge_commit_sha,provenance.source_tree_hash,provenance.workflow_run_id,provenance.workflow_sha,decision_hash,parent_execution_hash,proofLineageOriginHash,invocation_nonce,String(execution.workflow_integrity_hash || "")),
           env.DB.prepare(`UPDATE authority_registry SET status='CONSUMED' WHERE decision_id=?1 AND session_id=?2 AND status='EXECUTED' AND continuity_id=?5 AND EXISTS (SELECT 1 FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.proof_id=?3 AND p.decision_id=?1 AND p.validated_object_hash=?4 AND e.invocation_nonce=?6)`).bind(decision_id,session_id,proof_id,validated_object_hash,String(execution.continuity_id || ""),invocation_nonce),
-          env.DB.prepare(`INSERT OR IGNORE INTO proof_propagation_outbox (outbox_id,proof_id,decision_id,execution_id,validated_object_hash,event_type,payload,status,publish_attempts,created_at,replay_neutral,fail_closed) SELECT ?1,?2,?3,?4,?5,'LEGITIMACY_PROOF_PERSISTED',?6,'PENDING',0,?7,'true','true' WHERE EXISTS (SELECT 1 FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.proof_id=?2 AND p.decision_id=?3 AND p.execution_id=?4 AND p.validated_object_hash=?5 AND e.invocation_nonce=?8)`).bind(crypto.randomUUID(),proof_id,decision_id,execution_id,validated_object_hash,canonicalize({ proof_id, decision_id, execution_id, validated_object_hash, invocation_nonce, route: "/proof", lineage_stage: "proof", execution_closure_hash: executionClosureHash }),created_at,invocation_nonce)
+          env.DB.prepare(`INSERT OR IGNORE INTO proof_propagation_outbox (outbox_id,proof_id,decision_id,execution_id,validated_object_hash,event_type,payload,status,publish_attempts,created_at,replay_neutral,fail_closed) SELECT ?1,?2,?3,?4,?5,'LEGITIMACY_PROOF_PERSISTED',?6,'PENDING',0,?7,'true','true' WHERE EXISTS (SELECT 1 FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.proof_id=?2 AND p.decision_id=?3 AND p.execution_id=?4 AND p.validated_object_hash=?5 AND e.invocation_nonce=?8)`).bind(crypto.randomUUID(),proof_id,decision_id,execution_id,validated_object_hash,canonicalize({ proof_id, decision_id, execution_id, validated_object_hash, invocation_nonce, route: "/proof", lineage_stage: "proof", execution_closure_hash: executionClosureHash, parent_closure_hash: executionClosureHash, govern_evidence_hash: String(governLineage?.candidate_hash || ""), govern_nonce_binding_hash: String(governLineage?.nonce_binding_hash || ""), govern_envelope_hash: String(governLineage?.envelope_hash || ""), govern_evidence_id: String(governLineage?.evidence_id || "") }),created_at,invocation_nonce)
         ]
         if (validatedAttestation) {
           proofStatements.push(env.DB.prepare(`INSERT INTO attestation_registry (attestation_id,envelope_hash,payload_hash,payload_type,signer_identity,decision_id,validated_object_hash,workflow_run_id,workflow_sha,canonical_aeo_hash,transparency_log_id,transparency_integrated_time,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'VALIDATED',?13)`).bind(crypto.randomUUID(), validatedAttestation.envelope_hash, validatedAttestation.payload_hash, validatedAttestation.payload_type, validatedAttestation.signer_identity, validatedAttestation.decision_id, validatedAttestation.validated_object_hash, validatedAttestation.workflow_run_id, validatedAttestation.workflow_sha, validatedAttestation.canonical_aeo_hash, validatedAttestation.transparency_log_id, validatedAttestation.transparency_integrated_time, created_at))
