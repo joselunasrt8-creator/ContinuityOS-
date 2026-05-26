@@ -83,6 +83,36 @@ function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCand
   if (!isPlainRecord(input.finality)) return { ok: false, reason: "missing_finality" }
   return { ok: true, candidate: { intent: input.intent, scope: input.scope, target: input.target, finality: input.finality } }
 }
+
+
+type ProjectionDriftReason = "projection_scope_drift" | "projection_target_drift" | "projection_finality_drift" | "projection_tool_params_drift" | "projection_intent_drift"
+
+type GovernProjection = { intent: string, scope: Record<string, unknown>, target: Record<string, unknown>, finality: Record<string, unknown> }
+
+function canonicalGovernProjectionFromCanonicalAeo(aeo: CanonicalAEO): GovernProjection {
+  return Object.freeze({
+    intent: String(aeo.intent || ""),
+    scope: canonicalRecord(aeo.scope),
+    target: canonicalRecord(aeo.target),
+    finality: canonicalRecord(aeo.finality),
+  })
+}
+
+async function computeGovernProjectionHashFromCanonicalAeo(aeo: CanonicalAEO): Promise<string> {
+  return sha256Hex(canonicalize(canonicalGovernProjectionFromCanonicalAeo(aeo)))
+}
+
+function projectionDriftReason(expected: GovernProjection, actual: GovernProjection): ProjectionDriftReason {
+  if (expected.intent !== actual.intent) return "projection_intent_drift"
+  if (canonicalize(expected.scope) !== canonicalize(actual.scope)) return "projection_scope_drift"
+  if (canonicalize(expected.target) !== canonicalize(actual.target)) return "projection_target_drift"
+  if (canonicalize(expected.finality) !== canonicalize(actual.finality) || String((expected.finality as any)?.proof_required || "") !== String((actual.finality as any)?.proof_required || "")) return "projection_finality_drift"
+  const expectedTool = canonicalize(canonicalRecord((expected.target as any)?.params))
+  const actualTool = canonicalize(canonicalRecord((actual.target as any)?.params))
+  if (expectedTool !== actualTool) return "projection_tool_params_drift"
+  return "projection_target_drift"
+}
+
 type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_SCHEMA_INITIALIZED"
   | "BOOTSTRAP_MIGRATIONS_VALIDATED"
@@ -7629,6 +7659,7 @@ export default {
         if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
         const requirePreoLineage = preoGovernanceEnabled(constraints, target)
 
+        await env.DB.prepare(`ALTER TABLE aeo_registry ADD COLUMN projection_hash TEXT`).run().catch(() => {})
         const existingAeos = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(decision_id).all<any>()
         const existingRows = Array.isArray(existingAeos?.results) ? existingAeos.results : []
         if (existingRows.length > 0) {
@@ -7641,23 +7672,28 @@ export default {
           if (!canonicalAeo || !storedHash || recomputedHash !== storedHash || hasConflictingAeo) {
             return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "compiled_aeo_hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/compile", stored_hash: storedHash, actual_hash: recomputedHash, indicator: "stored_aeo_hash_mismatch" }, drift_class: "hash_drift" })
           }
+          const projectionHash = String(first.projection_hash || "")
+          const compiledProjection = canonicalGovernProjectionFromCanonicalAeo(canonicalAeo as CanonicalAEO)
+          const actualProjectionHash = await sha256Hex(canonicalize(compiledProjection))
+          if (projectionHash && projectionHash !== actualProjectionHash) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "projection_hash_drift" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/compile", expected_projection_hash: projectionHash, actual_projection_hash: actualProjectionHash, indicator: "projection_hash_drift" }, drift_class: "hash_drift" })
           const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash: storedHash, authority, required: requirePreoLineage })
           if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash: storedHash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
           const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash: storedHash, ...compileSnapshot }))
           await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(first.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash: storedHash, validated_execution_snapshot, indicator: "existing_canonical_aeo_reused" } })
-          return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, validated_execution_snapshot, canonical_aeo: canonicalAeo })
+          return json({ status: "COMPILED", decision_id, validated_object_hash: storedHash, projection_hash: projectionHash || actualProjectionHash, validated_execution_snapshot, canonical_aeo: canonicalAeo })
         }
 
         const canonical_aeo = toCanonicalAeo({ intent: authority.intent, scope: JSON.parse(String(authority.scope || "{}")), validation: { workflow: GOVERNED_WORKFLOW }, target, finality: { proof_required: true } })
         if (!canonical_aeo) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "registry_drift" })
         const canonical_aeo_json = canonicalize(canonical_aeo)
         const validated_object_hash = await sha256Hex(canonical_aeo_json)
-        const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash, ...compileSnapshot }))
+        const projection_hash = await computeGovernProjectionHashFromCanonicalAeo(canonical_aeo)
+        const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash, projection_hash, ...compileSnapshot }))
         const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash, authority, required: requirePreoLineage })
         if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
-        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,status,created_at,workflow_integrity_hash,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash) VALUES (?1,?2,?3,?4,?5,?6,'COMPILED',?7,?8,?9,?10,?11,?12)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, new Date().toISOString(), String(compileSnapshot.workflow_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || "")).run()
+        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,projection_hash,status,created_at,workflow_integrity_hash,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,'COMPILED',?8,?9,?10,?11,?12,?13)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, projection_hash, new Date().toISOString(), String(compileSnapshot.workflow_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || "")).run()
         await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash, validated_execution_snapshot } })
-        return json({ status: "COMPILED", decision_id, validated_object_hash, validated_execution_snapshot, canonical_aeo: JSON.parse(canonical_aeo_json) })
+        return json({ status: "COMPILED", decision_id, validated_object_hash, projection_hash, validated_execution_snapshot, canonical_aeo: JSON.parse(canonical_aeo_json) })
       } catch (error: any) {
         await recordDrift(env, { drift_class: "registry_drift", severity: "CRITICAL", payload: { route: "/compile", error: String(error?.message || error || "unknown_error") } })
         return json({
@@ -7730,6 +7766,11 @@ export default {
       const canonicalCompiledJson = compiledCanonicalAeo ? canonicalize(compiledCanonicalAeo) : ""
       const compiledHash = compiledCanonicalAeo ? await sha256Hex(canonicalize(compiledCanonicalAeo)) : ""
       if (!compiledCanonicalAeo || compiledHash !== validated_object_hash || compiledHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_hash: validated_object_hash, actual_hash: compiledHash, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
+      const projectionExpected = canonicalGovernProjectionFromCanonicalAeo(compiledCanonicalAeo)
+      const projectionActual = canonicalGovernProjectionFromCanonicalAeo(compiledCanonicalAeo)
+      const computedProjectionHash = await sha256Hex(canonicalize(projectionActual))
+      const storedProjectionHash = String(compiled.projection_hash || "")
+      if (!storedProjectionHash || storedProjectionHash !== computedProjectionHash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"projection_hash_drift" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_projection_hash: storedProjectionHash, actual_projection_hash: computedProjectionHash, projection_drift_reason: projectionDriftReason(projectionExpected, projectionActual), indicator: "projection_hash_drift" }, drift_class: "hash_drift" })
       if (String(compiled.canonical_aeo || "") !== canonicalCompiledJson) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_hash: validated_object_hash, actual_hash: compiledHash, indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (String(compiled.authority_id || "") !== String(authority.authority_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_authority_id: authority.authority_id, provided_authority_id: compiled.authority_id, indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
@@ -7803,6 +7844,10 @@ export default {
       const executionCanonicalAeo = toCanonicalAeo(executionAeo)
       const execHash = executionCanonicalAeo ? await sha256Hex(canonicalize(executionCanonicalAeo)) : ""
       if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
+      const storedProjectionHash = String((compiled as any).projection_hash || "")
+      const execProjection = canonicalGovernProjectionFromCanonicalAeo(executionCanonicalAeo)
+      const execProjectionHash = await sha256Hex(canonicalize(execProjection))
+      if (!storedProjectionHash || storedProjectionHash !== execProjectionHash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"projection_hash_drift" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_projection_hash: storedProjectionHash, actual_projection_hash: execProjectionHash, projection_drift_reason: projectionDriftReason(execProjection, execProjection), indicator: "projection_hash_drift" }, drift_class: "hash_drift" })
       if (String(validation.validated_object_hash || "") !== execHash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: String(validation.validated_object_hash || ""), actual_hash: execHash, indicator: "validated_object_execution_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
       if (String(compiled.status || "") !== "COMPILED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"policy_invalid" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", compiled_status: compiled.status || null, indicator: "policy_invalid_at_execution" }, drift_class: "execution_drift" })
