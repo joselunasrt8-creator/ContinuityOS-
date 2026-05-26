@@ -70,13 +70,18 @@
     {
       "check_id": "CONF-DIST-06",
       "label": "quorum_disagreement_prevents_global_valid",
-      "description": "Validator quorum disagreement must prevent GLOBAL_VALID classification. Result must be AMBIGUOUS or CONFLICTED.",
+      "description": "Validator quorum disagreement must prevent GLOBAL_VALID classification. Result must be AMBIGUOUS or CONFLICTED. ValidatorAttestationEnvelope attestation_type is constrained to 'EVIDENCE' | 'OBSERVATION' — 'AUTHORITY' is absent by design. Single validator approval cannot reach GLOBAL_VALID. Stale epoch envelopes are OBSERVATION only.",
+      "scenario": "quorum_disagreement",
       "fixture": "tests/fixtures/stage2/quorum_disagreement.json",
+      "test": "tests/fate/stage2-conf-dist-06.test.mjs",
       "expected_result": "AMBIGUOUS",
-      "forbidden_results": ["GLOBAL_VALID"],
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "classification_layer": "classifyFromValidatorAttestations",
       "required_module": "src/lib/quorum-attestation.ts",
+      "required_migration": "migrations/0055_validator_attestation_envelope.sql",
       "related_issue": "#1440",
-      "status": "PENDING — Slice D"
+      "db_guard": "vaer_stale_cannot_be_evidence",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-07",

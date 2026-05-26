@@ -1,0 +1,55 @@
+{
+  "_fixture_id": "CONF-DIST-06",
+  "_description": "Validator quorum disagreement: validators v1 and v2 attest hash-A; validators v3 and v4 attest hash-B. Weight is equal (2 vs 2, total 4). No single hash reaches the 2/3 threshold. Classification must be AMBIGUOUS — quorum evidence is absent because validators disagree. GLOBAL_VALID is forbidden.",
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-slice-d-validator-attestation-envelope-plan.md",
+  "_related_issue": "#1440",
+  "_invariant": "Validator quorum disagreement on the attested object_hash means quorum_met=0 for every candidate hash. The Q predicate is false. Without Q, classifyFromPredicates() cannot reach GLOBAL_VALID or CONVERGENCE_VALID. The expected outcome is AMBIGUOUS — the distributed legitimacy state is unresolvable without further evidence.",
+  "_guard": "classifyFromValidatorAttestations() detects multiple distinct object_hash values across EVIDENCE envelopes and returns AMBIGUOUS before calling evaluateWeightedQuorum(). Agreement on a single hash is a prerequisite for quorum evaluation.",
+  "_single_validator_rule": "A single EVIDENCE validator attestation sets Q=false regardless of its content. GLOBAL_VALID requires quorum (multiple validators agreeing), not a single validator's endorsement.",
+  "scenario": "quorum_disagreement",
+  "validator_attestations": [
+    {
+      "validator_id": "v1",
+      "object_hash": "hash-A",
+      "member_weight": 1,
+      "attestation_type": "EVIDENCE",
+      "is_epoch_stale": 0,
+      "is_topology_visible": 1
+    },
+    {
+      "validator_id": "v2",
+      "object_hash": "hash-A",
+      "member_weight": 1,
+      "attestation_type": "EVIDENCE",
+      "is_epoch_stale": 0,
+      "is_topology_visible": 1
+    },
+    {
+      "validator_id": "v3",
+      "object_hash": "hash-B",
+      "member_weight": 1,
+      "attestation_type": "EVIDENCE",
+      "is_epoch_stale": 0,
+      "is_topology_visible": 1
+    },
+    {
+      "validator_id": "v4",
+      "object_hash": "hash-B",
+      "member_weight": 1,
+      "attestation_type": "EVIDENCE",
+      "is_epoch_stale": 0,
+      "is_topology_visible": 1
+    }
+  ],
+  "quorum_threshold_fraction": 0.667,
+  "topology_present": true,
+  "epoch_status": "EPOCH_GLOBAL_AUTHORITATIVE",
+  "expected_classification": "AMBIGUOUS",
+  "forbidden_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+  "_classification_function": "classifyFromValidatorAttestations(envelopes, basePredicates, threshold=0.667, epochStatus='EPOCH_GLOBAL_AUTHORITATIVE')",
+  "_module": "src/lib/quorum-attestation.ts",
+  "_disagreement_rule": "Multiple distinct object_hash values across EVIDENCE envelopes → AMBIGUOUS. evaluateWeightedQuorum() is not called.",
+  "_stale_epoch_variant": "If epoch_status were EPOCH_STALE_VISIBLE, classifyFromPredicates() would return STALE_VISIBLE regardless of disagreement.",
+  "_single_validator_variant": "A single EVIDENCE envelope with full convergence predicates → LOCAL_VALID at best (Q=false: single validator ≠ quorum)."
+}
