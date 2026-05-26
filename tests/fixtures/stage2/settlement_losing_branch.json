@@ -1,0 +1,57 @@
+{
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "check_id": "CONF-DIST-10",
+  "label": "settlement_preserves_losing_branch_evidence",
+  "scenario": "settlement_losing_branch",
+  "anchor_issue": "#1348",
+  "supporting_issues": ["#1441", "#1418", "#1442", "#1340"],
+  "conflict_id": "cse_conf_dist_10_test",
+  "epoch_id": "epoch_stage2_001",
+  "detected_at": "2026-01-01T00:00:00Z",
+  "competing_roots": [
+    {
+      "root_hash": "root_winner000000000000000000000000000000000000000000000000000000",
+      "proof_id": "proof_winner_001",
+      "validator_attestations": [
+        { "validator_id": "v1", "attestation_type": "EVIDENCE", "object_hash": "root_winner000000000000000000000000000000000000000000000000000000" },
+        { "validator_id": "v2", "attestation_type": "EVIDENCE", "object_hash": "root_winner000000000000000000000000000000000000000000000000000000" }
+      ],
+      "causal_clock": { "index": 1, "partition_id": "shard_alpha" },
+      "branch_evidence": { "lineage_id": "lin_winner_001", "topology_visible": true, "replay_safe": true }
+    },
+    {
+      "root_hash": "root_loser0000000000000000000000000000000000000000000000000000000",
+      "proof_id": "proof_loser_001",
+      "validator_attestations": [
+        { "validator_id": "v3", "attestation_type": "EVIDENCE", "object_hash": "root_loser0000000000000000000000000000000000000000000000000000000" }
+      ],
+      "causal_clock": { "index": 2, "partition_id": "shard_beta" },
+      "branch_evidence": { "lineage_id": "lin_loser_001", "topology_visible": true, "replay_safe": true }
+    }
+  ],
+  "winning_root": "root_winner000000000000000000000000000000000000000000000000000000",
+  "losing_roots": ["root_loser0000000000000000000000000000000000000000000000000000000"],
+  "settlement_state": "SETTLED",
+  "settlement_evidence": {
+    "causal_ordering": "winner causal_clock.index=1 < loser causal_clock.index=2",
+    "epoch_consistent": true,
+    "topology_visible": true,
+    "proof_lineage_present": true
+  },
+  "settlement_opts": {
+    "epoch_id_present": true,
+    "epoch_stale": false,
+    "has_replay_resurrection_conflict": false,
+    "topology_ambiguous": false,
+    "has_detached_proof": false,
+    "has_missing_proof_lineage": false
+  },
+  "expected_result": "STALE_VISIBLE",
+  "expected_settlement_state": "SETTLED",
+  "losing_roots_preserved": true,
+  "losing_branches_classification": "STALE_VISIBLE",
+  "creates_authority": false,
+  "restores_replay": false,
+  "_note": "Conflict settled with causal ordering evidence. Winning root selected deterministically (earliest causal_clock.index). Losing root preserved in losing_roots — not deleted. Losing branches are STALE_VISIBLE. Settlement ≠ authority. Settlement cannot restore replay eligibility."
+}

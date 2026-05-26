@@ -71,10 +71,15 @@
       "label": "conflicting_proof_roots_create_conflicted",
       "description": "Two or more proofs claiming the same execution surface with different roots must produce CONFLICTED classification.",
       "fixture": "tests/fixtures/stage2/conflicting_proof_roots.json",
+      "test": "tests/fate/stage2-conf-dist-05.test.mjs",
       "expected_result": "CONFLICTED",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID", "SETTLED", "NULL"],
+      "classification_layer": "detectConflictSet",
       "required_module": "src/lib/conflict-set.ts",
+      "required_migration": "migrations/0057_conflict_set_envelope_settlement.sql",
       "related_issue": "#1348",
-      "status": "PENDING — Slice E"
+      "slice": "E",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-06",
@@ -133,10 +138,15 @@
       "label": "settlement_preserves_losing_branch_evidence",
       "description": "Conflict-set settlement must preserve all competing root evidence. Losing branches must remain in the registry as STALE_VISIBLE.",
       "fixture": "tests/fixtures/stage2/settlement_losing_branch.json",
+      "test": "tests/fate/stage2-conf-dist-10.test.mjs",
       "expected_result": "STALE_VISIBLE",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "classification_layer": "settleConflictSet + preserveLosingBranchEvidence",
       "required_module": "src/lib/conflict-set.ts",
+      "required_migration": "migrations/0057_conflict_set_envelope_settlement.sql",
       "related_issue": "#1348",
-      "status": "PENDING — Slice E"
+      "slice": "E",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-11",

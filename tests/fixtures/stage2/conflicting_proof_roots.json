@@ -1,0 +1,37 @@
+{
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "check_id": "CONF-DIST-05",
+  "label": "conflicting_proof_roots_create_conflicted",
+  "scenario": "conflicting_proof_roots",
+  "anchor_issue": "#1348",
+  "supporting_issues": ["#1441", "#1418", "#1442", "#1340"],
+  "conflict_id": "cse_conf_dist_05_test",
+  "epoch_id": "epoch_stage2_001",
+  "detected_at": "2026-01-01T00:00:00Z",
+  "competing_roots": [
+    {
+      "root_hash": "root_aaa000000000000000000000000000000000000000000000000000000000000",
+      "proof_id": "proof_aaa_001",
+      "validator_attestations": [
+        { "validator_id": "v1", "attestation_type": "EVIDENCE", "object_hash": "root_aaa000000000000000000000000000000000000000000000000000000000000" }
+      ],
+      "causal_clock": { "index": 1, "partition_id": "shard_alpha" },
+      "branch_evidence": { "lineage_id": "lin_aaa_001", "topology_visible": true }
+    },
+    {
+      "root_hash": "root_bbb000000000000000000000000000000000000000000000000000000000000",
+      "proof_id": "proof_bbb_001",
+      "validator_attestations": [
+        { "validator_id": "v2", "attestation_type": "EVIDENCE", "object_hash": "root_bbb000000000000000000000000000000000000000000000000000000000000" }
+      ],
+      "causal_clock": { "index": 2, "partition_id": "shard_beta" },
+      "branch_evidence": { "lineage_id": "lin_bbb_001", "topology_visible": true }
+    }
+  ],
+  "expected_classification": "CONFLICTED",
+  "forbidden_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID", "LOCAL_VALID", "SETTLED", "NULL"],
+  "creates_authority": false,
+  "restores_replay": false,
+  "_note": "Two proof roots claiming the same execution surface with different root hashes. Split-brain detected (2 competing roots). detectConflictSet() must return CONFLICTED. conflict_set ≠ authority."
+}
