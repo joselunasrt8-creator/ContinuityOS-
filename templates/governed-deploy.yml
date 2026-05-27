@@ -1,0 +1,221 @@
+# governed-deploy.yml — ContinuityOS governed deploy template
+#
+# Installation:
+#   Copy this file to .github/workflows/governed-deploy.yml in your repo.
+#   Set WORKER_URL and API_KEY in your repo's Actions secrets.
+#   Configure the DEPLOY_ENVIRONMENT and DEPLOY_INTENT env vars below.
+#
+# Legitimacy invariants enforced by this workflow:
+#   - workflow_dispatch only — no push, schedule, or PR trigger
+#   - decision_id, validated_object_hash, and invocation_nonce are required
+#   - Hash mismatch between compiled AEO and input returns NULL
+#   - Consumed nonce returns NULL (replay resistance)
+#   - Missing authority returns NULL
+#   - proof_required: true — proof is emitted or workflow fails
+#   - Serial execution — no concurrent deploys
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIGURATION: edit these values for your repo
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: governed-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      decision_id:
+        description: "Authority decision ID (from /authority route)"
+        required: true
+        type: string
+      validated_object_hash:
+        description: "SHA-256 hash of the compiled AEO (from /compile route)"
+        required: true
+        type: string
+      invocation_nonce:
+        description: "Single-use UUID nonce (from /compile route)"
+        required: true
+        type: string
+
+concurrency:
+  group: governed-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  governed-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      # ── Required secrets ──────────────────────────────────────────────────
+      WORKER_URL: ${{ secrets.WORKER_URL }}
+      API_KEY: ${{ secrets.API_KEY }}
+      # ── Required inputs ───────────────────────────────────────────────────
+      DECISION_ID: ${{ github.event.inputs.decision_id }}
+      VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
+      INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
+      # ── Configuration: edit these for your repo ───────────────────────────
+      DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      # ── Runtime context (do not edit) ─────────────────────────────────────
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+
+    steps:
+      # ── Step 1: Fail closed if any required input is missing ─────────────
+      - name: HARD FAIL — Missing critical inputs or secrets
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit workflow_dispatch invocation allowed"
+            exit 1
+          fi
+
+          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          # Canonical workflow binding check — prevents invocation through a modified copy
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/$DEPLOY_WORKFLOW@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through $DEPLOY_WORKFLOW"
+              exit 1
+              ;;
+          esac
+
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      # ── Step 2: Validate the legitimacy object ────────────────────────────
+      - name: Legitimacy check — validate AEO against runtime
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sf -X POST "$CLEAN_WORKER_URL/validate" \
+            -H "X-API-Key: $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
+
+          STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
+          RESULT=$(echo "$RESPONSE" | jq -r '.result // empty')
+
+          if [ "$STATUS" != "VALID" ] || [ "$RESULT" != "VALID" ]; then
+            echo "NULL — Legitimacy check failed"
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          echo "Legitimacy check: VALID"
+          echo "VALIDATION_RESPONSE=$(echo "$RESPONSE" | jq -c .)" >> "$GITHUB_ENV"
+
+      # ── Step 3: Execute through runtime ───────────────────────────────────
+      - name: Execute — governed execution
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sf -X POST "$CLEAN_WORKER_URL/execute" \
+            -H "X-API-Key: $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg intent "$DEPLOY_INTENT" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --arg run_id "$WORKFLOW_RUN_ID" \
+              --arg commit_sha "$WORKFLOW_SHA" \
+              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, intent: $intent, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow, run_id: $run_id, commit_sha: $commit_sha}')")
+
+          EXEC_STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
+          EXECUTION_ID=$(echo "$RESPONSE" | jq -r '.execution_id // empty')
+
+          if [ "$EXEC_STATUS" != "EXECUTED" ] || [ -z "$EXECUTION_ID" ]; then
+            echo "NULL — Execution failed"
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          echo "Execution: EXECUTED ($EXECUTION_ID)"
+          echo "EXECUTION_ID=$EXECUTION_ID" >> "$GITHUB_ENV"
+
+      # ── Step 4: YOUR DEPLOY COMMAND ───────────────────────────────────────
+      # Replace this step with your actual deploy command.
+      # This step runs ONLY after the legitimacy check and execution record
+      # above have both succeeded.
+      - name: Deploy — your deploy command here
+        run: |
+          set -euo pipefail
+          echo "Replace this step with your actual deploy command."
+          echo "Examples:"
+          echo "  npx wrangler deploy"
+          echo "  npm run build && npm run deploy"
+          echo "  ./deploy.sh"
+          # YOUR DEPLOY COMMAND HERE
+
+      # ── Step 5: Emit proof ────────────────────────────────────────────────
+      - name: Emit proof artifact
+        if: always()
+        run: |
+          set -euo pipefail
+
+          if [ -z "${EXECUTION_ID:-}" ]; then
+            echo "NULL — No execution ID; proof cannot be emitted"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sf -X POST "$CLEAN_WORKER_URL/proof" \
+            -H "X-API-Key: $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg execution_id "$EXECUTION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg surface "github_actions" \
+              --arg run_id "$WORKFLOW_RUN_ID" \
+              --arg commit_sha "$WORKFLOW_SHA" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              '{decision_id: $decision_id, execution_id: $execution_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
+
+          PROOF_STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
+          PROOF_ID=$(echo "$RESPONSE" | jq -r '.proof.proof_id // .proof_id // empty')
+
+          if [ "$PROOF_STATUS" != "PROVEN" ] || [ -z "$PROOF_ID" ]; then
+            echo "NULL — Proof emission failed"
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          echo "Proof emitted: $PROOF_ID"
