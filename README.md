@@ -118,3 +118,103 @@ ContinuityOS operationalizes it.
 - `docs/stage2-conformance-matrix.md` — Stage 2 conformance matrix (CONF-DIST-01–15)
 - `docs/stage2-distributed-legitimacy-enforcement-plan-v1.md` — Stage 2 plan
 - `docs/glossary.md` — canonical terminology
+
+---
+
+# External Demo: Portable Legitimacy Conformance Evidence
+
+This repository contains a portable conformance harness demonstrating that
+legitimacy observability infrastructure can operate outside the canonical runtime
+with minimal dependency friction.
+
+## What this demonstrates
+
+- Conformance pack-v1 executes with no dependency on the canonical runtime
+- Governance evidence artifacts are emitted deterministically
+- CI-visible evidence is published on every pack-relevant change
+- Governance vocabulary is portable before runtime adoption occurs
+
+## What this does NOT demonstrate
+
+- Runtime legitimacy
+- Authority issuance
+- Execution permission
+- Distributed proof finality
+- Deployment
+
+## Running the conformance harness
+
+Requirements: Node.js >= 18, shell.
+
+```bash
+node conformance/pack-v1/harness.mjs
+```
+
+or via the runner script:
+
+```bash
+./scripts/run-conformance.sh
+```
+
+Expected output (all vectors passing):
+
+```
+CONFORMANCE_EVIDENCE_OBSERVED
+VALIDATION_FAIL_CLOSED_CONFIRMED
+REPLAY_CONSUMPTION_PRESERVED
+PROOF_APPEND_ONLY_CONFIRMED
+CONVERGENCE_CLASSIFICATION_CORRECT
+PACK_V1_CONFORMANCE_COMPLETE
+```
+
+Evidence artifact written to: `conformance/pack-v1/conformance-pack-v1-evidence.json`
+Reference snapshot at: `evidence/latest.json`
+
+---
+
+# Governance Boundary
+
+```text
+conformance evidence  ≠  authority
+badge                 ≠  execution permission
+observability         ≠  legitimacy
+fixture pass          ≠  runtime governance
+visibility            ≠  legitimacy
+```
+
+The conformance harness is:
+
+- **Evidence-only** — it reads static fixtures and emits structured output
+- **Non-operative** — it does not create authority, perform deployment, or mutate runtime state
+- **Fail-closed** — if any vector fails, the harness exits non-zero and CI fails
+
+The purpose is observability, comparability, and governance vocabulary portability.
+Not runtime governance, authority issuance, or distributed proof finality.
+
+---
+
+# Install-Base Interpretation
+
+Install base is **not**:
+
+- stars
+- downloads
+- chatbot usage
+- prompts
+
+Install base **is**:
+
+```text
+workflow dependency
++
+execution dependency
++
+governance dependency
+```
+
+Install-base expansion starts when external systems depend on your governance vocabulary
+before they depend on your runtime.
+
+This repository is the first external proof that legitimacy observability infrastructure
+is portable — demonstrating governance vocabulary can become an external dependency
+surface before runtime adoption occurs.

@@ -1,0 +1,107 @@
+name: conformance-pack-v1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'conformance/pack-v1/**'
+      - 'scripts/run-conformance.sh'
+      - '.github/workflows/conformance.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'conformance/pack-v1/**'
+      - 'scripts/run-conformance.sh'
+      - '.github/workflows/conformance.yml'
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: Run conformance pack-v1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run conformance harness
+        id: harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          node conformance/pack-v1/harness.mjs
+
+      - name: Verify evidence artifact written
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f conformance/pack-v1/conformance-pack-v1-evidence.json ]]; then
+            echo "Evidence artifact missing — conformance fails closed."
+            exit 1
+          fi
+          echo "Evidence artifact present."
+          cat conformance/pack-v1/conformance-pack-v1-evidence.json | python3 -m json.tool --no-indent > /dev/null
+          echo "Evidence JSON valid."
+
+      - name: Check evidence status
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS=$(python3 -c "
+          import json, sys
+          with open('conformance/pack-v1/conformance-pack-v1-evidence.json') as f:
+            d = json.load(f)
+          print(d.get('status', 'UNKNOWN'))
+          sys.exit(0 if d.get('status') == 'PACK_V1_CONFORMANCE_COMPLETE' else 1)
+          ")
+          echo "Evidence status: $STATUS"
+
+      - name: Verify governance boundaries preserved
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c "
+          import json, sys
+          with open('conformance/pack-v1/conformance-pack-v1-evidence.json') as f:
+            d = json.load(f)
+          assert d.get('non_operative') == True,         'non_operative must be true'
+          assert d.get('authority_created') == False,    'authority_created must be false'
+          assert d.get('deployment_performed') == False, 'deployment_performed must be false'
+          assert d.get('runtime_mutation_capable') == False, 'runtime_mutation_capable must be false'
+          assert d.get('production_proof_emitted') == False, 'production_proof_emitted must be false'
+          print('Governance boundaries preserved.')
+          "
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-pack-v1-evidence
+          path: conformance/pack-v1/conformance-pack-v1-evidence.json
+          retention-days: 90
+
+      - name: Conformance summary
+        if: success()
+        shell: bash
+        run: |
+          echo "PACK_V1_CONFORMANCE_COMPLETE"
+          echo "Mode:                  evidence-only"
+          echo "Authority created:     false"
+          echo "Deployment performed:  false"
+          echo "Runtime mutation:      false"
+          echo ""
+          echo "Governance boundary:"
+          echo "  visibility    ≠ legitimacy"
+          echo "  evidence      ≠ authority"
+          echo "  conformance   ≠ execution eligibility"
