@@ -75,6 +75,102 @@ function verifyAppendOnlyMigration(suite) {
   assert.match(migration, /BEFORE DELETE ON federated_checkpoint_registry/)
 }
 
+const CONF_DIST_CHECK_IDS = [
+  'CONF-DIST-01', 'CONF-DIST-02', 'CONF-DIST-03', 'CONF-DIST-04', 'CONF-DIST-05',
+  'CONF-DIST-06', 'CONF-DIST-07', 'CONF-DIST-08', 'CONF-DIST-09', 'CONF-DIST-10',
+  'CONF-DIST-11', 'CONF-DIST-12', 'CONF-DIST-13', 'CONF-DIST-14', 'CONF-DIST-15',
+]
+
+// Verifies the Stage 2 distributed legitimacy conformance suite descriptor.
+// Read-only: only reads files and asserts structural invariants.
+// Does not invoke runtime, does not mutate state, does not consume replay.
+function verifyStage2ConformanceSuite(suite) {
+  // Suite-level invariants
+  assert.equal(suite.non_operative, true, `${suite.suite_id} must be non-operative`)
+  assert.equal(suite.runtime_mutation_capable, false, `${suite.suite_id} must not mutate runtime`)
+  assert.equal(suite.replay_neutral, true, `${suite.suite_id} must be replay-neutral`)
+  assert.equal(suite.raw_production_apply_path, 'DENIED', `${suite.suite_id} raw_production_apply_path must be DENIED`)
+
+  // All 15 CONF-DIST checks must be present
+  const presentIds = new Set(suite.checks.map((c) => c.check_id))
+  for (const id of CONF_DIST_CHECK_IDS) {
+    if (!presentIds.has(id)) failClosed(`stage2 conformance matrix missing required check ${id}`)
+  }
+  assert.equal(suite.checks.length, CONF_DIST_CHECK_IDS.length, 'stage2 suite must have exactly 15 checks')
+
+  for (const check of suite.checks) {
+    // Required fields
+    if (!check.check_id) failClosed('stage2 check missing check_id')
+    if (!check.label) failClosed(`${check.check_id} missing label`)
+    if (!check.description) failClosed(`${check.check_id} missing description`)
+    if (!check.expected_result) failClosed(`${check.check_id} missing expected_result`)
+    if (!check.required_module) failClosed(`${check.check_id} missing required_module`)
+
+    // All checks must be fully implemented
+    if (check.status !== 'IMPLEMENTED') {
+      failClosed(`${check.check_id} status is '${check.status}' — must be IMPLEMENTED`)
+    }
+
+    // GLOBAL_VALID must never be an expected_result: conformance classifies; it does not create authority
+    if (check.expected_result === 'GLOBAL_VALID') {
+      failClosed(`${check.check_id} expected_result is GLOBAL_VALID — conformance cannot create distributed authority`)
+    }
+
+    // expected_result must not appear in forbidden_results (no self-contradiction)
+    if (Array.isArray(check.forbidden_results) && check.forbidden_results.includes(check.expected_result)) {
+      failClosed(`${check.check_id} expected_result '${check.expected_result}' is in forbidden_results — contradicted`)
+    }
+
+    // Fixture must exist and declare itself non-operative
+    if (check.fixture) {
+      const fixtureData = JSON.parse(readFileSync(join(root, check.fixture), 'utf8'))
+      if (fixtureData._non_operative !== true) {
+        failClosed(`${check.check_id} fixture ${check.fixture} missing _non_operative: true`)
+      }
+    }
+
+    // FATE test file must exist
+    if (check.test) {
+      readFileSync(join(root, check.test), 'utf8')
+    }
+
+    // Required runtime module must exist
+    readFileSync(join(root, check.required_module), 'utf8')
+
+    // Required migration must exist when specified
+    if (check.required_migration) {
+      readFileSync(join(root, check.required_migration), 'utf8')
+    }
+  }
+}
+
+function verifyStage2MatrixSummary(summary, suite) {
+  assert.equal(summary.status, 'COMPLETE', 'stage2 matrix summary status must be COMPLETE')
+  assert.equal(summary.non_operative, true, 'stage2 matrix summary must be non-operative')
+  assert.equal(summary.raw_production_apply_path, 'DENIED', 'stage2 matrix summary raw_production_apply_path must be DENIED')
+  assert.equal(summary.invariants.authority_created, false, 'stage2 matrix must not create authority')
+  assert.equal(summary.invariants.execution_eligibility_expanded, false, 'stage2 matrix must not expand execution eligibility')
+  assert.equal(summary.invariants.replay_restoration_paths_introduced, false, 'stage2 matrix must not introduce replay restoration paths')
+  assert.equal(summary.summary.total_checks, 15, 'stage2 matrix summary must cover 15 checks')
+  assert.equal(summary.summary.implemented, 15, 'stage2 matrix summary must have 15 implemented checks')
+  assert.equal(summary.summary.passing, 15, 'stage2 matrix summary must have 15 passing checks')
+  assert.equal(summary.summary.stage1_regressions, 0, 'stage2 matrix summary must have 0 Stage 1 regressions')
+
+  // Cross-check matrix entries against the suite
+  const summaryIds = new Set(summary.matrix.map((e) => e.check_id))
+  const suiteIds = new Set(suite.checks.map((c) => c.check_id))
+  for (const id of CONF_DIST_CHECK_IDS) {
+    if (!summaryIds.has(id)) failClosed(`stage2 matrix summary missing entry for ${id}`)
+    if (!suiteIds.has(id)) failClosed(`stage2 conformance suite missing check ${id}`)
+  }
+
+  // Every matrix entry must report PASS and must not expect GLOBAL_VALID
+  for (const entry of summary.matrix) {
+    if (entry.status !== 'PASS') failClosed(`stage2 matrix entry ${entry.check_id} status is '${entry.status}' — must be PASS`)
+    if (entry.expected === 'GLOBAL_VALID') failClosed(`${entry.check_id} matrix entry expects GLOBAL_VALID — authority creation forbidden`)
+  }
+}
+
 try {
   const bundle = readJson('conformance/vectors/deterministic-legitimacy-vectors.json')
   const suites = [
@@ -88,7 +184,15 @@ try {
   verifyVectorHashes(bundle)
   verifySuites(bundle, suites)
   verifyAppendOnlyMigration(suites.at(-1))
+
+  const stage2Suite = readJson('conformance/suites/stage2-distributed-legitimacy-conformance.json')
+  verifyStage2ConformanceSuite(stage2Suite)
+
+  const stage2MatrixSummary = readJson('conformance/stage2-matrix-summary.json')
+  verifyStage2MatrixSummary(stage2MatrixSummary, stage2Suite)
+
   console.log('CONFORMANCE_EVIDENCE_OBSERVED')
+  console.log('STAGE2_CONFORMANCE_MATRIX_COMPLETE')
 } catch (error) {
   console.error(error?.conformance_status || NULL_STATUS, error?.message || error)
   process.exitCode = 1
