@@ -34,7 +34,7 @@ function createEnv() {
                 evidence.push({ candidate_hash: this._args[1], nonce: this._args[2], result: this._args[3], reason: this._args[4], created_at: this._args[5] })
               }
               if (sql.includes('INSERT OR IGNORE INTO govern_envelope_registry')) {
-                envelopes.push({ envelope_id: this._args[0], envelope_hash: this._args[1], nonce: this._args[4], nonce_domain: this._args[5], status: this._args[6], reason: this._args[7] })
+                envelopes.push({ envelope_id: this._args[0], envelope_hash: this._args[1], nonce: this._args[5], nonce_domain: this._args[6], status: this._args[10], reason: this._args[11] })
               }
               return { meta: { changes: 1 } }
             },
@@ -65,7 +65,10 @@ const validCandidate = {
   intent: 'create_github_issue',
   scope: { repo: 'mindshift-demo' },
   target: { system: 'github', action: 'issue_draft', title: 'example' },
-  finality: { proof_required: true, proof_type: 'governance_evaluation_log' }
+  finality: { proof_required: true, proof_type: 'governance_evaluation_log' },
+  policy_class: 'TOOL_RUNTIME_MUTATION',
+  policy_digest: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  topology_attestation_hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 }
 
 test('issue #1369 /govern validates candidate, deterministically hashes, records evidence, and blocks replay', async () => {
