@@ -125,3 +125,18 @@ Use this checklist on every deploy request:
 - [ ] Execution occurred only through `/execute` boundary.
 - [ ] Proof persisted via `/proof` and is queryable by lineage keys.
 - [ ] Replay-like retries returned `NULL` (expected fail-closed behavior).
+
+---
+
+## Stage 2 Context
+
+This quickstart covers Stage 1 governed CI/CD semantics for a single surface.
+
+Stage 2 extends these guarantees to distributed topology. Local correctness (`LOCAL_VALID`) does not imply distributed legitimacy coherence (`GLOBAL_VALID`). See:
+
+- `QUICKSTART.md` — Stage 2 overview and distributed legitimacy lifecycle
+- `docs/stage2-legitimacy-vocabulary.md` — 12-state vocabulary and LOCAL_VALID vs GLOBAL_VALID
+- `docs/reconciliation-state-machine.md` — reconciliation state machine
+- `docs/topology-visibility-semantics.md` — topology visibility semantics
+- `docs/causal-legitimacy-clock-semantics.md` — causal legitimacy clock semantics
+- `docs/stage2-conformance-matrix.md` — CONF-DIST-01 through CONF-DIST-15
