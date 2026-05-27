@@ -1,6 +1,7 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
 import type { CanonicalAEO } from "./lib/aeo-governance.ts"
 import { classifyFromPredicates, classifyPartitionFinalityAdmission } from "./lib/finality-classification.js"
+import { classifyTopologyEpochAdmission } from "./lib/topology-epoch.js"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -304,6 +305,19 @@ const SESSION_TTL_MS = 3600_000
 const VALIDATION_FRESHNESS_WINDOW_MS = 5 * 60_000
 const PROOF_FRESHNESS_WINDOW_MS = 10 * 60_000
 const SYSTEM_MAX_CONTINUITY_DEPTH = 32
+
+async function enforceTopologyEpochAdmission(env: Env, payload: any, route: string) {
+  const epochAdmission = await classifyTopologyEpochAdmission({
+    topology_epoch: payload?.topology_epoch,
+    epoch_lineage_parent: payload?.epoch_lineage_parent,
+    epoch_nonce: payload?.epoch_nonce,
+    topology_visibility_state: payload?.topology_visibility_state,
+    scope: payload?.epoch_scope || "GLOBAL",
+    db: env.DB
+  })
+  if (!epochAdmission.ok) return { ok: false, reason: epochAdmission.reason }
+  return { ok: true, epoch_ordering_hash: epochAdmission.epoch_ordering_hash }
+}
 const CANONICAL_RUNTIME_ROUTES = ["/session", "/continuity", "/authority", "/compile", "/validate", "/execute", "/proof"] as const
 const EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/authority", "/compile", "/validate", "/execute", "/proof"] as const)
 const NON_EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/session", "/continuity"] as const)
@@ -7712,6 +7726,8 @@ export default {
 
     if (url.pathname === "/authority" && request.method === "POST") {
       const b = await body(request)
+      const topologyEpochAdmission = await enforceTopologyEpochAdmission(env, b, "")
+      if (!topologyEpochAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: topologyEpochAdmission.reason }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "authority", indicator: topologyEpochAdmission.reason }, drift_class: "topology_drift" })
       const session_id = String(b.session_id || "")
       const session = await activeSession(env, session_id)
       if (!session) return rejectWithTelemetry(env, { status: "NULL", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/authority", session_id }, drift_class: "authority_drift" })
@@ -7751,6 +7767,8 @@ export default {
     if (url.pathname === "/compile" && request.method === "POST") {
       try {
         const b = await body(request)
+      const topologyEpochAdmission = await enforceTopologyEpochAdmission(env, b, "")
+      if (!topologyEpochAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: topologyEpochAdmission.reason }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/compile", indicator: topologyEpochAdmission.reason }, drift_class: "topology_drift" })
         const decision_id = String(b.decision_id || "")
         const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/compile")
         if (!envelopeLink.ok) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/compile", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
@@ -7921,7 +7939,9 @@ export default {
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {
-      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const environment = b.environment; const session_id = String(b.session_id || "")
+      const b = await body(request);      const topologyEpochAdmission = await enforceTopologyEpochAdmission(env, b, "")
+      if (!topologyEpochAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: topologyEpochAdmission.reason }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/validate", indicator: topologyEpochAdmission.reason }, drift_class: "topology_drift" })
+ const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const environment = b.environment; const session_id = String(b.session_id || "")
       const governRequirement = await requiresGovernEnvelopeLineage(env, decision_id, b)
       let validateGovernLineage: { govern_envelope_id: string, govern_envelope_hash: string } | null = null
       if (governRequirement.required) {
@@ -7999,7 +8019,9 @@ export default {
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
-      const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b); const executionSnapshot = executionSnapshotFrom(b)
+      const b = await body(request);      const topologyEpochAdmission = await enforceTopologyEpochAdmission(env, b, "")
+      if (!topologyEpochAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: topologyEpochAdmission.reason }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/execute", indicator: topologyEpochAdmission.reason }, drift_class: "topology_drift" })
+ const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const session_id = String(b.session_id || ""); const provenance = deploymentProvenanceFrom(b); const executionSnapshot = executionSnapshotFrom(b)
       const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/execute")
       if (!envelopeLink.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
       await emitTelemetry(env, { event_type: "EXECUTION_STARTED", decision_id, severity: "INFO", payload: { route: "/execute", validated_object_hash, invocation_nonce } })
