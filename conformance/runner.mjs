@@ -75,12 +75,12 @@ function verifyAppendOnlyMigration(suite) {
   assert.match(migration, /BEFORE DELETE ON federated_checkpoint_registry/)
 }
 
-const STAGE2_CHECK_IDS = [
 const CONF_DIST_CHECK_IDS = [
   'CONF-DIST-01', 'CONF-DIST-02', 'CONF-DIST-03', 'CONF-DIST-04', 'CONF-DIST-05',
   'CONF-DIST-06', 'CONF-DIST-07', 'CONF-DIST-08', 'CONF-DIST-09', 'CONF-DIST-10',
   'CONF-DIST-11', 'CONF-DIST-12', 'CONF-DIST-13', 'CONF-DIST-14', 'CONF-DIST-15',
 ]
+const STAGE2_CHECK_IDS = CONF_DIST_CHECK_IDS
 
 function verifyStage2Suite(suite) {
   assert.equal(suite.non_operative, true, `${suite.suite_id} must be non_operative`)
@@ -105,6 +105,9 @@ function verifyStage2Suite(suite) {
     if (!existsSync(join(root, check.test))) failClosed(`${check.check_id} test not found: ${check.test}`)
     if (!check.forbidden_results || check.forbidden_results.length === 0) failClosed(`${check.check_id} must declare forbidden_results`)
     if (!check.forbidden_results.includes('GLOBAL_VALID')) failClosed(`${check.check_id} must forbid GLOBAL_VALID`)
+  }
+}
+
 // Verifies the Stage 2 distributed legitimacy conformance suite descriptor.
 // Read-only: only reads files and asserts structural invariants.
 // Does not invoke runtime, does not mutate state, does not consume replay.

@@ -63,10 +63,19 @@ CONF-DIST-03: FAIL
   observed: {"status":"VALID"}
 ```
 
-### Step 3 — Read the JSON report
+### Step 3 — Capture the output (optional)
+
+The runner prints evidence to stdout only — it does not write a `conformance/report.json` file.
+To save the output for your final project submission, redirect it:
 
 ```bash
-cat conformance/report.json | jq '{total: .total_checks, passed: .passed, failed: .failed}'
+npm run conformance 2>&1 | tee conformance-output.txt
+```
+
+Then inspect the saved file:
+
+```bash
+cat conformance-output.txt
 ```
 
 ### Step 4 — Identify a failing check (if any)
@@ -82,9 +91,16 @@ Common failures and their causes:
 | CONF-DIST-04 fails | Proof registry allows updates |
 | CONF-CICD-01 fails | Workflow trigger is not `workflow_dispatch` only |
 
-### Step 5 — Save the report
+### Step 5 — Save the output for submission
 
-Copy `conformance/report.json` to your fork or lab submission location. This is the artifact you submit with your final project.
+The conformance runner outputs evidence to stdout. Capture it as your submission artifact:
+
+```bash
+npm run conformance 2>&1 | tee conformance-output.txt
+```
+
+Include `conformance-output.txt` in your fork or lab submission. The file shows which checks
+passed and the `STAGE2_CONFORMANCE_MATRIX_COMPLETE` line confirms all checks passed.
 
 ---
 

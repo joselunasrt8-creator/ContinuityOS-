@@ -44,6 +44,7 @@ Run steps 1–5 from Lab 3 to get a valid `DECISION_ID`, `HASH`, and `NONCE`.
 Alternatively, if you have these values from Lab 3, export them:
 
 ```bash
+export SESSION=<your-session-id-from-lab-3>
 export DECISION_ID=<your-decision-id-from-lab-3>
 export HASH=<your-hash-from-lab-3>
 export NONCE=<your-nonce-from-lab-3>
@@ -71,17 +72,32 @@ echo "Execution ID: $EXECUTION_ID"
 
 ### Step 7 — Emit proof
 
+The `/proof` route requires full execution lineage: `execution_id`, `validated_object_hash`,
+`invocation_nonce`, and `session_id` must all match the values used during `/execute`.
+Passing only `decision_id` returns NULL — the runtime verifies the complete chain.
+
 ```bash
 PROOF_RESULT=$(curl -sf -X POST "$BASE_URL/proof" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d "{\"decision_id\": \"$DECISION_ID\"}")
+  -d "{
+    \"decision_id\": \"$DECISION_ID\",
+    \"execution_id\": \"$EXECUTION_ID\",
+    \"validated_object_hash\": \"$HASH\",
+    \"invocation_nonce\": \"$NONCE\",
+    \"session_id\": \"$SESSION\"
+  }")
 echo "$PROOF_RESULT" | jq .
-PROOF_ID=$(echo "$PROOF_RESULT" | jq -r '.proof_id')
+PROOF_ID=$(echo "$PROOF_RESULT" | jq -r '.proof.proof_id // .proof_id')
 echo "Proof ID: $PROOF_ID"
 ```
 
 **Expected:** a proof object with `proof_id`, `decision_hash`, `execution_id`, and `created_at`.
+
+> **Important:** proof existence ≠ distributed finality. A proof stored on a single local node
+> carries `distributed_finality: false`. It records that an execution occurred; it does not
+> propagate that record to other nodes or guarantee global convergence. See Module 7 for
+> distributed finality semantics.
 
 ### Step 8 — Verify the proof row exists
 
@@ -96,13 +112,19 @@ curl -sf "$BASE_URL/proof/$PROOF_ID" \
 
 ### Step 9 — Verify append-only behavior
 
-Attempt to overwrite the proof by posting to `/proof` again with the same `decision_id`:
+Attempt to overwrite the proof by posting to `/proof` again with the same execution lineage:
 
 ```bash
 curl -sf -X POST "$BASE_URL/proof" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d "{\"decision_id\": \"$DECISION_ID\"}" | jq .
+  -d "{
+    \"decision_id\": \"$DECISION_ID\",
+    \"execution_id\": \"$EXECUTION_ID\",
+    \"validated_object_hash\": \"$HASH\",
+    \"invocation_nonce\": \"$NONCE\",
+    \"session_id\": \"$SESSION\"
+  }" | jq .
 ```
 
 **Expected:** an error response — the proof already exists. The `UNIQUE` constraint on `decision_hash` prevents a second insert.

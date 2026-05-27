@@ -5,14 +5,23 @@
 #   Set WORKER_URL and API_KEY in your repo's Actions secrets.
 #   Configure the DEPLOY_ENVIRONMENT and DEPLOY_INTENT env vars below.
 #
+# Pre-dispatch lifecycle (completed before triggering this workflow):
+#   /session  → obtain session_id
+#   /govern   → obtain governed_tool_envelope_id (binds candidate to a nonce)
+#   /authority → requires session_id + governed_tool_envelope_id → obtain decision_id
+#   /compile  → requires decision_id → obtain validated_object_hash + invocation_nonce
+#   Then dispatch this workflow with: decision_id, validated_object_hash,
+#                                     invocation_nonce, session_id
+#
 # Legitimacy invariants enforced by this workflow:
 #   - workflow_dispatch only — no push, schedule, or PR trigger
-#   - decision_id, validated_object_hash, and invocation_nonce are required
+#   - decision_id, validated_object_hash, invocation_nonce, and session_id are required
 #   - Hash mismatch between compiled AEO and input returns NULL
 #   - Consumed nonce returns NULL (replay resistance)
 #   - Missing authority returns NULL
 #   - proof_required: true — proof is emitted or workflow fails
 #   - Serial execution — no concurrent deploys
+#   - Proof is emitted only after deploy step succeeds (not on failure)
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION: edit these values for your repo
@@ -33,6 +42,10 @@ on:
         type: string
       invocation_nonce:
         description: "Single-use UUID nonce (from /compile route)"
+        required: true
+        type: string
+      session_id:
+        description: "Session ID (from /session route — must match the session used at /authority)"
         required: true
         type: string
 
@@ -56,6 +69,7 @@ jobs:
       DECISION_ID: ${{ github.event.inputs.decision_id }}
       VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
       INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
+      SESSION_ID: ${{ github.event.inputs.session_id }}
       # ── Configuration: edit these for your repo ───────────────────────────
       DEPLOY_ENVIRONMENT: production
       DEPLOY_INTENT: deploy_production
@@ -80,7 +94,7 @@ jobs:
             exit 1
           fi
 
-          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE WORKER_URL API_KEY; do
+          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE SESSION_ID WORKER_URL API_KEY; do
             if [ -z "${!var:-}" ]; then
               echo "NULL — Missing required variable: $var"
               exit 1
@@ -116,11 +130,12 @@ jobs:
               --arg decision_id "$DECISION_ID" \
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
               --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg session_id "$SESSION_ID" \
               --arg environment "$DEPLOY_ENVIRONMENT" \
               --arg repo "$DEPLOY_REPO" \
               --arg branch "$DEPLOY_BRANCH" \
               --arg workflow "$DEPLOY_WORKFLOW" \
-              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
+              '{decision_id: $decision_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, session_id: $session_id, environment: $environment, repo: $repo, branch: $branch, workflow: $workflow}')")
 
           STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
           RESULT=$(echo "$RESPONSE" | jq -r '.result // empty')
@@ -182,8 +197,10 @@ jobs:
           # YOUR DEPLOY COMMAND HERE
 
       # ── Step 5: Emit proof ────────────────────────────────────────────────
+      # Proof is emitted only after the deploy step succeeds.
+      # Removing the if: always() guard ensures proof cannot be emitted
+      # for a failed deployment — proof must attest a completed action.
       - name: Emit proof artifact
-        if: always()
         run: |
           set -euo pipefail
 
@@ -200,6 +217,7 @@ jobs:
               --arg execution_id "$EXECUTION_ID" \
               --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
               --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg session_id "$SESSION_ID" \
               --arg surface "github_actions" \
               --arg run_id "$WORKFLOW_RUN_ID" \
               --arg commit_sha "$WORKFLOW_SHA" \
@@ -207,7 +225,7 @@ jobs:
               --arg environment "$DEPLOY_ENVIRONMENT" \
               --arg repo "$DEPLOY_REPO" \
               --arg branch "$DEPLOY_BRANCH" \
-              '{decision_id: $decision_id, execution_id: $execution_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
+              '{decision_id: $decision_id, execution_id: $execution_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, session_id: $session_id, surface: $surface, run_id: $run_id, commit_sha: $commit_sha, workflow: $workflow, environment: $environment, repo: $repo, branch: $branch}')")
 
           PROOF_STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
           PROOF_ID=$(echo "$RESPONSE" | jq -r '.proof.proof_id // .proof_id // empty')
