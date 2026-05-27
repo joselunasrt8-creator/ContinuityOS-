@@ -1,0 +1,167 @@
+{
+  "matrix_id": "stage2_distributed_legitimacy_conformance_matrix_v1",
+  "suite_id": "stage2_distributed_legitimacy_conformance_v1",
+  "stage": 2,
+  "generated_at": "2026-05-27",
+  "anchor_issue": "#1442",
+  "supporting_issues": ["#1340", "#1418", "#1440", "#1441", "#1405", "#1408", "#1338", "#1346"],
+  "status": "COMPLETE",
+  "non_operative": true,
+  "raw_production_apply_path": "DENIED",
+  "invariants": {
+    "authority_created": false,
+    "execution_eligibility_expanded": false,
+    "replay_restoration_paths_introduced": false,
+    "fail_closed": true,
+    "append_only": true,
+    "replay_neutral": true,
+    "observability_only": true
+  },
+  "matrix": [
+    {
+      "check_id": "CONF-DIST-01",
+      "label": "local_valid_does_not_imply_global_valid",
+      "expected": "LOCAL_VALID",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "module": "src/lib/finality-classification.ts",
+      "migration": "migrations/0053_finality_classification_convergence_valid.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-02",
+      "label": "partition_local_proof_downgraded",
+      "expected": "PARTITION_SUSPENDED",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "LOCAL_VALID"],
+      "module": "src/lib/proof-finality-metadata.ts",
+      "migration": "migrations/0056_proof_finality_metadata_events.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-03",
+      "label": "replay_consumed_in_partition_remains_consumed_after_healing",
+      "expected": "NULL",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "REPLAY_SAFE"],
+      "module": "src/lib/replay-convergence.ts",
+      "migration": null,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-04",
+      "label": "stale_lineage_collapses_to_stale_visible",
+      "expected": "STALE_VISIBLE",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "CONVERGED", "FINALIZED"],
+      "module": "src/lib/reconciliation-state-machine.ts",
+      "migration": "migrations/0058_reconciliation_state_machine_events.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-05",
+      "label": "conflicting_proof_roots_create_conflicted",
+      "expected": "CONFLICTED",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "SETTLED", "NULL"],
+      "module": "src/lib/conflict-set.ts",
+      "migration": "migrations/0057_conflict_set_envelope_settlement.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-06",
+      "label": "quorum_disagreement_prevents_global_valid",
+      "expected": "AMBIGUOUS",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "module": "src/lib/quorum-attestation.ts",
+      "migration": "migrations/0055_validator_attestation_envelope.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-07",
+      "label": "detached_proof_cannot_finalize",
+      "expected": "NULL",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "LOCAL_VALID", "PARTITION_SUSPENDED"],
+      "module": "src/lib/proof-finality-metadata.ts",
+      "migration": "migrations/0056_proof_finality_metadata_events.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-08",
+      "label": "reconciliation_cannot_create_authority",
+      "expected": "NO_AUTHORITY",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "module": "src/lib/reconciliation-state-machine.ts",
+      "migration": "migrations/0058_reconciliation_state_machine_events.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-09",
+      "label": "topology_invisibility_returns_null_or_ambiguous",
+      "expected": "AMBIGUOUS",
+      "forbidden": ["GLOBAL_VALID", "LOCAL_VALID"],
+      "module": "src/lib/topology-visibility.ts",
+      "migration": "migrations/0059_topology_visibility_enforcement.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-10",
+      "label": "settlement_preserves_losing_branch_evidence",
+      "expected": "STALE_VISIBLE",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "module": "src/lib/conflict-set.ts",
+      "migration": "migrations/0057_conflict_set_envelope_settlement.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-11",
+      "label": "epoch_mismatch_prevents_convergence_valid",
+      "expected": "STALE_VISIBLE",
+      "forbidden": ["CONVERGENCE_VALID", "GLOBAL_VALID"],
+      "module": "src/lib/finality-classification.ts",
+      "migration": "migrations/0054_epoch_settlement_coupling.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-12",
+      "label": "revocation_liveness_downgrade_propagates",
+      "expected": "STALE_VISIBLE or REVOKED non-executable",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "CONVERGED", "FINALIZED"],
+      "module": "src/lib/reconciliation-state-machine.ts",
+      "migration": "migrations/0058_reconciliation_state_machine_events.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-13",
+      "label": "causal_ordering_ambiguity_prevents_finality",
+      "expected": "AMBIGUOUS",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "module": "src/lib/causal-legitimacy-clock.ts",
+      "migration": "migrations/0060_causal_legitimacy_clock_registry.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-14",
+      "label": "proof_downgrade_upgrade_is_append_only",
+      "expected": "APPEND_ONLY_ENFORCED",
+      "forbidden": [],
+      "module": "src/lib/proof-finality-metadata.ts",
+      "migration": "migrations/0056_proof_finality_metadata_events.sql",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONF-DIST-15",
+      "label": "partition_healing_does_not_restore_replay_eligibility",
+      "expected": "NULL",
+      "forbidden": ["GLOBAL_VALID", "CONVERGENCE_VALID", "REPLAY_SAFE"],
+      "module": "src/lib/replay-convergence.ts",
+      "migration": null,
+      "status": "PASS"
+    }
+  ],
+  "summary": {
+    "total_checks": 15,
+    "implemented": 15,
+    "passing": 15,
+    "forbidden_global_valid_paths_covered": 15,
+    "stage1_regressions": 0,
+    "authority_creation_paths": 0,
+    "execution_eligibility_expansion_paths": 0,
+    "replay_restoration_paths": 0
+  }
+}
