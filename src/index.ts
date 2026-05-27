@@ -137,7 +137,25 @@ function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCand
 }
 
 
-type GovernEnvelopeLineageResolution = { ok: true, govern_envelope_id: string, govern_envelope_hash: string } | { ok: false, reason: string }
+
+function canonicalGovernProjectionFromCandidate(candidate: GovernCandidate): GovernCandidate {
+  return { intent: String(candidate.intent || ""), scope: canonicalRecord(candidate.scope), target: canonicalRecord(candidate.target), finality: canonicalRecord(candidate.finality) }
+}
+
+function canonicalGovernProjectionFromAeo(aeo: CanonicalAEO): GovernCandidate {
+  return { intent: String(aeo.intent || ""), scope: canonicalRecord(aeo.scope), target: canonicalRecord(aeo.target), finality: canonicalRecord(aeo.finality) }
+}
+
+async function computeGovernProjectionHash(projection: GovernCandidate): Promise<string> {
+  return sha256Hex(canonicalize(canonicalGovernProjectionFromCandidate(projection)))
+}
+
+function compareGovernProjectionHashes(expected: string, actual: string): { ok: true } | { ok: false, reason: string } {
+  if (String(expected||"") === String(actual||"")) return { ok: true }
+  return { ok: false, reason: "projection_hash_drift" }
+}
+
+type GovernEnvelopeLineageResolution = { ok: true, govern_envelope_id: string, govern_envelope_hash: string, govern_projection_hash: string } | { ok: false, reason: string }
 type GovernEnvelopeRequirement = { required: false } | { required: true, persisted_govern_envelope_id: string }
 
 function isOpenClawOriginPayload(payload: any): boolean {
@@ -181,7 +199,7 @@ async function resolveGovernEnvelopeLineage(env: Env, payload: any, missingReaso
   const storedHash = String(record.envelope_hash || "")
   if (storedHash !== recomputedHash) return { ok: false, reason: hashMismatchReason }
   if (govern_envelope_hash && govern_envelope_hash !== storedHash) return { ok: false, reason: hashMismatchReason }
-  return { ok: true, govern_envelope_id: String(record.envelope_id || ""), govern_envelope_hash: storedHash }
+  return { ok: true, govern_envelope_id: String(record.envelope_id || ""), govern_envelope_hash: storedHash, govern_projection_hash: String(record.govern_projection_hash || "") }
 }
 async function verifyGovernedToolEnvelopeLinkage(env: Env, decision_id: string, route: string): Promise<{ ok: true, envelope_id: string } | { ok: false, reason: string }> {
   const authority = await env.DB.prepare(`SELECT governed_tool_envelope_id FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
@@ -1360,7 +1378,7 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_continuity_registry_session_identity ON continuity_registry(session_id, identity_id, status, expires_at)`,
       `CREATE TABLE IF NOT EXISTS authority_registry (authority_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL UNIQUE, session_id TEXT NOT NULL, owner TEXT NOT NULL, intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, expiry TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, identity_id TEXT, delegated_authority_id TEXT, parent_authority_id TEXT, delegation_depth TEXT, delegation_scope_subset TEXT, delegation_expiry TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT, governed_tool_envelope_id TEXT)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_authority_registry_decision_unique ON authority_registry(decision_id)`,
-      `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, workflow_integrity_hash TEXT, delegated_authority_id TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT, lineage_stage TEXT, lineage_origin_hash TEXT, governed_tool_envelope_id TEXT)`,
+      `CREATE TABLE IF NOT EXISTS aeo_registry (aeo_id TEXT PRIMARY KEY, authority_id TEXT NOT NULL, decision_id TEXT NOT NULL, canonical_aeo TEXT NOT NULL, validated_object_hash TEXT NOT NULL, govern_projection_hash TEXT NOT NULL DEFAULT "", status TEXT NOT NULL, created_at TEXT NOT NULL, continuity_id TEXT, workflow_integrity_hash TEXT, delegated_authority_id TEXT, delegation_lineage_hash TEXT, delegation_root_hash TEXT, delegated_replay_chain_hash TEXT, lineage_stage TEXT, lineage_origin_hash TEXT, governed_tool_envelope_id TEXT)`,
       `CREATE INDEX IF NOT EXISTS idx_aeo_registry_decision_hash ON aeo_registry(decision_id, validated_object_hash)`,
       `CREATE TABLE IF NOT EXISTS preo_registry (preo_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, authority_id TEXT NOT NULL, continuity_id TEXT NOT NULL, reviewed_hash TEXT NOT NULL, reviewed_tree_hash TEXT, merge_commit_sha TEXT, canonical_preo TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(decision_id, reviewed_hash))`,
       `CREATE INDEX IF NOT EXISTS idx_preo_registry_decision_hash ON preo_registry(decision_id, reviewed_hash)`,
@@ -7767,10 +7785,11 @@ export default {
         if (!canonical_aeo) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "invalid_canonical_aeo" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile" }, drift_class: "registry_drift" })
         const canonical_aeo_json = canonicalize(canonical_aeo)
         const validated_object_hash = await sha256Hex(canonical_aeo_json)
+        const governProjectionHash = await computeGovernProjectionHash(canonicalGovernProjectionFromAeo(canonical_aeo))
         const validated_execution_snapshot = await sha256Hex(canonicalize({ decision_id, validated_object_hash, ...compileSnapshot }))
         const preoLineage = await validatePreoLineage(env, { decision_id, validated_object_hash, authority, required: requirePreoLineage })
         if (preoLineage !== "OK") return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: preoLineage }, { event_type: preoLineage === "preo_hash_mismatch" ? "HASH_MISMATCH" : "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", validated_object_hash, policy: REQUIRE_PREO_LINEAGE, required: requirePreoLineage, indicator: preoLineage }, drift_class: preoLineage === "preo_hash_mismatch" ? "hash_drift" : "registry_drift" })
-        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,status,created_at,workflow_integrity_hash,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash,governed_tool_envelope_id) VALUES (?1,?2,?3,?4,?5,?6,'COMPILED',?7,?8,?9,?10,?11,?12,?13)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, new Date().toISOString(), String(compileSnapshot.workflow_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || ""), String(authority.governed_tool_envelope_id || "")).run()
+        await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,continuity_id,canonical_aeo,validated_object_hash,govern_projection_hash,status,created_at,workflow_integrity_hash,delegated_authority_id,delegation_lineage_hash,delegation_root_hash,delegated_replay_chain_hash,governed_tool_envelope_id) VALUES (?1,?2,?3,?4,?5,?6,?7,'COMPILED',?8,?9,?10,?11,?12,?13,?14)`).bind(crypto.randomUUID(), authority.authority_id, decision_id, String(authority.continuity_id || ""), canonical_aeo_json, validated_object_hash, governProjectionHash, new Date().toISOString(), String(compileSnapshot.workflow_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), String(authority.delegated_replay_chain_hash || ""), String(authority.governed_tool_envelope_id || "")).run()
         await emitTelemetry(env, { event_type: "AEO_COMPILED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/compile", validated_object_hash, validated_execution_snapshot } })
         return json({ status: "COMPILED", decision_id, validated_object_hash, validated_execution_snapshot, canonical_aeo: JSON.parse(canonical_aeo_json) })
       } catch (error: any) {
@@ -7793,6 +7812,7 @@ export default {
       const candidate = parsed.ok ? parsed.candidate : { intent: "", scope: {}, target: {}, finality: {} }
       const candidate_canonical = canonicalize(candidate)
       const candidate_hash = await sha256Hex(candidate_canonical)
+      const govern_projection_hash = await computeGovernProjectionHash(canonicalGovernProjectionFromCandidate(candidate))
       const timestamp = new Date().toISOString()
       let result: GovernResult = parsed.ok ? "VALID_CANDIDATE" : "NULL"
       let reason = parsed.ok ? "" : "malformed_candidate"
@@ -7803,7 +7823,7 @@ export default {
       await ensureGovernNonceRegistrySchema(env)
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, govern_projection_hash TEXT NOT NULL DEFAULT "", nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
       if (result === "VALID_CANDIDATE") {
         const nonceExisting = await env.DB.prepare(`SELECT candidate_hash FROM govern_nonce_registry WHERE nonce=?1 AND nonce_domain=?2`).bind(nonce, nonce_domain).first<any>()
         if (nonceExisting) {
@@ -7841,8 +7861,8 @@ export default {
       const envelope_status = result
       const envelope_reason = reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate")
       const envelope_hash = await sha256Hex(canonicalize({ candidate_hash, nonce, nonce_domain, route: "/govern", status: envelope_status }))
-      const envelopePersist = await env.DB.prepare(`INSERT OR IGNORE INTO govern_envelope_registry (envelope_id, envelope_hash, candidate_hash, candidate_canonical, nonce, nonce_domain, status, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`)
-        .bind(envelope_id, envelope_hash, candidate_hash, candidate_canonical, nonce, nonce_domain, envelope_status, envelope_reason, timestamp).run()
+      const envelopePersist = await env.DB.prepare(`INSERT OR IGNORE INTO govern_envelope_registry (envelope_id, envelope_hash, candidate_hash, candidate_canonical, govern_projection_hash, nonce, nonce_domain, status, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`)
+        .bind(envelope_id, envelope_hash, candidate_hash, candidate_canonical, govern_projection_hash, nonce, nonce_domain, envelope_status, envelope_reason, timestamp).run()
       if ((envelopePersist.meta?.changes || 0) === 0) {
         result = "NULL"
         reason = "envelope_persist_failed"
@@ -7968,12 +7988,14 @@ export default {
       if (!executionLineageCheck.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: executionLineageCheck.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: executionLineageCheck.reason }, drift_class: "execution_drift" })
       const replay = await env.DB.prepare(`SELECT execution_id FROM execution_registry WHERE decision_id=?1 AND validated_object_hash=?2`).bind(decision_id,validated_object_hash).first<any>()
       if (replay) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"replay_detected" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), execution_id: String(replay.execution_id || ""), severity: "HIGH", payload: { route: "/execute", validated_object_hash, invocation_nonce, indicator: "duplicate_execution" }, drift_class: "replay_drift" })
-      const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
+      const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,govern_projection_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
       let executionAeo: any
       try { executionAeo = JSON.parse(String(compiled?.canonical_aeo || "{}")) } catch { executionAeo = null }
       const executionCanonicalAeo = toCanonicalAeo(executionAeo)
       const execHash = executionCanonicalAeo ? await sha256Hex(canonicalize(executionCanonicalAeo)) : ""
       if (!compiled || !executionCanonicalAeo || execHash !== validated_object_hash || execHash !== String(compiled.validated_object_hash || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, actual_hash: execHash, indicator: "execution_hash_mismatch" }, drift_class: "hash_drift" })
+      const executionProjectionHash = await computeGovernProjectionHash(canonicalGovernProjectionFromAeo(executionCanonicalAeo as CanonicalAEO))
+      if (String(compiled.govern_projection_hash || "") && compareGovernProjectionHashes(String(compiled.govern_projection_hash || ""), executionProjectionHash).ok !== true) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"projection_hash_drift" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", indicator: "projection_hash_drift" }, drift_class: "hash_drift" })
       if (String(validation.validated_object_hash || "") !== execHash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_hash: String(validation.validated_object_hash || ""), actual_hash: execHash, indicator: "validated_object_execution_mismatch" }, drift_class: "hash_drift" })
       if (String(compiled.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", expected_continuity_id: authority.continuity_id, provided_continuity_id: compiled.continuity_id, indicator: "non_canonical_validation_lineage" }, drift_class: "execution_drift" })
       if (String(compiled.status || "") !== "COMPILED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"policy_invalid" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/execute", compiled_status: compiled.status || null, indicator: "policy_invalid_at_execution" }, drift_class: "execution_drift" })
@@ -8131,7 +8153,7 @@ export default {
       const currentContinuityIdentity = await resolveCurrentContinuityIdentity(env, session)
       if (!currentContinuityIdentity) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_continuity_identity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "missing_current_continuity_identity" }, drift_class: "proof_drift" })
       if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(execution.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_execution_continuity_identity" }, drift_class: "proof_drift" })
-      const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
+      const compiled = await env.DB.prepare(`SELECT canonical_aeo,validated_object_hash,govern_projection_hash,continuity_id,status FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id,validated_object_hash).first<any>()
       let proofAeo: any
       try { proofAeo = JSON.parse(String(compiled?.canonical_aeo || "{}")) } catch { proofAeo = null }
       const proofCanonicalAeo = toCanonicalAeo(proofAeo)
@@ -8178,6 +8200,7 @@ export default {
         govern_envelope_hash: String(proofGovernLineage?.govern_envelope_hash || "")
       })
       const executionLineage = canonicalize({
+        govern_projection_hash: String(compiled?.govern_projection_hash || ""),
         identity_id: String(authority.identity_id || ""),
         session_id,
         continuity_id: String(execution.continuity_id || ""),
