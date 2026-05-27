@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "mindshift": "./cli/index.mjs"
+  },
   "scripts": {
     "deploy": "echo \"Direct deploy disabled as a convenience guard. Production deploys must use .github/workflows/governed-deploy.yml.\" && exit 1",
     "deploy:dry-run": "npx wrangler deploy src/index.ts --name mindshift-demo --compatibility-date 2026-05-18 --dry-run",
     "dev": "wrangler dev --local",
     "d1:migrate:local": "wrangler d1 migrations apply mindshift-demo-local --local",
     "test": "node --import tsx --test",
+    "test:cli": "node --test tests/cli-sdk-surface.test.mjs",
     "conformance": "node conformance/runner.mjs",
     "graph:load": "npx tsx graph/load_constitutional_graph.ts",
     "graph:runtime": "npx tsx graph/ingest_runtime_graph.ts",
