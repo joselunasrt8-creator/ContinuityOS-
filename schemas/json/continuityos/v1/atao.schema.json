@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mindshift.local/schemas/mindshift-atao-object.schema.json",
-  "title": "MindShift ATAO Object",
+  "$id": "https://mindshift.local/schemas/json/continuityos/v1/atao.schema.json",
+  "title": "ContinuityOS v1 ATAO Object",
   "description": "Captures proposed action before execution legitimacy exists.",
   "type": "object",
   "additionalProperties": false,
@@ -70,6 +70,5 @@
       "type": "string",
       "format": "date-time"
     }
-  },
-  "$comment": "Canonical ContinuityOS v1 schema: schemas/json/continuityos/v1/atao.schema.json"
+  }
 }

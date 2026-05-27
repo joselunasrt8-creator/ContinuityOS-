@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mindshift.local/schemas/mindshift-aeo-object.schema.json",
-  "title": "MindShift AEO Object",
+  "$id": "https://mindshift.local/schemas/json/continuityos/v1/aeo.schema.json",
+  "title": "ContinuityOS v1 AEO Object",
   "description": "Exact executable object. validated_object must equal executed_object.",
   "type": "object",
   "additionalProperties": false,
@@ -89,6 +89,5 @@
         }
       }
     }
-  },
-  "$comment": "Canonical ContinuityOS v1 schema: schemas/json/continuityos/v1/aeo.schema.json"
+  }
 }
