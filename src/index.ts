@@ -135,6 +135,38 @@ function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCand
   if (!isPlainRecord(input.finality)) return { ok: false, reason: "missing_finality" }
   return { ok: true, candidate: { intent: input.intent, scope: input.scope, target: input.target, finality: input.finality } }
 }
+
+
+type GovernEnvelopeLineageResolution = { ok: true, govern_envelope_id: string, govern_envelope_hash: string } | { ok: false, reason: string }
+
+function isOpenClawOriginPayload(payload: any): boolean {
+  const origin = String(payload?.origin || payload?.authority_origin || payload?.lineage_origin || "").toLowerCase()
+  const nonceDomain = String(payload?.nonce_domain || "").toLowerCase()
+  return origin === "openclaw" || nonceDomain === "openclaw" || nonceDomain.startsWith("openclaw-")
+}
+
+async function resolveGovernEnvelopeLineage(env: Env, payload: any, missingReason: string, ambiguousReason: string, invalidStatusReason: string, hashMismatchReason: string): Promise<GovernEnvelopeLineageResolution> {
+  const govern_envelope_id = String(payload?.govern_envelope_id || "")
+  const govern_envelope_hash = String(payload?.govern_envelope_hash || "")
+  if (!govern_envelope_id && !govern_envelope_hash) return { ok: false, reason: missingReason }
+  const byId = govern_envelope_id
+    ? await env.DB.prepare(`SELECT * FROM govern_envelope_registry WHERE envelope_id=?1 ORDER BY created_at DESC LIMIT 2`).bind(govern_envelope_id).all<any>()
+    : { results: [] as any[] }
+  const byHash = govern_envelope_hash
+    ? await env.DB.prepare(`SELECT * FROM govern_envelope_registry WHERE envelope_hash=?1 ORDER BY created_at DESC LIMIT 2`).bind(govern_envelope_hash).all<any>()
+    : { results: [] as any[] }
+  const matches = [...(byId.results || []), ...(byHash.results || [])]
+  const unique = new Map<string, any>()
+  for (const row of matches) unique.set(`${String(row.envelope_id||"")}:${String(row.envelope_hash||"")}`, row)
+  if (unique.size !== 1) return { ok: false, reason: ambiguousReason }
+  const record = [...unique.values()][0]
+  if (String(record.status || "") !== "VALID_CANDIDATE") return { ok: false, reason: invalidStatusReason }
+  const recomputedHash = await sha256Hex(canonicalize({ candidate_hash: String(record.candidate_hash || ""), nonce: String(record.nonce || ""), nonce_domain: String(record.nonce_domain || ""), route: "/govern", status: String(record.status || "") }))
+  const storedHash = String(record.envelope_hash || "")
+  if (storedHash !== recomputedHash) return { ok: false, reason: hashMismatchReason }
+  if (govern_envelope_hash && govern_envelope_hash !== storedHash) return { ok: false, reason: hashMismatchReason }
+  return { ok: true, govern_envelope_id: String(record.envelope_id || ""), govern_envelope_hash: storedHash }
+}
 async function verifyGovernedToolEnvelopeLinkage(env: Env, decision_id: string, route: string): Promise<{ ok: true, envelope_id: string } | { ok: false, reason: string }> {
   const authority = await env.DB.prepare(`SELECT governed_tool_envelope_id FROM authority_registry WHERE decision_id=?1`).bind(decision_id).first<any>()
   const envelope_id = String(authority?.governed_tool_envelope_id || "")
@@ -7805,6 +7837,13 @@ export default {
 
     if (url.pathname === "/validate" && request.method === "POST") {
       const b = await body(request); const decision_id = String(b.decision_id || ""); const validated_object_hash = String(b.validated_object_hash || ""); const invocation_nonce = String(b.invocation_nonce || ""); const environment = b.environment; const session_id = String(b.session_id || "")
+      const openClawOrigin = isOpenClawOriginPayload(b)
+      let validateGovernLineage: { govern_envelope_id: string, govern_envelope_hash: string } | null = null
+      if (openClawOrigin) {
+        const governLineage = await resolveGovernEnvelopeLineage(env, b, "govern_envelope_missing", "govern_envelope_ambiguous", "govern_envelope_invalid_status", "govern_envelope_hash_mismatch")
+        if (!governLineage.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: governLineage.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/validate", indicator: governLineage.reason }, drift_class: "hash_drift" })
+        validateGovernLineage = governLineage
+      }
       const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/validate")
       if (!envelopeLink.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/validate", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/validate" }, drift_class: "hash_drift" })
@@ -7869,7 +7908,7 @@ export default {
       const _topology_present = false // topology infrastructure pending (#1346+); fail-closed
       const _predicate_snapshot = { V: true, A: true, U: true, P: true, R: true, T: false, C: true, Q: false, G: false, L: false, X: false }
       const _classification = classifyFromPredicates(_predicate_snapshot, _topology_present)
-      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, policy_class: validatePolicyClass, policy_class_digest: validatePolicyClassDigest, policy_predicate_outcomes: { authority_active: true, continuity_identity_match: true, compiled_hash_match: true, delegated_authority_lineage_valid: true, topology_visible: _topology_present }, denial_reason: null, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present } })
+      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, ...(validateGovernLineage || {}), policy_class: validatePolicyClass, policy_class_digest: validatePolicyClassDigest, policy_predicate_outcomes: { authority_active: true, continuity_identity_match: true, compiled_hash_match: true, delegated_authority_lineage_valid: true, topology_visible: _topology_present }, denial_reason: null, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present } })
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
@@ -7976,6 +8015,13 @@ export default {
       const provenance = deploymentProvenanceFrom(b)
       const execution_id = String(b.execution_id || "")
       const decision_id = String(b.decision_id || "")
+      const openClawOrigin = isOpenClawOriginPayload(b)
+      let proofGovernLineage: { govern_envelope_id: string, govern_envelope_hash: string } | null = null
+      if (openClawOrigin) {
+        const governLineage = await resolveGovernEnvelopeLineage(env, b, "govern_ancestry_missing", "govern_ancestry_ambiguous", "govern_envelope_invalid_status", "govern_ancestry_hash_mismatch")
+        if (!governLineage.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: governLineage.reason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", indicator: governLineage.reason }, drift_class: "proof_drift" })
+        proofGovernLineage = governLineage
+      }
       const envelopeLink = await verifyGovernedToolEnvelopeLinkage(env, decision_id, "/proof")
       if (!envelopeLink.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: envelopeLink.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/proof", indicator: envelopeLink.reason }, drift_class: "authority_drift" })
       const validated_object_hash = String(b.validated_object_hash || "")
@@ -8107,7 +8153,9 @@ export default {
         parent_authority_id: String(authority.parent_authority_id || ""),
         delegation_lineage_hash: String(authority.delegation_lineage_hash || ""),
         delegation_root_hash: String(authority.delegation_root_hash || ""),
-        delegated_replay_chain_hash: String(authority.delegated_replay_chain_hash || "")
+        delegated_replay_chain_hash: String(authority.delegated_replay_chain_hash || ""),
+        govern_envelope_id: String(proofGovernLineage?.govern_envelope_id || ""),
+        govern_envelope_hash: String(proofGovernLineage?.govern_envelope_hash || "")
       })
       const executionLineage = canonicalize({
         identity_id: String(authority.identity_id || ""),
