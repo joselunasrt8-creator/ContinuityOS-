@@ -7698,28 +7698,42 @@ export default {
     if (url.pathname === "/govern" && request.method === "POST") {
       const body = await request.json().catch(() => null)
       const nonce = String(request.headers.get("X-Nonce") || "")
+      const nonce_domain = String(request.headers.get("X-Nonce-Domain") || "openclaw")
       const parsed = parseGovernCandidate(body)
       const candidate = parsed.ok ? parsed.candidate : { intent: "", scope: {}, target: {}, finality: {} }
       const candidate_canonical = canonicalize(candidate)
       const candidate_hash = await sha256Hex(candidate_canonical)
       const timestamp = new Date().toISOString()
       let result: GovernResult = parsed.ok ? "VALID_CANDIDATE" : "NULL"
-      let reason = parsed.ok ? "" : parsed.reason
+      let reason = parsed.ok ? "" : "malformed_candidate"
       if (!nonce) {
         result = "NULL"
         reason = "missing_nonce"
       }
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (nonce, nonce_domain))`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
       if (result === "VALID_CANDIDATE") {
-        const nonceInsert = await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry (nonce, candidate_hash, created_at) VALUES (?1,?2,?3)`).bind(nonce, candidate_hash, timestamp).run()
+        const nonceExisting = await env.DB.prepare(`SELECT candidate_hash FROM govern_nonce_registry WHERE nonce=?1 AND nonce_domain=?2`).bind(nonce, nonce_domain).first<any>()
+        if (nonceExisting) {
+          if (String(nonceExisting.candidate_hash || "") !== candidate_hash) {
+            result = "NULL"
+            reason = "nonce_rebinding"
+          } else {
+            result = "NULL"
+            reason = "nonce_replay"
+          }
+        }
+      }
+      if (result === "VALID_CANDIDATE") {
+        const nonceInsert = await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry (nonce, nonce_domain, candidate_hash, created_at) VALUES (?1,?2,?3,?4)`).bind(nonce, nonce_domain, candidate_hash, timestamp).run()
         if ((nonceInsert.meta?.changes || 0) === 0) {
           result = "NULL"
           reason = "nonce_replay"
         }
       }
-      const evidence_id = await sha256Hex(canonicalize({ candidate_hash, nonce, timestamp, result, reason }))
+      const evidence_id = await sha256Hex(canonicalize({ candidate_hash, nonce, nonce_domain, timestamp, result, reason }))
       await env.DB.prepare(`INSERT OR IGNORE INTO govern_evidence_registry (evidence_id, candidate_hash, nonce, result, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6)`).bind(evidence_id, candidate_hash, nonce, result, reason || null, timestamp).run()
       const envelope: GovernedToolEnvelope = {
         candidate_hash,
@@ -7734,8 +7748,17 @@ export default {
       const envelope_id = await sha256Hex(canonicalize(envelope))
       await env.DB.prepare(`INSERT OR IGNORE INTO governed_tool_envelope_registry (envelope_id,candidate_hash,nonce_binding,policy_digest,topology_digest,lineage_pointers,timestamp,non_operative,tool_surface_descriptor,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'true',?8,?9)`)
         .bind(envelope_id, envelope.candidate_hash, envelope.nonce_binding, envelope.policy_digest, envelope.topology_digest, canonicalize(envelope.lineage_pointers), envelope.timestamp, canonicalize(envelope.tool_surface_descriptor), timestamp).run()
+      const envelope_status = result
+      const envelope_reason = reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate")
+      const envelope_hash = await sha256Hex(canonicalize({ candidate_hash, nonce, nonce_domain, route: "/govern", status: envelope_status }))
+      const envelopePersist = await env.DB.prepare(`INSERT OR IGNORE INTO govern_envelope_registry (envelope_id, envelope_hash, candidate_hash, candidate_canonical, nonce, nonce_domain, status, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`)
+        .bind(envelope_id, envelope_hash, candidate_hash, candidate_canonical, nonce, nonce_domain, envelope_status, envelope_reason, timestamp).run()
+      if ((envelopePersist.meta?.changes || 0) === 0) {
+        result = "NULL"
+        reason = "envelope_persist_failed"
+      }
       try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true } }) } catch {}
-      return json({ status: result, envelope_id, evidence: { candidate_hash, nonce, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
+      return json({ status: result, reason: reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate"), envelope_id, envelope_hash, nonce_domain, evidence: { candidate_hash, nonce, nonce_domain, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {
