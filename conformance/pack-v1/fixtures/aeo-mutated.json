@@ -1,0 +1,15 @@
+{
+  "_non_operative": true,
+  "_purpose": "Mutated AEO — decision_id changed after hash binding; mutation_capable true; must return NULL",
+  "_mutation_marker": "decision_id_changed_after_hash_binding",
+  "object_type": "AuthorizedExecutionObject",
+  "decision_id": "decision-pack-v1-aeo-MUTATED-POST-HASH",
+  "validated_object_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "invocation_nonce": "nonce-pack-v1-aeo-valid-0001",
+  "session_id": "session-pack-v1-0001",
+  "governed_tool_envelope_id": "envelope-pack-v1-0001",
+  "replay_state": "UNUSED",
+  "continuity_lineage_id": "lineage-pack-v1-intact-0001",
+  "mutation_capable": true,
+  "evidence_only": false
+}

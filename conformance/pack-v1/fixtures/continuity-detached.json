@@ -1,0 +1,14 @@
+{
+  "_non_operative": true,
+  "_purpose": "Detached continuity — null predecessor lineage; no valid continuity chain; must classify DETACHED and block authority",
+  "_detached_marker": "predecessor_lineage_id_null_no_valid_chain",
+  "record_type": "ContinuityLineage",
+  "lineage_id": "lineage-pack-v1-detached-0001",
+  "epoch": 5,
+  "predecessor_lineage_id": null,
+  "predecessor_settled": false,
+  "depth": 0,
+  "status": "DETACHED",
+  "mutation_capable": false,
+  "evidence_only": true
+}

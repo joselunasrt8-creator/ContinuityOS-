@@ -1,0 +1,57 @@
+{
+  "suite_id": "PACK-V1-VALIDATOR",
+  "stage": 3,
+  "non_operative": true,
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "description": "Exact-object validation vectors. Verifies fail-closed behavior, required field enforcement, mutation detection, and canonical hash determinism.",
+  "invariants": {
+    "fail_closed": true,
+    "exact_object_preserving": true,
+    "non_authoritative": true,
+    "validated_equals_executed": "validated_object_hash must equal executed_object_hash at execution time"
+  },
+  "vectors": [
+    {
+      "vector_id": "VALIDATOR-01",
+      "description": "valid AEO: all required fields present; mutation_capable false",
+      "fixture_file": "aeo-valid.json",
+      "check_type": "required_fields_present",
+      "required_fields": [
+        "decision_id",
+        "validated_object_hash",
+        "invocation_nonce",
+        "session_id",
+        "governed_tool_envelope_id"
+      ],
+      "expected_result": "VALID",
+      "forbidden_results": ["NULL", "AMBIGUOUS"]
+    },
+    {
+      "vector_id": "VALIDATOR-02",
+      "description": "mutated AEO: mutation_capable true; _mutation_marker present — fails closed (NULL)",
+      "fixture_file": "aeo-mutated.json",
+      "check_type": "mutation_detected_fails_closed",
+      "mutation_marker": "_mutation_marker",
+      "expected_result": "NULL",
+      "forbidden_results": ["VALID"]
+    },
+    {
+      "vector_id": "VALIDATOR-03",
+      "description": "AEO missing governed_tool_envelope_id — fails closed (NULL)",
+      "fixture_file": "aeo-missing-key.json",
+      "check_type": "missing_required_field_fails_closed",
+      "missing_field": "governed_tool_envelope_id",
+      "expected_result": "NULL",
+      "forbidden_results": ["VALID"]
+    },
+    {
+      "vector_id": "VALIDATOR-04",
+      "description": "canonical hash: deterministic across two computations of the same object",
+      "fixture_file": "aeo-valid.json",
+      "check_type": "canonical_hash_deterministic",
+      "expected_result": "DETERMINISTIC",
+      "forbidden_results": ["NON_DETERMINISTIC"]
+    }
+  ]
+}

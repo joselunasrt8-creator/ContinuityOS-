@@ -1,0 +1,84 @@
+{
+  "suite_id": "PACK-V1-CONVERGENCE",
+  "stage": 3,
+  "non_operative": true,
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "description": "Convergence classification vectors. Verifies LOCAL_VALID ≠ GLOBAL_VALID, partition behavior, conflict detection, quorum disagreement, and settled convergence. Conformance classifies state; it does not create distributed authority.",
+  "invariants": {
+    "local_valid_not_global_valid": "LOCAL_VALID on a single node does not equal GLOBAL_VALID",
+    "partition_suspends_execution": "partition_detected halts execution gate",
+    "conflict_produces_conflicted": "conflicting proof roots produce CONFLICTED classification",
+    "quorum_disagreement_produces_ambiguous": "quorum cannot agree → AMBIGUOUS; GLOBAL_VALID is forbidden",
+    "global_valid_requires_external_quorum_attestation": "GLOBAL_VALID requires quorum attestation; conformance cannot grant it",
+    "conformance_cannot_create_authority": "conformance ≠ execution authority"
+  },
+  "vectors": [
+    {
+      "vector_id": "CONV-01",
+      "description": "local-only context: quorum_size 1, result_claim LOCAL_VALID — GLOBAL_VALID is forbidden",
+      "check_type": "convergence_local_valid_only",
+      "convergence_object": {
+        "quorum_size": 1,
+        "result_claim": "LOCAL_VALID",
+        "note": "single-node proof cannot produce GLOBAL_VALID"
+      },
+      "expected_result": "LOCAL_VALID",
+      "forbidden_result": "GLOBAL_VALID"
+    },
+    {
+      "vector_id": "CONV-02",
+      "description": "partition detected: partition_detected true — execution suspended; PARTITION_SUSPENDED",
+      "check_type": "convergence_partition_suspended",
+      "convergence_object": {
+        "partition_detected": true,
+        "quorum_size": 3,
+        "reachable_nodes": 1,
+        "note": "partition detected; execution gate suspended until topology resolves"
+      },
+      "expected_result": "PARTITION_SUSPENDED",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGED"]
+    },
+    {
+      "vector_id": "CONV-03",
+      "description": "conflicting proof roots: conflicting_proof_roots true — CONFLICTED classification",
+      "check_type": "convergence_conflicting_roots",
+      "convergence_object": {
+        "conflicting_proof_roots": true,
+        "root_a": "proof-root-pack-v1-A",
+        "root_b": "proof-root-pack-v1-B",
+        "note": "two incompatible proof roots; neither can finalize without settlement"
+      },
+      "expected_result": "CONFLICTED",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGED", "FINALIZED"]
+    },
+    {
+      "vector_id": "CONV-04",
+      "description": "quorum disagreement: quorum_disagree true — AMBIGUOUS; GLOBAL_VALID is forbidden",
+      "check_type": "convergence_quorum_disagreement_ambiguous",
+      "convergence_object": {
+        "quorum_size": 3,
+        "quorum_disagree": true,
+        "agreeing_nodes": 1,
+        "disagreeing_nodes": 2,
+        "note": "quorum cannot agree; GLOBAL_VALID is forbidden until consensus is reached"
+      },
+      "expected_result": "AMBIGUOUS",
+      "forbidden_result": "GLOBAL_VALID"
+    },
+    {
+      "vector_id": "CONV-05",
+      "description": "settled convergence: converged and epoch_match true — CONVERGED (not GLOBAL_VALID; conformance ≠ authority)",
+      "check_type": "convergence_settled_not_global_valid",
+      "convergence_object": {
+        "converged": true,
+        "epoch_match": true,
+        "quorum_size": 3,
+        "agreeing_nodes": 3,
+        "note": "conformance classifies CONVERGED; it cannot grant GLOBAL_VALID — that requires external quorum attestation"
+      },
+      "expected_result": "CONVERGED",
+      "forbidden_result": "GLOBAL_VALID"
+    }
+  ]
+}

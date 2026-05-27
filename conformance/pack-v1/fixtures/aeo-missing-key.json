@@ -1,0 +1,13 @@
+{
+  "_non_operative": true,
+  "_purpose": "AEO missing governed_tool_envelope_id — must fail validation with NULL",
+  "object_type": "AuthorizedExecutionObject",
+  "decision_id": "decision-pack-v1-aeo-missing-0001",
+  "validated_object_hash": "c1d2e3f4a5b6c1d2e3f4a5b6c1d2e3f4a5b6c1d2e3f4a5b6c1d2e3f4a5b6c1d2",
+  "invocation_nonce": "nonce-pack-v1-missing-0001",
+  "session_id": "session-pack-v1-0001",
+  "replay_state": "UNUSED",
+  "continuity_lineage_id": "lineage-pack-v1-intact-0001",
+  "mutation_capable": false,
+  "evidence_only": true
+}
