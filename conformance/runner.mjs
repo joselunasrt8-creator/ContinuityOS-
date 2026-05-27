@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { canonicalize, sha256Hex } from '../src/canonical.js'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
@@ -75,12 +75,36 @@ function verifyAppendOnlyMigration(suite) {
   assert.match(migration, /BEFORE DELETE ON federated_checkpoint_registry/)
 }
 
+const STAGE2_CHECK_IDS = [
 const CONF_DIST_CHECK_IDS = [
   'CONF-DIST-01', 'CONF-DIST-02', 'CONF-DIST-03', 'CONF-DIST-04', 'CONF-DIST-05',
   'CONF-DIST-06', 'CONF-DIST-07', 'CONF-DIST-08', 'CONF-DIST-09', 'CONF-DIST-10',
   'CONF-DIST-11', 'CONF-DIST-12', 'CONF-DIST-13', 'CONF-DIST-14', 'CONF-DIST-15',
 ]
 
+function verifyStage2Suite(suite) {
+  assert.equal(suite.non_operative, true, `${suite.suite_id} must be non_operative`)
+  assert.equal(suite.observability_only, true, `${suite.suite_id} must be observability_only`)
+  assert.equal(suite.runtime_mutation_capable, false, `${suite.suite_id} must be incapable of runtime mutation`)
+  assert.equal(suite.stage, 2, `${suite.suite_id} must be stage 2`)
+  assert.equal(suite.raw_production_apply_path, 'DENIED', `${suite.suite_id} raw_production_apply_path must be DENIED`)
+
+  const presentIds = new Set(suite.checks.map((c) => c.check_id))
+  for (const id of STAGE2_CHECK_IDS) {
+    if (!presentIds.has(id)) failClosed(`stage2 suite missing check ${id}`)
+  }
+  assert.equal(suite.checks.length, 15, 'stage2 suite must have exactly 15 checks')
+
+  for (const check of suite.checks) {
+    if (check.status !== 'IMPLEMENTED') failClosed(`${check.check_id} status must be IMPLEMENTED, got: ${check.status}`)
+    if (!check.fixture) failClosed(`${check.check_id} missing fixture path`)
+    if (!check.test) failClosed(`${check.check_id} missing test path`)
+    if (!check.expected_result) failClosed(`${check.check_id} missing expected_result`)
+    if (!check.required_module) failClosed(`${check.check_id} missing required_module`)
+    if (!existsSync(join(root, check.fixture))) failClosed(`${check.check_id} fixture not found: ${check.fixture}`)
+    if (!existsSync(join(root, check.test))) failClosed(`${check.check_id} test not found: ${check.test}`)
+    if (!check.forbidden_results || check.forbidden_results.length === 0) failClosed(`${check.check_id} must declare forbidden_results`)
+    if (!check.forbidden_results.includes('GLOBAL_VALID')) failClosed(`${check.check_id} must forbid GLOBAL_VALID`)
 // Verifies the Stage 2 distributed legitimacy conformance suite descriptor.
 // Read-only: only reads files and asserts structural invariants.
 // Does not invoke runtime, does not mutate state, does not consume replay.
@@ -186,6 +210,10 @@ try {
   verifyAppendOnlyMigration(suites.at(-1))
 
   const stage2Suite = readJson('conformance/suites/stage2-distributed-legitimacy-conformance.json')
+  verifyStage2Suite(stage2Suite)
+
+  console.log('CONFORMANCE_EVIDENCE_OBSERVED')
+  console.log(`STAGE2_CONF_DIST_COVERAGE: ${STAGE2_CHECK_IDS.join(', ')} — all IMPLEMENTED`)
   verifyStage2ConformanceSuite(stage2Suite)
 
   const stage2MatrixSummary = readJson('conformance/stage2-matrix-summary.json')
