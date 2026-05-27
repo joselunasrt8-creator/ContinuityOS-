@@ -81,6 +81,7 @@ type GovernedToolEnvelope = {
 }
 
 type GovernResult = "VALID_CANDIDATE" | "NULL"
+type GovernPredicateResolution = { ok: true, value: string } | { ok: false, reason: string }
 
 type PolicyClass = "TOOL_RUNTIME_MUTATION" | "TOOL_RECONCILIATION_READONLY" | "TOOL_UNKNOWN"
 
@@ -127,13 +128,42 @@ async function policyClassDigest(policy_class: PolicyClass): Promise<string> {
 function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCandidate } | { ok: false, reason: string } {
   if (!isPlainRecord(input)) return { ok: false, reason: "invalid_candidate" }
   const keys = Object.keys(input)
-  const allowed = ["intent", "scope", "target", "finality"]
+  const allowed = ["intent", "scope", "target", "finality", "policy_class", "policy_digest", "topology_attestation_hash", "topology_epoch", "topology_observed_at", "topology_visibility_state"]
   if (keys.some((key) => !allowed.includes(key))) return { ok: false, reason: "strict_mode_extra_top_level_field" }
   if (typeof input.intent !== "string" || input.intent.length === 0) return { ok: false, reason: "missing_intent" }
   if (!isPlainRecord(input.scope)) return { ok: false, reason: "missing_scope" }
   if (!isPlainRecord(input.target)) return { ok: false, reason: "missing_target" }
   if (!isPlainRecord(input.finality)) return { ok: false, reason: "missing_finality" }
   return { ok: true, candidate: { intent: input.intent, scope: input.scope, target: input.target, finality: input.finality } }
+}
+
+function resolveGovernPolicyPredicate(input: unknown): { policy_class: string, policy_digest: string } {
+  if (!isPlainRecord(input)) return { policy_class: "", policy_digest: "" }
+  return {
+    policy_class: String(input.policy_class || "").trim(),
+    policy_digest: String(input.policy_digest || "").trim()
+  }
+}
+
+function validateGovernPolicyPredicate(policy_class: string, policy_digest: string): GovernPredicateResolution {
+  if (!policy_class) return { ok: false, reason: "policy_class_missing" }
+  if (!policy_digest) return { ok: false, reason: "policy_digest_missing" }
+  if (!["TOOL_RUNTIME_MUTATION", "TOOL_RECONCILIATION_READONLY"].includes(policy_class)) return { ok: false, reason: "policy_class_invalid" }
+  if (!/^[a-f0-9]{64}$/i.test(policy_digest)) return { ok: false, reason: "policy_digest_mismatch" }
+  return { ok: true, value: policy_digest.toLowerCase() }
+}
+
+function resolveGovernTopologyPredicate(input: unknown): { topology_attestation_hash: string } {
+  if (!isPlainRecord(input)) return { topology_attestation_hash: "" }
+  return { topology_attestation_hash: String(input.topology_attestation_hash || "").trim() }
+}
+
+function validateGovernTopologyPredicate(topology_attestation_hash: string): GovernPredicateResolution {
+  if (!topology_attestation_hash) return { ok: false, reason: "topology_attestation_missing" }
+  if (topology_attestation_hash.toLowerCase() === "stale") return { ok: false, reason: "topology_attestation_stale" }
+  if (topology_attestation_hash.toLowerCase() === "ambiguous") return { ok: false, reason: "topology_attestation_ambiguous" }
+  if (!/^[a-f0-9]{64}$/i.test(topology_attestation_hash)) return { ok: false, reason: "topology_unreconcilable" }
+  return { ok: true, value: topology_attestation_hash.toLowerCase() }
 }
 
 
@@ -7810,6 +7840,8 @@ export default {
       const nonce_domain = String(request.headers.get("X-Nonce-Domain") || "openclaw")
       const parsed = parseGovernCandidate(body)
       const candidate = parsed.ok ? parsed.candidate : { intent: "", scope: {}, target: {}, finality: {} }
+      const policyPredicate = resolveGovernPolicyPredicate(body)
+      const topologyPredicate = resolveGovernTopologyPredicate(body)
       const candidate_canonical = canonicalize(candidate)
       const candidate_hash = await sha256Hex(candidate_canonical)
       const govern_projection_hash = await computeGovernProjectionHash(canonicalGovernProjectionFromCandidate(candidate))
@@ -7820,10 +7852,27 @@ export default {
         result = "NULL"
         reason = "missing_nonce"
       }
+      if (result === "VALID_CANDIDATE") {
+        const policyCheck = validateGovernPolicyPredicate(policyPredicate.policy_class, policyPredicate.policy_digest)
+        if (!policyCheck.ok) {
+          result = "NULL"
+          reason = policyCheck.reason
+        }
+      }
+      if (result === "VALID_CANDIDATE") {
+        const topologyCheck = validateGovernTopologyPredicate(topologyPredicate.topology_attestation_hash)
+        if (!topologyCheck.ok) {
+          result = "NULL"
+          reason = topologyCheck.reason
+        }
+      }
       await ensureGovernNonceRegistrySchema(env)
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, govern_projection_hash TEXT NOT NULL DEFAULT "", nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, govern_projection_hash TEXT NOT NULL DEFAULT "", nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, policy_class TEXT NOT NULL DEFAULT "", policy_digest TEXT NOT NULL DEFAULT "", topology_attestation_hash TEXT NOT NULL DEFAULT "", status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+      try { await env.DB.prepare(`ALTER TABLE govern_envelope_registry ADD COLUMN policy_class TEXT NOT NULL DEFAULT ''`).run() } catch {}
+      try { await env.DB.prepare(`ALTER TABLE govern_envelope_registry ADD COLUMN policy_digest TEXT NOT NULL DEFAULT ''`).run() } catch {}
+      try { await env.DB.prepare(`ALTER TABLE govern_envelope_registry ADD COLUMN topology_attestation_hash TEXT NOT NULL DEFAULT ''`).run() } catch {}
       if (result === "VALID_CANDIDATE") {
         const nonceExisting = await env.DB.prepare(`SELECT candidate_hash FROM govern_nonce_registry WHERE nonce=?1 AND nonce_domain=?2`).bind(nonce, nonce_domain).first<any>()
         if (nonceExisting) {
@@ -7861,8 +7910,8 @@ export default {
       const envelope_status = result
       const envelope_reason = reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate")
       const envelope_hash = await sha256Hex(canonicalize({ candidate_hash, nonce, nonce_domain, route: "/govern", status: envelope_status }))
-      const envelopePersist = await env.DB.prepare(`INSERT OR IGNORE INTO govern_envelope_registry (envelope_id, envelope_hash, candidate_hash, candidate_canonical, govern_projection_hash, nonce, nonce_domain, status, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`)
-        .bind(envelope_id, envelope_hash, candidate_hash, candidate_canonical, govern_projection_hash, nonce, nonce_domain, envelope_status, envelope_reason, timestamp).run()
+      const envelopePersist = await env.DB.prepare(`INSERT OR IGNORE INTO govern_envelope_registry (envelope_id, envelope_hash, candidate_hash, candidate_canonical, govern_projection_hash, nonce, nonce_domain, policy_class, policy_digest, topology_attestation_hash, status, reason, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)`)
+        .bind(envelope_id, envelope_hash, candidate_hash, candidate_canonical, govern_projection_hash, nonce, nonce_domain, policyPredicate.policy_class, policyPredicate.policy_digest, topologyPredicate.topology_attestation_hash, envelope_status, envelope_reason, timestamp).run()
       if ((envelopePersist.meta?.changes || 0) === 0) {
         result = "NULL"
         reason = "envelope_persist_failed"
@@ -8283,5 +8332,3 @@ async function ensureGovernNonceRegistrySchema(env: any): Promise<void> {
   const postColumns = Array.isArray(postInfo?.results) ? postInfo.results.map((row: any) => String(row?.name || "")) : []
   if (!postColumns.includes("nonce_domain")) throw new Error("govern_nonce_registry_nonce_domain_upgrade_failed")
 }
-
-
