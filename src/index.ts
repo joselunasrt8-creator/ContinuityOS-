@@ -1601,7 +1601,7 @@ function columnType(column: string): string {
 }
 
 async function tableColumns(env: Env, table: string): Promise<Set<string>> {
-  const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all<any>()
+  const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all()
   const rows = Array.isArray(info?.results) ? info.results : []
   return new Set(rows.map((row: any) => String(row?.name || "")).filter(Boolean))
 }
@@ -2008,7 +2008,7 @@ async function deterministicGraphTraversalEngine(env: Env): Promise<LegitimacyGr
     const columns = await tableColumns(env, registry)
     if (columns.size === 0) continue
     const orderBy = Array.from(columns).sort().map((column) => `${column} ASC`).join(", ")
-    const rowsResult = await env.DB.prepare(`SELECT * FROM ${registry} ORDER BY ${orderBy}`).all<any>()
+    const rowsResult = await env.DB.prepare(`SELECT * FROM ${registry} ORDER BY ${orderBy}`).all()
     const rows = Array.isArray(rowsResult?.results) ? rowsResult.results : []
     for (const row of rows) {
       const canonical_object = canonicalRecord(row)
@@ -2143,7 +2143,7 @@ async function deterministicRegistryRows(env: Env, registry: string): Promise<Re
   const columns = await tableColumns(env, registry)
   if (columns.size === 0) return []
   const orderBy = Array.from(columns).sort().map((column) => `${column} ASC`).join(", ")
-  const result = await env.DB.prepare(`SELECT * FROM ${registry} ORDER BY ${orderBy}`).all<any>()
+  const result = await env.DB.prepare(`SELECT * FROM ${registry} ORDER BY ${orderBy}`).all()
   return Array.isArray(result?.results) ? result.results.map((row: any) => canonicalRecord(row)) : []
 }
 
@@ -2441,7 +2441,7 @@ async function ensureLegitimacyQuarantineRegistry(env: Env) {
 }
 
 async function latestContainmentContaminationEvidence(env: Env): Promise<Record<string, unknown>> {
-  const propagated = await env.DB.prepare(`SELECT * FROM legitimacy_drift_propagation_registry ORDER BY propagation_hash ASC LIMIT 1`).all<any>()
+  const propagated = await env.DB.prepare(`SELECT * FROM legitimacy_drift_propagation_registry ORDER BY propagation_hash ASC LIMIT 1`).all()
   const row = Array.isArray(propagated?.results) ? propagated.results[0] : null
   if (row) {
     const propagationObject = parseJsonRecord(row.propagation_object)
@@ -2549,7 +2549,7 @@ async function collectContinuityDescendants(env: Env, root_continuity_id: string
   const frontier = [root_continuity_id]
   while (frontier.length > 0) {
     const parent_id = frontier.shift() || ""
-    const children = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE parent_continuity_id=?1`).bind(parent_id).all<any>()
+    const children = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE parent_continuity_id=?1`).bind(parent_id).all()
     for (const row of Array.isArray(children?.results) ? children.results : []) {
       const child_id = String(row?.continuity_id || "")
       if (!child_id || discovered.has(child_id)) continue
@@ -2587,7 +2587,7 @@ async function invalidateContinuityLineage(env: Env, continuity_id: string, stat
     SELECT delegated_authority_id, delegation_lineage_hash
     FROM authority_registry
     WHERE continuity_id IN (SELECT continuity_id FROM lineage)
-      AND delegated_authority_id IS NOT NULL AND delegated_authority_id != ''`).bind(continuity_id).all<any>()
+      AND delegated_authority_id IS NOT NULL AND delegated_authority_id != ''`).bind(continuity_id).all()
   for (const row of Array.isArray(delegatedRows?.results) ? delegatedRows.results : []) {
     await appendDelegatedRevocationProjection(env, { object_type: "DelegatedRevocationProjection", delegated_authority_id: String(row.delegated_authority_id || ""), delegation_lineage_hash: String(row.delegation_lineage_hash || ""), projection_status: status, revocation_reason: reason, evidence_only: true, replay_neutral: true }, invalidated_at)
   }
@@ -2635,7 +2635,7 @@ async function resolveContinuityLineage(env: Env, continuity_id: string, session
       await cascadeRevocation(env, current_id)
       return null
     }
-    const continuitySession = await env.DB.prepare(`SELECT session_id, identity_id, expires_at, continuity_status FROM session_registry WHERE session_id=?1 LIMIT 2`).bind(String(continuity.session_id || "")).all<any>()
+    const continuitySession = await env.DB.prepare(`SELECT session_id, identity_id, expires_at, continuity_status FROM session_registry WHERE session_id=?1 LIMIT 2`).bind(String(continuity.session_id || "")).all()
     const continuitySessionRows = Array.isArray(continuitySession.results) ? continuitySession.results : []
     if (continuitySessionRows.length !== 1) {
       await cascadeRevocation(env, current_id)
@@ -2843,7 +2843,7 @@ async function buildDelegatedAuthorityForIssuance(env: Env, input: any, authorit
 
 async function delegatedObservabilityEnvelope(env: Env, url: URL): Promise<DelegationChainEnvelope & { checkpoint_hash: string, replay: DelegatedReplayEnvelope | null }> {
   const delegated_authority_id = String(url.searchParams.get("delegated_authority_id") || "")
-  const rows = await env.DB.prepare(`SELECT * FROM delegated_authority_registry WHERE (?1='' OR delegated_authority_id=?1) ORDER BY created_at ASC, registry_id ASC LIMIT 100`).bind(delegated_authority_id).all<any>()
+  const rows = await env.DB.prepare(`SELECT * FROM delegated_authority_registry WHERE (?1='' OR delegated_authority_id=?1) ORDER BY created_at ASC, registry_id ASC LIMIT 100`).bind(delegated_authority_id).all()
   const chain: DelegatedAuthorityObject[] = []
   const drift = new Set<DelegatedAuthorityDriftClass>()
   for (const row of Array.isArray(rows?.results) ? rows.results : []) {
@@ -3039,7 +3039,7 @@ function reconciliationLookup(anchor: ReconciliationAnchor, context: Record<stri
 async function readReconciliationRows(env: Env, anchor: ReconciliationAnchor, context: Record<string, any>, registry: ReconciliationRegistry): Promise<{ rows: any[], lookup_key: string }> {
   const lookup = reconciliationLookup(anchor, context, registry)
   const stmt = env.DB.prepare(lookup.sql).bind(...lookup.bind)
-  const result = await stmt.all<any>()
+  const result = await stmt.all()
   return { rows: Array.isArray(result?.results) ? result.results : [], lookup_key: lookup.lookup_key }
 }
 
@@ -3061,7 +3061,7 @@ async function verifyContinuityAncestryReadOnly(env: Env, continuity: any, sessi
     try { canonical = JSON.parse(String(current.canonical_continuity || "{}")) } catch { return "recursive_ancestry_drift" }
     const actualHash = await continuityHash(canonical)
     if (actualHash !== String(current.continuity_hash || "") || actualHash !== String(canonical.continuity_hash || "")) return "recursive_ancestry_drift"
-    const duplicateHash = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE continuity_hash=?1 ORDER BY continuity_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`).bind(String(current.continuity_hash || "")).all<any>()
+    const duplicateHash = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE continuity_hash=?1 ORDER BY continuity_id ASC LIMIT ${RECONCILIATION_ROW_LIMIT}`).bind(String(current.continuity_hash || "")).all()
     if ((duplicateHash?.results || []).length > 1) return "duplicate_lineage_hash_drift"
     const canonicalParent = canonical.parent_continuity_id ? String(canonical.parent_continuity_id) : ""
     const storedParent = current.parent_continuity_id ? String(current.parent_continuity_id) : ""
@@ -3492,7 +3492,7 @@ async function deterministicReconciliationSchedule(env: Env): Promise<Reconcilia
       anchors: []
     }
   }
-  const result = await env.DB.prepare(`SELECT session_id,continuity_id,decision_id,execution_id,proof_id,validated_object_hash FROM proof_registry ORDER BY created_at ASC, decision_id ASC, execution_id ASC, proof_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).all<any>()
+  const result = await env.DB.prepare(`SELECT session_id,continuity_id,decision_id,execution_id,proof_id,validated_object_hash FROM proof_registry ORDER BY created_at ASC, decision_id ASC, execution_id ASC, proof_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).all()
   const anchors = (Array.isArray(result?.results) ? result.results : []).map((row, index): ReconciliationScheduleAnchor => ({
     canonical_schedule_position: index + 1,
     scheduled_registry: "proof_registry",
@@ -4831,7 +4831,7 @@ async function topologyNode(layer: RevocationTopologyNode["topology_layer"], obj
 
 async function collectRevokedLineage(env: Env, continuity_id: string): Promise<string[]> {
   if (!continuity_id || !hasDb(env)) return []
-  const rows = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE (continuity_id=?1 OR parent_continuity_id=?1) AND (status IN ('REVOKED','EXPIRED') OR revoked_at IS NOT NULL) ORDER BY continuity_id ASC`).bind(continuity_id).all<any>()
+  const rows = await env.DB.prepare(`SELECT continuity_id FROM continuity_registry WHERE (continuity_id=?1 OR parent_continuity_id=?1) AND (status IN ('REVOKED','EXPIRED') OR revoked_at IS NOT NULL) ORDER BY continuity_id ASC`).bind(continuity_id).all()
   return (Array.isArray(rows?.results) ? rows.results : []).map((row) => String(row.continuity_id || "")).filter(Boolean)
 }
 
@@ -4839,7 +4839,7 @@ async function detectOrphanedExecutions(env: Env, continuity_id = ""): Promise<R
   if (!hasDb(env)) return []
   const scoped = continuity_id ? `AND e.continuity_id=?1` : ``
   const query = `SELECT e.* FROM execution_registry e LEFT JOIN validation_registry v ON v.decision_id=e.decision_id AND v.validated_object_hash=e.validated_object_hash AND v.invocation_nonce=e.invocation_nonce AND v.status='VALID' LEFT JOIN authority_registry a ON a.decision_id=e.decision_id WHERE e.status='EXECUTED' AND (v.validation_id IS NULL OR a.authority_id IS NULL) ${scoped} ORDER BY e.created_at ASC, e.execution_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`
-  const rows = continuity_id ? await env.DB.prepare(query).bind(continuity_id).all<any>() : await env.DB.prepare(query).all<any>()
+  const rows = continuity_id ? await env.DB.prepare(query).bind(continuity_id).all() : await env.DB.prepare(query).all()
   const nodes: RevocationTopologyNode[] = []
   for (const row of Array.isArray(rows?.results) ? rows.results : []) nodes.push(await topologyNode("execution_lineage", String(row.execution_id || ""), String(row.decision_id || ""), row, "ORPHANED"))
   return nodes
@@ -4860,16 +4860,16 @@ async function deriveRevocationTopology(env: Env, anchor: ReconciliationAnchor):
     nodes.push(await topologyNode("authority", authority_id, String(authority.continuity_id || ""), authority, String(authority.status || "UNKNOWN")))
     if (["REVOKED", "EXPIRED"].includes(String(authority.status || ""))) drift.add("revoked_authority_execution")
   }
-  const delegated = continuity_id ? await env.DB.prepare(`SELECT * FROM authority_registry WHERE continuity_id=?1 AND decision_id<>?2 ORDER BY created_at ASC, authority_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(continuity_id, decision_id).all<any>() : { results: [] }
+  const delegated = continuity_id ? await env.DB.prepare(`SELECT * FROM authority_registry WHERE continuity_id=?1 AND decision_id<>?2 ORDER BY created_at ASC, authority_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(continuity_id, decision_id).all() : { results: [] }
   for (const row of Array.isArray(delegated?.results) ? delegated.results : []) nodes.push(await topologyNode("delegated_authority", String(row.authority_id || ""), authority_id, row, String(row.status || "UNKNOWN")))
-  const executions = decision_id ? await env.DB.prepare(`SELECT * FROM execution_registry WHERE decision_id=?1 ORDER BY created_at ASC, execution_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(decision_id).all<any>() : { results: [] }
+  const executions = decision_id ? await env.DB.prepare(`SELECT * FROM execution_registry WHERE decision_id=?1 ORDER BY created_at ASC, execution_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(decision_id).all() : { results: [] }
   for (const row of Array.isArray(executions?.results) ? executions.results : []) {
     nodes.push(await topologyNode("execution_lineage", String(row.execution_id || ""), authority_id, row, String(row.status || "UNKNOWN")))
     if (drift.has("revoked_authority_execution") && String(row.status || "") === "EXECUTED") drift.add("revoked_authority_execution")
   }
-  const proofs = decision_id ? await env.DB.prepare(`SELECT * FROM proof_registry WHERE decision_id=?1 ORDER BY created_at ASC, proof_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(decision_id).all<any>() : { results: [] }
+  const proofs = decision_id ? await env.DB.prepare(`SELECT * FROM proof_registry WHERE decision_id=?1 ORDER BY created_at ASC, proof_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(decision_id).all() : { results: [] }
   for (const row of Array.isArray(proofs?.results) ? proofs.results : []) nodes.push(await topologyNode("proof_lineage", String(row.proof_id || ""), String(row.execution_id || ""), row, String(row.status || "PROVEN")))
-  const federated = decision_id ? await env.DB.prepare(`SELECT * FROM federated_revocation_observability_registry WHERE decision_id=?1 ORDER BY observed_at ASC, revocation_evidence_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(decision_id).all<any>() : { results: [] }
+  const federated = decision_id ? await env.DB.prepare(`SELECT * FROM federated_revocation_observability_registry WHERE decision_id=?1 ORDER BY observed_at ASC, revocation_evidence_id ASC LIMIT ${RECONCILIATION_SCHEDULER_BATCH_LIMIT}`).bind(decision_id).all() : { results: [] }
   for (const row of Array.isArray(federated?.results) ? federated.results : []) {
     nodes.push(await topologyNode("federated_projection_lineage", String(row.revocation_evidence_id || ""), String(row.lineage_hash || ""), row, String(row.verification_status || "OBSERVED")))
     if (String(row.drift_class || "") === "federated_lineage_divergence") drift.add("federated_lineage_divergence")
@@ -4945,7 +4945,7 @@ async function quarantineHistoricalProofDuplicates(env: Env): Promise<ProofDupli
     WHERE decision_hash IN (
       SELECT decision_hash FROM proof_registry GROUP BY decision_hash HAVING COUNT(*) > 1
     )
-    ORDER BY decision_id ASC, validated_object_hash ASC, created_at ASC, proof_id ASC`).all<any>()
+    ORDER BY decision_id ASC, validated_object_hash ASC, created_at ASC, proof_id ASC`).all()
   const rows = Array.isArray(duplicateRows?.results) ? duplicateRows.results : []
   if (rows.length === 0) return { detected: false, quarantined: 0 }
 
@@ -5114,7 +5114,7 @@ function deterministicRatio(numerator: number, denominator: number): number | nu
 }
 
 async function installBaseGovernanceMetrics(env: Env) {
-  const rows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM install_base_telemetry_registry GROUP BY event_type`).all<any>()
+  const rows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM install_base_telemetry_registry GROUP BY event_type`).all()
   const counts = new Map<string, number>()
   for (const row of rows.results || []) counts.set(String(row.event_type || ""), Number(row.count || 0))
   const total_executions = counts.get("governed_execution_attempted") || 0
@@ -5190,12 +5190,12 @@ function boundedObservabilityWindow(url: URL, fallback = 30): number {
 async function installBaseEventTrend(env: Env, event_type: InstallBaseTelemetryEventType, window: number) {
   const rows = await env.DB.prepare(`SELECT substr(created_at,1,10) AS day, COUNT(*) AS count FROM install_base_telemetry_registry WHERE event_type=?1 GROUP BY day ORDER BY day DESC LIMIT ?2`)
     .bind(event_type, window)
-    .all<any>()
+    .all()
   return (rows.results || []).map((row: any) => ({ day: String(row.day || ""), count: Number(row.count || 0) }))
 }
 
 async function governanceObservabilityEvidence(env: Env, window: number) {
-  const telemetrySummaryRows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM observability_registry GROUP BY event_type ORDER BY count DESC LIMIT 50`).all<any>()
+  const telemetrySummaryRows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM observability_registry GROUP BY event_type ORDER BY count DESC LIMIT 50`).all()
   const telemetry_event_summaries = (telemetrySummaryRows.results || []).map((row: any) => ({ event_type: String(row.event_type || ""), count: Number(row.count || 0) }))
   const governance_dependency_metrics = await installBaseGovernanceMetrics(env)
   const replay_rejection_trends = await installBaseEventTrend(env, "replay_rejected", window)
@@ -6004,7 +6004,7 @@ async function rejectWithTelemetry(env: Env, response: Record<string, unknown>, 
 }
 
 async function hasColumn(env: Env, table: string, column: string): Promise<boolean> {
-  const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all<any>()
+  const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all()
   const rows = Array.isArray(info?.results) ? info.results : []
   return rows.some((row: any) => String(row?.name) === column)
 }
@@ -6076,7 +6076,7 @@ async function deploymentPreoLineage(env: Env, decision_id: string, validated_ob
     return { status: "OK" }
   }
 
-  const rows = await env.DB.prepare(`SELECT * FROM preo_registry WHERE decision_id=?1 AND status='PREO_VALID' ORDER BY created_at ASC, preo_id ASC`).bind(decision_id).all<any>()
+  const rows = await env.DB.prepare(`SELECT * FROM preo_registry WHERE decision_id=?1 AND status='PREO_VALID' ORDER BY created_at ASC, preo_id ASC`).bind(decision_id).all()
   const preos = Array.isArray(rows?.results) ? rows.results : []
   if (preos.length === 0) return { status: required ? "missing_preo" : "OK" }
 
@@ -7082,7 +7082,7 @@ export default {
     if (url.pathname === TELEMETRY_ROUTE && request.method === "GET") {
       try {
         if (!hasDb(env)) return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false })
-        const telemetryRows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM install_base_telemetry_registry GROUP BY event_type`).all<any>()
+        const telemetryRows = await env.DB.prepare(`SELECT event_type, COUNT(*) AS count FROM install_base_telemetry_registry GROUP BY event_type`).all()
         const telemetryCounts = new Map<string, number>()
         for (const row of telemetryRows.results || []) telemetryCounts.set(String(row.event_type || ""), Number(row.count || 0))
         const metrics = {
@@ -7696,7 +7696,7 @@ export default {
         if (target.workflow !== GOVERNED_WORKFLOW) return rejectWithTelemetry(env, { status: "NULL", route: "/compile", reason: "workflow_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/compile", workflow: target.workflow, indicator: "unmanaged_deploy_surface" }, drift_class: "registry_drift" })
         const requirePreoLineage = preoGovernanceEnabled(constraints, target)
 
-        const existingAeos = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(decision_id).all<any>()
+        const existingAeos = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(decision_id).all()
         const existingRows = Array.isArray(existingAeos?.results) ? existingAeos.results : []
         if (existingRows.length > 0) {
           const first = existingRows[0]
@@ -7752,7 +7752,7 @@ export default {
         result = "NULL"
         reason = "missing_nonce"
       }
-      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (nonce, nonce_domain))`).run()
+      await ensureGovernNonceRegistrySchema(env)
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
@@ -8045,7 +8045,7 @@ export default {
       if (String(authority.status) !== "EXECUTED") return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"authority_not_executed" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/proof", authority_status: authority.status || null, indicator: "authority_reuse_after_consumed" }, drift_class: "authority_drift" })
       const executionContinuityRevoked = await continuityIsRevokedOrAmbiguous(env, String(execution.continuity_id || ""))
       if (executionContinuityRevoked) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"revoked_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/proof", continuity_id: execution.continuity_id || null, indicator: "proof_lookup_blocked_by_revocation" }, drift_class: "proof_drift" })
-      const existingProofs = await env.DB.prepare(`SELECT p.* FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.decision_hash=?1 AND p.execution_id=?2 AND p.decision_id=?3 AND p.validated_object_hash=?4 AND e.invocation_nonce=?5 ORDER BY p.created_at ASC, p.proof_id ASC LIMIT 3`).bind(decision_hash,execution_id,decision_id,validated_object_hash,invocation_nonce).all<any>()
+      const existingProofs = await env.DB.prepare(`SELECT p.* FROM proof_registry p JOIN execution_registry e ON e.execution_id=p.execution_id WHERE p.decision_hash=?1 AND p.execution_id=?2 AND p.decision_id=?3 AND p.validated_object_hash=?4 AND e.invocation_nonce=?5 ORDER BY p.created_at ASC, p.proof_id ASC LIMIT 3`).bind(decision_hash,execution_id,decision_id,validated_object_hash,invocation_nonce).all()
       const canonicalProofResolution = resolveCanonicalProofEvidence(existingProofs.results || [], execution)
       const proofCandidates = canonicalProofResolution.candidates
       const canonicalProofCandidates = proofCandidates.filter((proof: any) => proofExecutionLineageMatches(proof, execution))
@@ -8178,3 +8178,19 @@ export default {
     }
   }
 }
+
+async function ensureGovernNonceRegistrySchema(env: any): Promise<void> {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (nonce, nonce_domain))`).run()
+  const tableInfo = await env.DB.prepare(`PRAGMA table_info(govern_nonce_registry)`).all()
+  const columns = Array.isArray(tableInfo?.results) ? tableInfo.results.map((row: any) => String(row?.name || "")) : []
+  if (columns.includes("nonce_domain")) return
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry_v2 (nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (nonce, nonce_domain))`).run()
+  await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry_v2 (nonce, nonce_domain, candidate_hash, created_at) SELECT nonce, 'openclaw', candidate_hash, created_at FROM govern_nonce_registry`).run()
+  await env.DB.prepare(`DROP TABLE govern_nonce_registry`).run()
+  await env.DB.prepare(`ALTER TABLE govern_nonce_registry_v2 RENAME TO govern_nonce_registry`).run()
+  const postInfo = await env.DB.prepare(`PRAGMA table_info(govern_nonce_registry)`).all()
+  const postColumns = Array.isArray(postInfo?.results) ? postInfo.results.map((row: any) => String(row?.name || "")) : []
+  if (!postColumns.includes("nonce_domain")) throw new Error("govern_nonce_registry_nonce_domain_upgrade_failed")
+}
+
+
