@@ -104,10 +104,16 @@ export function evidenceFlagsFromPredicates(p: PredicateSnapshot): {
 // LOCAL_VALID → GLOBAL_VALID transition is forbidden without passing through
 // CONVERGENCE_VALID: convergence evidence (Q, G, L, X) must all be present,
 // and epoch must be EPOCH_GLOBAL_AUTHORITATIVE before GLOBAL_VALID is reachable.
+//
+// causalOverride — optional output of classifyCausalLegitimacyClocks() or
+// causalClockToClassification(). When AMBIGUOUS or NULL, it blocks CONVERGENCE_VALID
+// and GLOBAL_VALID: causal ambiguity prevents finality (CONF-DIST-13).
+// null means no causal override — predicate logic proceeds normally.
 export function classifyFromPredicates(
   p: PredicateSnapshot,
   topologyPresent: boolean,
   epochStatus: EpochFinalityStatus | null = null,
+  causalOverride: FinalityClassification | null = null,
 ): FinalityClassification {
   if (!topologyPresent) return 'PARTITION_SUSPENDED'
   // Epoch state takes precedence: stale or blocking epochs override predicate logic.
@@ -117,6 +123,10 @@ export function classifyFromPredicates(
   const base = p.V && p.A && p.U && p.P && p.R && p.T && p.C
   if (!base) return 'NULL'
   if (p.Q && p.G && p.L && p.X) {
+    // Causal ambiguity blocks convergence — checked before CONVERGENCE_VALID or GLOBAL_VALID.
+    // Concurrent legitimacy roots or unresolved ordering must return AMBIGUOUS or NULL;
+    // observation alone cannot infer causal ordering (CONF-DIST-13).
+    if (causalOverride === 'AMBIGUOUS' || causalOverride === 'NULL') return causalOverride
     // Convergence evidence present. Only a globally authoritative epoch grants GLOBAL_VALID;
     // without it the object is at CONVERGENCE_VALID — the required intermediate state.
     if (epochStatus !== null && isEpochGloballyAuthoritative(epochStatus)) return 'GLOBAL_VALID'

@@ -199,12 +199,20 @@
     {
       "check_id": "CONF-DIST-13",
       "label": "causal_ordering_ambiguity_prevents_finality",
-      "description": "When causal ordering of legitimacy events is ambiguous, classification must return AMBIGUOUS — not CONVERGENCE_VALID.",
+      "description": "When causal ordering of legitimacy events is ambiguous, classification must return AMBIGUOUS — not CONVERGENCE_VALID. Concurrent legitimacy roots block finality. Observation alone cannot infer causal ordering. Causal evidence alone cannot create authority or execution eligibility.",
       "fixture": "tests/fixtures/stage2/causal_ambiguity.json",
+      "test": "tests/fate/stage2-conf-dist-13.test.mjs",
       "expected_result": "AMBIGUOUS",
+      "forbidden_results": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+      "classification_layer": "compareCausalClocks + detectCausalAmbiguity + causalClockToClassification + classifyFromPredicates(causalOverride)",
       "required_module": "src/lib/causal-legitimacy-clock.ts",
+      "required_migration": "migrations/0060_causal_legitimacy_clock_registry.sql",
+      "db_guard": "clcr_no_authority_creation + clcr_no_execution_creation + clcr_ambiguity_preserves_concurrent_evidence",
       "related_issue": "#1338",
-      "status": "PENDING — Slice J"
+      "anchor_issues": ["#1338", "#1346"],
+      "supporting_issues": ["#1418", "#1340", "#1405", "#1408", "#1442", "#1441"],
+      "slice": "J",
+      "status": "IMPLEMENTED"
     },
     {
       "check_id": "CONF-DIST-14",

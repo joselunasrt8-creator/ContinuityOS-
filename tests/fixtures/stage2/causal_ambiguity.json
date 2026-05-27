@@ -1,0 +1,150 @@
+{
+  "_fixture_id": "CONF-DIST-13",
+  "_description": "Concurrent legitimacy roots with no deterministic happens-before ordering must produce AMBIGUOUS — never CONVERGENCE_VALID. Causal ambiguity prevents finality. Observation alone cannot infer causal ordering; explicit vector evidence is required.",
+  "_expected_outcome": "AMBIGUOUS",
+  "_non_operative": true,
+  "_planning_artifact": "docs/stage2-distributed-legitimacy-enforcement-plan-v1.md",
+  "_anchor_issue": "#1338",
+  "_related_issue": "#1346",
+  "_supporting_issues": ["#1418", "#1340", "#1405", "#1408", "#1442", "#1441"],
+  "_invariant": "causal ambiguity prevents CONVERGENCE_VALID. observation ≠ causal certainty. causal evidence alone cannot create authority or execution eligibility.",
+  "_guard": "compareCausalClocks returns CONCURRENT when neither vector dominates. detectCausalAmbiguity returns true. causalClockToClassification('CONCURRENT') returns AMBIGUOUS. classifyFromPredicates with causalOverride=AMBIGUOUS returns AMBIGUOUS even when all convergence predicates (Q, G, L, X) are satisfied.",
+  "_slice": "J",
+  "_module": "src/lib/causal-legitimacy-clock.ts",
+  "scenario": "causal_ordering_ambiguity_prevents_finality",
+  "predicate_snapshot": {
+    "V": true,
+    "A": true,
+    "U": true,
+    "P": true,
+    "R": true,
+    "T": true,
+    "C": true,
+    "Q": true,
+    "G": true,
+    "L": true,
+    "X": true
+  },
+  "topology_present": true,
+  "epoch_status": "EPOCH_GLOBAL_AUTHORITATIVE",
+  "expected_classification": "AMBIGUOUS",
+  "forbidden_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"],
+  "_classification_function": "classifyFromPredicates(predicates, topologyPresent=true, epochStatus='EPOCH_GLOBAL_AUTHORITATIVE', causalOverride='AMBIGUOUS')",
+  "cases": [
+    {
+      "_name": "concurrent_legitimacy_roots_node_a_leads_b_trails",
+      "_description": "Node A is ahead on axis node-A but behind on axis node-B relative to clock B. Neither vector dominates — genuinely concurrent.",
+      "clock_a": {
+        "clock_id": "clc_aaaa0000000000000000000000000000000000000000000000000000000000aa",
+        "epoch_id": "epoch-causal-test-01",
+        "node_id": "node-A",
+        "vector": { "node-A": 2, "node-B": 1 },
+        "observed_events": ["evt_A1", "evt_A2", "evt_B1"],
+        "happens_before": [],
+        "concurrent_with": ["clc_bbbb0000000000000000000000000000000000000000000000000000000000bb"],
+        "ambiguity_detected": false,
+        "created_at": "2026-05-27T00:00:00Z"
+      },
+      "clock_b": {
+        "clock_id": "clc_bbbb0000000000000000000000000000000000000000000000000000000000bb",
+        "epoch_id": "epoch-causal-test-01",
+        "node_id": "node-B",
+        "vector": { "node-A": 1, "node-B": 2 },
+        "observed_events": ["evt_A1", "evt_B1", "evt_B2"],
+        "happens_before": [],
+        "concurrent_with": ["clc_aaaa0000000000000000000000000000000000000000000000000000000000aa"],
+        "ambiguity_detected": false,
+        "created_at": "2026-05-27T00:00:01Z"
+      },
+      "expected_ordering": "CONCURRENT",
+      "expected_ambiguity_detected": true,
+      "expected_finality_override": "AMBIGUOUS",
+      "forbidden_finality_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"]
+    },
+    {
+      "_name": "explicit_ambiguity_flag_set",
+      "_description": "Clock with ambiguity_detected=true must produce AMBIGUOUS regardless of vector values.",
+      "clock_a": {
+        "clock_id": "clc_cccc0000000000000000000000000000000000000000000000000000000000cc",
+        "epoch_id": "epoch-causal-test-02",
+        "node_id": "node-C",
+        "vector": { "node-C": 5 },
+        "observed_events": ["evt_C1"],
+        "happens_before": [],
+        "concurrent_with": [],
+        "ambiguity_detected": true,
+        "created_at": "2026-05-27T00:01:00Z"
+      },
+      "clock_b": {
+        "clock_id": "clc_dddd0000000000000000000000000000000000000000000000000000000000dd",
+        "epoch_id": "epoch-causal-test-02",
+        "node_id": "node-D",
+        "vector": { "node-C": 3 },
+        "observed_events": ["evt_C1"],
+        "happens_before": [],
+        "concurrent_with": [],
+        "ambiguity_detected": false,
+        "created_at": "2026-05-27T00:01:01Z"
+      },
+      "expected_ordering": "AMBIGUOUS",
+      "expected_ambiguity_detected": true,
+      "expected_finality_override": "AMBIGUOUS",
+      "forbidden_finality_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"]
+    },
+    {
+      "_name": "missing_clock_evidence",
+      "_description": "Absent clock evidence (null clock) must return NULL — missing evidence cannot support convergence.",
+      "clock_a": null,
+      "clock_b": {
+        "clock_id": "clc_eeee0000000000000000000000000000000000000000000000000000000000ee",
+        "epoch_id": "epoch-causal-test-03",
+        "node_id": "node-E",
+        "vector": { "node-E": 1 },
+        "observed_events": ["evt_E1"],
+        "happens_before": [],
+        "concurrent_with": [],
+        "ambiguity_detected": false,
+        "created_at": "2026-05-27T00:02:00Z"
+      },
+      "expected_ordering": "NULL",
+      "expected_ambiguity_detected": true,
+      "expected_finality_override": "NULL",
+      "forbidden_finality_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"]
+    },
+    {
+      "_name": "replay_resurrection_conflict_ordering_null",
+      "_description": "Replay resurrection conflict ordering cannot produce GLOBAL_VALID. Conflicting replay ordering remains NULL.",
+      "clock_a": {
+        "clock_id": "clc_ffff0000000000000000000000000000000000000000000000000000000000ff",
+        "epoch_id": "epoch-causal-test-04",
+        "node_id": "node-F",
+        "vector": { "node-F": 3, "node-G": 3 },
+        "observed_events": ["evt_replay_F1", "evt_replay_F2"],
+        "happens_before": [],
+        "concurrent_with": ["clc_gggg0000000000000000000000000000000000000000000000000000000000gg"],
+        "ambiguity_detected": true,
+        "_replay_resurrection_conflict": true,
+        "created_at": "2026-05-27T00:03:00Z"
+      },
+      "clock_b": {
+        "clock_id": "clc_gggg0000000000000000000000000000000000000000000000000000000000gg",
+        "epoch_id": "epoch-causal-test-04",
+        "node_id": "node-G",
+        "vector": { "node-F": 3, "node-G": 3 },
+        "observed_events": ["evt_replay_G1", "evt_replay_G2"],
+        "happens_before": [],
+        "concurrent_with": ["clc_ffff0000000000000000000000000000000000000000000000000000000000ff"],
+        "ambiguity_detected": true,
+        "_replay_resurrection_conflict": true,
+        "created_at": "2026-05-27T00:03:01Z"
+      },
+      "expected_ordering": "AMBIGUOUS",
+      "expected_ambiguity_detected": true,
+      "expected_finality_override": "AMBIGUOUS",
+      "forbidden_finality_classifications": ["GLOBAL_VALID", "CONVERGENCE_VALID"]
+    }
+  ],
+  "creates_authority": false,
+  "creates_execution": false,
+  "raw_production_apply_path": "DENIED"
+}
