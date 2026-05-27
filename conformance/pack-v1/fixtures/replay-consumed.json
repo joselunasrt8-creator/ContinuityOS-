@@ -1,0 +1,13 @@
+{
+  "_non_operative": true,
+  "_purpose": "Consumed replay record — invocation_nonce already spent; any re-use must return NULL; restoration_eligible false",
+  "record_type": "ReplayRecord",
+  "invocation_nonce": "nonce-pack-v1-consumed-0001",
+  "decision_id": "decision-pack-v1-consumed",
+  "replay_state": "CONSUMED",
+  "consumed_at_epoch": 3,
+  "consumed_by_execution_id": "execution-pack-v1-consumed-0001",
+  "restoration_eligible": false,
+  "mutation_capable": false,
+  "evidence_only": true
+}

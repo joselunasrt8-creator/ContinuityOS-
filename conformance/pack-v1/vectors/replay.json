@@ -1,0 +1,40 @@
+{
+  "suite_id": "PACK-V1-REPLAY",
+  "stage": 3,
+  "non_operative": true,
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "description": "Replay consumption vectors. Verifies consumed nonces block reuse, resurrection attempts are rejected, and unused nonces remain eligible.",
+  "invariants": {
+    "replay_safe": true,
+    "consumed_state_permanent": "CONSUMED state is irreversible; no restoration path exists",
+    "resurrection_forbidden": "any attempt to restore a CONSUMED nonce returns NULL",
+    "non_authoritative": true
+  },
+  "vectors": [
+    {
+      "vector_id": "REPLAY-01",
+      "description": "consumed nonce: replay_state CONSUMED; restoration_eligible false — any reuse returns NULL",
+      "fixture_file": "replay-consumed.json",
+      "check_type": "replay_state_consumed_blocks_reuse",
+      "expected_result": "NULL",
+      "forbidden_results": ["ELIGIBLE", "VALID"]
+    },
+    {
+      "vector_id": "REPLAY-02",
+      "description": "replay resurrection attempt: resurrection_claim true on CONSUMED nonce — NULL enforced",
+      "fixture_file": "replay-resurrection-attempt.json",
+      "check_type": "replay_resurrection_blocked",
+      "expected_result": "NULL",
+      "forbidden_results": ["ELIGIBLE", "VALID"]
+    },
+    {
+      "vector_id": "REPLAY-03",
+      "description": "unused nonce: replay_state UNUSED — eligible for first-and-only use",
+      "fixture_file": "aeo-valid.json",
+      "check_type": "replay_state_unused_eligible",
+      "expected_result": "ELIGIBLE",
+      "forbidden_results": ["NULL", "CONSUMED"]
+    }
+  ]
+}

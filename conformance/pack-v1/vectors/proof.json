@@ -1,0 +1,59 @@
+{
+  "suite_id": "PACK-V1-PROOF",
+  "stage": 3,
+  "non_operative": true,
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "description": "Proof append-only and finality vectors. Verifies proof state machine is forward-only, detached proofs are classified correctly, and proof existence does not imply distributed finality.",
+  "invariants": {
+    "append_only": "proof state transitions are forward-only; no backwards transitions allowed",
+    "no_backwards_transitions": true,
+    "proof_existence_not_finality": "a local proof artifact does not constitute distributed finality",
+    "local_valid_not_global_valid": "LOCAL_VALID on a single node does not equal GLOBAL_VALID",
+    "non_authoritative": true
+  },
+  "vectors": [
+    {
+      "vector_id": "PROOF-01",
+      "description": "append-only: proof state forward transitions only; backwards transitions forbidden",
+      "check_type": "proof_append_only_forward_only",
+      "allowed_transitions": [
+        "OBSERVED→PENDING",
+        "PENDING→RECONCILING",
+        "RECONCILING→CONVERGED",
+        "RECONCILING→CONFLICTED",
+        "CONVERGED→FINALIZED"
+      ],
+      "forbidden_transitions": [
+        "FINALIZED→PENDING",
+        "CONVERGED→OBSERVED",
+        "RECONCILING→OBSERVED",
+        "PENDING→OBSERVED",
+        "FINALIZED→OBSERVED"
+      ],
+      "expected_result": "APPEND_ONLY_CONFIRMED",
+      "forbidden_results": ["BACKWARDS_TRANSITION_ALLOWED"]
+    },
+    {
+      "vector_id": "PROOF-02",
+      "description": "detached continuity: null predecessor lineage — classified DETACHED; no valid authority path",
+      "fixture_file": "continuity-detached.json",
+      "check_type": "proof_detached_classification",
+      "expected_result": "DETACHED",
+      "forbidden_results": ["ACTIVE", "FINALIZED", "GLOBAL_VALID"]
+    },
+    {
+      "vector_id": "PROOF-03",
+      "description": "proof existence ≠ finality: local_proof_exists=true with global_quorum_attested=false — LOCAL_VALID only",
+      "check_type": "proof_existence_not_finality",
+      "proof_object": {
+        "local_proof_exists": true,
+        "global_quorum_attested": false,
+        "quorum_size": 1,
+        "note": "local_proof_exists does not imply global_quorum_attested; proof existence ≠ distributed finality"
+      },
+      "expected_result": "LOCAL_VALID_NOT_GLOBAL",
+      "forbidden_results": ["GLOBAL_VALID", "FINALIZED"]
+    }
+  ]
+}

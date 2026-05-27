@@ -1,122 +1,165 @@
-# Lab 7 — Run the Full Conformance Suite
+# Lab 7 — Run the Conformance Suite
 
 **Module:** 8  
-**Estimated time:** 20 minutes  
-**Prerequisites:** Runtime running locally; Lab 6 complete
+**Estimated time:** 25 minutes  
+**Prerequisites:** Lab 6 complete
 
 ---
 
 ## Goal
 
-Run the ContinuityOS conformance suite against your local runtime and produce a passing conformance report.
+Verify your repository's compatibility with ContinuityOS legitimacy invariants by running
+the external conformance pack — no live runtime required — then optionally run the full
+canonical suite against a live runtime if you have one available.
 
 ---
 
-## Background
+## Part A — External Conformance Pack v1 (no runtime required)
 
-The conformance suite (`conformance/runner.mjs`) runs all CONF-CICD and CONF-DIST checks against a live runtime. Each check submits a test vector and verifies the expected response.
+The pack verifies 15 invariant checks across four suites: exact-object validation, replay
+consumption, proof append-only semantics, and convergence classification.
 
-**Code reference:** [`conformance/runner.mjs`](../../../conformance/runner.mjs)
+**Code reference:** [`conformance/pack-v1/harness.mjs`](../../../conformance/pack-v1/harness.mjs)
+
+### Step 1 — Install the pack into your starter repo
+
+Copy the pack directory into your repo:
+
+```bash
+cp -r /path/to/mindshift-demo/conformance/pack-v1 ./conformance/pack-v1
+```
+
+Or if working inside the canonical repo directly, it is already present.
+
+### Step 2 — Run the harness
+
+```bash
+node conformance/pack-v1/harness.mjs
+```
+
+No `npm install` needed. The harness has zero external dependencies and embeds the
+canonical serialization algorithm.
+
+### Step 3 — Read the output
+
+A passing run prints a result per check, then five terminal signals:
+
+```
+CONFORMANCE_EVIDENCE_OBSERVED
+VALIDATION_FAIL_CLOSED_CONFIRMED
+REPLAY_CONSUMPTION_PRESERVED
+PROOF_APPEND_ONLY_CONFIRMED
+CONVERGENCE_CLASSIFICATION_CORRECT
+PACK_V1_CONFORMANCE_COMPLETE
+```
+
+The `PACK_V1_CONFORMANCE_COMPLETE` line is the machine-readable pass signal.
+Exit code 0 = all pass. Exit code 1 = at least one failure.
+
+### Step 4 — Capture output for submission
+
+```bash
+node conformance/pack-v1/harness.mjs 2>&1 | tee conformance-pack-v1-output.txt
+```
+
+The harness also writes a structured JSON evidence file:
+`conformance/pack-v1/conformance-pack-v1-evidence.json`
+
+Include either file in your submission. The evidence file is the adoption artifact that
+proves your repo ran the pack.
+
+### Step 5 — Understand what the pack proves
+
+| Invariant verified | Checked by |
+|--------------------|------------|
+| Invalid objects fail closed (NULL) | VALIDATOR-02, VALIDATOR-03 |
+| Canonical hash is deterministic | VALIDATOR-04 |
+| Consumed nonce blocks all reuse | REPLAY-01, REPLAY-02 |
+| Proof state is append-only | PROOF-01 |
+| Proof existence ≠ distributed finality | PROOF-03 |
+| Conformance ≠ execution authority | CONV-01 through CONV-05 |
+
+**The pack does not prove:**
+
+- Production deployment has occurred
+- Authority has been granted
+- GLOBAL_VALID has been reached
+- Distributed finality exists
+
+```
+conformance ≠ authority
+proof existence ≠ distributed finality
+```
 
 ---
 
-## Setup
+## Part B — Canonical Suite (live runtime required)
 
-Ensure the runtime is running:
+If you have the ContinuityOS runtime running locally, run the full Stage 2 suite:
+
+### Step 1 — Start the runtime
 
 ```bash
 npm run dev
 ```
 
----
-
-## Steps
-
-### Step 1 — Run the suite
+### Step 2 — Run the canonical conformance suite
 
 ```bash
 npm run conformance
 ```
 
-Or, to run against an explicit URL:
-
-```bash
-WORKER_URL=http://localhost:8787 API_KEY=your-api-key npm run conformance
-```
-
-### Step 2 — Read the output
-
-The suite prints a line per check:
+### Step 3 — Read the output
 
 ```
-CONF-DIST-01: PASS  — canonical NULL result enforced
-CONF-DIST-02: PASS  — hash mismatch returns NULL
-...
-Total: 30/30 PASS
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONF_DIST_COVERAGE: CONF-DIST-01, ... CONF-DIST-15 — all IMPLEMENTED
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONFORMANCE_MATRIX_COMPLETE
 ```
 
-If any check fails, it prints the expected vs. observed values:
+The `STAGE2_CONFORMANCE_MATRIX_COMPLETE` line confirms all 15 CONF-DIST checks pass.
 
-```
-CONF-DIST-03: FAIL
-  expected: {"status":"NULL"}
-  observed: {"status":"VALID"}
-```
-
-### Step 3 — Capture the output (optional)
-
-The runner prints evidence to stdout only — it does not write a `conformance/report.json` file.
-To save the output for your final project submission, redirect it:
+### Step 4 — Capture output for submission
 
 ```bash
 npm run conformance 2>&1 | tee conformance-output.txt
 ```
 
-Then inspect the saved file:
+### Step 5 — Identify a failing check (if any)
 
-```bash
-cat conformance-output.txt
-```
+Read its description in [`docs/stage2-conformance-matrix.md`](../../stage2-conformance-matrix.md).
 
-### Step 4 — Identify a failing check (if any)
-
-If any check fails, read its description in [`docs/stage2-conformance-matrix.md`](../../stage2-conformance-matrix.md) to understand what it tests.
-
-Common failures and their causes:
+Common failures:
 
 | Failure | Likely cause |
 |---------|-------------|
 | CONF-DIST-02 fails | Hash comparison not implemented correctly |
 | CONF-DIST-03 fails | Nonce replay not rejected |
 | CONF-DIST-04 fails | Proof registry allows updates |
-| CONF-CICD-01 fails | Workflow trigger is not `workflow_dispatch` only |
-
-### Step 5 — Save the output for submission
-
-The conformance runner outputs evidence to stdout. Capture it as your submission artifact:
-
-```bash
-npm run conformance 2>&1 | tee conformance-output.txt
-```
-
-Include `conformance-output.txt` in your fork or lab submission. The file shows which checks
-passed and the `STAGE2_CONFORMANCE_MATRIX_COMPLETE` line confirms all checks passed.
 
 ---
 
 ## Expected Results
 
+**Part A (pack-v1):**
 ```
-Total: 30/30 PASS
+Total:  15  |  PASS: 15  |  FAIL: 0
+PACK_V1_CONFORMANCE_COMPLETE
 ```
 
-All checks pass on a correctly configured runtime.
+**Part B (canonical, if available):**
+```
+STAGE2_CONFORMANCE_MATRIX_COMPLETE
+```
 
 ---
 
 ## What You Proved
 
-Your local runtime enforces all 30 legitimacy conformance checks. The report is the machine-readable evidence you will reference in your final project.
+Running Part A proves your repo enforces all 15 Stage 3 legitimacy invariants without
+requiring a live runtime. This is the external conformance artifact referenced by the
+[conformance badge](../conformance-badge.md).
 
 ---
 

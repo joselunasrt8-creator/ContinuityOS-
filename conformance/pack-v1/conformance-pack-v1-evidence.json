@@ -1,0 +1,91 @@
+{
+  "pack": "pack-v1",
+  "stage": 3,
+  "run_at": "2026-05-27T18:52:54.793Z",
+  "non_operative": true,
+  "authority_created": false,
+  "deployment_performed": false,
+  "runtime_mutation_capable": false,
+  "production_proof_emitted": false,
+  "total": 15,
+  "pass": 15,
+  "fail": 0,
+  "status": "PACK_V1_CONFORMANCE_COMPLETE",
+  "results": [
+    {
+      "vector_id": "VALIDATOR-01",
+      "status": "PASS",
+      "message": "valid AEO: all required fields present; mutation_capable false"
+    },
+    {
+      "vector_id": "VALIDATOR-02",
+      "status": "PASS",
+      "message": "mutated AEO: mutation_capable true; _mutation_marker present — fails closed (NULL)"
+    },
+    {
+      "vector_id": "VALIDATOR-03",
+      "status": "PASS",
+      "message": "AEO missing governed_tool_envelope_id — fails closed (NULL)"
+    },
+    {
+      "vector_id": "VALIDATOR-04",
+      "status": "PASS",
+      "message": "canonical hash: deterministic across two computations of the same object [sha256: a2f33a60d82d0c2e...]"
+    },
+    {
+      "vector_id": "REPLAY-01",
+      "status": "PASS",
+      "message": "consumed nonce: replay_state CONSUMED; restoration_eligible false — any reuse returns NULL"
+    },
+    {
+      "vector_id": "REPLAY-02",
+      "status": "PASS",
+      "message": "replay resurrection attempt: resurrection_claim true on CONSUMED nonce — NULL enforced"
+    },
+    {
+      "vector_id": "REPLAY-03",
+      "status": "PASS",
+      "message": "unused nonce: replay_state UNUSED — eligible for first-and-only use"
+    },
+    {
+      "vector_id": "PROOF-01",
+      "status": "PASS",
+      "message": "append-only: proof state forward transitions only; backwards transitions forbidden"
+    },
+    {
+      "vector_id": "PROOF-02",
+      "status": "PASS",
+      "message": "detached continuity: null predecessor lineage — classified DETACHED; no valid authority path"
+    },
+    {
+      "vector_id": "PROOF-03",
+      "status": "PASS",
+      "message": "proof existence ≠ finality: local_proof_exists=true with global_quorum_attested=false — LOCAL_VALID only"
+    },
+    {
+      "vector_id": "CONV-01",
+      "status": "PASS",
+      "message": "local-only context: quorum_size 1, result_claim LOCAL_VALID — GLOBAL_VALID is forbidden"
+    },
+    {
+      "vector_id": "CONV-02",
+      "status": "PASS",
+      "message": "partition detected: partition_detected true — execution suspended; PARTITION_SUSPENDED"
+    },
+    {
+      "vector_id": "CONV-03",
+      "status": "PASS",
+      "message": "conflicting proof roots: conflicting_proof_roots true — CONFLICTED classification"
+    },
+    {
+      "vector_id": "CONV-04",
+      "status": "PASS",
+      "message": "quorum disagreement: quorum_disagree true — AMBIGUOUS; GLOBAL_VALID is forbidden"
+    },
+    {
+      "vector_id": "CONV-05",
+      "status": "PASS",
+      "message": "settled convergence: converged and epoch_match true — CONVERGED (not GLOBAL_VALID; conformance ≠ authority)"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "_non_operative": true,
+  "_purpose": "Intact continuity lineage — valid predecessor chain; depth 1 from genesis; status ACTIVE",
+  "record_type": "ContinuityLineage",
+  "lineage_id": "lineage-pack-v1-intact-0001",
+  "epoch": 1,
+  "predecessor_lineage_id": "lineage-pack-v1-genesis",
+  "predecessor_settled": true,
+  "depth": 1,
+  "status": "ACTIVE",
+  "mutation_capable": false,
+  "evidence_only": true
+}

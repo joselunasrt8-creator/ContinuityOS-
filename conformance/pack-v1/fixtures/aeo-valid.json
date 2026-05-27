@@ -1,0 +1,14 @@
+{
+  "_non_operative": true,
+  "_purpose": "Canonical valid AEO — all 5 required keys present; replay_state UNUSED; mutation_capable false",
+  "object_type": "AuthorizedExecutionObject",
+  "decision_id": "decision-pack-v1-aeo-valid-0001",
+  "validated_object_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "invocation_nonce": "nonce-pack-v1-aeo-valid-0001",
+  "session_id": "session-pack-v1-0001",
+  "governed_tool_envelope_id": "envelope-pack-v1-0001",
+  "replay_state": "UNUSED",
+  "continuity_lineage_id": "lineage-pack-v1-intact-0001",
+  "mutation_capable": false,
+  "evidence_only": true
+}

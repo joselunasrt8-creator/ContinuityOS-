@@ -1,0 +1,13 @@
+{
+  "_non_operative": true,
+  "_purpose": "Replay resurrection attempt — re-submits a CONSUMED nonce with restoration_eligible true and resurrection_claim true; must return NULL",
+  "_resurrection_marker": "attempts_to_restore_consumed_nonce",
+  "record_type": "ReplayResurrectionAttempt",
+  "invocation_nonce": "nonce-pack-v1-consumed-0001",
+  "decision_id": "decision-pack-v1-resurrection-attempt",
+  "replay_state": "CONSUMED",
+  "resurrection_claim": true,
+  "restoration_eligible": true,
+  "mutation_capable": true,
+  "evidence_only": false
+}

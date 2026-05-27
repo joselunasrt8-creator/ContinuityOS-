@@ -102,7 +102,15 @@ cp /path/to/mindshift-demo/templates/governed-deploy.yml \
    .github/workflows/governed-deploy.yml
 ```
 
-### Step 2 — Configure secrets
+### Step 2 — Install the external conformance pack
+
+```bash
+cp -r /path/to/mindshift-demo/conformance/pack-v1 ./conformance/pack-v1
+```
+
+The pack is self-contained. No `npm install` required.
+
+### Step 3 — Configure secrets
 
 In your repo's Settings → Secrets and variables → Actions:
 
@@ -111,7 +119,7 @@ In your repo's Settings → Secrets and variables → Actions:
 | `WORKER_URL` | Your ContinuityOS runtime URL |
 | `API_KEY` | Your API key |
 
-### Step 3 — Replace the raw deploy workflow
+### Step 4 — Replace the raw deploy workflow
 
 Open `.github/workflows/deploy.yml` (or equivalent) and add a comment:
 
@@ -122,7 +130,7 @@ Open `.github/workflows/deploy.yml` (or equivalent) and add a comment:
 
 Remove or disable the `on: push` trigger from your original workflow.
 
-### Step 4 — Create a proof log directory
+### Step 5 — Create a proof log directory
 
 ```bash
 mkdir proof-log
@@ -136,16 +144,27 @@ git push
 
 ## Verifying Installation
 
-After installation, trigger the governed deploy workflow without inputs. Confirm it fails closed with a NULL signal. This is your first successful governance check.
+After installation, trigger the governed deploy workflow without inputs. Confirm it fails
+closed with a NULL signal. This is your first successful governance check.
+
+Then run the conformance pack to verify invariant compatibility:
+
+```bash
+node conformance/pack-v1/harness.mjs 2>&1 | tee conformance-pack-v1-output.txt
+```
+
+Confirm the output ends with `PACK_V1_CONFORMANCE_COMPLETE`.
 
 ---
 
 ## Final Project Checklist
 
 - [ ] Repo is public
-- [ ] `governed-deploy.yml` is installed and passes CONF-CICD checks
-- [ ] At least one execution has been validated and proved
-- [ ] Proof row exists in the proof log
-- [ ] Conformance suite passes: `npm run conformance` → 30/30 PASS
+- [ ] `governed-deploy.yml` is installed in `.github/workflows/`
+- [ ] Conformance pack installed: `conformance/pack-v1/` present in repo
+- [ ] Pack passes: `node conformance/pack-v1/harness.mjs` → `PACK_V1_CONFORMANCE_COMPLETE`
+- [ ] Pack evidence captured: `conformance-pack-v1-output.txt` committed
+- [ ] At least one execution has been validated and proved via the governed deploy workflow
+- [ ] Proof artifact exists in the proof log
 - [ ] A mutated object demonstrably returns NULL (from Lab 3)
-- [ ] (Optional) Conformance badge added to README
+- [ ] (Optional) Conformance badge added to README — see [conformance-badge.md](conformance-badge.md)
