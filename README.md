@@ -96,9 +96,25 @@ Execution gate:
 
 ```text
 VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID
+∧ REPLAY_SAFE ∧ TOPOLOGY_VISIBLE
+∧ RECONCILABLE ∧ EPOCH_VALID ∧ CONVERGENCE_VALID
 ```
 
 ContinuityOS does not replace intelligence. It enforces legitimacy before execution.
 
 MindShift discovered the canon.
 ContinuityOS operationalizes it.
+
+---
+
+# Documentation
+
+- `QUICKSTART.md` — Stage 1 and Stage 2 developer quickstart
+- `docs/governed-deploy-quickstart.md` — Stage 1 governed deploy walkthrough
+- `docs/stage2-legitimacy-vocabulary.md` — 12-state distributed legitimacy vocabulary
+- `docs/reconciliation-state-machine.md` — reconciliation state machine
+- `docs/topology-visibility-semantics.md` — topology visibility semantics
+- `docs/causal-legitimacy-clock-semantics.md` — causal legitimacy clock semantics
+- `docs/stage2-conformance-matrix.md` — Stage 2 conformance matrix (CONF-DIST-01–15)
+- `docs/stage2-distributed-legitimacy-enforcement-plan-v1.md` — Stage 2 plan
+- `docs/glossary.md` — canonical terminology
