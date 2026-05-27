@@ -82,6 +82,48 @@ type GovernedToolEnvelope = {
 
 type GovernResult = "VALID_CANDIDATE" | "NULL"
 
+type PolicyClass = "TOOL_RUNTIME_MUTATION" | "TOOL_RECONCILIATION_READONLY" | "TOOL_UNKNOWN"
+
+type PolicyRegistryEntry = {
+  policy_class: PolicyClass
+  tool_classes: readonly string[]
+  authority_predicates: readonly string[]
+  replay_policy: "nonce_required_single_use" | "evidence_only_no_mutation" | "deny"
+  topology_visibility_required: boolean
+  proof_requirements: readonly string[]
+}
+
+const POLICY_REGISTRY: Record<Exclude<PolicyClass, "TOOL_UNKNOWN">, PolicyRegistryEntry> = Object.freeze({
+  TOOL_RUNTIME_MUTATION: Object.freeze({
+    policy_class: "TOOL_RUNTIME_MUTATION",
+    tool_classes: Object.freeze(["deploy_runtime", "runtime_mutation", "state_mutation"] as const),
+    authority_predicates: Object.freeze(["authority_active", "continuity_identity_match", "compiled_hash_match", "delegated_authority_lineage_valid"] as const),
+    replay_policy: "nonce_required_single_use",
+    topology_visibility_required: true,
+    proof_requirements: Object.freeze(["lineage_origin_hash", "proof_required_true", "validated_object_equals_executed_object"] as const)
+  }),
+  TOOL_RECONCILIATION_READONLY: Object.freeze({
+    policy_class: "TOOL_RECONCILIATION_READONLY",
+    tool_classes: Object.freeze(["reconciliation_readonly", "observability_readonly"] as const),
+    authority_predicates: Object.freeze(["read_only_surface", "remote_authority_denied"] as const),
+    replay_policy: "evidence_only_no_mutation",
+    topology_visibility_required: false,
+    proof_requirements: Object.freeze(["evidence_only_true"] as const)
+  })
+})
+
+function classifyToolSurface(target: Record<string, unknown>): { tool_surface: string, policy_class: PolicyClass } {
+  const surface = String(target.tool_surface || target.execution_surface || target.surface || "deploy_runtime")
+  if (POLICY_REGISTRY.TOOL_RUNTIME_MUTATION.tool_classes.includes(surface)) return { tool_surface: surface, policy_class: "TOOL_RUNTIME_MUTATION" }
+  if (POLICY_REGISTRY.TOOL_RECONCILIATION_READONLY.tool_classes.includes(surface)) return { tool_surface: surface, policy_class: "TOOL_RECONCILIATION_READONLY" }
+  return { tool_surface: surface, policy_class: "TOOL_UNKNOWN" }
+}
+
+async function policyClassDigest(policy_class: PolicyClass): Promise<string> {
+  if (policy_class === "TOOL_UNKNOWN") return ""
+  return sha256Hex(canonicalize(POLICY_REGISTRY[policy_class]))
+}
+
 function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCandidate } | { ok: false, reason: string } {
   if (!isPlainRecord(input)) return { ok: false, reason: "invalid_candidate" }
   const keys = Object.keys(input)
@@ -7783,6 +7825,11 @@ export default {
       if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(authority.continuity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/validate", continuity_id: authority.continuity_id || null, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_authority_continuity_identity" }, drift_class: "authority_drift" })
       if (String(authority.identity_id || "") !== String(session.identity_id || "")) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"identity_lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", expected_identity_id: session.identity_id, provided_identity_id: authority.identity_id }, drift_class: "authority_drift" })
       const compiled = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND status='COMPILED'`).bind(decision_id, validated_object_hash).first<any>()
+      const validateSurface = classifyToolSurface({ execution_surface: "deploy_runtime" })
+      const validatePolicyClass = validateSurface.policy_class
+      const validatePolicyClassDigest = await policyClassDigest(validatePolicyClass)
+      const validatePolicy = validatePolicyClass === "TOOL_UNKNOWN" ? null : POLICY_REGISTRY[validatePolicyClass]
+      if (!validatePolicy || !validatePolicyClassDigest) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"policy_class_invalid" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", policy_class: validatePolicyClass, indicator: "policy_class_missing_or_invalid", denial_reason: "policy_class_missing_or_invalid" }, drift_class: "registry_drift" })
       if (!compiled) {
         const compiledForOtherLineage = await env.DB.prepare(`SELECT decision_id,authority_id,continuity_id FROM aeo_registry WHERE validated_object_hash=?1 AND status='COMPILED'`).bind(validated_object_hash).first<any>()
         if (compiledForOtherLineage) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"lineage_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "HIGH", payload: { route: "/validate", validated_object_hash, expected_decision_id: decision_id, provided_decision_id: String(compiledForOtherLineage.decision_id || ""), indicator: "non_canonical_validation_lineage" }, drift_class: "hash_drift" })
@@ -7822,7 +7869,7 @@ export default {
       const _topology_present = false // topology infrastructure pending (#1346+); fail-closed
       const _predicate_snapshot = { V: true, A: true, U: true, P: true, R: true, T: false, C: true, Q: false, G: false, L: false, X: false }
       const _classification = classifyFromPredicates(_predicate_snapshot, _topology_present)
-      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present } })
+      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, policy_class: validatePolicyClass, policy_class_digest: validatePolicyClassDigest, policy_predicate_outcomes: { authority_active: true, continuity_identity_match: true, compiled_hash_match: true, delegated_authority_lineage_valid: true, topology_visible: _topology_present }, denial_reason: null, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present } })
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
