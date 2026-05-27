@@ -171,8 +171,18 @@ In the governed deploy workflow, proof emission is a required step:
     PROOF_RESPONSE=$(curl -sf -X POST "$CLEAN_WORKER_URL/proof" \
       -H "X-API-Key: $API_KEY" \
       -H "Content-Type: application/json" \
-      -d "{\"decision_id\": \"$DECISION_ID\"}")
+      -d "$(jq -n \
+        --arg decision_id "$DECISION_ID" \
+        --arg execution_id "$EXECUTION_ID" \
+        --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+        --arg invocation_nonce "$INVOCATION_NONCE" \
+        --arg session_id "$SESSION_ID" \
+        '{decision_id: $decision_id, execution_id: $execution_id, validated_object_hash: $validated_object_hash, invocation_nonce: $invocation_nonce, session_id: $session_id}')")
 ```
+
+The `/proof` route requires the full execution lineage: `execution_id`, `validated_object_hash`,
+`invocation_nonce`, and `session_id` must all match the values recorded during `/execute`.
+Omitting any of these fields returns NULL.
 
 If this step fails:
 - The workflow fails

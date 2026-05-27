@@ -12,10 +12,10 @@ Add to your repo's README:
 [![ContinuityOS Conformant](https://img.shields.io/badge/ContinuityOS-Conformant-4caf50?style=flat-square&logo=data:image/svg+xml;base64,...)](docs/conformance-report.json)
 ```
 
-Or with a link to your conformance report:
+Or with a link to your conformance output file:
 
 ```markdown
-[![ContinuityOS Conformant](https://img.shields.io/badge/ContinuityOS-Conformant-4caf50?style=flat-square)](https://github.com/your-org/your-repo/blob/main/conformance/report.json)
+[![ContinuityOS Conformant](https://img.shields.io/badge/ContinuityOS-Conformant-4caf50?style=flat-square)](https://github.com/your-org/your-repo/blob/main/conformance-output.txt)
 ```
 
 ---
@@ -45,35 +45,26 @@ Or with a link to your conformance report:
 ## Earning the Badge
 
 1. Run `npm run conformance` against your runtime
-2. Confirm 30/30 PASS
-3. Commit `conformance/report.json` to your repo
-4. Add the badge markup to your README
-5. Submit your conformance report as part of your final project
+2. Confirm the output ends with `STAGE2_CONFORMANCE_MATRIX_COMPLETE`
+3. Capture and commit the output: `npm run conformance 2>&1 | tee conformance-output.txt`
+4. Add the badge markup to your README (link to `conformance-output.txt`)
+5. Submit `conformance-output.txt` as part of your final project
 
 ---
 
-## Badge Schema
+## Conformance Evidence Format
 
-The conformance report JSON schema that the badge service validates:
+The runner prints structured lines to stdout. A passing run contains:
 
-```json
-{
-  "run_id": "string",
-  "timestamp": "ISO 8601 string",
-  "total_checks": 30,
-  "passed": "number (must equal 30 for badge)",
-  "failed": "number (must equal 0 for badge)",
-  "checks": [
-    {
-      "id": "CONF-DIST-01 through CONF-CICD-15",
-      "status": "PASS | FAIL",
-      "description": "string",
-      "observed": "string",
-      "expected": "string"
-    }
-  ]
-}
 ```
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONF_DIST_COVERAGE: CONF-DIST-01, CONF-DIST-02, ... CONF-DIST-15 — all IMPLEMENTED
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONFORMANCE_MATRIX_COMPLETE
+```
+
+The `STAGE2_CONFORMANCE_MATRIX_COMPLETE` line is the machine-readable pass signal.
+Any assertion failure causes a non-zero exit and prints the failing check.
 
 ---
 

@@ -63,22 +63,46 @@ CONTINUITY=$(curl -sf -X POST "$BASE_URL/continuity" \
 echo "Continuity: $CONTINUITY"
 ```
 
-### Step 3 — Create an authority
+### Step 3 — Create a governed tool envelope
+
+The runtime requires a governed tool envelope to be created before authority is issued.
+The envelope binds a candidate intent to a single-use nonce via `/govern`.
 
 ```bash
 DECISION_ID=$(node -e "console.log(require('crypto').randomUUID())")
+GOVERN_NONCE=$(node -e "console.log(require('crypto').randomUUID())")
+ENVELOPE_ID=$(curl -sf -X POST "$BASE_URL/govern" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "X-Nonce: $GOVERN_NONCE" \
+  -d "{
+    \"decision_id\": \"$DECISION_ID\",
+    \"continuity_id\": \"$CONTINUITY\",
+    \"intent\": \"lab 3 demo execution\",
+    \"scope\": {\"env\": \"lab\"},
+    \"target\": {\"resource\": \"demo-resource\"},
+    \"finality\": {\"continuity_required\": true}
+  }" | jq -r '.envelope_id')
+echo "Envelope: $ENVELOPE_ID"
+```
+
+### Step 4 — Create an authority
+
+```bash
 AUTHORITY=$(curl -sf -X POST "$BASE_URL/authority" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d "{
+    \"session_id\": \"$SESSION\",
     \"decision_id\": \"$DECISION_ID\",
     \"continuity_id\": \"$CONTINUITY\",
+    \"governed_tool_envelope_id\": \"$ENVELOPE_ID\",
     \"authority_class\": \"LAB_DEMO\"
   }" | jq -r '.authority_id')
 echo "Authority: $AUTHORITY"
 ```
 
-### Step 4 — Compile the AEO
+### Step 5 — Compile the AEO
 
 ```bash
 NONCE=$(node -e "console.log(require('crypto').randomUUID())")
@@ -99,7 +123,7 @@ HASH=$(echo "$COMPILE_RESULT" | jq -r '.validated_object_hash')
 echo "Hash: $HASH"
 ```
 
-### Step 5 — Validate the AEO
+### Step 6 — Validate the AEO
 
 ```bash
 VALIDATE_RESULT=$(curl -sf -X POST "$BASE_URL/validate" \
@@ -108,14 +132,15 @@ VALIDATE_RESULT=$(curl -sf -X POST "$BASE_URL/validate" \
   -d "{
     \"decision_id\": \"$DECISION_ID\",
     \"validated_object_hash\": \"$HASH\",
-    \"invocation_nonce\": \"$NONCE\"
+    \"invocation_nonce\": \"$NONCE\",
+    \"session_id\": \"$SESSION\"
   }")
 echo "$VALIDATE_RESULT" | jq .
 ```
 
 **Expected:** `"status": "VALID"`
 
-### Step 6 — Mutate one field and attempt validation
+### Step 7 — Mutate one field and attempt validation
 
 Compute a hash for a mutated version of the same AEO (change `target.resource`):
 
@@ -144,7 +169,8 @@ curl -sf -X POST "$BASE_URL/validate" \
   -d "{
     \"decision_id\": \"$DECISION_ID\",
     \"validated_object_hash\": \"$MUTATED_HASH\",
-    \"invocation_nonce\": \"$NONCE\"
+    \"invocation_nonce\": \"$NONCE\",
+    \"session_id\": \"$SESSION\"
   }" | jq .
 ```
 

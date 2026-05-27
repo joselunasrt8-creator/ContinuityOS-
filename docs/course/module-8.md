@@ -42,23 +42,24 @@ npm run conformance
 This runs the conformance runner against your local runtime. The runner:
 
 1. Loads all suite files from `conformance/suites/`
-2. Runs each check against the `/validate`, `/execute`, `/proof`, and other routes
-3. Produces a JSON report at `conformance/report.json`
-4. Prints a summary to stdout
+2. Verifies structural invariants, vector hashes, and suite descriptors
+3. Prints evidence lines to stdout — no `conformance/report.json` file is written
 
-**Output format:**
+**Output format (stdout):**
 
 ```
-CONF-DIST-01: PASS  — canonical NULL result enforced
-CONF-DIST-02: PASS  — hash mismatch returns NULL
-CONF-DIST-03: PASS  — nonce replay returns NULL
-CONF-DIST-04: PASS  — proof is append-only
-CONF-DIST-05: PASS  — authority expiry returns NULL
-...
-CONF-CICD-01: PASS  — workflow_dispatch only
-CONF-CICD-02: PASS  — decision_id required
-...
-Total: 30/30 PASS
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONF_DIST_COVERAGE: CONF-DIST-01, CONF-DIST-02, ... CONF-DIST-15 — all IMPLEMENTED
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONFORMANCE_MATRIX_COMPLETE
+```
+
+If any check fails, the runner exits with a non-zero status and prints the failing assertion.
+
+To save the output as your submission artifact, redirect stdout:
+
+```bash
+npm run conformance 2>&1 | tee conformance-output.txt
 ```
 
 ---
@@ -89,31 +90,26 @@ The distributed legitimacy conformance checks verify the legitimacy invariants t
 
 ---
 
-## 8.4 The Conformance Report
+## 8.4 The Conformance Evidence
 
-After running the suite, `conformance/report.json` contains:
+The conformance runner does not write a JSON report file. It prints structured evidence lines
+to stdout. A passing run produces:
 
-```json
-{
-  "run_id": "...",
-  "timestamp": "...",
-  "total_checks": 30,
-  "passed": 30,
-  "failed": 0,
-  "checks": [
-    {
-      "id": "CONF-DIST-01",
-      "status": "PASS",
-      "description": "Canonical NULL result enforced",
-      "test_vector": "...",
-      "observed": "NULL",
-      "expected": "NULL"
-    }
-  ]
-}
+```
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONF_DIST_COVERAGE: CONF-DIST-01, ... CONF-DIST-15 — all IMPLEMENTED
+CONFORMANCE_EVIDENCE_OBSERVED
+STAGE2_CONFORMANCE_MATRIX_COMPLETE
 ```
 
-This report is the artifact you submit with your final project. It is machine-readable and can be parsed by the conformance badge service.
+The `STAGE2_CONFORMANCE_MATRIX_COMPLETE` line confirms all 15 CONF-DIST checks passed.
+Capture this output as your submission artifact:
+
+```bash
+npm run conformance 2>&1 | tee conformance-output.txt
+```
+
+Include `conformance-output.txt` in your final project submission.
 
 ---
 
