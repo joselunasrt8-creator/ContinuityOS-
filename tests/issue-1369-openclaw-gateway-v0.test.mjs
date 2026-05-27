@@ -6,11 +6,13 @@ async function loadWorker() { return (await importWorker()).default }
 
 function createEnv() {
   const writes = []
-  const nonceSet = new Set()
+  const nonceMap = new Map()
   const evidence = []
+  const envelopes = []
   return {
     writes,
     evidence,
+    envelopes,
     env: {
       API_KEY: 'test-key',
       DB: {
@@ -22,16 +24,28 @@ function createEnv() {
               writes.push({ sql, args: this._args })
               if (sql.includes('INSERT OR IGNORE INTO govern_nonce_registry')) {
                 const nonce = this._args[0]
-                if (nonceSet.has(nonce)) return { meta: { changes: 0 } }
-                nonceSet.add(nonce)
+                const nonceDomain = this._args[1]
+                const key = `${nonce}:${nonceDomain}`
+                if (nonceMap.has(key)) return { meta: { changes: 0 } }
+                nonceMap.set(key, this._args[2])
                 return { meta: { changes: 1 } }
               }
               if (sql.includes('INSERT OR IGNORE INTO govern_evidence_registry')) {
                 evidence.push({ candidate_hash: this._args[1], nonce: this._args[2], result: this._args[3], reason: this._args[4], created_at: this._args[5] })
               }
+              if (sql.includes('INSERT OR IGNORE INTO govern_envelope_registry')) {
+                envelopes.push({ envelope_id: this._args[0], envelope_hash: this._args[1], nonce: this._args[4], nonce_domain: this._args[5], status: this._args[6], reason: this._args[7] })
+              }
               return { meta: { changes: 1 } }
             },
-            async first() { return null },
+            async first() {
+              if (sql.includes('SELECT candidate_hash FROM govern_nonce_registry')) {
+                const key = `${this._args[0]}:${this._args[1]}`
+                const candidate_hash = nonceMap.get(key)
+                return candidate_hash ? { candidate_hash } : null
+              }
+              return null
+            },
             async all() { return { results: [] } }
           }
         }
@@ -40,8 +54,8 @@ function createEnv() {
   }
 }
 
-function post(body, nonce='n') {
-  return new Request('https://runtime.test/govern', { method: 'POST', headers: { 'content-type': 'application/json', 'X-API-Key': 'test-key', 'X-Nonce': nonce }, body: JSON.stringify(body) })
+function post(body, nonce='n', nonceDomain='openclaw') {
+  return new Request('https://runtime.test/govern', { method: 'POST', headers: { 'content-type': 'application/json', 'X-API-Key': 'test-key', 'X-Nonce': nonce, 'X-Nonce-Domain': nonceDomain }, body: JSON.stringify(body) })
 }
 
 const validCandidate = {
@@ -58,6 +72,7 @@ test('issue #1369 /govern validates candidate, deterministically hashes, records
   const first = await worker.fetch(post(validCandidate, 'n1'), db.env)
   const firstPayload = await first.json()
   assert.equal(firstPayload.status, 'VALID_CANDIDATE')
+  assert.equal(firstPayload.reason, 'valid_candidate')
   assert.equal(firstPayload.evidence.nonce, 'n1')
   assert.ok(firstPayload.evidence.candidate_hash)
 
@@ -70,10 +85,12 @@ test('issue #1369 /govern validates candidate, deterministically hashes, records
   const replayPayload = await replay.json()
   assert.equal(replayPayload.status, 'NULL')
   assert.equal(replayPayload.evidence.reason, 'nonce_replay')
+  assert.equal(replayPayload.reason, 'nonce_replay')
 
   assert.equal(db.evidence.length >= 3, true)
   assert.equal(firstPayload.evidence.result, 'VALID_CANDIDATE')
   assert.equal(firstPayload.status === 'VALID_CANDIDATE' && !('execution_id' in firstPayload), true)
+  assert.equal(db.envelopes.length >= 3, true)
 })
 
 test('issue #1369 /govern rejects missing required fields and strict-mode extra top-level fields', async () => {
@@ -89,6 +106,27 @@ test('issue #1369 /govern rejects missing required fields and strict-mode extra 
     const res = await worker.fetch(post(item.body, item.nonce), db.env)
     const payload = await res.json()
     assert.equal(payload.status, 'NULL')
+    assert.equal(payload.reason, 'malformed_candidate')
   }
   assert.equal(db.evidence.length, 5)
+})
+
+test('issue #1463 /govern detects nonce rebinding within nonce domain and allows cross-domain reuse', async () => {
+  const worker = await loadWorker()
+  const db = createEnv()
+  const alternateCandidate = { ...validCandidate, target: { ...validCandidate.target, title: 'different' } }
+
+  const first = await worker.fetch(post(validCandidate, 'rb1', 'openclaw'), db.env)
+  const firstPayload = await first.json()
+  assert.equal(firstPayload.status, 'VALID_CANDIDATE')
+
+  const rebinding = await worker.fetch(post(alternateCandidate, 'rb1', 'openclaw'), db.env)
+  const rebindingPayload = await rebinding.json()
+  assert.equal(rebindingPayload.status, 'NULL')
+  assert.equal(rebindingPayload.reason, 'nonce_rebinding')
+
+  const differentDomain = await worker.fetch(post(alternateCandidate, 'rb1', 'openclaw-alt'), db.env)
+  const differentDomainPayload = await differentDomain.json()
+  assert.equal(differentDomainPayload.status, 'VALID_CANDIDATE')
+  assert.equal(differentDomainPayload.nonce_domain, 'openclaw-alt')
 })
