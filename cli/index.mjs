@@ -12,6 +12,7 @@
  *   proof       Inspect proof lineage (observability-only)
  *   topology    Inspect topology state (observability-only)
  *   reconcile   Detect legitimacy drift across lifecycle phases
+ *   adoption    Track external execution surface adoption (observability-only)
  *
  * Core invariant: validated_object == executed_object
  *
@@ -30,6 +31,7 @@ import { run as execute } from "./commands/execute.mjs"
 import { run as proof } from "./commands/proof.mjs"
 import { run as topology } from "./commands/topology.mjs"
 import { run as reconcile } from "./commands/reconcile.mjs"
+import { run as adoption } from "./commands/adoption.mjs"
 
 const COMMANDS = {
   authority,
@@ -39,6 +41,7 @@ const COMMANDS = {
   proof,
   topology,
   reconcile,
+  adoption,
 }
 
 const USAGE = `
@@ -52,6 +55,7 @@ Commands:
   proof       Inspect proof lineage (observability-only)
   topology    Inspect topology state (observability-only)
   reconcile   Detect legitimacy drift across lifecycle phases
+  adoption    Track external execution surface adoption (observability-only)
 
 Core invariant: validated_object == executed_object
 
