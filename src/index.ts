@@ -1,6 +1,6 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
 import type { CanonicalAEO } from "./lib/aeo-governance.ts"
-import { classifyFromPredicates } from "./lib/finality-classification.js"
+import { classifyFromPredicates, classifyPartitionFinalityAdmission } from "./lib/finality-classification.js"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -8006,6 +8006,19 @@ export default {
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", severity: "WARN", payload: { route: "/execute" }, drift_class: "execution_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: "validation_hash_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, severity: "HIGH", payload: { route: "/execute", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
+      const executePartitionAdmission = classifyPartitionFinalityAdmission({
+        partition_finality_state: b.partition_finality_state,
+        partition_epoch: b.partition_epoch,
+        partition_closure_hash: b.partition_closure_hash,
+        canonical_lineage_hash: b.canonical_lineage_hash,
+        partition_lineage_hash: b.partition_lineage_hash,
+        topology_visible: b.topology_visible,
+        reconciliation_deterministic: b.reconciliation_deterministic,
+        reconciliation_ordering_deterministic: b.reconciliation_ordering_deterministic,
+        settlement_observed_at: b.partition_settlement_observed_at,
+        freshness_window_ms: VALIDATION_FRESHNESS_WINDOW_MS
+      })
+      if (!executePartitionAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:executePartitionAdmission.reason }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", indicator: executePartitionAdmission.reason }, drift_class: "execution_drift" })
       const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND result='VALID' AND status='VALID'`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
       if (!validation) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"hash_mismatch" }, { event_type: "HASH_MISMATCH", decision_id, severity: "HIGH", payload: { route: "/execute", expected_hash: validated_object_hash, indicator: "validation_lineage_missing_or_mismatched" }, drift_class: "hash_drift" })
       if (!isFresh(String(validation.created_at || ""), VALIDATION_FRESHNESS_WINDOW_MS)) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"stale_validation" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "HIGH", payload: { route: "/execute", validation_created_at: validation.created_at || null, freshness_window_ms: VALIDATION_FRESHNESS_WINDOW_MS, indicator: "stale_validation_blocked_at_execution" }, drift_class: "execution_drift" })
@@ -8122,6 +8135,19 @@ export default {
       if (!decision_id) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_decision_id" }, { event_type: "VALIDATION_REJECTED", execution_id, severity: "WARN", payload: { route: "/proof" }, drift_class: "proof_drift" })
       if (!validated_object_hash) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_validated_object_hash" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "WARN", payload: { route: "/proof" }, drift_class: "proof_drift" })
       if (!invocation_nonce) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_invocation_nonce" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "missing_nonce" }, drift_class: "replay_drift" })
+      const proofPartitionAdmission = classifyPartitionFinalityAdmission({
+        partition_finality_state: b.partition_finality_state,
+        partition_epoch: b.partition_epoch,
+        partition_closure_hash: b.partition_closure_hash,
+        canonical_lineage_hash: b.canonical_lineage_hash,
+        partition_lineage_hash: b.partition_lineage_hash,
+        topology_visible: b.topology_visible,
+        reconciliation_deterministic: b.reconciliation_deterministic,
+        reconciliation_ordering_deterministic: b.reconciliation_ordering_deterministic,
+        settlement_observed_at: b.partition_settlement_observed_at,
+        freshness_window_ms: VALIDATION_FRESHNESS_WINDOW_MS
+      })
+      if (!proofPartitionAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:proofPartitionAdmission.reason }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", indicator: proofPartitionAdmission.reason }, drift_class: "proof_drift" })
       const proofEarlyValidation = await env.DB.prepare(`SELECT created_at FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND status='VALID' AND result='VALID'`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
       if (proofEarlyValidation && !isFresh(String(proofEarlyValidation.created_at || ""), VALIDATION_FRESHNESS_WINDOW_MS)) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"stale_validation" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", validation_created_at: proofEarlyValidation.created_at || null, freshness_window_ms: VALIDATION_FRESHNESS_WINDOW_MS, indicator: "stale_validation_blocked_at_proof" }, drift_class: "proof_drift" })
       const proof_id = crypto.randomUUID()

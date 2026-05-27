@@ -17,6 +17,57 @@ export type FinalityClassification =
   | 'PARTITION_SUSPENDED'
   | 'NULL'
 
+export type PartitionFinalityState =
+  | "PARTITION_OPEN"
+  | "PARTITION_PENDING_SETTLEMENT"
+  | "PARTITION_SETTLED"
+  | "PARTITION_RECONCILED"
+  | "PARTITION_DRIFT"
+  | "NULL"
+
+export type PartitionAdmissionDecision =
+  | { ok: true, state: "PARTITION_SETTLED" | "PARTITION_RECONCILED" }
+  | { ok: false, reason: "missing_partition_metadata" | "ambiguous_partition_ordering" | "finality_hash_drift" | "reconciliation_ambiguity" | "detached_lineage" | "partition_visibility_loss" | "stale_partition_settlement_evidence" | "non_deterministic_partition_reconciliation" | "partition_unsettled" | "partition_drift" }
+
+export function classifyPartitionFinalityAdmission(input: {
+  partition_finality_state?: unknown
+  partition_epoch?: unknown
+  partition_closure_hash?: unknown
+  canonical_lineage_hash?: unknown
+  partition_lineage_hash?: unknown
+  topology_visible?: unknown
+  reconciliation_deterministic?: unknown
+  reconciliation_ordering_deterministic?: unknown
+  now_ms?: number
+  settlement_observed_at?: unknown
+  freshness_window_ms?: number
+}): PartitionAdmissionDecision {
+  const state = String(input.partition_finality_state || "") as PartitionFinalityState
+  const closureHash = String(input.partition_closure_hash || "")
+  const canonicalLineage = String(input.canonical_lineage_hash || "")
+  const partitionLineage = String(input.partition_lineage_hash || "")
+  const topologyVisible = input.topology_visible === true
+  const reconciliationDeterministic = input.reconciliation_deterministic === true
+  const orderingDeterministic = input.reconciliation_ordering_deterministic === true
+  const epoch = Number(input.partition_epoch)
+  const observedAtMs = Date.parse(String(input.settlement_observed_at || ""))
+  const nowMs = Number.isFinite(input.now_ms) ? Number(input.now_ms) : Date.now()
+  const freshnessWindow = Number.isFinite(input.freshness_window_ms) ? Number(input.freshness_window_ms) : 5 * 60_000
+  if (!state || !closureHash || !canonicalLineage || !partitionLineage || !Number.isFinite(epoch)) return { ok: false, reason: "missing_partition_metadata" }
+  if (!topologyVisible) return { ok: false, reason: "partition_visibility_loss" }
+  if (!orderingDeterministic) return { ok: false, reason: "ambiguous_partition_ordering" }
+  if (!reconciliationDeterministic) return { ok: false, reason: "non_deterministic_partition_reconciliation" }
+  if (!Number.isFinite(observedAtMs) || (nowMs - observedAtMs) > freshnessWindow) return { ok: false, reason: "stale_partition_settlement_evidence" }
+  if (canonicalLineage !== partitionLineage) return { ok: false, reason: "detached_lineage" }
+  const canonicalClosureHash = sha256Hex(canonicalize({ partition_epoch: epoch, canonical_lineage_hash: canonicalLineage }))
+  if (closureHash !== canonicalClosureHash) return { ok: false, reason: "finality_hash_drift" }
+  if (state === "PARTITION_DRIFT") return { ok: false, reason: "partition_drift" }
+  if (state === "PARTITION_OPEN" || state === "PARTITION_PENDING_SETTLEMENT") return { ok: false, reason: "partition_unsettled" }
+  if (state === "NULL") return { ok: false, reason: "reconciliation_ambiguity" }
+  if (state === "PARTITION_SETTLED" || state === "PARTITION_RECONCILED") return { ok: true, state }
+  return { ok: false, reason: "reconciliation_ambiguity" }
+}
+
 export type FinalityObjectType =
   | 'authority'
   | 'aeo'
