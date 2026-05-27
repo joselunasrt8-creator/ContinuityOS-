@@ -46,7 +46,10 @@ function createEnv() {
               }
               return null
             },
-            async all() { return { results: [] } }
+            async all() {
+              if (sql.includes('PRAGMA table_info(govern_nonce_registry)')) return { results: [{ name: 'nonce' }, { name: 'nonce_domain' }, { name: 'candidate_hash' }, { name: 'created_at' }] }
+              return { results: [] }
+            }
           }
         }
       }
@@ -129,4 +132,78 @@ test('issue #1463 /govern detects nonce rebinding within nonce domain and allows
   const differentDomainPayload = await differentDomain.json()
   assert.equal(differentDomainPayload.status, 'VALID_CANDIDATE')
   assert.equal(differentDomainPayload.nonce_domain, 'openclaw-alt')
+})
+
+
+function createLegacySchemaEnv(legacyRows = []) {
+  const writes = []
+  const legacyMap = new Map(legacyRows.map((row) => [row.nonce, row.candidate_hash]))
+  const nonceMap = new Map()
+  let upgraded = false
+  return {
+    writes,
+    env: {
+      API_KEY: 'test-key',
+      DB: {
+        prepare(sql) {
+          return {
+            _args: [],
+            bind(...args) { this._args = args; return this },
+            async run() {
+              writes.push({ sql, args: this._args })
+              if (sql.includes('INSERT OR IGNORE INTO govern_nonce_registry_v2') && !upgraded) {
+                for (const [nonce, hash] of legacyMap.entries()) nonceMap.set(`${nonce}:openclaw`, hash)
+                return { meta: { changes: 1 } }
+              }
+              if (sql.includes('ALTER TABLE govern_nonce_registry_v2 RENAME TO govern_nonce_registry')) {
+                upgraded = true
+                return { meta: { changes: 1 } }
+              }
+              if (sql.includes('INSERT OR IGNORE INTO govern_nonce_registry')) {
+                const key = `${this._args[0]}:${this._args[1]}`
+                if (nonceMap.has(key)) return { meta: { changes: 0 } }
+                nonceMap.set(key, this._args[2])
+                return { meta: { changes: 1 } }
+              }
+              return { meta: { changes: 1 } }
+            },
+            async first() {
+              if (sql.includes('SELECT candidate_hash FROM govern_nonce_registry')) {
+                const key = `${this._args[0]}:${this._args[1]}`
+                const candidate_hash = nonceMap.get(key)
+                return candidate_hash ? { candidate_hash } : null
+              }
+              return null
+            },
+            async all() {
+              if (sql.includes('PRAGMA table_info(govern_nonce_registry)')) {
+                if (!upgraded) return { results: [{ name: 'nonce' }, { name: 'candidate_hash' }, { name: 'created_at' }] }
+                return { results: [{ name: 'nonce' }, { name: 'nonce_domain' }, { name: 'candidate_hash' }, { name: 'created_at' }] }
+              }
+              return { results: [] }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+test('issue #1469 /govern upgrades old nonce schema and preserves openclaw replay semantics', async () => {
+  const worker = await loadWorker()
+  const baseline = createEnv()
+  const seeded = await worker.fetch(post(validCandidate, 'legacy-nonce', 'openclaw'), baseline.env)
+  const seededPayload = await seeded.json()
+  const db = createLegacySchemaEnv([{ nonce: 'legacy-nonce', candidate_hash: seededPayload.evidence.candidate_hash }])
+
+  const replay = await worker.fetch(post(validCandidate, 'legacy-nonce', 'openclaw'), db.env)
+  const replayPayload = await replay.json()
+  assert.equal(replayPayload.status, 'NULL')
+  assert.equal(replayPayload.reason, 'nonce_replay')
+
+  const crossDomain = await worker.fetch(post(validCandidate, 'legacy-nonce', 'openclaw-alt'), db.env)
+  const crossDomainPayload = await crossDomain.json()
+  assert.equal(crossDomainPayload.status, 'VALID_CANDIDATE')
+
+  assert.equal(db.writes.some((entry) => entry.sql.includes('ALTER TABLE govern_nonce_registry_v2 RENAME TO govern_nonce_registry')), true)
 })
