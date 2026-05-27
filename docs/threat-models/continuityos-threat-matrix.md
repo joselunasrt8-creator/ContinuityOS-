@@ -1,15 +1,13 @@
 # ContinuityOS Threat Matrix
 
-> **Non-Operative Boundary**
->
-> This document is architectural threat-model guidance only. It is **not** validator canon, protocol authority, executable semantics, or implementation binding.
+> **Non-Operative Note:** This document is architectural and threat-model oriented. It does **not** define validator canon, protocol authority, executable semantics, or implementation-binding behavior.
 
 ## Core Compression
 
-AI scales cognition.
+AI scales cognition.  
 ContinuityOS scales legitimacy.
 
-Probabilistic model behavior can improve assistance quality, but it cannot, by itself, guarantee mutation legitimacy in distributed systems. ContinuityOS positions legitimacy as infrastructure: a deterministic control plane that decides whether state mutation is allowed before execution occurs.
+Probabilistic model behavior can improve decision quality, but it cannot guarantee deterministic mutation safety in distributed systems. Mutation legitimacy must therefore be enforced as infrastructure, not inferred from model quality.
 
 ## Canonical Runtime Spine
 
@@ -23,99 +21,111 @@ Probabilistic model behavior can improve assistance quality, but it cannot, by i
 → /proof
 ```
 
-This runtime spine separates cognition from mutation authority. The governance objective is not to predict model intent, but to constrain state change to legitimacy-bounded objects that can be validated, executed, and proven under deterministic checks.
+This spine represents a mutation-control topology, not a generic orchestration pipeline. Each stage constrains the next stage’s ability to mutate shared state.
 
 ## Core Invariants
 
-1. **If no valid object exists → nothing happens**
-2. **validated_object == executed_object**
-3. **No valid continuity lineage → no valid authority → no valid execution**
-4. **All persisted legitimacy lineage must remain recursively reconcilable**
-5. **VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID; else → NULL**
-
-These invariants define mutation-control boundaries. They are evaluated as infrastructure constraints, not advisory policy language.
+- If no valid object exists → nothing happens.
+- `validated_object == executed_object`.
+- No valid continuity lineage → no valid authority → no valid execution.
+- All persisted legitimacy lineage must remain recursively reconcilable.
+- `VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID`; else → `NULL`.
 
 ## Why Probabilistic AI Safety Is Insufficient
 
-Probabilistic safety methods can reduce unsafe outputs, but they do not produce deterministic guarantees over distributed mutation surfaces. The dominant operational risk is not only malicious intent; it is ambiguity under machine-speed execution where:
+Probabilistic safeguards (prompting, policy heuristics, model-side refusals) are useful but structurally incomplete for distributed mutation control because they do not provide:
 
-- execution paths fan out across tools, queues, and services,
-- authority can become stale between check and use,
-- replays can resurrect previously valid artifacts,
-- partitions can produce contradictory local truths.
+- deterministic replay boundaries,
+- topologically consistent authority propagation,
+- object-level equivalence guarantees across validation and execution,
+- reconciliation-safe lineage under partitions and retries.
 
-In this environment, safety heuristics are necessary but insufficient. Deterministic legitimacy boundaries are required so that mutation rights remain verifiable under replay, concurrency, and partition stress.
+ContinuityOS reframes the safety problem from “model intent quality” to “state mutation legitimacy under distributed uncertainty.”
+
+## Why Legitimacy Must Become Infrastructure
+
+In high-throughput systems, machine-speed execution amplifies minor ambiguity into systemic drift. Legitimacy must be encoded as enforceable runtime constraints with auditable lineage so that mutation rights are:
+
+- explicit,
+- bounded,
+- replay-safe,
+- topology-visible,
+- and reconcilable after faults.
+
+## Dominant Failure Surface: Distributed Ambiguity
+
+The critical risk is not singular malicious intent; it is distributed ambiguity: retries, partial failures, stale caches, race windows, and split-brain visibility producing contradictory legitimacy conclusions.
+
+Deterministic legitimacy boundaries are required to collapse ambiguity before mutation is committed.
 
 ## Threat Matrix
 
-| Threat | Traditional Pipeline Vulnerability | ContinuityOS Mitigation | Legitimacy Invariant Involved |
+| Threat | Traditional pipeline vulnerability | ContinuityOS mitigation | Legitimacy invariant involved |
 |---|---|---|---|
-| TOCTOU drift | Validation and execution occur on non-identical objects; object can change after check and before mutation. | Bind execution strictly to the validated object identity; reject if object hash/version diverges at execution boundary. | `validated_object == executed_object` |
-| Hidden tool mutation | Side-effecting tools mutate state outside declared governance path; observability lags mutation. | Require all state-changing paths to originate from legitimacy objects and proof-bearing execution records. Undeclared mutation surfaces are non-legitimate. | `If no valid object exists → nothing happens` |
-| Replay resurrection | Previously valid execution artifacts are replayed after policy/authority context changed. | Enforce freshness, single-use constraints, and replay tombstoning on legitimacy objects. | `VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID; else → NULL` |
-| Stale authority | Authority token remains accepted after lineage supersession, revocation, or continuity break. | Resolve authority against current continuity lineage at validation time; stale lineage invalidates execution eligibility. | `No valid continuity lineage → no valid authority → no valid execution` |
-| Partition ambiguity | Distributed partitions produce concurrent but conflicting authority/continuity views. | Require reconciliation closure before cross-partition legitimacy acceptance; unresolved divergence blocks mutation. | `All persisted legitimacy lineage must remain recursively reconcilable` |
-| Proof spoofing | Execution claims are asserted without cryptographically or topologically coherent provenance. | Treat proof as mandatory boundary artifact linked to executed object and continuity lineage; unbound proofs are non-authoritative. | `validated_object == executed_object` + recursive reconcilability |
+| TOCTOU drift | Object validated at `t1`, mutated or substituted before execution at `t2`. | Bind execution to the exact validated object identity and hash; fail closed on mismatch. | `validated_object == executed_object` |
+| Hidden tool mutation | Side-channel or tool-internal state changes bypass declared execution path. | Constrain mutation to declared, proof-bearing execution surfaces only; reject untracked side effects. | If no valid object exists → nothing happens |
+| Replay resurrection | Previously valid mutation is replayed after context/policy changes. | Enforce single-use semantics and replay-nullification via `UNUSED` and lineage checks. | `VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID` |
+| Stale authority | Expired or superseded authority token remains accepted in lagged nodes/services. | Require continuity-coupled authority freshness and lineage continuity at validation time. | No continuity lineage → no valid authority |
+| Partition ambiguity | Network partition yields divergent legitimacy views; multiple branches claim authority. | Defer mutation finality until continuity/proof reconciliation resolves branch legitimacy. | Persisted lineage recursively reconcilable |
+| Proof spoofing | Execution claim emitted without faithful linkage to validated mutation object. | Require cryptographically or deterministically linked proof artifacts referencing executed object and lineage. | `validated_object == executed_object` and reconcilable lineage |
 
 ## Deep-Dive Failure Sections
 
-### 1) TOCTOU + Hidden Mutation
+### 1) TOCTOU Drift + Hidden Mutation
 
-**Failure mode:**
-A system validates object `O1`, then executes `O2` due to asynchronous tool mutation, queue substitution, or mutable payload references.
+**Failure pattern:**
+- Validation is performed on object `A`.
+- Execution surface later receives object `A'` (or `A` with hidden side effects).
+- Pipeline reports “validated then executed,” but the mutated effect does not correspond to the validated object.
 
-**Why this dominates at scale:**
-As throughput increases, even short timing windows create deterministic drift opportunities. Hidden tool surfaces amplify this by introducing mutations outside declared control paths.
+**Distributed consequence:**
+- Local correctness assertions remain green while global state diverges.
+- Audit trails lose object equivalence, making post-incident reconstruction non-deterministic.
 
-**ContinuityOS framing:**
-- Validation is object-specific, not intent-generic.
-- Execution must consume the exact validated object.
-- Any non-declared side effect is treated as legitimacy-null.
-
-**Boundary consequence:**
-If identity equivalence cannot be shown at execution time, mutation is denied.
+**ContinuityOS posture:**
+- Validation and execution are identity-coupled.
+- Hidden mutation channels are non-legitimate by construction.
+- Any mismatch collapses to `NULL` (no state mutation).
 
 ### 2) Replay Resurrection + Stale Lineage
 
-**Failure mode:**
-A once-valid authority or execution artifact is replayed after supersession, policy change, or continuity invalidation.
+**Failure pattern:**
+- A once-valid authority/intent bundle is captured and replayed.
+- Lineage observers with stale continuity state accept it as current.
 
-**Why this dominates at scale:**
-Distributed retry logic, eventual consistency, and asynchronous recovery paths routinely re-introduce old artifacts unless explicit single-use and freshness controls exist.
+**Distributed consequence:**
+- Deprecated policy context can re-enter active mutation surfaces.
+- “Already consumed” legitimacy objects reanimate under retry storms.
 
-**ContinuityOS framing:**
-- Legitimacy objects are freshness-bound and usage-bound.
-- Lineage supersession propagates invalidation.
-- Replay attempts evaluate against current policy and continuity state, not historical acceptance.
-
-**Boundary consequence:**
-Past validity does not imply present legitimacy; stale or previously consumed artifacts resolve to NULL.
+**ContinuityOS posture:**
+- Legitimacy objects are single-use within continuity lineage.
+- Authority is continuity-scoped, freshness-bound, and invalid outside current lineage.
+- Replay attempts lacking current `UNUSED` + lineage consistency resolve to `NULL`.
 
 ### 3) Partition Ambiguity + Distributed Split-Brain Legitimacy
 
-**Failure mode:**
-Network partitions create local authority/continuity decisions that cannot be globally reconciled, enabling divergent mutation histories.
+**Failure pattern:**
+- Topology partition creates isolated legitimacy evaluators.
+- Each side independently derives valid-looking authority chains.
 
-**Why this dominates at scale:**
-Multi-region systems inevitably encounter partial failure and delayed convergence; ambiguity becomes a first-class threat surface rather than an edge case.
+**Distributed consequence:**
+- Concurrent, contradictory mutations can both appear legitimate locally.
+- Later merge requires conflict adjudication without deterministic lineage precedence.
 
-**ContinuityOS framing:**
-- Legitimacy is topology-aware, not node-local.
-- Mutation under unresolved lineage divergence is blocked.
-- Reconciliation is a precondition for cross-domain legitimacy acceptance.
-
-**Boundary consequence:**
-Where continuity cannot be reconciled recursively, authority remains non-final and execution is denied.
+**ContinuityOS posture:**
+- Legitimacy is not finalized solely by local acceptance during partition.
+- Continuity and proof reconciliation gate final mutation legitimacy across branches.
+- Unreconcilable branches remain non-authoritative for irreversible mutation.
 
 ## Core Architectural Shift
 
-Traditional framing:
+Replace:
 
 ```text
 prompt → execution
 ```
 
-ContinuityOS framing:
+with:
 
 ```text
 intent
@@ -127,7 +137,7 @@ intent
 → reconciliation
 ```
 
-This shift compresses governance from subjective intent interpretation into deterministic mutation control with explicit lineage and closure requirements.
+This shift turns “model output handling” into “distributed mutation governance.”
 
 ## Key Compression
 
@@ -137,14 +147,20 @@ The real danger is:
 
 **distributed ambiguity under machine-speed execution.**
 
-ContinuityOS addresses this by turning legitimacy into infrastructure and treating ambiguous mutation authority as a denial condition rather than an acceptable operational gray zone.
+ContinuityOS addresses this by making legitimacy deterministic, lineage-aware, and infrastructure-enforced.
 
-## In-Repo Positioning Rationale
+## Scope Boundary (Non-Operative)
 
-This artifact belongs in-repo because the repository defines the runtime surfaces (`/session` through `/proof`) and therefore owns the architectural threat model for mutation legitimacy. Keeping this matrix adjacent to implementation:
+This document is intentionally:
 
-- preserves topology visibility between design and code,
-- improves review discipline for mutation-capable changes,
-- creates a shared deterministic vocabulary for threat analysis,
-- supports replay-safe evolution without conflating architecture with executable canon.
+- architectural,
+- explanatory,
+- threat-model oriented,
+- and non-operative.
 
+It is intentionally **not**:
+
+- validator canon,
+- protocol authority,
+- executable semantics,
+- implementation binding.
