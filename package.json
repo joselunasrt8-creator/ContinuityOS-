@@ -22,7 +22,9 @@
   "devDependencies": {
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
-    "wrangler": "^4.93.1"
+    "wrangler": "^4.93.1",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   },
   "dependencies": {
     "neo4j-driver": "^6.0.1"

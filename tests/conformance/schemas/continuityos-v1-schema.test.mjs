@@ -1,52 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 
 async function loadSchema(path) {
   return JSON.parse(await readFile(new URL(`../../../${path}`, import.meta.url), 'utf8'));
 }
 
-function isObject(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function validate(schema, candidate) {
-  if (schema.type === 'object') {
-    if (!isObject(candidate)) return false;
-
-    if (Array.isArray(schema.required)) {
-      for (const key of schema.required) {
-        if (!(key in candidate)) return false;
-      }
-    }
-
-    if (schema.additionalProperties === false && schema.properties) {
-      for (const key of Object.keys(candidate)) {
-        if (!(key in schema.properties)) return false;
-      }
-    }
-
-    if (schema.properties) {
-      for (const [key, propertySchema] of Object.entries(schema.properties)) {
-        if (key in candidate && !validate(propertySchema, candidate[key])) return false;
-      }
-    }
-
-    return true;
-  }
-
-  if (schema.type === 'string') {
-    if (typeof candidate !== 'string') return false;
-    if (typeof schema.minLength === 'number' && candidate.length < schema.minLength) return false;
-    if (Array.isArray(schema.enum) && !schema.enum.includes(candidate)) return false;
-    return true;
-  }
-
-  if (schema.type === 'boolean') {
-    return typeof candidate === 'boolean';
-  }
-
-  return true;
+function createValidator(schema) {
+  const ajv = new Ajv2020({ allErrors: true, strict: false, validateFormats: true });
+  addFormats(ajv);
+  return ajv.compile(schema);
 }
 
 const validAtao = {
@@ -87,45 +52,78 @@ const validAeo = {
 
 test('continuityos v1 ATAO accepts valid object', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/atao.schema.json');
-  assert.equal(validate(schema, validAtao), true);
+  const validate = createValidator(schema);
+  assert.equal(validate(validAtao), true);
 });
 
 test('continuityos v1 ATAO rejects missing required field', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/atao.schema.json');
+  const validate = createValidator(schema);
   const invalid = { ...validAtao };
   delete invalid.session_id;
-  assert.equal(validate(schema, invalid), false);
+  assert.equal(validate(invalid), false);
 });
 
 test('continuityos v1 ATAO rejects extra field', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/atao.schema.json');
-  assert.equal(validate(schema, { ...validAtao, extra: true }), false);
+  const validate = createValidator(schema);
+  assert.equal(validate({ ...validAtao, extra: true }), false);
+});
+
+test('continuityos v1 ATAO rejects invalid risk_class enum value', async () => {
+  const schema = await loadSchema('schemas/json/continuityos/v1/atao.schema.json');
+  const validate = createValidator(schema);
+  assert.equal(validate({ ...validAtao, risk_class: 'P9' }), false);
+});
+
+test('continuityos v1 ATAO rejects invalid timestamp format with date-time validation', async () => {
+  const schema = await loadSchema('schemas/json/continuityos/v1/atao.schema.json');
+  const validate = createValidator(schema);
+  assert.equal(validate({ ...validAtao, timestamp: 'not-a-date-time' }), false);
 });
 
 test('continuityos v1 AEO accepts valid object', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
-  assert.equal(validate(schema, validAeo), true);
+  const validate = createValidator(schema);
+  assert.equal(validate(validAeo), true);
 });
 
 test('continuityos v1 AEO rejects missing required five-field member', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
+  const validate = createValidator(schema);
   const invalid = { ...validAeo };
   delete invalid.finality;
-  assert.equal(validate(schema, invalid), false);
+  assert.equal(validate(invalid), false);
 });
 
 test('continuityos v1 AEO rejects extra top-level field', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
-  assert.equal(validate(schema, { ...validAeo, drift: true }), false);
+  const validate = createValidator(schema);
+  assert.equal(validate({ ...validAeo, drift: true }), false);
 });
 
 test('continuityos v1 AEO rejects top-level schema_version', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
-  assert.equal(validate(schema, { ...validAeo, schema_version: 'CONTINUITYOS_V1' }), false);
+  const validate = createValidator(schema);
+  assert.equal(validate({ ...validAeo, schema_version: 'CONTINUITYOS_V1' }), false);
+});
+
+test('continuityos v1 AEO rejects malformed nested validation object', async () => {
+  const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
+  const validate = createValidator(schema);
+  const invalid = {
+    ...validAeo,
+    validation: {
+      ...validAeo.validation,
+      require_exact_object_hash: 'yes'
+    }
+  };
+  assert.equal(validate(invalid), false);
 });
 
 test('continuityos v1 AEO validation is order-independent', async () => {
   const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
+  const validate = createValidator(schema);
   const reordered = {
     finality: validAeo.finality,
     target: validAeo.target,
@@ -133,20 +131,20 @@ test('continuityos v1 AEO validation is order-independent', async () => {
     scope: validAeo.scope,
     intent: validAeo.intent
   };
-  assert.equal(validate(schema, reordered), true);
+  assert.equal(validate(reordered), true);
 });
 
 test('legacy and v1 AEO schemas both accept same valid fixture', async () => {
-  const legacy = await loadSchema('schemas/aeo.schema.json');
-  const v1 = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
-  assert.equal(validate(legacy, validAeo), true);
-  assert.equal(validate(v1, validAeo), true);
+  const legacy = createValidator(await loadSchema('schemas/aeo.schema.json'));
+  const v1 = createValidator(await loadSchema('schemas/json/continuityos/v1/aeo.schema.json'));
+  assert.equal(legacy(validAeo), true);
+  assert.equal(v1(validAeo), true);
 });
 
 test('legacy and v1 AEO schemas both reject same extra-field fixture', async () => {
-  const legacy = await loadSchema('schemas/aeo.schema.json');
-  const v1 = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
+  const legacy = createValidator(await loadSchema('schemas/aeo.schema.json'));
+  const v1 = createValidator(await loadSchema('schemas/json/continuityos/v1/aeo.schema.json'));
   const invalid = { ...validAeo, extra_field: 'nope' };
-  assert.equal(validate(legacy, invalid), false);
-  assert.equal(validate(v1, invalid), false);
+  assert.equal(legacy(invalid), false);
+  assert.equal(v1(invalid), false);
 });
