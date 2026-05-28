@@ -61,7 +61,7 @@ test('/validate predicate_snapshot binds T to explicit topology evidence', () =>
 })
 
 test('/validate predicate_snapshot sets distributed predicates false (not yet available)', () => {
-  assert.match(validateSection, /Q: false, G: false, L: false, X: false/)
+  assert.match(validateSection, /Q: false, G: false, L: _local_lineage_present, X: false/)
 })
 
 test('/validate topology evidence cannot promote GLOBAL_VALID without distributed predicates', () => {
@@ -96,4 +96,21 @@ test('PARTITION_SUSPENDED classification does not block VALID gate (additive evi
   // The /validate route returns status:"VALID" at the same time as classification_evidence.classification="PARTITION_SUSPENDED"
   // These are independent: gate = VALID/NULL; classification = distributed finality evidence
   assert.match(validateSection, /status:"VALID".*classification_evidence/)
+})
+
+test('/validate binds local lineage freshness evidence', () => {
+  assert.match(validateSection, /const _local_lineage_present = Boolean/)
+  assert.match(validateSection, /L: _local_lineage_present/)
+  assert.match(validateSection, /local_lineage_present: _local_lineage_present/)
+})
+
+test('/validate exposes absent distributed convergence evidence explicitly', () => {
+  assert.match(validateSection, /distributed_quorum_present: false/)
+  assert.match(validateSection, /global_consensus_present: false/)
+  assert.match(validateSection, /cryptographic_integrity_present: false/)
+})
+
+test('/validate local lineage freshness does not imply convergence or global validity', () => {
+  assert.match(validateSection, /Q: false, G: false, L: _local_lineage_present, X: false/)
+  assert.match(validateSection, /classifyFromPredicates\(_predicate_snapshot, _topology_present\)/)
 })
