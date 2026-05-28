@@ -40,6 +40,16 @@ const EVIDENCE_FLAGS = Object.freeze({
   creates_authority: false,
   proof_generating: false,
 })
+export const RECONCILIATION_NULL_REASONS = Object.freeze([
+  'RECON_INPUT_HASH_MISMATCH',
+  'NON_CANONICAL_INPUT_ORDER',
+  'CONFLICT_SET_HASH_MISMATCH',
+  'NON_REPRODUCIBLE_OUTPUT_HASH',
+  'MISSING_LINEAGE_EDGE',
+  'AMBIGUOUS_RECON_ORDERING',
+  'NONDETERMINISTIC_QUARANTINE_MAPPING',
+  'STALE_RECONCILIATION_EVIDENCE',
+])
 
 function asArray(value) { return Array.isArray(value) ? value : [] }
 function truthy(value) { return value === true || value === 'true' || value === 1 || value === '1' }
@@ -140,6 +150,7 @@ function one(records, predicate) {
 
 export function traverseCrossRegistries(state = {}, options = {}) {
   const limit = Number.isInteger(options.limit) ? options.limit : 1000
+  const nonCanonicalInputOrder = hashCanonical(state) !== hashCanonical(canonicalRegistryState(state))
   const canonical = canonicalRegistryState(state)
   const limited = Object.fromEntries(Object.entries(canonical).map(([registry, records]) => [registry, records.slice(0, limit)]))
   const ctx = { edges: [], drift: [], orphans: [] }
@@ -306,13 +317,15 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   const unresolved_edges = ctx.edges.filter((item) => item.status !== 'RESOLVED').sort((a, b) => hashCanonical(a).localeCompare(hashCanonical(b)))
   const drift_classes = [...new Set(ctx.drift.map((item) => item.drift_class))].sort()
   const orphaned_records = [...ctx.orphans].sort((a, b) => hashCanonical(a).localeCompare(hashCanonical(b)))
-  const containment_status = drift_classes.length > 0 || unresolved_edges.length > 0 ? 'RECONCILIATION_REQUIRED' : 'RECONCILED'
-  const legitimacy_status = containment_status === 'RECONCILED' ? 'LEGITIMATE' : 'NULL'
+  const reconciliation_input_hash = hashCanonical(canonical)
+  const conflict_set_hash = hashCanonical({ unresolved_edges, orphaned_records, drift_classes })
+  const null_reasons = []
+  if (nonCanonicalInputOrder) null_reasons.push('NON_CANONICAL_INPUT_ORDER')
+  if (unresolved_edges.length > 0) null_reasons.push('MISSING_LINEAGE_EDGE')
+  if (drift_classes.includes('RECONCILIATION_DRIFT')) null_reasons.push('AMBIGUOUS_RECON_ORDERING')
+  if (drift_classes.includes('CONTINUITY_DRIFT')) null_reasons.push('STALE_RECONCILIATION_EVIDENCE')
 
   const lineage_edges = ctx.edges.sort((a, b) => hashCanonical(a).localeCompare(hashCanonical(b)))
-  const equivalence = Object.freeze({ object_type: 'CrossRegistryEquivalence', equivalent: containment_status === 'RECONCILED', drift_classes, legitimacy_status })
-  const continuity_proof = Object.freeze({ object_type: 'CrossRegistryContinuityProof', replay_neutral: true, replay_consumed: false, continuity_preserved: containment_status === 'RECONCILED', legitimacy_status })
-
   const registry_set_hash = hashCanonical(limited)
   const lineage_graph_hash = hashCanonical(lineage_edges)
   const continuity_graph_hash = hashCanonical(lineage_edges.filter((item) => item.relation.includes('CONTINUITY') || item.relation.includes('SESSION')))
@@ -320,7 +333,16 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   const replay_graph_hash = hashCanonical({ invocations, nonce_to_objects: [...nonceToObjects.entries()].map(([nonce, objects]) => [nonce, [...objects].sort()]).sort() })
   const topology_binding_hash = hashCanonical(limited.runtime_topology_registry)
   const governance_binding_hash = hashCanonical({ recursive: limited.recursive_governance_containment_registry, root: limited.root_authority_observability_registry, closure: limited.unauthorized_mutation_closure_registry, preo: limited.preo_registry })
+  const deterministicNullReasons = Object.freeze([...new Set(null_reasons)].sort())
+  const containment_status = deterministicNullReasons.length > 0 ? 'NULL' : 'RECONCILED_DETERMINISTIC'
+  const legitimacy_status = containment_status === 'RECONCILED_DETERMINISTIC' ? 'LEGITIMATE' : 'NULL'
+  const equivalence = Object.freeze({ object_type: 'CrossRegistryEquivalence', equivalent: containment_status === 'RECONCILED_DETERMINISTIC', drift_classes, legitimacy_status })
+  const continuity_proof = Object.freeze({ object_type: 'CrossRegistryContinuityProof', replay_neutral: true, replay_consumed: false, continuity_preserved: containment_status === 'RECONCILED_DETERMINISTIC', legitimacy_status })
   const reconciliation_equivalence_hash = hashCanonical({ equivalence, continuity_proof, drift_classes, unresolved_edges, orphaned_records })
+  const reconciliation_output_hash = hashCanonical({ reconciliation_input_hash, conflict_set_hash, registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash, null_reasons: deterministicNullReasons })
+  const reproduced_output_hash = hashCanonical({ reconciliation_input_hash, conflict_set_hash, registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash, null_reasons: deterministicNullReasons })
+  const reproducible = reconciliation_output_hash === reproduced_output_hash
+  const quarantine_status = reproducible ? (deterministicNullReasons.length > 0 ? 'RECONCILED_DRIFT' : 'RECONCILED_DETERMINISTIC') : 'QUARANTINED_NONDETERMINISTIC'
 
   return Object.freeze({
     object_type: 'CrossRegistryReconciliationSnapshot',
@@ -333,6 +355,10 @@ export function traverseCrossRegistries(state = {}, options = {}) {
     topology_binding_hash,
     governance_binding_hash,
     reconciliation_equivalence_hash,
+    reconciliation_input_hash,
+    conflict_set_hash,
+    reconciliation_output_hash,
+    determinism_version: 'v1',
     lineage_edges,
     continuity_proof,
     equivalence,
@@ -341,6 +367,8 @@ export function traverseCrossRegistries(state = {}, options = {}) {
     unresolved_edges,
     orphaned_records,
     containment_status,
+    quarantine_status,
+    null_reasons: deterministicNullReasons,
     legitimacy_status,
     ...EVIDENCE_FLAGS,
   })
@@ -359,8 +387,14 @@ export function deterministicReconciliationReport(snapshot = {}) {
     topology_binding_hash: String(snapshot.topology_binding_hash || ''),
     governance_binding_hash: String(snapshot.governance_binding_hash || ''),
     reconciliation_equivalence_hash: String(snapshot.reconciliation_equivalence_hash || ''),
-    containment_status: String(snapshot.containment_status || 'RECONCILIATION_REQUIRED'),
+    reconciliation_input_hash: String(snapshot.reconciliation_input_hash || ''),
+    conflict_set_hash: String(snapshot.conflict_set_hash || ''),
+    reconciliation_output_hash: String(snapshot.reconciliation_output_hash || ''),
+    determinism_version: String(snapshot.determinism_version || 'v1'),
+    containment_status: String(snapshot.containment_status || 'NULL'),
+    quarantine_status: String(snapshot.quarantine_status || 'RECONCILED_DRIFT'),
     legitimacy_status: String(snapshot.legitimacy_status || 'NULL'),
+    null_reasons: asArray(snapshot.null_reasons).map(String).sort(),
     drift_classes: asArray(snapshot.drift_classes).map(String).sort(),
     unresolved_edges: sortRecords(asArray(snapshot.unresolved_edges)),
     orphaned_records: sortRecords(asArray(snapshot.orphaned_records)),
