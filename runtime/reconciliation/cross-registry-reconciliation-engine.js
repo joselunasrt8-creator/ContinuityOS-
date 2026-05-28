@@ -322,6 +322,7 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   const null_reasons = []
   if (nonCanonicalInputOrder) null_reasons.push('NON_CANONICAL_INPUT_ORDER')
   if (unresolved_edges.length > 0) null_reasons.push('MISSING_LINEAGE_EDGE')
+  if (drift_classes.length > 0) null_reasons.push('MISSING_LINEAGE_EDGE')
   if (drift_classes.includes('RECONCILIATION_DRIFT')) null_reasons.push('AMBIGUOUS_RECON_ORDERING')
   if (drift_classes.includes('CONTINUITY_DRIFT')) null_reasons.push('STALE_RECONCILIATION_EVIDENCE')
 
@@ -334,10 +335,10 @@ export function traverseCrossRegistries(state = {}, options = {}) {
   const topology_binding_hash = hashCanonical(limited.runtime_topology_registry)
   const governance_binding_hash = hashCanonical({ recursive: limited.recursive_governance_containment_registry, root: limited.root_authority_observability_registry, closure: limited.unauthorized_mutation_closure_registry, preo: limited.preo_registry })
   const deterministicNullReasons = Object.freeze([...new Set(null_reasons)].sort())
-  const containment_status = deterministicNullReasons.length > 0 ? 'NULL' : 'RECONCILED_DETERMINISTIC'
-  const legitimacy_status = containment_status === 'RECONCILED_DETERMINISTIC' ? 'LEGITIMATE' : 'NULL'
-  const equivalence = Object.freeze({ object_type: 'CrossRegistryEquivalence', equivalent: containment_status === 'RECONCILED_DETERMINISTIC', drift_classes, legitimacy_status })
-  const continuity_proof = Object.freeze({ object_type: 'CrossRegistryContinuityProof', replay_neutral: true, replay_consumed: false, continuity_preserved: containment_status === 'RECONCILED_DETERMINISTIC', legitimacy_status })
+  const containment_status = deterministicNullReasons.length > 0 ? 'RECONCILIATION_REQUIRED' : 'RECONCILED'
+  const legitimacy_status = containment_status === 'RECONCILED' ? 'LEGITIMATE' : 'NULL'
+  const equivalence = Object.freeze({ object_type: 'CrossRegistryEquivalence', equivalent: containment_status === 'RECONCILED', drift_classes, legitimacy_status })
+  const continuity_proof = Object.freeze({ object_type: 'CrossRegistryContinuityProof', replay_neutral: true, replay_consumed: false, continuity_preserved: containment_status === 'RECONCILED', legitimacy_status })
   const reconciliation_equivalence_hash = hashCanonical({ equivalence, continuity_proof, drift_classes, unresolved_edges, orphaned_records })
   const reconciliation_output_hash = hashCanonical({ reconciliation_input_hash, conflict_set_hash, registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash, null_reasons: deterministicNullReasons })
   const reproduced_output_hash = hashCanonical({ reconciliation_input_hash, conflict_set_hash, registry_set_hash, lineage_graph_hash, continuity_graph_hash, proof_graph_hash, replay_graph_hash, topology_binding_hash, governance_binding_hash, reconciliation_equivalence_hash, null_reasons: deterministicNullReasons })
