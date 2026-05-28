@@ -241,6 +241,26 @@ async function verifyGovernedToolEnvelopeLinkage(env: Env, decision_id: string, 
   if (String(envelope.non_operative || "") !== "false" && route !== "/govern") return { ok: false, reason: "governed_tool_envelope_non_operative" }
   return { ok: true, envelope_id }
 }
+
+type ValidateTopologyEvidence = {
+  topology_present: boolean
+  topology_snapshot_id: string
+  topology_hash: string
+}
+
+async function deriveValidateTopologyEvidence(env: Env): Promise<ValidateTopologyEvidence> {
+  const row = await env.DB.prepare(`
+    SELECT snapshot_id, topology_hash
+    FROM runtime_topology_registry
+    WHERE evidence_only='true' AND replay_neutral='true' AND executable='false' AND deployment_capable='false' AND creates_authority='false'
+    ORDER BY created_at DESC, snapshot_id DESC
+    LIMIT 1
+  `).first<any>()
+  const topology_snapshot_id = String(row?.snapshot_id || "")
+  const topology_hash = String(row?.topology_hash || "")
+  const topology_present = Boolean(topology_snapshot_id && topology_hash)
+  return { topology_present, topology_snapshot_id, topology_hash }
+}
 type BootstrapDiagnosticEvent =
   | "BOOTSTRAP_SCHEMA_INITIALIZED"
   | "BOOTSTRAP_MIGRATIONS_VALIDATED"
@@ -8012,10 +8032,11 @@ export default {
       await env.DB.prepare(`UPDATE governed_tool_envelope_registry SET non_operative='false' WHERE envelope_id=(SELECT governed_tool_envelope_id FROM authority_registry WHERE decision_id=?1)`).bind(decision_id).run()
       await emitTelemetry(env, { event_type: "VALIDATION_GRANTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "INFO", payload: { route: "/validate", validated_object_hash, invocation_nonce, authority_status: "RESERVED" } })
       await emitInstallBaseTelemetryEvidenceBestEffort(env, { event_type: "validated_execution", decision_id, authority_id: String(authority.authority_id || ""), lineage_origin_hash: validationLineageOriginHash, lineage_origin_match: "MATCH", payload: { event_type: "validated_execution", continuity_id: String(authority.continuity_id || ""), validated_object_hash, execution_surface: "deploy_runtime", result: "NULL" } })
-      const _topology_present = false // topology infrastructure pending (#1346+); fail-closed
-      const _predicate_snapshot = { V: true, A: true, U: true, P: true, R: true, T: false, C: true, Q: false, G: false, L: false, X: false }
+      const _topology_evidence = await deriveValidateTopologyEvidence(env)
+      const _topology_present = _topology_evidence.topology_present
+      const _predicate_snapshot = { V: true, A: true, U: true, P: true, R: true, T: _topology_present, C: true, Q: false, G: false, L: false, X: false }
       const _classification = classifyFromPredicates(_predicate_snapshot, _topology_present)
-      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, ...(validateGovernLineage || {}), policy_class: validatePolicyClass, policy_class_digest: validatePolicyClassDigest, policy_predicate_outcomes: { authority_active: true, continuity_identity_match: true, compiled_hash_match: true, delegated_authority_lineage_valid: true, topology_visible: _topology_present }, denial_reason: null, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present } })
+      return json({ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, ...(validateGovernLineage || {}), policy_class: validatePolicyClass, policy_class_digest: validatePolicyClassDigest, policy_predicate_outcomes: { authority_active: true, continuity_identity_match: true, compiled_hash_match: true, delegated_authority_lineage_valid: true, topology_visible: _topology_present }, denial_reason: null, classification_evidence: { classification: _classification, predicate_snapshot: _predicate_snapshot, topology_present: _topology_present, topology_snapshot_id: _topology_evidence.topology_snapshot_id, topology_hash: _topology_evidence.topology_hash } })
     }
 
     if (url.pathname === "/execute" && request.method === "POST") {
