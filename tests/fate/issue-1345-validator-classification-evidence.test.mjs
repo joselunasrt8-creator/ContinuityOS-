@@ -103,3 +103,14 @@ test('/validate binds local lineage freshness evidence', () => {
   assert.match(validateSection, /L: _local_lineage_present/)
   assert.match(validateSection, /local_lineage_present: _local_lineage_present/)
 })
+
+test('/validate exposes absent distributed convergence evidence explicitly', () => {
+  assert.match(validateSection, /distributed_quorum_present: false/)
+  assert.match(validateSection, /global_consensus_present: false/)
+  assert.match(validateSection, /cryptographic_integrity_present: false/)
+})
+
+test('/validate local lineage freshness does not imply convergence or global validity', () => {
+  assert.match(validateSection, /Q: false, G: false, L: _local_lineage_present, X: false/)
+  assert.match(validateSection, /classifyFromPredicates\(_predicate_snapshot, _topology_present\)/)
+})
