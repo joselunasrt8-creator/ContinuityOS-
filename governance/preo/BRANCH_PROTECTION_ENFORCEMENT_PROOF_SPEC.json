@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "branch_protection_enforcement_proof_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "enforcement_proof_specification",
+  "closes": "#1635",
+  "depends_on": ["#1630", "#1631", "#1632", "#1633", "#1634"],
+  "scope": {
+    "name": "BRANCH_PROTECTION_ENFORCEMENT_PROOF",
+    "purpose": "Define the canonical proof object that distinguishes live GitHub branch-protection enforcement from policy declaration alone. Policy declaration is not enforcement proof. Merge legitimacy requires evidence that branch protection is actually active and bound to emitted checks.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "canonical_compression": {
+    "rule_1": "Branch protection policy is not enforcement proof.",
+    "rule_2": "Merge legitimacy requires evidence that GitHub branch protection is actually active and bound to emitted checks.",
+    "rule_3": "Declared checks ≠ enforced checks.",
+    "rule_4": "Policy ≠ live protection.",
+    "rule_5": "admin_bypass_used → BRANCH_PROTECTION_ENFORCEMENT_INVALID."
+  },
+  "enforcement_proof_object": {
+    "object_type": "BRANCH_PROTECTION_ENFORCEMENT_PROOF",
+    "defined": true,
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "target_branch",
+      "repository",
+      "required_status_checks",
+      "emitted_check_name_mapping",
+      "required_approving_review_count",
+      "dismiss_stale_reviews_state",
+      "direct_push_restriction_state",
+      "force_push_disabled_state",
+      "branch_deletion_disabled_state",
+      "conversation_resolution_requirement",
+      "fetched_at"
+    ],
+    "output_fields": [
+      "enforcement_proof_hash",
+      "enforcement_result",
+      "invalid_reasons",
+      "emergency_exception_observed"
+    ],
+    "enforcement_result_enum": [
+      "BRANCH_PROTECTION_ENFORCED",
+      "BRANCH_PROTECTION_ENFORCEMENT_INVALID"
+    ],
+    "default_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID"
+  },
+  "valid_conditions": {
+    "required_status_checks_match_emitted_jobs": {
+      "rule": "Every required_status_check must resolve via an explicit emitted_check_name_mapping entry to a currently emitted GitHub Actions job check-run name. String-matching heuristics are forbidden.",
+      "no_mapping_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "missing_required_check"
+    },
+    "required_approval_count_satisfied": {
+      "rule": "The live branch-protection configuration must require at least one approving review. A configured count of zero is not enforcement.",
+      "zero_count_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "required_approvals_not_enforced"
+    },
+    "stale_review_dismissal_enabled": {
+      "rule": "dismiss_stale_reviews_state must be true. If stale reviews are not dismissed on new commits, previously approved states can persist through head changes.",
+      "disabled_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "stale_review_dismissal_disabled"
+    },
+    "direct_push_to_main_restricted": {
+      "rule": "direct_push_restriction_state must be true. Unrestricted direct push to the target branch bypasses all review and check enforcement.",
+      "unrestricted_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "direct_push_allowed"
+    },
+    "force_push_disabled": {
+      "rule": "force_push_disabled_state must be true. Permitted force pushes allow history rewriting that undermines commit-SHA-bound proofs.",
+      "permitted_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "force_push_allowed"
+    },
+    "branch_deletion_disabled": {
+      "rule": "branch_deletion_disabled_state must be true. A deletable protected branch is not a protected branch.",
+      "permitted_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "branch_deletion_allowed"
+    }
+  },
+  "invalid_conditions": {
+    "missing_required_check": {
+      "condition": "A required_status_check has no entry in emitted_check_name_mapping",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "missing_required_check"
+    },
+    "required_check_not_emitted": {
+      "condition": "A mapped check-run name does not appear in the live emitted checks for the current head SHA",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "required_check_not_emitted"
+    },
+    "stale_required_check": {
+      "condition": "An emitted check-run is present but bound to a prior commit SHA, not the current head SHA",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "stale_required_check"
+    },
+    "branch_protection_disabled": {
+      "condition": "No branch-protection rule is configured for the target branch",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "branch_protection_disabled"
+    },
+    "admin_bypass_enabled_without_governance_artifact": {
+      "condition": "admin_bypass_config_enabled is true and no approved governance artifact authorizes the bypass",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "admin_bypass_config_enabled"
+    },
+    "admin_bypass_used": {
+      "condition": "The observed merge path used admin bypass regardless of bypass configuration state",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "admin_bypass_used",
+      "emergency_exception_observed": true,
+      "legitimacy_effect": "NULL",
+      "requires_root_authority_containment": true
+    },
+    "force_push_allowed": {
+      "condition": "force_push_disabled_state is false",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "force_push_allowed"
+    },
+    "direct_push_allowed": {
+      "condition": "direct_push_restriction_state is false",
+      "result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+      "invalid_reason": "direct_push_allowed"
+    }
+  },
+  "admin_bypass_determination": {
+    "rule": "admin_bypass must be treated as a hard failure for branch-protection enforcement proof regardless of emergency authority claims.",
+    "bypass_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "emergency_exception_handling": "metadata_logging_only",
+    "legitimacy_substitution": "forbidden",
+    "canonical_form": "admin_bypass_used → BRANCH_PROTECTION_ENFORCEMENT_INVALID"
+  },
+  "defensive_validation_requirements": {
+    "config_checks": [
+      "branch_protection_config_present",
+      "required_checks_enforced",
+      "required_checks_bound_to_head_sha",
+      "approval_requirements_enforced",
+      "stale_reviews_dismissed_if_required"
+    ],
+    "observed_path_checks": [
+      "admin_bypass_config_disabled",
+      "admin_bypass_not_used"
+    ],
+    "any_failure_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID"
+  },
+  "preo_integration": {
+    "gate_position": "fourth",
+    "gate_chain": "PREO_VALID ∧ SCO_VALID ∧ APPROVAL_LINEAGE_VALID ∧ BRANCH_PROTECTION_ENFORCED",
+    "failure_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "enforcement_proof_is_not_merge_legitimacy": "BRANCH_PROTECTION_ENFORCED proves protected-path enforcement only. It does not by itself establish merge legitimacy.",
+    "policy_declaration_not_sufficient": "Branch protection policy declaration is not a substitute for BRANCH_PROTECTION_ENFORCED.",
+    "workflow_success_not_substitute": "Workflow success alone is not a substitute for BRANCH_PROTECTION_ENFORCED."
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical branch-protection configuration inputs must produce identical BRANCH_PROTECTION_ENFORCED or BRANCH_PROTECTION_ENFORCEMENT_INVALID outputs.",
+    "enforcement_proof_hash_must_be_deterministic": true,
+    "audit_logic_must_not_depend_on_provider_specific_ordering": true
+  },
+  "fail_closed_semantics": {
+    "default_result": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "missing_branch_protection_config": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "missing_required_check_mapping": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "stale_check": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "admin_bypass_used": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "admin_bypass_config_enabled": "BRANCH_PROTECTION_ENFORCEMENT_INVALID",
+    "policy_only_declaration": "BRANCH_PROTECTION_ENFORCEMENT_INVALID"
+  }
+}
