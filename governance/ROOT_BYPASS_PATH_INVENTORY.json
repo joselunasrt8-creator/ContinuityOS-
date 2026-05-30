@@ -1,0 +1,179 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "root_bypass_path_inventory",
+  "status": "non_operative_governance_artifact",
+  "issue_reference": "#1639",
+  "depends_on": [
+    "governance/runtime/RESIDUAL_BYPASS_MATRIX.json",
+    "governance/BYPASS_CAPABLE_SURFACES.json",
+    "governance/ROOT_AUTHORITY_INVENTORY.json"
+  ],
+  "purpose": "Complete canonical inventory of root authority bypass paths across all governed boundaries. Non-operative. Does not create authority, execution, merge permission, proof, or deployment. Consolidates and extends RESIDUAL_BYPASS_MATRIX.json with all root authority surfaces from ROOT_AUTHORITY_INVENTORY.json.",
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false
+  },
+  "bypass_path_invariant": "Every bypass path entry represents an observability and containment classification. The existence of a bypass path does not authorize use. Detection of bypass path use forces LEGITIMACY_NULL for the affected epoch.",
+  "bypass_paths": [
+    {
+      "bypass_id": "RBP-001",
+      "surface_id": "RAS-005",
+      "name": "Cloudflare Git Integration automatic deploy",
+      "governed_boundary_bypassed": ["governed_deploy_pipeline", "canonical_chain", "proof_registry_binding"],
+      "preconditions": [
+        "Cloudflare Git Integration enabled at account level",
+        "Push to tracked branch (main or equivalent)"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "EXTERNAL_ONLY — Cloudflare dashboard deploy log only; not bound to MindShift proof registry",
+      "containment_status": "CONTAINMENT_REQUIRED",
+      "break_glass": false,
+      "closure_condition": "Cloudflare Git Integration disabled at account level — account administrator action required",
+      "legitimacy_effect": "Any deploy via this path forces LEGITIMACY_NULL for the affected epoch",
+      "source_ref": "governance/runtime/RESIDUAL_BYPASS_MATRIX.json#RB-001"
+    },
+    {
+      "bypass_id": "RBP-002",
+      "surface_id": "RAS-007",
+      "name": "Direct wrangler deploy via CLOUDFLARE_API_TOKEN",
+      "governed_boundary_bypassed": ["governed_deploy_pipeline", "canonical_chain", "proof_binding"],
+      "preconditions": [
+        "Valid CLOUDFLARE_API_TOKEN with Workers:Write scope",
+        "Local wrangler CLI access"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "PARTIAL — Cloudflare dashboard deploy log; not bound to MindShift proof registry",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": true,
+      "break_glass_classification": "EXPLICIT_ROOT_AUTHORITY",
+      "closure_condition": "CLOUDFLARE_API_TOKEN scoped to GitHub Actions OIDC only; no static token capable of production deploy",
+      "legitimacy_effect": "Deploy via this path forces LEGITIMACY_NULL for the affected epoch unless executed through governed workflow",
+      "source_ref": "governance/runtime/RESIDUAL_BYPASS_MATRIX.json#RB-002"
+    },
+    {
+      "bypass_id": "RBP-003",
+      "surface_id": "RAS-006",
+      "name": "Local governed-deploy.ts with valid token and fabricated canonical artifact",
+      "governed_boundary_bypassed": ["governed_deploy_pipeline"],
+      "preconditions": [
+        "Valid CLOUDFLARE_API_TOKEN",
+        "MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed set locally",
+        "Fabricated legitimacy artifact with valid canonical chain responses (must hit live /session through /proof endpoints)"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "AUDIT_LOG — deploy_audit_registry.json entry emitted on all invocations including rejections; Cloudflare dashboard deploy log",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": true,
+      "break_glass_classification": "LOCAL_ROOT_AUTHORITY_WITH_CANONICAL_CHAIN",
+      "closure_condition": "CLOUDFLARE_API_TOKEN scoped to GitHub Actions OIDC only — no local token means no local deploy",
+      "legitimacy_effect": "Requires both token AND canonical chain completion; residual local root authority path classified and monitored",
+      "source_ref": "governance/runtime/RESIDUAL_BYPASS_MATRIX.json#RB-003"
+    },
+    {
+      "bypass_id": "RBP-004",
+      "surface_id": "RAS-001",
+      "name": "GitHub admin workflow modification and admin-merged bypass",
+      "governed_boundary_bypassed": ["merge_governance", "branch_protection_enforcement", "workflow_execution_gates"],
+      "preconditions": [
+        "GitHub repository admin access",
+        "Ability to bypass branch protection or merge without PREO"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "GitHub audit log; constitutional-integrity.yml detects workflow changes as PR-3_SOVEREIGNTY drift",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": false,
+      "closure_condition": "Branch protection enforcement at repository level; admin bypass policy disabled",
+      "legitimacy_effect": "Admin bypass of merge governance forces LEGITIMACY_NULL for the affected merge epoch",
+      "source_ref": "governance/runtime/RESIDUAL_BYPASS_MATRIX.json#RB-004"
+    },
+    {
+      "bypass_id": "RBP-005",
+      "surface_id": "RAS-004",
+      "name": "GitHub repository secrets mutation — MINDSHIFT_WORKER_URL or token redirect",
+      "governed_boundary_bypassed": ["canonical_chain_routing", "deploy_legitimacy", "runtime_authority"],
+      "preconditions": [
+        "GitHub repository admin or environments admin access",
+        "Ability to mutate MINDSHIFT_WORKER_URL, MINDSHIFT_API_KEY, or CLOUDFLARE_API_TOKEN secrets"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "GitHub audit log only — MindShift has no internal visibility into secret mutation events",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": false,
+      "closure_condition": "Secret write authority restricted to designated administrators; secret rotation and integrity policy enforced",
+      "legitimacy_effect": "Secret mutation outside governed change management invalidates all deploy epochs that used the mutated secrets",
+      "source_ref": "governance/runtime/RESIDUAL_BYPASS_MATRIX.json#RB-005"
+    },
+    {
+      "bypass_id": "RBP-006",
+      "surface_id": "RAS-002",
+      "name": "Branch protection bypass merge",
+      "governed_boundary_bypassed": ["branch_protection_enforcement", "required_review_gates", "required_status_checks"],
+      "preconditions": [
+        "Repository admin or operator with branch protection override capability",
+        "Ability to merge without required PREO reviews or status checks"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "GitHub audit log and pull request event log; merge-governance-check.yml detects unprotected merges",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": false,
+      "closure_condition": "Branch protection rules enforced with no admin override; all merges require PREO and status checks",
+      "legitimacy_effect": "Branch protection bypass forces LEGITIMACY_NULL for the affected merge epoch"
+    },
+    {
+      "bypass_id": "RBP-007",
+      "surface_id": "RAS-008",
+      "name": "Canonical serialization code mutation outside governed change",
+      "governed_boundary_bypassed": ["legitimacy_identity_integrity", "governance_mutation_containment"],
+      "preconditions": [
+        "Commit access to governance or canonical serialization code paths",
+        "Merge without PREO or CODEOWNERS review"
+      ],
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "observability": "Git commit history; CODEOWNERS review requirement; constitutional-integrity.yml",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": false,
+      "closure_condition": "CODEOWNERS enforcement on all governance and serialization paths; required PREO review for any governance mutation",
+      "legitimacy_effect": "Serialization code mutation outside governed pipeline must be treated as legitimacy identity mutation and forces NULL for subsequent epochs"
+    },
+    {
+      "bypass_id": "RBP-008",
+      "surface_id": "RAS-009",
+      "name": "Federation evidence treated as legitimacy authority",
+      "governed_boundary_bypassed": ["local_legitimacy_chain", "proof_registry"],
+      "preconditions": [
+        "Federation evidence available from external source",
+        "Attempt to use federation evidence to override local legitimacy determination"
+      ],
+      "production_capable": false,
+      "governed_by_mindshift": false,
+      "observability": "Audit-time detection — governance documents and audit spec define that federation evidence is EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "break_glass": false,
+      "closure_condition": "Federation evidence permanently classified as EVIDENCE_ONLY; no execution path that treats federation evidence as authoritative",
+      "legitimacy_effect": "Treating federation evidence as authoritative forces LEGITIMACY_NULL for the affected epoch"
+    }
+  ],
+  "bypass_closure_requirements": [
+    "RBP-001: Disable Cloudflare Git Integration at account level — CONTAINMENT_REQUIRED, pending account action",
+    "RBP-002: Scope CLOUDFLARE_API_TOKEN to GitHub Actions OIDC only — resolves RBP-003 as well",
+    "RBP-003: Resolved by RBP-002 closure (no local static token = no local deploy)",
+    "RBP-004: Enforce branch protection with no admin override; monitor via constitutional-integrity.yml",
+    "RBP-005: Restrict secret write access; enforce secret rotation and integrity policy",
+    "RBP-006: Enforce required PREO and status checks with no bypass path on main branch",
+    "RBP-007: Enforce CODEOWNERS and required PREO for all governance mutations",
+    "RBP-008: Permanent EVIDENCE_ONLY classification; no authorizing use path"
+  ],
+  "containment_readiness_classification": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
+  "containment_reason": "RBP-001 remains CONTAINMENT_REQUIRED — Cloudflare Git Integration disable requires account-level administrative action. All other bypass paths are CLASSIFIED_OPEN with active observability and compensating controls.",
+  "observability_requirement": "All production mutation events — governed or bypass — must be detectable. RBP-001 and RBP-002 are only visible in Cloudflare dashboard (external observability). RBP-003 is visible in deploy_audit_registry.json. RBP-004 through RBP-007 are visible in GitHub audit log. No production mutation path is fully unobservable."
+}

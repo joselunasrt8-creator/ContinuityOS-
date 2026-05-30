@@ -1,0 +1,261 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "root_authority_containment_rules",
+  "status": "non_operative_governance_artifact",
+  "issue_reference": "#1639",
+  "purpose": "Define the containment rules for each root authority surface inventoried in ROOT_AUTHORITY_INVENTORY.json. These rules establish that root authority evidence is containment-only, non-authorizing, and topology-visible. Non-operative. Does not create authority, execution, merge permission, proof, or deployment.",
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false,
+    "enforcement_implementation": false
+  },
+  "core_invariant": "Root authority evidence may observe, classify, and invalidate. Root authority evidence may not create merge legitimacy, deploy legitimacy, execution authorization, or proof.",
+  "topology_visibility_requirement": "All root authority surfaces must be topology-visible: each surface must have declared evidence_paths, containment_status, and boundary conditions that allow audit-time verification.",
+  "containment_rules": [
+    {
+      "rule_id": "CR-001",
+      "surface_id": "RAS-001",
+      "surface_name": "repository_admin_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify a merge epoch as illegitimate when admin bypass is detected",
+          "Invalidate legitimacy for epochs with unprotected admin mutations",
+          "Provide observable evidence in GitHub audit log"
+        ],
+        "may_not_do": [
+          "Create merge legitimacy for any epoch",
+          "Authorize deployment",
+          "Generate proof objects",
+          "Authorize execution"
+        ]
+      },
+      "topology_visibility": "GitHub audit log — admin bypass events are externally observable",
+      "compensating_controls": [
+        "Branch protection enforcement",
+        "CODEOWNERS required reviewers",
+        "Environment protection rules"
+      ],
+      "containment_requirement": "Maintain explicit sovereignty assumption. Any admin bypass must be classified as EVIDENCE_ONLY — it invalidates the affected epoch but does not create legitimacy.",
+      "drift_triggers": ["SD-002", "SD-004"]
+    },
+    {
+      "rule_id": "CR-002",
+      "surface_id": "RAS-002",
+      "surface_name": "branch_protection_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify a merge epoch as illegitimate when branch protection bypass is detected",
+          "Invalidate PREO validity when branch protection is weakened"
+        ],
+        "may_not_do": [
+          "Create merge legitimacy",
+          "Override PREO_VALID requirements",
+          "Authorize deployment or execution"
+        ]
+      },
+      "topology_visibility": "GitHub audit log and merge-governance-check.yml workflow",
+      "compensating_controls": [
+        "Required status checks on main",
+        "Required PREO review before merge",
+        "Dismiss stale reviews on push"
+      ],
+      "containment_requirement": "Branch protection bypass evidence forces NULL for affected merge epochs. Branch protection rules must not allow admin override without explicit break-glass justification recorded in GitHub audit log.",
+      "drift_triggers": ["SD-002", "SD-004"]
+    },
+    {
+      "rule_id": "CR-003",
+      "surface_id": "RAS-003",
+      "surface_name": "workflow_dispatch_authority",
+      "containment_class": "GOVERNED_WITH_RESIDUAL_RISK",
+      "containment_status": "GOVERNED",
+      "boundary_declaration": {
+        "may_do": [
+          "Trigger governed deployment when all canonical chain inputs are valid",
+          "Classify dispatch invocations with invalid inputs as illegitimate"
+        ],
+        "may_not_do": [
+          "Bypass canonical chain validation",
+          "Authorize deployment without canonical chain completion",
+          "Create proof objects directly"
+        ]
+      },
+      "topology_visibility": "GitHub Actions workflow run logs — all dispatch invocations are recorded",
+      "compensating_controls": [
+        "Hard-fail on missing canonical inputs",
+        "Authority expiry derived from /authority response",
+        "Caller workflow ref validation in governed-deploy.yml"
+      ],
+      "containment_requirement": "Dispatch inputs must be validated against canonical chain responses. Fabricated inputs must fail hard. Dispatch itself is governed; compromise of canonical chain endpoints would expose residual risk.",
+      "drift_triggers": ["SD-003", "SD-004"]
+    },
+    {
+      "rule_id": "CR-004",
+      "surface_id": "RAS-004",
+      "surface_name": "environment_secret_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify deploy epochs where secrets were mutated outside governed process as illegitimate",
+          "Invalidate canonical chain routing when MINDSHIFT_WORKER_URL is mutated"
+        ],
+        "may_not_do": [
+          "Create deploy legitimacy",
+          "Authorize execution",
+          "Generate proof"
+        ]
+      },
+      "topology_visibility": "GitHub audit log — secret mutation events are externally observable; MindShift has no internal visibility",
+      "compensating_controls": [
+        "Restrict secret write to designated administrators",
+        "Periodic secret integrity audits",
+        "Alert on secret mutation events in GitHub audit log"
+      ],
+      "containment_requirement": "Secret mutation authority is classified as root. Any secret mutation outside governed change management invalidates all deploy epochs that used mutated secrets.",
+      "drift_triggers": ["SD-002", "SD-004", "SD-005"]
+    },
+    {
+      "rule_id": "CR-005",
+      "surface_id": "RAS-005",
+      "surface_name": "cloudflare_deploy_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CONTAINMENT_REQUIRED",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify deploy epochs triggered via Cloudflare Git Integration outside governed pipeline as illegitimate",
+          "Provide external deploy evidence via Cloudflare dashboard"
+        ],
+        "may_not_do": [
+          "Create deploy legitimacy",
+          "Authorize execution",
+          "Generate proof"
+        ]
+      },
+      "topology_visibility": "EXTERNAL_ONLY — Cloudflare dashboard deploy log; not visible to MindShift proof registry",
+      "compensating_controls": [
+        "wrangler.toml [env.preview] environment separation (partial)",
+        "Account-level Git Integration disable required (pending)"
+      ],
+      "containment_requirement": "Cloudflare Git Integration MUST be disabled at account level. Until disabled, any push to tracked branch may trigger production deploy outside canonical chain. Classify all such deploys as illegitimate and evidence-only.",
+      "open_action": "Disable Cloudflare Git Integration at account level — account administrator action required",
+      "drift_triggers": ["SD-001", "SD-002", "SD-004"]
+    },
+    {
+      "rule_id": "CR-006",
+      "surface_id": "RAS-006",
+      "surface_name": "local_wrangler_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify deploy epochs triggered via local wrangler outside governed pipeline as illegitimate",
+          "Emit audit log entry in deploy_audit_registry.json for all invocations"
+        ],
+        "may_not_do": [
+          "Create deploy legitimacy",
+          "Authorize execution",
+          "Generate proof"
+        ]
+      },
+      "topology_visibility": "AUDIT_LOG — governed-deploy.ts emits deploy_audit_registry.json entry for all invocations including rejections",
+      "compensating_controls": [
+        "package.json direct deploy script disabled (exits 1)",
+        "governed-deploy.ts MINDSHIFT_GOVERNED_DEPLOY_CONTEXT guard",
+        "deploy_audit_registry.json entry on all invocations"
+      ],
+      "containment_requirement": "Local wrangler deploys are break-glass root authority. Both a valid CLOUDFLARE_API_TOKEN AND MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed are required for execution. All invocations emit audit records. Full containment requires OIDC-only token binding.",
+      "drift_triggers": ["SD-002", "SD-004"]
+    },
+    {
+      "rule_id": "CR-007",
+      "surface_id": "RAS-007",
+      "surface_name": "token_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify deploy epochs where token was used outside governed pipeline as illegitimate",
+          "Provide observable evidence of token-based deploy in Cloudflare dashboard"
+        ],
+        "may_not_do": [
+          "Create deploy legitimacy",
+          "Authorize execution or merge",
+          "Generate proof"
+        ]
+      },
+      "topology_visibility": "PARTIAL — Cloudflare dashboard deploy log; MindShift proof registry only if governed workflow ran",
+      "compensating_controls": [
+        "Scope token to minimum required permissions (Workers:Write only)",
+        "Rotate token after each use",
+        "Bind to GitHub Actions OIDC where possible"
+      ],
+      "containment_requirement": "CLOUDFLARE_API_TOKEN must be scoped to minimum permissions and bound to GitHub Actions OIDC. Static tokens capable of production deploy classify as root break-glass authority. Any static token use outside governed workflow invalidates affected deploy epochs.",
+      "drift_triggers": ["SD-002", "SD-003", "SD-004"]
+    },
+    {
+      "rule_id": "CR-008",
+      "surface_id": "RAS-008",
+      "surface_name": "infrastructure_mutation_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify governance or infrastructure mutations made outside governed pipeline as illegitimate",
+          "Invalidate legitimacy identity if canonical serialization code is mutated outside governed change"
+        ],
+        "may_not_do": [
+          "Create execution legitimacy",
+          "Authorize merge or deploy",
+          "Generate proof"
+        ]
+      },
+      "topology_visibility": "Git history — infrastructure mutations are observable via commit log; serialization code mutations are detectable via code review",
+      "compensating_controls": [
+        "CODEOWNERS for governance and serialization code",
+        "Required PR reviews for governance path mutations",
+        "Constitutional-integrity.yml workflow detects sovereignty drift"
+      ],
+      "containment_requirement": "Local terminal shell and serialization code mutation are irreducible operator root authority unless sandboxed. Serialization code mutation must be treated as legitimacy identity mutation. All infrastructure mutations outside governed pipeline invalidate affected epochs.",
+      "drift_triggers": ["SD-001", "SD-003", "SD-004"]
+    },
+    {
+      "rule_id": "CR-009",
+      "surface_id": "RAS-009",
+      "surface_name": "federation_root_authority",
+      "containment_class": "ROOT_AUTHORITY_EVIDENCE_ONLY",
+      "containment_status": "CLASSIFIED_OPEN",
+      "boundary_declaration": {
+        "may_do": [
+          "Classify federated evidence as supporting or contradicting local legitimacy claims",
+          "Invalidate local legitimacy when federated evidence indicates governance bypass"
+        ],
+        "may_not_do": [
+          "Create legitimacy by federation agreement",
+          "Override local canonical chain results",
+          "Authorize merge, deploy, execution, or proof generation"
+        ]
+      },
+      "topology_visibility": "Federated legitimacy registries — external observability; topology visible via FEDERATED_RECONCILIATION_SPEC.json",
+      "compensating_controls": [
+        "Federation evidence classified as EVIDENCE_ONLY in FEDERATED_RECONCILIATION_SPEC.json",
+        "RECURSIVE_GOVERNANCE_CONTAINMENT_MODEL.json — federation cannot create local authority"
+      ],
+      "containment_requirement": "Federation evidence is always EVIDENCE_ONLY. Federation root authority may never be elevated to authorizing status. Any attempt to treat federation evidence as authoritative forces NULL for the affected epoch.",
+      "drift_triggers": ["SD-004", "SD-005"]
+    }
+  ],
+  "containment_readiness_summary": {
+    "surfaces_governed": ["RAS-003"],
+    "surfaces_classified_open": ["RAS-001", "RAS-002", "RAS-004", "RAS-006", "RAS-007", "RAS-008", "RAS-009"],
+    "surfaces_containment_required": ["RAS-005"],
+    "overall_containment_readiness": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
+    "reason": "RAS-005 (cloudflare_deploy_authority) remains CONTAINMENT_REQUIRED pending account-level Git Integration disable. All other surfaces are CLASSIFIED_OPEN with active compensating controls and evidence-only classification rules."
+  }
+}

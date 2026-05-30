@@ -1,0 +1,252 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "root_authority_inventory",
+  "status": "non_operative_governance_artifact",
+  "issue_reference": "#1639",
+  "depends_on_inventories": [
+    "governance/root_authority_registry.json",
+    "governance/ROOT_AUTHORITY_CLASSIFICATION.json",
+    "governance/BYPASS_CAPABLE_SURFACES.json",
+    "governance/SOVEREIGNTY_ASSUMPTION_REGISTRY.json",
+    "governance/runtime/RESIDUAL_BYPASS_MATRIX.json",
+    "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+  ],
+  "purpose": "Comprehensive canonical inventory of all root authority surfaces across all audit dimensions defined in ROOT_AUTHORITY_CONTAINMENT_CLOSURE_AUDIT_SPEC.json. Non-operative. Does not create authority or execution.",
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false
+  },
+  "surfaces": [
+    {
+      "surface_id": "RAS-001",
+      "surface_name": "repository_admin_authority",
+      "canonical_ref": "RA-001",
+      "authority_class": "RA-0_ABSOLUTE_ROOT",
+      "authority_source": "GitHub repository owner/admin — settings, branch protection bypass, force-push, workflow mutation, secrets write",
+      "bypass_capable": true,
+      "can_bypass": [
+        "merge_governance",
+        "branch_protection_enforcement",
+        "workflow_execution_gates",
+        "secret_write_control"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Enforce branch protection, CODEOWNERS, and environment restrictions as compensating controls. Document as explicit sovereignty assumption. Admin bypass classified as EVIDENCE_ONLY.",
+      "evidence_paths": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/root_authority_registry.json",
+        "governance/SOVEREIGNTY_ASSUMPTION_REGISTRY.json"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — admin bypass may classify an epoch as illegitimate but may not create merge or deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-002",
+      "surface_name": "branch_protection_authority",
+      "canonical_ref": "ROOT_AUTHORITY_CLASSIFICATION.json#branch_protection",
+      "authority_class": "RA-3_REPOSITORY_ROOT",
+      "authority_source": "GitHub branch protection rules — enforcement, bypass conditions, required reviewers, status checks",
+      "bypass_capable": true,
+      "can_bypass": [
+        "merge_governance",
+        "required_review_gates",
+        "required_status_checks"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Preserve branch protection and prevent admin bypass merges. Branch protection bypass evidence classified as EVIDENCE_ONLY.",
+      "evidence_paths": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/ROOT_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — branch protection bypass classifies epoch as illegitimate; does not create merge legitimacy"
+    },
+    {
+      "surface_id": "RAS-003",
+      "surface_name": "workflow_dispatch_authority",
+      "canonical_ref": "ROOT_AUTHORITY_CLASSIFICATION.json#workflow_dispatch",
+      "authority_class": "RA-3_REPOSITORY_ROOT",
+      "authority_source": "GitHub Actions workflow_dispatch — invocation of governed or ungoverned workflows with arbitrary inputs",
+      "bypass_capable": true,
+      "can_bypass": [
+        "deploy_legitimacy_chain",
+        "canonical_chain_validation_via_fabricated_inputs"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": true,
+      "containment_status": "GOVERNED",
+      "sovereignty_assumption": "CONSTRAINED",
+      "containment_recommendation": "Keep dispatch constrained to canonical endpoints. Reject missing or malformed canonical inputs. Authority expiry derived from /authority response (not hardcoded).",
+      "evidence_paths": [
+        ".github/workflows/prepare-governed-deploy.yml",
+        ".github/workflows/governed-deploy.yml"
+      ],
+      "containment_rule": "GOVERNED — workflow_dispatch is constrained by canonical chain validation; bypass risk exists if canonical chain endpoints are compromised"
+    },
+    {
+      "surface_id": "RAS-004",
+      "surface_name": "environment_secret_authority",
+      "canonical_ref": "ROOT_AUTHORITY_CLASSIFICATION.json#github_secrets",
+      "authority_class": "RA-4_SECRET_ROOT",
+      "authority_source": "GitHub repository and environment secrets write authority — CLOUDFLARE_API_TOKEN, MINDSHIFT_WORKER_URL, MINDSHIFT_API_KEY, MINDSHIFT_DEPLOY_SECRET",
+      "bypass_capable": true,
+      "can_bypass": [
+        "deploy_legitimacy",
+        "runtime_canonical_chain_routing",
+        "governed_endpoint_targeting"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Protect secret write authority with admin controls. Restrict secret mutation to designated administrators. Enforce periodic integrity audits. Classified as root authority.",
+      "evidence_paths": [
+        ".github/workflows/governed-deploy.yml",
+        ".github/workflows/prepare-governed-deploy.yml"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — secret mutation evidence classifies affected epochs as illegitimate; does not create deploy or execution legitimacy"
+    },
+    {
+      "surface_id": "RAS-005",
+      "surface_name": "cloudflare_deploy_authority",
+      "canonical_ref": "ROOT_AUTHORITY_CLASSIFICATION.json#cloudflare_git_integration",
+      "authority_class": "RA-2_DEPLOYMENT_ROOT",
+      "authority_source": "Cloudflare account-level deploy authority — Git Integration (automatic deploy on push), API-level deploy, Workers & Pages admin",
+      "bypass_capable": true,
+      "can_bypass": [
+        "governed_deploy_pipeline",
+        "canonical_chain",
+        "proof_registry_binding"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CONTAINMENT_REQUIRED",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "DISABLE Cloudflare Git Integration at account level. Cannot be enforced from repository code. Account-level administrative action required. Classify as absolute external sovereignty dependency.",
+      "evidence_paths": [
+        "wrangler.toml",
+        "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — Cloudflare deploy events outside governed pipeline classify affected epochs as illegitimate; do not create deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-006",
+      "surface_name": "local_wrangler_authority",
+      "canonical_ref": "RA-009",
+      "authority_class": "RA-6_LOCAL_OPERATOR_ROOT",
+      "authority_source": "Authenticated local wrangler CLI session with production credentials — direct production deploy outside governed pipeline",
+      "bypass_capable": true,
+      "can_bypass": [
+        "governed_deploy_pipeline",
+        "canonical_chain",
+        "proof_registry_binding"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Direct deploy blocked in package.json script. governed-deploy.ts MINDSHIFT_GOVERNED_DEPLOY_CONTEXT guard active. Classified as root break-glass authority observable via deploy_audit_registry.json.",
+      "evidence_paths": [
+        "package.json",
+        "scripts/governed-deploy.ts"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — local wrangler deploy events classify affected epochs as illegitimate; do not create deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-007",
+      "surface_name": "token_authority",
+      "canonical_ref": "RA-008",
+      "authority_class": "RA-1_INFRASTRUCTURE_ADMIN",
+      "authority_source": "CLOUDFLARE_API_TOKEN and equivalent credential authority — Workers:Write scope, scoping status, rotation status, OIDC binding",
+      "bypass_capable": true,
+      "can_bypass": [
+        "governed_deploy_pipeline",
+        "proof_binding"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Scope token to minimum required permissions. Rotate token after use or bind to GitHub Actions OIDC. Classify as root break-glass authority.",
+      "evidence_paths": [
+        "governance/root_authority_registry.json",
+        "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — token-based deploy events outside governed pipeline classify affected epochs as illegitimate"
+    },
+    {
+      "surface_id": "RAS-008",
+      "surface_name": "infrastructure_mutation_authority",
+      "canonical_ref_1": "RA-016",
+      "canonical_ref_2": "RA-021",
+      "authority_class": "RA-8_GOVERNANCE_MUTATION_ROOT",
+      "authority_source": "Local terminal shell and canonical serialization code mutation — direct infrastructure mutation capability outside governed pipeline",
+      "bypass_capable": true,
+      "can_bypass": [
+        "governance_mutation_containment",
+        "legitimacy_identity_integrity",
+        "governed_deploy_pipeline"
+      ],
+      "mutation_capability": true,
+      "production_capable": true,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Document as irreducible operator root unless sandboxed. Treat serialization code mutation as root legitimacy identity mutation. Classify as break-glass infrastructure authority.",
+      "evidence_paths": [
+        "governance/root_authority_registry.json"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — infrastructure mutation events classify affected epochs as illegitimate; do not create execution or deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-009",
+      "surface_name": "federation_root_authority",
+      "canonical_ref": "governance/runtime/FEDERATED_RECONCILIATION_SPEC.json",
+      "authority_class": "RA-9_UNKNOWN_ROOT",
+      "authority_source": "Federated legitimacy roots — external federation evidence that could be treated as authoritative",
+      "bypass_capable": true,
+      "can_bypass": [
+        "local_legitimacy_chain",
+        "proof_registry"
+      ],
+      "mutation_capability": false,
+      "production_capable": false,
+      "governed_by_mindshift": false,
+      "containment_status": "CLASSIFIED_OPEN",
+      "sovereignty_assumption": "OPEN",
+      "containment_recommendation": "Federation evidence is EVIDENCE_ONLY. Federation evidence may never be treated as a legitimacy authority. Federation evidence may classify or invalidate only.",
+      "evidence_paths": [
+        "governance/runtime/FEDERATED_RECONCILIATION_SPEC.json",
+        "governance/recursive/RECURSIVE_GOVERNANCE_CONTAINMENT_MODEL.json"
+      ],
+      "containment_rule": "ROOT_AUTHORITY_EVIDENCE_ONLY — federation evidence may classify distributed state; it may not create legitimacy"
+    }
+  ],
+  "inventory_completeness": {
+    "all_audit_surfaces_covered": true,
+    "surfaces_count": 9,
+    "audit_surfaces_ref": "governance/ROOT_AUTHORITY_CONTAINMENT_CLOSURE_AUDIT_SPEC.json#audit_surfaces",
+    "gap_report": {
+      "undeclared_surfaces_detected": false,
+      "gaps": []
+    }
+  },
+  "topology_visibility": {
+    "all_surfaces_topology_visible": true,
+    "note": "Each surface has declared evidence_paths enabling topology-level observability. Surfaces with EXTERNAL_ONLY observability (RAS-005) are marked CONTAINMENT_REQUIRED."
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sovereignty_drift_taxonomy",
+  "status": "non_operative_governance_artifact",
+  "issue_reference": "#1639",
+  "purpose": "Define the canonical taxonomy of sovereignty drift classes for root authority surfaces. Every drift class results in LEGITIMACY_NULL for the affected epoch. Non-operative. Does not create authority, execution, merge permission, proof, or deployment.",
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false,
+    "registry_mutation": false
+  },
+  "drift_invariant": "Sovereignty drift -> NULL. Any change to a root authority surface boundary, containment status, or bypass capability outside a governed governance mutation forces LEGITIMACY_NULL for the affected epoch.",
+  "drift_classes": [
+    {
+      "drift_id": "SD-001",
+      "drift_class": "UNDECLARED_ROOT_SURFACE",
+      "description": "A bypass-capable root authority surface was detected that is not present in ROOT_AUTHORITY_INVENTORY.json. The surface exercises governance-bypassing authority without being inventoried or classified.",
+      "triggers": [
+        "New GitHub Actions workflow with deploy or merge authority added outside governed pipeline",
+        "New Cloudflare surface with Workers:Write capability not present in inventory",
+        "New secret or token with production mutation capability not declared"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs where the undeclared surface is active",
+      "evidence_classification": "EVIDENCE_ONLY — detection of undeclared surface invalidates; does not create legitimacy"
+    },
+    {
+      "drift_id": "SD-002",
+      "drift_class": "CONTAINMENT_STATUS_REGRESSION",
+      "description": "A previously CONTAINED or GOVERNED root authority surface regressed to CLASSIFIED_OPEN or CONTAINMENT_REQUIRED without a governed governance mutation.",
+      "triggers": [
+        "Cloudflare Git Integration re-enabled after being disabled",
+        "Branch protection rules weakened or removed",
+        "Workflow dispatch inputs relaxed to allow canonical chain bypass",
+        "OIDC token binding removed and static token re-enabled"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs from the regression event forward until re-containment is confirmed",
+      "evidence_classification": "EVIDENCE_ONLY — regression detection invalidates; does not create legitimacy"
+    },
+    {
+      "drift_id": "SD-003",
+      "drift_class": "BYPASS_CAPABILITY_EXPANSION",
+      "description": "An existing root authority surface's bypass_capable scope expanded — new governance boundaries added to can_bypass targets — outside a governed governance mutation.",
+      "triggers": [
+        "GitHub admin gains new capability to bypass proof registry",
+        "Wrangler local session gains access to a new production surface",
+        "Federation root authority gains capability to authorize execution"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs from the expansion event forward",
+      "evidence_classification": "EVIDENCE_ONLY — expansion detection invalidates; does not create legitimacy"
+    },
+    {
+      "drift_id": "SD-004",
+      "drift_class": "ROOT_AUTHORITY_TREATED_AS_AUTHORIZING",
+      "description": "Root authority evidence was used to derive, authorize, or create merge legitimacy, deploy legitimacy, execution authorization, or proof — violating the non-authorizing invariant.",
+      "triggers": [
+        "Admin bypass used to assert merge legitimacy for an epoch",
+        "Root deploy event used to assert deploy legitimacy without canonical chain",
+        "Federation evidence treated as legitimacy authority rather than evidence only"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "The specific epoch where root authority was treated as authorizing",
+      "evidence_classification": "EVIDENCE_ONLY — the root authority event may only invalidate the affected epoch"
+    },
+    {
+      "drift_id": "SD-005",
+      "drift_class": "SOVEREIGNTY_ASSUMPTION_VIOLATION",
+      "description": "An OPEN sovereignty assumption was used to claim governance coverage it does not provide. Sovereignty assumption status OPEN means the surface is classified but not contained.",
+      "triggers": [
+        "OPEN surface cited as evidence that governance controls are sufficient",
+        "CLASSIFIED_OPEN surface used to assert deploy legitimacy",
+        "Sovereignty assumption registry queried to create legitimacy rather than to acknowledge open exposure"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs where the sovereignty assumption violation is present",
+      "evidence_classification": "EVIDENCE_ONLY"
+    },
+    {
+      "drift_id": "SD-006",
+      "drift_class": "ROOT_AUTHORITY_INVENTORY_GAP",
+      "description": "The root authority inventory is incomplete — a required surface is missing, a surface lacks required fields, or a new surface was identified during audit but not added to ROOT_AUTHORITY_INVENTORY.json.",
+      "triggers": [
+        "New surface added to BYPASS_CAPABLE_SURFACES.json without updating ROOT_AUTHORITY_INVENTORY.json",
+        "Root authority registry updated without corresponding inventory update",
+        "Audit surfaces list expanded without inventory update"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs where the inventory gap exists"
+    },
+    {
+      "drift_id": "SD-007",
+      "drift_class": "CONTAINMENT_RULE_ABSENT",
+      "description": "A root authority surface exists in ROOT_AUTHORITY_INVENTORY.json but has no corresponding containment rule in ROOT_AUTHORITY_CONTAINMENT_RULES.json.",
+      "triggers": [
+        "New surface added to inventory without adding containment rule",
+        "Containment rules file not updated when inventory is updated"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs where the surface is active without a containment rule"
+    },
+    {
+      "drift_id": "SD-008",
+      "drift_class": "DRIFT_TAXONOMY_ABSENT",
+      "description": "The sovereignty drift taxonomy (this document) is absent, incomplete, or not referenced by ROOT_AUTHORITY_CONTAINMENT_CLOSURE_AUDIT_SPEC.json.",
+      "triggers": [
+        "SOVEREIGNTY_DRIFT_TAXONOMY.json missing from repository",
+        "Drift taxonomy does not cover all audit surfaces",
+        "Audit spec does not reference drift taxonomy"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs until taxonomy is restored and verified"
+    }
+  ],
+  "canonical_compression": {
+    "rule_1": "Sovereignty drift -> NULL.",
+    "rule_2": "Every drift class has exactly one containment_result: LEGITIMACY_NULL.",
+    "rule_3": "Drift detection may invalidate. Drift detection may not create legitimacy.",
+    "rule_4": "An undeclared surface is the most severe drift class — it means containment has an unknown boundary."
+  }
+}
