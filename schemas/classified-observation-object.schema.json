@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/classified-observation-object.schema.json",
+  "title": "Classified Observation Object",
+  "description": "Canonical schema for topology-visible observations. Preserves the distinction between observation, verification, lineage, proof, authority, and legitimacy. No observation may imply more certainty than its evidence supports.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "object_type",
+    "schema_version",
+    "observation_id",
+    "lineage_hash",
+    "topology_view_id",
+    "observer_id",
+    "observed_at",
+    "classification",
+    "target_surface",
+    "evidence",
+    "non_operability"
+  ],
+  "properties": {
+    "object_type": {
+      "type": "string",
+      "const": "RUNTIME_TOPOLOGY_OBSERVATION"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identity of this observation."
+    },
+    "lineage_hash": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Lineage attachment anchor. Binds the observation to a specific lineage."
+    },
+    "topology_view_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifies the topology perspective from which this observation was made."
+    },
+    "observer_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of the emitting node."
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the observation."
+    },
+    "reconciliation_epoch": {
+      "type": "string",
+      "description": "Reconciliation epoch context at time of observation."
+    },
+    "classification": {
+      "type": "string",
+      "enum": [
+        "TOPOLOGY_VISIBLE",
+        "TOPOLOGY_PARTIAL",
+        "TOPOLOGY_STALE",
+        "TOPOLOGY_CONFLICTED",
+        "TOPOLOGY_UNOBSERVABLE"
+      ],
+      "description": "Topology visibility classification. Not a legitimacy determination."
+    },
+    "target_surface": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The topology surface being observed."
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "evidence_hash",
+        "schema_version",
+        "summary",
+        "redacted"
+      ],
+      "properties": {
+        "evidence_type": {
+          "type": "string",
+          "enum": [
+            "REGISTRY_STATE",
+            "PROOF_STATE",
+            "REPLAY_STATE",
+            "AUTHORITY_STATE",
+            "TOPOLOGY_GAP",
+            "GOVERNANCE_STATE"
+          ]
+        },
+        "evidence_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "object",
+          "description": "Describes observed state. Must not interpret legitimacy.",
+          "not": {
+            "anyOf": [
+              { "required": ["is_legitimate"] },
+              { "required": ["legitimacy_valid"] },
+              { "required": ["authorization_granted"] },
+              { "required": ["authority_valid"] },
+              { "required": ["execution_authorized"] },
+              { "required": ["execution_eligible"] },
+              { "required": ["replay_safe"] },
+              { "required": ["proof_valid"] },
+              { "required": ["reconciliation_successful"] },
+              { "required": ["convergence_achieved"] },
+              { "required": ["validator_result"] },
+              { "required": ["merge_allowed"] },
+              { "required": ["deploy_allowed"] },
+              { "required": ["policy_valid"] }
+            ]
+          }
+        },
+        "redacted": {
+          "type": "boolean",
+          "description": "Whether raw evidence has been redacted from this object."
+        },
+        "raw_evidence_ref": {
+          "type": "string",
+          "description": "Optional reference to the raw evidence source."
+        },
+        "topology_gap": {
+          "type": "object",
+          "description": "Required when evidence_type is TOPOLOGY_GAP.",
+          "additionalProperties": false,
+          "required": [
+            "gap_reconciliation_status",
+            "affected_window"
+          ],
+          "properties": {
+            "gap_reconciliation_status": {
+              "type": "string",
+              "enum": ["BRIDGEABLE", "UNKNOWN", "UNBRIDGEABLE"]
+            },
+            "affected_window": {
+              "type": "object",
+              "required": ["start", "end"],
+              "additionalProperties": false,
+              "properties": {
+                "start": { "type": "string", "format": "date-time" },
+                "end": { "type": "string", "format": "date-time" }
+              }
+            },
+            "reconstruction_sources": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "non_operability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "creates_validity",
+        "creates_authority",
+        "creates_execution_eligibility",
+        "creates_reconciliation_closure"
+      ],
+      "properties": {
+        "creates_validity": {
+          "type": "boolean",
+          "const": false
+        },
+        "creates_authority": {
+          "type": "boolean",
+          "const": false
+        },
+        "creates_execution_eligibility": {
+          "type": "boolean",
+          "const": false
+        },
+        "creates_reconciliation_closure": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    }
+  }
+}
