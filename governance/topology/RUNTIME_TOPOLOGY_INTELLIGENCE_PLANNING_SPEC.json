@@ -1,0 +1,444 @@
+{
+  "artifact": "RUNTIME_TOPOLOGY_INTELLIGENCE_PLANNING_SPEC",
+  "issue": "#1640",
+  "version": "1.0.0",
+  "status": "PLANNING_COMPLETE",
+  "planning_status": [
+    "TOPOLOGY_MODEL_STABILIZED",
+    "READY_FOR_#1641",
+    "READY_FOR_#1642",
+    "READY_FOR_#1644"
+  ],
+  "planning_only": true,
+  "non_goals": [
+    "No implementation.",
+    "No runtime mutation.",
+    "No authority creation.",
+    "No proof generation.",
+    "No reconciliation execution claim.",
+    "No expansion into general-purpose monitoring."
+  ],
+  "core_purpose": "Runtime Topology Intelligence = visibility layer for legitimacy-relevant state. Not: authority layer, execution layer, reconciliation engine, validator, or proof generator.",
+  "core_invariant": "Only observations capable of altering distributed legitimacy interpretation belong in Runtime Topology Intelligence.",
+  "non_authoritative_boundary": {
+    "topology_intelligence_may": [
+      "classify visibility state",
+      "emit observation gap notifications",
+      "classify topology closure state",
+      "classify gap bridgeability",
+      "classify observation categories"
+    ],
+    "topology_intelligence_may_not": [
+      "create validity",
+      "create authority",
+      "produce reconciliation closure",
+      "determine execution eligibility",
+      "decide legitimacy",
+      "mutate registry",
+      "trigger reconciliation",
+      "authorize execution"
+    ],
+    "boundary_rules": {
+      "observation_ne_validation": "Observation is not validation.",
+      "visibility_ne_legitimacy": "Visibility is not legitimacy.",
+      "observer_responsibility": "observe -> compare -> classify visibility -> emit only"
+    }
+  },
+  "observation_taxonomy": {
+    "categories": [
+      {
+        "id": "LOCAL_OPERATIONAL",
+        "topology_relevance": "NONE",
+        "description": "Local process metrics with no legitimacy implication.",
+        "examples": [
+          "process_id",
+          "memory_usage",
+          "cpu_usage",
+          "request_latency",
+          "container_uptime"
+        ]
+      },
+      {
+        "id": "GOVERNANCE_RELEVANT",
+        "topology_relevance": "HIGH",
+        "description": "Lifecycle events that affect governance interpretation.",
+        "examples": [
+          "authority_created",
+          "authority_revoked",
+          "continuity_created",
+          "continuity_revoked",
+          "validation_passed",
+          "validation_failed",
+          "execution_started",
+          "execution_completed",
+          "proof_created",
+          "proof_missing",
+          "registry_persisted"
+        ]
+      },
+      {
+        "id": "RECONCILIATION_RELEVANT",
+        "topology_relevance": "CRITICAL",
+        "description": "Events that can directly affect reconciliation outcome or closure.",
+        "examples": [
+          "lineage_drift",
+          "proof_divergence",
+          "replay_divergence",
+          "authority_divergence",
+          "topology_drift",
+          "classification_conflict"
+        ]
+      },
+      {
+        "id": "AUTHORITY_RELEVANT",
+        "topology_relevance": "HIGH",
+        "description": "Events in the authority lifecycle observable without creating authority.",
+        "examples": [
+          "authority_lifecycle_started",
+          "authority_lifecycle_completed",
+          "authority_scope_observed",
+          "authority_chain_observed"
+        ]
+      },
+      {
+        "id": "REPLAY_RELEVANT",
+        "topology_relevance": "HIGH",
+        "description": "Events that affect replay safety or nonce ledger state.",
+        "examples": [
+          "nonce_consumed",
+          "nonce_ledger_transition",
+          "replay_window_observed",
+          "replay_conflict_detected"
+        ]
+      },
+      {
+        "id": "PROOF_RELEVANT",
+        "topology_relevance": "HIGH",
+        "description": "Events in the proof lifecycle observable without creating proof.",
+        "examples": [
+          "proof_binding_observed",
+          "proof_registry_state_observed",
+          "proof_hash_transition",
+          "proof_gap_detected"
+        ]
+      },
+      {
+        "id": "TOPOLOGY_NOISE",
+        "topology_relevance": "NONE",
+        "description": "Events that cannot affect execution eligibility, authority interpretation, replay safety, proof binding, or reconciliation outcome.",
+        "selection_rule": "If an observation cannot materially affect execution eligibility, authority interpretation, replay safety, proof binding, or reconciliation outcome, classify as TOPOLOGY_NOISE."
+      }
+    ],
+    "observation_selection_rule": {
+      "observe": "anything that changes lineage, authority, proof, replay, reconciliation, or governance interpretation",
+      "ignore": "anything that only changes performance, capacity, throughput, resource utilization, or local process noise"
+    },
+    "primary_legitimacy_relevance_test": "Can this observation materially affect execution eligibility, authority interpretation, replay safety, proof binding, or reconciliation outcome? If no: TOPOLOGY_NOISE."
+  },
+  "topology_relevant_state_inventory": {
+    "included_lifecycle_domains": [
+      "authority_lifecycle_observations",
+      "continuity_lifecycle_observations",
+      "validation_lifecycle_observations",
+      "execution_lifecycle_observations",
+      "proof_lifecycle_observations",
+      "registry_lifecycle_observations",
+      "reconciliation_lifecycle_observations",
+      "topology_drift_observations"
+    ],
+    "excluded_domains": [
+      "cpu_utilization",
+      "memory_utilization",
+      "process_identifiers",
+      "container_uptime",
+      "infrastructure_performance_metrics",
+      "standard_operational_telemetry_without_legitimacy_implications"
+    ]
+  },
+  "elevation_rules": {
+    "description": "Operational events are elevated only when they impair legitimacy visibility.",
+    "formula": "operational_event + legitimacy_observation_impairment = elevated_observation",
+    "examples": [
+      {
+        "event": "Validator container restarted",
+        "classification": "LOCAL_OPERATIONAL",
+        "elevated": false,
+        "reason": "Container restart alone does not impair legitimacy visibility."
+      },
+      {
+        "event": "Validator unavailable for 17 minutes + registry observations missing + proof emissions not observed",
+        "classification": "GOVERNANCE_RELEVANT / RECONCILIATION_RELEVANT",
+        "elevated": true,
+        "reason": "Combination impairs the system's ability to observe legitimacy-relevant state."
+      }
+    ],
+    "core_rule": "Events are not elevated because they happened. Events are elevated because they changed the system's ability to observe legitimacy-relevant state."
+  },
+  "core_metadata_anchors": {
+    "minimum_required": [
+      "observation_id",
+      "lineage_hash",
+      "topology_view_id"
+    ],
+    "supporting_metadata": [
+      "observer_id",
+      "observed_at",
+      "reconciliation_epoch",
+      "classification",
+      "target_surface"
+    ],
+    "anchor_questions_every_observation_must_answer": [
+      "What is this?",
+      "What lineage is it about?",
+      "From whose topology view was it observed?"
+    ]
+  },
+  "typed_evidence_envelope": {
+    "description": "Avoid free-form observation blobs. Use typed evidence envelopes.",
+    "schema": {
+      "evidence": {
+        "evidence_type": "REGISTRY_STATE | PROOF_STATE | REPLAY_STATE | AUTHORITY_STATE | TOPOLOGY_GAP | GOVERNANCE_STATE",
+        "evidence_hash": "hash",
+        "schema_version": "string",
+        "summary": {},
+        "redacted": true,
+        "raw_evidence_ref": "optional_reference"
+      }
+    },
+    "boundary_rules": {
+      "summary": "may describe observed state",
+      "evidence_hash": "binds the observed state",
+      "raw_evidence_ref": "may point to source evidence",
+      "none_of_these_create_legitimacy": true
+    },
+    "forbidden_summary_fields": [
+      "is_legitimate",
+      "legitimacy_valid",
+      "authorization_granted",
+      "authority_valid",
+      "execution_authorized",
+      "execution_eligible",
+      "replay_safe",
+      "proof_valid",
+      "reconciliation_successful",
+      "convergence_achieved",
+      "validator_result",
+      "merge_allowed",
+      "deploy_allowed",
+      "policy_valid"
+    ],
+    "core_rule": "Summary describes evidence. It must not interpret legitimacy."
+  },
+  "observation_propagation_constraints": {
+    "rule": "No observation may be propagated without classification metadata.",
+    "forbidden_propagation_example": "DEPLOYMENT_ACTIVE (alone)",
+    "required_propagation_fields": [
+      "classification",
+      "verification_status",
+      "lineage_status",
+      "proof_status",
+      "authority_status"
+    ]
+  },
+  "emission_trigger_model": {
+    "emit_if_observation": [
+      "changes classification",
+      "creates an observation gap",
+      "closes an observation gap",
+      "detects conflicting evidence",
+      "detects stale evidence",
+      "observes authority/replay/proof transition",
+      "changes reconstruction bridgeability",
+      "changes topology_view_id coverage"
+    ],
+    "do_not_emit_for": [
+      "performance changes",
+      "routine heartbeats",
+      "unchanged registry reads",
+      "duplicate observations",
+      "local process churn",
+      "resource utilization changes"
+    ],
+    "critical_transitions_emit_immediately": [
+      "authority revocation observed",
+      "replay nonce consumed",
+      "proof hash mismatch",
+      "root bypass path observed",
+      "conflicting lineage hash"
+    ]
+  },
+  "stability_window_and_flapping_model": {
+    "stability_confirmed_transition_rule": "A transition becomes emission-eligible only if: (1) it persists past a stability window, OR (2) it affects a critical legitimacy surface, OR (3) it creates an irreversible lineage transition.",
+    "flapping_handling": {
+      "emit_immediately_for": "irreversible legitimacy transitions",
+      "debounce": "reversible visibility churn",
+      "aggregate_flapping": "one bounded observation window"
+    },
+    "reconciliation_safety_rule": {
+      "condition": "active flapping window + reconciliation requested",
+      "result": "do not derive closure",
+      "safe_behavior": {
+        "if_critical_transition_observed": "process immediately",
+        "if_non_critical_flapping_active": "hold closure derivation",
+        "if_bridgeable_independent_evidence_exists": "reconciliation may proceed using lineage-bound evidence",
+        "if_not_bridgeable": "REGISTRY_RECONCILIATION_INCOMPLETE"
+      },
+      "core_rule": "Flapping topology cannot produce closure. Only stable topology or bridgeable lineage-bound evidence can support reconciliation."
+    }
+  },
+  "topology_closure_states": {
+    "states": [
+      {
+        "id": "TOPOLOGY_VISIBLE",
+        "description": "All required topology surfaces are observable and consistent."
+      },
+      {
+        "id": "TOPOLOGY_PARTIAL",
+        "description": "Some topology surfaces are observable; coverage is incomplete."
+      },
+      {
+        "id": "TOPOLOGY_STALE",
+        "description": "Topology observations exist but exceed acceptable staleness threshold."
+      },
+      {
+        "id": "TOPOLOGY_CONFLICTED",
+        "description": "Conflicting observations exist for the same topology surface."
+      },
+      {
+        "id": "TOPOLOGY_UNOBSERVABLE",
+        "description": "Required topology surfaces cannot be observed."
+      },
+      {
+        "id": "TOPOLOGY_NOISE_IGNORED",
+        "description": "Observation classified as TOPOLOGY_NOISE and suppressed."
+      }
+    ],
+    "observer_may_emit": ["OBSERVATION_GAP_DETECTED"],
+    "observer_may_not_emit_unless_derived_by_validator_or_reconciliation_layer": [
+      "LINEAGE_INVALID",
+      "AUTHORITY_INVALID",
+      "REPLAY_INVALID",
+      "PROOF_INVALID"
+    ],
+    "core_boundary": "Topology observer may classify visibility state. Topology observer may not classify legitimacy state."
+  },
+  "gap_bridgeability_semantics": {
+    "classifications": [
+      {
+        "id": "BRIDGEABLE",
+        "condition": "Convergent anchor — all lineage-bound anchors converge on the same lineage."
+      },
+      {
+        "id": "UNKNOWN",
+        "condition": "Missing anchor — required lineage anchor is absent."
+      },
+      {
+        "id": "UNBRIDGEABLE",
+        "condition": "Conflicting anchor — lineage anchors contradict each other."
+      }
+    ],
+    "canonical_bridgeability_invariant": {
+      "missing_anchor": "UNKNOWN",
+      "conflicting_anchor": "UNBRIDGEABLE",
+      "convergent_anchor": "BRIDGEABLE"
+    },
+    "required_replay_gap_anchors": [
+      "invocation_nonce",
+      "nonce_ledger_hash",
+      "execution_id",
+      "proof_id",
+      "validated_object_hash",
+      "topology_view_id",
+      "reconciliation_epoch"
+    ],
+    "replay_gap_bridgeable_only_when": "nonce, execution, proof, and object hash all converge on the same lineage.",
+    "proof_gap_examples": [
+      {
+        "scenario": "proof registry unreachable",
+        "bridgeability": "UNKNOWN"
+      },
+      {
+        "scenario": "proof entry exists but validated_object_hash differs from execution record",
+        "bridgeability": "UNBRIDGEABLE"
+      },
+      {
+        "scenario": "proof lineage converges on same execution_id and validated_object_hash",
+        "bridgeability": "BRIDGEABLE"
+      }
+    ],
+    "closure_effect": "UNKNOWN or UNBRIDGEABLE -> no reconciliation closure"
+  },
+  "evidence_precedence_hierarchy": {
+    "tiers": [
+      {
+        "tier": 1,
+        "label": "Verified immutable lineage anchors",
+        "description": "Cryptographically verified, append-only ledger entries with confirmed integrity."
+      },
+      {
+        "tier": 2,
+        "label": "Signed registry state",
+        "description": "Registry entries with verified signatures and lineage binding."
+      },
+      {
+        "tier": 3,
+        "label": "Topology observations",
+        "description": "Runtime topology intelligence observations classified per this taxonomy."
+      },
+      {
+        "tier": 4,
+        "label": "Derived reconstruction",
+        "description": "State derived from partial evidence when direct observation is unavailable."
+      }
+    ],
+    "arbitration_rule": "Verified Tier 1 > Tier 2 > Tier 3 > Tier 4.",
+    "integrity_suspension_rule": {
+      "if_tier1_integrity_verifies": "Tier 1 wins. Tier 2 becomes registry drift.",
+      "if_tier1_integrity_suspect": "Do not fall back to mutable registry truth. Suspend closure.",
+      "core_compression": "Ledger finality wins only when ledger integrity verifies. If ledger integrity fails, the system suspends closure."
+    }
+  },
+  "child_issue_alignment": {
+    "#1641": {
+      "scope": "Observation metadata schema and typed evidence envelope implementation.",
+      "derives_from": [
+        "core_metadata_anchors",
+        "typed_evidence_envelope"
+      ],
+      "minimum_anchors": ["observation_id", "lineage_hash", "topology_view_id"]
+    },
+    "#1642": {
+      "scope": "Emission trigger model and selective emission logic.",
+      "derives_from": [
+        "emission_trigger_model",
+        "stability_window_and_flapping_model"
+      ],
+      "emission_mode": "selective_not_continuous"
+    },
+    "#1644": {
+      "scope": "Evidence precedence hierarchy and conflict arbitration.",
+      "derives_from": [
+        "evidence_precedence_hierarchy",
+        "gap_bridgeability_semantics"
+      ],
+      "arbitration_rule": "Verified Tier 1 > Tier 2 > Tier 3 > Tier 4"
+    }
+  },
+  "legitimacy_preserving_observation_semantics": {
+    "core_boundary": "Topology visibility != legitimacy",
+    "permitted_operations": [
+      "observe",
+      "compare",
+      "classify visibility",
+      "emit"
+    ],
+    "forbidden_operations": [
+      "decide legitimacy",
+      "mutate registry",
+      "trigger reconciliation",
+      "authorize execution",
+      "create authority",
+      "produce proof"
+    ]
+  }
+}
