@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "evidence_snapshot_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "evidence_normalization_specification",
+  "scope": {
+    "name": "EvidenceSnapshot",
+    "purpose": "Define the canonical normalized evidence structure consumed by deterministic PREO audit checks. Provider-specific API variance is isolated in adapter layers; all validator logic consumes only a canonical EvidenceSnapshot.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "normalization_pipeline": {
+    "stages": [
+      {
+        "stage": 1,
+        "name": "raw_provider_response",
+        "description": "Raw API response from the provider. Provider-specific field names, ordering, and formats may be present."
+      },
+      {
+        "stage": 2,
+        "name": "provider_adapter",
+        "description": "Adapter layer that translates raw provider response into canonical EvidenceSnapshot fields. All provider-specific variance must be resolved here."
+      },
+      {
+        "stage": 3,
+        "name": "canonical_evidence_snapshot",
+        "description": "Normalized EvidenceSnapshot conforming to schemas/evidence-snapshot.schema.json. The snapshot_hash is computed at this stage.",
+        "schema": "schemas/evidence-snapshot.schema.json"
+      },
+      {
+        "stage": 4,
+        "name": "deterministic_audit_checks",
+        "description": "Audit logic that consumes only the canonical EvidenceSnapshot. No provider-specific fields or ordering dependencies are permitted at this stage."
+      },
+      {
+        "stage": 5,
+        "name": "preo_valid_or_preo_invalid",
+        "description": "Final PREO_VALID or PREO_INVALID transition result. Must be reproducible from the EvidenceSnapshot alone."
+      }
+    ]
+  },
+  "canonical_snapshot_requirements": {
+    "identical_inputs_produce_identical_snapshots": true,
+    "snapshot_hash_must_be_deterministic": true,
+    "audit_logic_must_not_depend_on_provider_specific_ordering": true,
+    "preo_valid_decisions_must_be_reproducible_from_snapshot_alone": true,
+    "missing_or_ambiguous_normalization_fails_closed": true
+  },
+  "required_snapshot_contents": [
+    "anchor_metadata",
+    "changed_files",
+    "reviews",
+    "emitted_checks",
+    "branch_protection_configuration",
+    "provider_metadata",
+    "capture_timestamp"
+  ],
+  "required_checks_alias_model": {
+    "purpose": "Each required_status_check must be resolved to its allowed emitted GitHub Actions job check-run names via explicit alias mappings. String-matching heuristics are forbidden.",
+    "alias_map_location": "branch_protection.required_checks_alias_map in the EvidenceSnapshot",
+    "resolution_rules": [
+      {
+        "rule": "no_alias_mapping",
+        "condition": "A required_status_check has no entry in the alias map.",
+        "result": "no_match -> PREO_INVALID"
+      },
+      {
+        "rule": "ambiguous_mapping",
+        "condition": "A required_status_check maps to more than one candidate that could match the same emitted check.",
+        "result": "PREO_INVALID"
+      },
+      {
+        "rule": "required_check_not_emitted",
+        "condition": "A required_status_check has an alias map entry but no emitted check with that name appears in emitted_checks for the exact head_sha.",
+        "result": "PREO_INVALID"
+      },
+      {
+        "rule": "string_matching_heuristics",
+        "condition": "Resolver uses partial string match, regex, or any non-explicit approach to associate required checks with emitted checks.",
+        "result": "forbidden -> PREO_INVALID"
+      }
+    ]
+  },
+  "stale_review_detection": {
+    "rule": "A review is stale if review.commit_sha does not equal anchor.head_sha.",
+    "stale_review_result": "PREO_INVALID"
+  },
+  "governance_drift_detection": {
+    "rule": "If the branch_protection configuration in the snapshot differs from the declared governance policy, governance drift is present.",
+    "drift_result": "PREO_INVALID"
+  },
+  "fail_closed_semantics": {
+    "missing_snapshot": "PREO_INVALID",
+    "schema_validation_failure": "PREO_INVALID",
+    "hash_mismatch": "PREO_INVALID",
+    "ambiguous_normalization": "PREO_INVALID",
+    "provider_adapter_failure": "PREO_INVALID"
+  }
+}
