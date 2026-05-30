@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "preo_valid_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "validity_transition_specification",
+  "scope": {
+    "name": "PREO_VALID",
+    "purpose": "Define the canonical validity transition gate that determines whether a PREO_CANDIDATE becomes PREO_VALID or PREO_INVALID before any merge legitimacy is considered.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "transition_model": {
+    "input_state": "PREO_CANDIDATE",
+    "output_states": ["PREO_VALID", "PREO_INVALID"],
+    "default_output": "PREO_INVALID",
+    "merge_legitimacy_without_preo_valid": "NULL",
+    "workflow_success_as_substitute_for_preo_valid": "forbidden",
+    "deterministic_artifact_required": true
+  },
+  "preo_valid_object": {
+    "object_type": "PREO_VALID",
+    "defined": true,
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "preo_valid_id",
+      "preo_candidate_id",
+      "preo_candidate_hash",
+      "head_sha",
+      "repository",
+      "base_branch",
+      "head_branch",
+      "evidence_snapshot_hash",
+      "required_checks_resolved",
+      "required_checks_alias_map",
+      "review_requirements_satisfied",
+      "governance_drift_absent",
+      "transition_result",
+      "transition_errors",
+      "validated_at"
+    ],
+    "transition_result_enum": ["PREO_VALID", "PREO_INVALID"],
+    "default_result": "PREO_INVALID"
+  },
+  "preo_valid_requires": {
+    "exact_head_sha_binding": {
+      "rule": "The PREO_VALID object must bind to the exact immutable head_sha present in the PREO_CANDIDATE.",
+      "failure_result": "PREO_INVALID"
+    },
+    "required_status_checks_resolved": {
+      "rule": "All required_status_checks declared in branch protection must have a resolved check conclusion in the EvidenceSnapshot for the exact head_sha.",
+      "unresolved_check_result": "PREO_INVALID"
+    },
+    "required_status_checks_match_emitted_job_names": {
+      "rule": "Each required_status_check must resolve via an explicit alias mapping to an emitted GitHub Actions job check-run name. String-matching heuristics are forbidden.",
+      "no_alias_mapping_result": "PREO_INVALID",
+      "ambiguous_mapping_result": "PREO_INVALID",
+      "required_check_not_emitted_result": "PREO_INVALID"
+    },
+    "review_requirements_satisfied": {
+      "rule": "All required review approvals declared in branch protection must be present, non-stale, and bound to the exact head_sha.",
+      "stale_review_result": "PREO_INVALID",
+      "missing_review_result": "PREO_INVALID"
+    },
+    "governance_drift_absent": {
+      "rule": "The EvidenceSnapshot must not contain governance drift signals. Any governance drift present forces PREO_INVALID.",
+      "drift_detected_result": "PREO_INVALID"
+    }
+  },
+  "preo_invalid_requires": {
+    "head_sha_mismatch": {
+      "rule": "If the head_sha in the candidate differs from the head_sha in the EvidenceSnapshot, the result is PREO_INVALID.",
+      "result": "PREO_INVALID"
+    },
+    "unresolved_required_checks": {
+      "rule": "If any required_status_check has no resolved, passing check conclusion for the exact head_sha, the result is PREO_INVALID.",
+      "result": "PREO_INVALID"
+    },
+    "governance_drift": {
+      "rule": "If any governance drift is detected in the EvidenceSnapshot, the result is PREO_INVALID.",
+      "result": "PREO_INVALID"
+    },
+    "stale_review_evidence": {
+      "rule": "If any required review was submitted against a commit SHA other than the current head_sha, the result is PREO_INVALID.",
+      "result": "PREO_INVALID"
+    }
+  },
+  "merge_legitimacy_gate": {
+    "canonical_gate": "PREO_VALID",
+    "merge_legitimacy_without_preo_valid": "NULL",
+    "workflow_success_as_substitute_for_preo_valid": "forbidden",
+    "admin_bypass_as_substitute_for_preo_valid": "forbidden",
+    "deployment_success_as_substitute_for_preo_valid": "forbidden"
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical EvidenceSnapshot inputs must produce identical PREO_VALID or PREO_INVALID outputs. The transition result must be reproducible from the EvidenceSnapshot alone.",
+    "snapshot_hash_must_be_deterministic": true,
+    "audit_logic_must_not_depend_on_provider_specific_ordering": true
+  },
+  "evidence_normalization": {
+    "pipeline": [
+      "raw_provider_response",
+      "provider_adapter",
+      "canonical_evidence_snapshot",
+      "deterministic_audit_checks",
+      "preo_valid_or_preo_invalid"
+    ],
+    "canonical_snapshot_schema": "schemas/evidence-snapshot.schema.json",
+    "provider_variance_isolation": "Provider-specific API variance must be isolated in adapter layers. Validator logic must consume only canonical EvidenceSnapshot.",
+    "ambiguity_result": "PREO_INVALID"
+  },
+  "required_checks_alias_model": {
+    "purpose": "Map each required_status_check to its allowed emitted GitHub Actions job check-run names.",
+    "alias_resolution_rules": [
+      "No alias mapping -> no match -> PREO_INVALID",
+      "Ambiguous mapping -> PREO_INVALID",
+      "Required check not emitted -> PREO_INVALID",
+      "String-matching heuristics -> forbidden"
+    ]
+  },
+  "fail_closed_semantics": {
+    "default_result": "PREO_INVALID",
+    "missing_input": "PREO_INVALID",
+    "ambiguous_evidence": "PREO_INVALID",
+    "normalization_failure": "PREO_INVALID",
+    "snapshot_hash_mismatch": "PREO_INVALID"
+  }
+}

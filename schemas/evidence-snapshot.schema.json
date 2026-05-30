@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/evidence-snapshot.schema.json",
+  "title": "EvidenceSnapshot",
+  "description": "Canonical normalized evidence snapshot consumed by deterministic PREO audit checks. Provider-specific variance must be resolved by adapter layers before population.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_id",
+    "snapshot_hash",
+    "capture_timestamp",
+    "anchor",
+    "changed_files",
+    "reviews",
+    "emitted_checks",
+    "branch_protection",
+    "provider_metadata"
+  ],
+  "properties": {
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable unique identifier for this EvidenceSnapshot."
+    },
+    "snapshot_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-fA-F0-9]{64}$",
+      "description": "sha256 of the canonical JSON of this snapshot excluding the snapshot_hash field itself."
+    },
+    "capture_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp at which this snapshot was captured."
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "pull_request_id",
+        "head_sha",
+        "base_branch",
+        "head_branch"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "description": "Repository in owner/name format."
+        },
+        "pull_request_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{40}$",
+          "description": "Exact immutable commit SHA this snapshot is bound to."
+        },
+        "base_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "description": "Files changed in the pull request.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "status", "additions", "deletions"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["added", "modified", "removed", "renamed"]
+          },
+          "additions": { "type": "integer", "minimum": 0 },
+          "deletions": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "reviews": {
+      "type": "array",
+      "description": "Normalized pull request reviews bound to the exact head_sha.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reviewer_login",
+          "reviewer_id",
+          "state",
+          "submitted_at",
+          "commit_sha"
+        ],
+        "properties": {
+          "reviewer_login": { "type": "string", "minLength": 1 },
+          "reviewer_id": { "type": "integer", "minimum": 1 },
+          "state": {
+            "type": "string",
+            "enum": ["APPROVED", "CHANGES_REQUESTED", "DISMISSED", "COMMENTED"]
+          },
+          "submitted_at": { "type": "string", "format": "date-time" },
+          "commit_sha": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{40}$",
+            "description": "Commit SHA against which this review was submitted. Must equal anchor.head_sha for non-stale reviews."
+          }
+        }
+      }
+    },
+    "emitted_checks": {
+      "type": "array",
+      "description": "Normalized check runs emitted by GitHub Actions for the exact head_sha. Provider-specific ordering must be removed by the adapter.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "head_sha",
+          "status",
+          "conclusion"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact emitted GitHub Actions job check-run name."
+          },
+          "head_sha": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{40}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["QUEUED", "IN_PROGRESS", "COMPLETED"]
+          },
+          "conclusion": {
+            "type": "string",
+            "enum": ["SUCCESS", "FAILURE", "CANCELLED", "SKIPPED", "TIMED_OUT", "ACTION_REQUIRED", "NEUTRAL", "NULL"]
+          }
+        }
+      }
+    },
+    "branch_protection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_status_checks",
+        "required_approving_review_count",
+        "dismiss_stale_reviews",
+        "require_code_owner_reviews"
+      ],
+      "description": "Normalized branch protection configuration at the time of snapshot capture.",
+      "properties": {
+        "required_status_checks": {
+          "type": "array",
+          "description": "Required status check names as declared in branch protection.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_approving_review_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dismiss_stale_reviews": {
+          "type": "boolean"
+        },
+        "require_code_owner_reviews": {
+          "type": "boolean"
+        },
+        "required_checks_alias_map": {
+          "type": "object",
+          "description": "Explicit mapping from each required_status_check name to its allowed emitted job check-run names. String-matching heuristics are forbidden.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "provider_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "api_version", "normalized_at"],
+      "description": "Metadata identifying the provider adapter that produced this canonical snapshot.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identity of the provider (e.g. 'github')."
+        },
+        "api_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalized_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
