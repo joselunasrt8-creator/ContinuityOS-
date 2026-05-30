@@ -1,0 +1,157 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "merge_proof_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "merge_proof_specification",
+  "closes": "#1634",
+  "depends_on": ["#1630", "#1631", "#1632", "#1633"],
+  "scope": {
+    "name": "MERGE_PROOF",
+    "purpose": "Define the canonical merge-proof object that binds the actual merge commit to the full validated merge-legitimacy chain. Merge success is not proof. A governed merge requires a deterministic proof object bound to the exact validated_head_sha, resulting merge_commit_sha, PREO_VALID hash, SCO_VALID hash when required, approval lineage hash, and branch-protection enforcement hash. MERGE_PROOF_VALID is recorded finality evidence, not merge authorization.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "non_goals": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_merge_permission": false
+  },
+  "merge_proof_object": {
+    "object_type": "MERGE_PROOF_VALID",
+    "defined": true,
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "preo_valid_hash",
+      "sco_valid_hash",
+      "approval_lineage_hash",
+      "branch_protection_enforcement_hash",
+      "validated_head_sha",
+      "merge_commit_sha",
+      "merge_method",
+      "merged_by",
+      "merged_at",
+      "validator_key_id",
+      "validator_signature",
+      "canonical_proof_hash"
+    ],
+    "sco_valid_hash_note": "sco_valid_hash must be present and bound to the validated_head_sha when governed files are present in the merged PR diff. It must be explicitly null and recorded when SCO governance is not required — it must never be absent.",
+    "failure_result": "MERGE_LEGITIMACY_NULL",
+    "default_result": "MERGE_LEGITIMACY_NULL"
+  },
+  "lineage_binding_requirements": {
+    "preo_valid_head_sha_match": {
+      "rule": "The preo_valid_hash in the proof must correspond to a PREO_VALID object whose head_sha equals the merged PR validated_head_sha. Stale or displaced PREO_VALID evidence is not valid input.",
+      "failure_result": "MERGE_LEGITIMACY_NULL"
+    },
+    "sco_valid_when_required": {
+      "rule": "When governed files are present in the merged PR diff, sco_valid_hash must be present and must correspond to a SCO_VALID object covering those files for the validated_head_sha.",
+      "failure_result": "MERGE_LEGITIMACY_NULL"
+    },
+    "approval_lineage_head_sha_match": {
+      "rule": "The approval_lineage_hash must correspond to an APPROVAL_LINEAGE_VALID object bound to the same validated_head_sha as the merged PR. Stale approvals are not valid inputs.",
+      "failure_result": "MERGE_LEGITIMACY_NULL"
+    },
+    "branch_protection_enforcement_head_sha_match": {
+      "rule": "The branch_protection_enforcement_hash must correspond to enforcement evidence evaluated for the same validated_head_sha.",
+      "failure_result": "MERGE_LEGITIMACY_NULL"
+    },
+    "merge_commit_sha_present": {
+      "rule": "The merge_commit_sha produced by the merge event must be present in the proof. Absence of merge_commit_sha means no proof can be generated.",
+      "failure_result": "MERGE_LEGITIMACY_NULL"
+    },
+    "validated_lineage_equals_merged_lineage": {
+      "rule": "The validated merge lineage (PREO_VALID + SCO_VALID + APPROVAL_LINEAGE + branch protection) must correspond to the lineage of the actual merge commit. Any divergence is a lineage mismatch.",
+      "failure_result": "MERGE_LEGITIMACY_NULL"
+    }
+  },
+  "trust_anchor": {
+    "merge_actor_is_evidence": "merged_by is event actor evidence included in the proof but is not the trust anchor.",
+    "validator_is_attestation": "The Governance Validator process is the canonical signer. validator_signature is the proof finality attestation.",
+    "rule": "The merge actor must be recorded in the proof. The merge actor must not be the trust anchor. The validator_signature over the canonical_proof_hash is the trust anchor."
+  },
+  "invalid_conditions": {
+    "missing_preo_valid_hash": {
+      "condition": "preo_valid_hash is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_sco_valid_hash": {
+      "condition": "sco_valid_hash is absent when governed files are present in the merged PR diff.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_approval_lineage_hash": {
+      "condition": "approval_lineage_hash is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_branch_protection_enforcement_hash": {
+      "condition": "branch_protection_enforcement_hash is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_merge_commit_sha": {
+      "condition": "merge_commit_sha is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "merge_commit_not_bound_to_validated_head_sha": {
+      "condition": "The merge_commit_sha is not a descendant of the validated_head_sha, or the gate hashes were not produced for the same validated_head_sha as the merged PR.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "stale_validated_head_sha": {
+      "condition": "The validated_head_sha in the proof does not match the head_sha of the merged PR at the time of merge. Any gate hash produced for a different head_sha is stale evidence.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_validator_signature": {
+      "condition": "The validator_signature attesting proof finality is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "proof_hash_mismatch": {
+      "condition": "The canonical_proof_hash recomputed from proof fields does not match the stored canonical_proof_hash, or the validator_signature does not verify against the canonical_proof_hash and validator_key_id.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_merge_actor": {
+      "condition": "merged_by is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_merge_timestamp": {
+      "condition": "merged_at is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    "missing_validator_key_id": {
+      "condition": "The validator_key_id identifying the canonical signer is absent, null, or empty.",
+      "result": "MERGE_LEGITIMACY_NULL"
+    }
+  },
+  "canonical_compression": {
+    "rule_1": "Merge success is not proof.",
+    "rule_2": "A governed merge requires proof bound to: exact validated_head_sha, resulting merge_commit_sha, preo_valid_hash, sco_valid_hash when required, approval_lineage_hash, and branch_protection_enforcement_hash.",
+    "rule_3": "No merge proof → no merge legitimacy.",
+    "rule_4": "Actor is evidence. Validator is attestation. Lineage is legitimacy.",
+    "rule_5": "MERGE_PROOF_VALID is recorded finality evidence, not merge authorization."
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical gate hash inputs plus identical merge event fields must produce an identical canonical_proof_hash. The proof must be reproducible from its constituent fields alone.",
+    "proof_hash_must_be_deterministic": true,
+    "audit_logic_must_not_depend_on_provider_specific_ordering": true
+  },
+  "fail_closed_semantics": {
+    "default_result": "MERGE_LEGITIMACY_NULL",
+    "missing_preo_valid_hash": "MERGE_LEGITIMACY_NULL",
+    "missing_sco_valid_hash": "MERGE_LEGITIMACY_NULL",
+    "missing_merge_commit_sha": "MERGE_LEGITIMACY_NULL",
+    "missing_approval_lineage_hash": "MERGE_LEGITIMACY_NULL",
+    "missing_branch_protection_enforcement_hash": "MERGE_LEGITIMACY_NULL",
+    "missing_validator_key_id": "MERGE_LEGITIMACY_NULL",
+    "missing_validator_signature": "MERGE_LEGITIMACY_NULL",
+    "proof_hash_mismatch": "MERGE_LEGITIMACY_NULL"
+  }
+}
