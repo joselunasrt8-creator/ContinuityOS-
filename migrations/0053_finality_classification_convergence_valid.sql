@@ -52,16 +52,30 @@ CREATE TABLE finality_classification_registry_v2 (
 INSERT INTO finality_classification_registry_v2
   SELECT * FROM finality_classification_registry;
 
--- Step 3: Drop the old table (its triggers drop with it).
+-- Step 3: Drop cross-table triggers that reference finality_classification_registry.
+--         These triggers live on other tables (conflict_set_registry,
+--         quorum_attestation_registry, revocation_liveness_registry, epoch_registry)
+--         and are NOT dropped by DROP TABLE below. However, SQLite 3.26+ validates
+--         all trigger bodies during ALTER TABLE RENAME; the dropped table name in
+--         their bodies causes a runtime abort at the rename step. Dropping them here
+--         eliminates the stale reference. They are recreated in step 9 after the
+--         rename completes, using their original definitions from migrations 0049-0052.
+
+DROP TRIGGER IF EXISTS csr_finality_class_must_exist;
+DROP TRIGGER IF EXISTS qar_finality_class_must_exist;
+DROP TRIGGER IF EXISTS rlr_finality_class_must_exist;
+DROP TRIGGER IF EXISTS er_finality_class_must_exist;
+
+-- Step 4: Drop the old table (its own triggers drop with it).
 
 DROP TABLE finality_classification_registry;
 
--- Step 4: Rename the replacement into position.
+-- Step 5: Rename the replacement into position.
 
 ALTER TABLE finality_classification_registry_v2
   RENAME TO finality_classification_registry;
 
--- Step 5: Recreate indexes.
+-- Step 6: Recreate indexes.
 
 CREATE INDEX IF NOT EXISTS idx_fcr_object_hash
   ON finality_classification_registry(object_hash);
@@ -73,7 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_fcr_supersedes
 CREATE INDEX IF NOT EXISTS idx_fcr_created_at
   ON finality_classification_registry(created_at);
 
--- Step 6: Recreate append-only triggers.
+-- Step 7: Recreate append-only triggers.
 
 CREATE TRIGGER IF NOT EXISTS fcr_no_update
   BEFORE UPDATE ON finality_classification_registry
@@ -87,7 +101,7 @@ BEGIN
   SELECT RAISE(ABORT, 'finality_classification_registry is append-only: DELETE is forbidden');
 END;
 
--- Step 7: Recreate referential-integrity and evidence-guard triggers.
+-- Step 8: Recreate referential-integrity and evidence-guard triggers.
 
 CREATE TRIGGER IF NOT EXISTS fcr_supersedes_must_exist
   BEFORE INSERT ON finality_classification_registry
@@ -121,7 +135,7 @@ BEGIN
   END;
 END;
 
--- Step 8: New guard — GLOBAL_VALID must supersede a CONVERGENCE_VALID record.
+-- Step 8a: New guard — GLOBAL_VALID must supersede a CONVERGENCE_VALID record.
 --         LOCAL_VALID cannot be promoted directly to GLOBAL_VALID.
 --         The supersession chain enforces: LOCAL_VALID → CONVERGENCE_VALID → GLOBAL_VALID.
 
@@ -147,6 +161,57 @@ BEGIN
           WHERE proof_id = NEW.proof_id
           AND status = 'COMPLETED') = 0
     THEN RAISE(ABORT, 'proof_id references non-existent or incomplete proof in proof_registry')
+  END;
+END;
+
+-- Step 9: Recreate the four cross-table triggers dropped in step 3.
+--         Definitions are identical to their originals in migrations 0049-0052.
+
+-- From 0049_conflict_set_registry.sql
+CREATE TRIGGER IF NOT EXISTS csr_finality_class_must_exist
+  BEFORE INSERT ON conflict_set_registry
+  WHEN NEW.finality_classification_id IS NOT NULL
+BEGIN
+  SELECT CASE
+    WHEN (SELECT COUNT(*) FROM finality_classification_registry
+          WHERE finality_classification_id = NEW.finality_classification_id) = 0
+    THEN RAISE(ABORT, 'finality_classification_id references non-existent finality classification record')
+  END;
+END;
+
+-- From 0050_quorum_attestation_registry.sql
+CREATE TRIGGER IF NOT EXISTS qar_finality_class_must_exist
+  BEFORE INSERT ON quorum_attestation_registry
+  WHEN NEW.finality_classification_id IS NOT NULL
+BEGIN
+  SELECT CASE
+    WHEN (SELECT COUNT(*) FROM finality_classification_registry
+          WHERE finality_classification_id = NEW.finality_classification_id) = 0
+    THEN RAISE(ABORT, 'finality_classification_id references non-existent finality classification record')
+  END;
+END;
+
+-- From 0051_revocation_liveness_registry.sql
+CREATE TRIGGER IF NOT EXISTS rlr_finality_class_must_exist
+  BEFORE INSERT ON revocation_liveness_registry
+  WHEN NEW.finality_classification_id IS NOT NULL
+BEGIN
+  SELECT CASE
+    WHEN (SELECT COUNT(*) FROM finality_classification_registry
+          WHERE finality_classification_id = NEW.finality_classification_id) = 0
+    THEN RAISE(ABORT, 'finality_classification_id references non-existent finality classification record')
+  END;
+END;
+
+-- From 0052_epoch_registry.sql
+CREATE TRIGGER IF NOT EXISTS er_finality_class_must_exist
+  BEFORE INSERT ON epoch_registry
+  WHEN NEW.finality_classification_id IS NOT NULL
+BEGIN
+  SELECT CASE
+    WHEN (SELECT COUNT(*) FROM finality_classification_registry
+          WHERE finality_classification_id = NEW.finality_classification_id) = 0
+    THEN RAISE(ABORT, 'finality_classification_id references non-existent finality classification record')
   END;
 END;
 
