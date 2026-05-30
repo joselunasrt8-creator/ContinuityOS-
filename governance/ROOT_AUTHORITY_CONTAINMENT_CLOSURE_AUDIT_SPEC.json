@@ -1,0 +1,289 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "root_authority_containment_closure_audit_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "root_authority_closure_audit_specification",
+  "closes": "#1639",
+  "depends_on": ["#1636", "#1637", "#1638"],
+  "scope": {
+    "name": "ROOT_AUTHORITY_CONTAINMENT_CLOSURE_AUDIT",
+    "purpose": "Define the canonical closure audit that classifies root authority surfaces as contained or not. The audit detects bypass paths, scope drift, delegation drift, and revocation failures without granting, revoking, repairing, or executing authority. Root authority can observe, classify, and invalidate. Root authority may not create legitimacy or bypass governance.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false,
+    "record_repair": false,
+    "execution_trigger": false
+  },
+  "non_goals": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_merge_permission": false,
+    "creates_proof": false,
+    "repairs_records": false,
+    "grants_authority": false,
+    "revokes_authority": false
+  },
+  "core_invariants": {
+    "root_authority_exists_ne_bypass_lineage": "root authority exists ≠ root authority may bypass lineage",
+    "registry_agreement_ne_authority_containment": "registry agreement ≠ authority containment",
+    "containment_closed_definition": "no bypass + lineage-bound authority → ROOT_AUTHORITY_CONTAINMENT_CLOSED",
+    "evidence_only_rule": "root authority evidence may classify and invalidate; it may not authorize merge, deploy, execution, or proof generation"
+  },
+  "audit_surfaces": [
+    "repository_admin_authority",
+    "branch_protection_authority",
+    "workflow_dispatch_authority",
+    "environment_secret_authority",
+    "cloudflare_deploy_authority",
+    "local_wrangler_authority",
+    "token_authority",
+    "infrastructure_mutation_authority",
+    "federation_root_authority"
+  ],
+  "bypass_source_evidence_structure": {
+    "purpose": "Bypass observations must be represented as structured evidence references — never as raw credential or token values.",
+    "required_fields": ["entry_id", "registry", "path_type", "target_surface", "evidence_hash"],
+    "disallowed_fields": ["raw_token", "raw_secret", "secret_value", "token_value", "credential"],
+    "validation_rule": "Any bypass_source entry missing a required_field or containing a disallowed_field forces ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL.",
+    "field_semantics": {
+      "entry_id": "Stable identifier for this bypass path entry in the canonical bypass registry",
+      "registry": "The governance registry where this bypass path is declared (e.g. ROOT_BYPASS_PATH_INVENTORY)",
+      "path_type": "Classification of the bypass path type (e.g. direct_deploy, admin_override, token_escape)",
+      "target_surface": "The audit surface ID this bypass path targets (e.g. RAS-005)",
+      "evidence_hash": "Canonical hash of the structured evidence record — not of any credential value"
+    }
+  },
+  "inventory_ne_containment_proof": {
+    "statement": "Declared inventory alone ≠ containment proof. ROOT_AUTHORITY_CONTAINMENT_CLOSED requires audit evidence — cross_registry_reconciliation_hash, authority_lineage_bound, and verified absence of bypass paths, scope drift, delegation drift, and revocation failures — in addition to a declared inventory. An inventory with no audit evidence cannot derive ROOT_AUTHORITY_CONTAINMENT_CLOSED.",
+    "invariant": "declared inventory ≠ containment proof"
+  },
+  "lineage_binding_semantics": {
+    "missing": {
+      "condition": "authority_lineage_bound is null or absent",
+      "classification": "ROOT_AUTHORITY_RECONCILIATION_INCOMPLETE",
+      "reason": "Evidence is absent — state cannot be determined"
+    },
+    "false_with_execution_path": {
+      "condition": "authority_lineage_bound is false AND execution_path_present is true",
+      "classification": "ROOT_AUTHORITY_BYPASS_PATH_PRESENT",
+      "reason": "Unbound authority with an available execution path is a bypass path — direct authorization is possible without lineage"
+    },
+    "false_without_execution_path": {
+      "condition": "authority_lineage_bound is false AND execution_path_present is not true",
+      "classification": "ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL",
+      "reason": "Unbound authority with unknown or absent execution path — cannot determine whether unbound authority is executable"
+    },
+    "true_with_no_bypass_or_drift": {
+      "condition": "authority_lineage_bound is true AND no bypass observations AND no scope drift AND no delegation drift AND no revocation failures AND cross_registry_reconciliation_hash present",
+      "classification": "ROOT_AUTHORITY_CONTAINMENT_CLOSED"
+    }
+  },
+  "verification_requirements": {
+    "root_authority_inventory_exists": {
+      "rule": "A declared root authority inventory must exist and cover all nine audit surfaces. An absent or incomplete inventory forces ROOT_AUTHORITY_RECONCILIATION_INCOMPLETE. The inventory alone does not prove containment — audit evidence is required.",
+      "satisfied_by": "governance/ROOT_AUTHORITY_INVENTORY.json",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "cross_registry_reconciliation_hash_required": {
+      "rule": "cross_registry_reconciliation_hash must be present in audit evidence for ROOT_AUTHORITY_CONTAINMENT_CLOSED to be derivable. Absence of the hash forces ROOT_AUTHORITY_RECONCILIATION_INCOMPLETE. This binds #1639 containment closure to #1638 cross-registry reconciliation.",
+      "depends_on": "#1638",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_boundaries_declared": {
+      "rule": "Each inventoried surface must have declared boundaries: bypass_capable flag, declared_containment_class, and declared_classification_basis. An undeclared surface boundary forces ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL.",
+      "satisfied_by": "governance/ROOT_AUTHORITY_CONTAINMENT_RULES.json",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_drift_taxonomy_exists": {
+      "rule": "A sovereignty drift taxonomy must exist covering scope drift, delegation drift, and revocation drift. Each drift class must yield LEGITIMACY_NULL.",
+      "satisfied_by": "governance/SOVEREIGNTY_DRIFT_TAXONOMY.json",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_containment_rules_exist": {
+      "rule": "Containment rules must exist for each audit surface, specifying that root authority evidence is evidence-only and non-authorizing.",
+      "satisfied_by": "governance/ROOT_AUTHORITY_CONTAINMENT_RULES.json",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "admin_bypass_classified_as_evidence_only": {
+      "rule": "repository_admin_authority and branch_protection_authority bypass evidence must be classified EVIDENCE_ONLY. Bypass evidence may not derive merge legitimacy.",
+      "surfaces": ["repository_admin_authority", "branch_protection_authority"],
+      "authorizes_merge": false,
+      "authorizes_deploy": false,
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "branch_protection_bypass_classified_as_evidence_only": {
+      "rule": "Branch protection bypass evidence is classified EVIDENCE_ONLY. It may force LEGITIMACY_NULL for the affected epoch; it may not create merge legitimacy.",
+      "surfaces": ["branch_protection_authority"],
+      "authorizes_merge": false,
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_deploy_authority_classified": {
+      "rule": "cloudflare_deploy_authority, local_wrangler_authority, and infrastructure_mutation_authority must each have a declared_containment_class. An unclassified surface forces ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL.",
+      "surfaces": ["cloudflare_deploy_authority", "local_wrangler_authority", "infrastructure_mutation_authority"],
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "secret_token_authority_classified": {
+      "rule": "environment_secret_authority and token_authority must each have a declared_containment_class. An unclassified surface forces ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL.",
+      "surfaces": ["environment_secret_authority", "token_authority"],
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "undeclared_root_surface_forces_NULL": {
+      "rule": "Any bypass-capable surface not present in ROOT_AUTHORITY_INVENTORY.json forces ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL for the affected epoch until declared and classified.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "sovereignty_drift_forces_NULL": {
+      "rule": "Any sovereignty drift event — scope expansion, delegation expansion, or revocation failure — forces LEGITIMACY_NULL for the affected epoch.",
+      "drift_taxonomy_ref": "governance/SOVEREIGNTY_DRIFT_TAXONOMY.json",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_evidence_may_not_authorize_merge": {
+      "rule": "Root authority evidence may not be used to derive or authorize merge legitimacy.",
+      "value": false,
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_evidence_may_not_authorize_deploy": {
+      "rule": "Root authority evidence may not be used to derive or authorize deployment legitimacy.",
+      "value": false,
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_evidence_may_not_authorize_execution": {
+      "rule": "Root authority evidence may not authorize any execution.",
+      "value": false,
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_evidence_may_not_create_proof": {
+      "rule": "Root authority evidence may not generate or create proof objects.",
+      "value": false,
+      "failure_result": "LEGITIMACY_NULL"
+    }
+  },
+  "outputs": {
+    "ROOT_AUTHORITY_CONTAINMENT_CLOSURE_REPORT": {
+      "defined": true,
+      "required_fields": [
+        "classification",
+        "legitimacy_status",
+        "audit_type",
+        "bypass_observations",
+        "scope_drift_events",
+        "delegation_drift_events",
+        "revocation_failures",
+        "authority_lineage_bound",
+        "audit_creates_authority",
+        "audit_creates_execution",
+        "audit_creates_deployment",
+        "audit_creates_merge_permission",
+        "audit_creates_proof"
+      ],
+      "default_result": "LEGITIMACY_NULL"
+    },
+    "root_authority_inventory_gap_report": {
+      "defined": true,
+      "description": "Declared surfaces detected as absent from ROOT_AUTHORITY_INVENTORY.json, with surface name and gap classification."
+    },
+    "sovereignty_drift_inventory": {
+      "defined": true,
+      "description": "List of detected sovereignty drift events with drift_class, affected_surface, and containment_result.",
+      "satisfied_by": "governance/SOVEREIGNTY_DRIFT_TAXONOMY.json"
+    },
+    "root_bypass_path_inventory": {
+      "defined": true,
+      "description": "Declared bypass paths with bypass_source structure, containment_class, and declared_closure_condition.",
+      "satisfied_by": "governance/ROOT_BYPASS_PATH_INVENTORY.json"
+    },
+    "containment_readiness_classification": {
+      "defined": true,
+      "description": "Final containment readiness classification from the classifications set.",
+      "possible_values": [
+        "ROOT_AUTHORITY_CONTAINMENT_CLOSED",
+        "ROOT_AUTHORITY_BYPASS_PATH_PRESENT",
+        "ROOT_AUTHORITY_SCOPE_DRIFT",
+        "ROOT_AUTHORITY_DELEGATION_DRIFT",
+        "ROOT_AUTHORITY_REVOCATION_DRIFT",
+        "ROOT_AUTHORITY_RECONCILIATION_INCOMPLETE",
+        "ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL"
+      ]
+    }
+  },
+  "classifications": {
+    "ROOT_AUTHORITY_CONTAINMENT_CLOSED": {
+      "condition": "cross_registry_reconciliation_hash present, declared root surfaces known, authority_lineage_bound true, no bypass observations, no scope drift, no delegation drift, no revocation failures, and no ambiguity.",
+      "legitimacy_status": "ROOT_AUTHORITY_CONTAINMENT_CLOSED",
+      "authorizes_execution": false,
+      "authorizes_merge": false,
+      "authorizes_deployment": false,
+      "creates_proof": false
+    },
+    "ROOT_AUTHORITY_BYPASS_PATH_PRESENT": {
+      "condition": "One or more bypass_observations present, OR authority_lineage_bound is false with execution_path_present true. In both cases direct authorization is possible without lineage. The bypass_source must include entry_id, registry, path_type, target_surface, and evidence_hash.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "ROOT_AUTHORITY_SCOPE_DRIFT": {
+      "condition": "A declared root authority surface's bypass_capable scope expanded outside a governed governance mutation.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "ROOT_AUTHORITY_DELEGATION_DRIFT": {
+      "condition": "A root authority surface delegated capability to an additional principal outside the declared delegation model.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "ROOT_AUTHORITY_REVOCATION_DRIFT": {
+      "condition": "A root authority surface that should have been revoked or constrained remains active beyond its declared lifetime or scope.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "ROOT_AUTHORITY_RECONCILIATION_INCOMPLETE": {
+      "condition": "Required evidence — inventory, bypass observations, drift events, or lineage binding status — is missing and state cannot be determined.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL": {
+      "condition": "An undeclared surface was detected, a bypass_source entry is malformed or contains disallowed fields, or authority lineage binding is indeterminate.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    }
+  },
+  "failure_result": "LEGITIMACY_NULL",
+  "cross_audit_boundary": {
+    "statement": "A successful #1638 cross-registry reconciliation audit does not survive a failed #1639 containment audit unchanged.",
+    "invariant": "registry agreement ≠ authority containment",
+    "effect": {
+      "registries_aligned_root_containment_failed": "closure_effect = NULL",
+      "semantics": "Registry agreement without authority containment is coherent but not legitimate."
+    },
+    "root_authority_bypass_path_present": {
+      "condition": "ROOT_AUTHORITY_BYPASS_PATH_PRESENT",
+      "prevents_derivation_of": "CROSS_REGISTRY_RECONCILIATION_CLOSED",
+      "scope": "affected_epoch"
+    }
+  },
+  "canonical_compression": {
+    "rule_1": "Root authority can observe.",
+    "rule_2": "Root authority can classify.",
+    "rule_3": "Root authority can invalidate.",
+    "rule_4": "Root authority may not create legitimacy.",
+    "rule_5": "Root authority may not bypass governance.",
+    "rule_6": "Root authority drift -> NULL.",
+    "rule_7": "Undeclared root surface -> NULL.",
+    "rule_8": "root authority exists ≠ root authority may bypass lineage.",
+    "rule_9": "registry agreement ≠ authority containment."
+  },
+  "fail_closed_semantics": {
+    "default_result": "LEGITIMACY_NULL",
+    "missing_inventory": "LEGITIMACY_NULL",
+    "undeclared_surface": "LEGITIMACY_NULL",
+    "bypass_path_observed": "LEGITIMACY_NULL",
+    "scope_drift": "LEGITIMACY_NULL",
+    "delegation_drift": "LEGITIMACY_NULL",
+    "revocation_drift": "LEGITIMACY_NULL",
+    "missing_evidence": "LEGITIMACY_NULL",
+    "malformed_bypass_source": "LEGITIMACY_NULL",
+    "root_authority_treated_as_authorizing": "LEGITIMACY_NULL"
+  }
+}

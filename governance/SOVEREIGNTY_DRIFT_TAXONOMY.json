@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sovereignty_drift_taxonomy",
+  "status": "non_operative_governance_artifact",
+  "issue_reference": "#1639",
+  "purpose": "Define the canonical taxonomy of sovereignty drift classes for root authority surfaces. Every drift class results in LEGITIMACY_NULL for the affected epoch. Non-operative — does not create authority, execution, merge permission, proof, or deployment.",
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false,
+    "registry_mutation": false
+  },
+  "drift_invariant": "Sovereignty drift -> LEGITIMACY_NULL. Any detected drift class forces LEGITIMACY_NULL for the affected epoch. Drift detection is evidence-only — it may invalidate; it may not create legitimacy.",
+  "drift_classes": [
+    {
+      "drift_id": "SD-001",
+      "drift_class": "ROOT_AUTHORITY_SCOPE_DRIFT",
+      "classification": "ROOT_AUTHORITY_SCOPE_DRIFT",
+      "description": "A declared root authority surface's bypass_capable scope expanded — new governance boundaries added to its declared_bypass_targets — outside a governed governance mutation.",
+      "example_triggers": [
+        "GitHub admin gains the ability to bypass a governance surface not listed in declared_bypass_targets",
+        "Cloudflare deploy authority gains access to a new production worker not in the declared surface inventory",
+        "Federation root authority acquires capability to authorize execution not declared in its scope"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs from the scope expansion event forward until re-classification is governed and confirmed",
+      "evidence_rule": "Scope drift detection is EVIDENCE_ONLY — scope drift classifies affected epochs as illegitimate; it does not create legitimacy"
+    },
+    {
+      "drift_id": "SD-002",
+      "drift_class": "ROOT_AUTHORITY_DELEGATION_DRIFT",
+      "classification": "ROOT_AUTHORITY_DELEGATION_DRIFT",
+      "description": "A root authority surface delegated its capability to an additional principal, workflow, or token outside the declared delegation model.",
+      "example_triggers": [
+        "CLOUDFLARE_API_TOKEN issued to an additional workflow beyond governed-deploy.yml",
+        "GitHub admin authority shared with a new principal not in CODEOWNERS or declared reviewer registry",
+        "Branch protection override capability granted to a workflow without governed mutation"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs from the delegation event forward until the delegation is revoked or re-declared",
+      "evidence_rule": "Delegation drift detection is EVIDENCE_ONLY — it classifies affected epochs as illegitimate; it does not create legitimacy"
+    },
+    {
+      "drift_id": "SD-003",
+      "drift_class": "ROOT_AUTHORITY_REVOCATION_DRIFT",
+      "classification": "ROOT_AUTHORITY_REVOCATION_DRIFT",
+      "description": "A root authority surface that should have been revoked, rotated, scoped, or constrained remains active beyond its declared lifetime or scope boundary.",
+      "example_triggers": [
+        "CLOUDFLARE_API_TOKEN not rotated after declared rotation interval",
+        "Wrangler local session credential not revoked after a break-glass use",
+        "Branch protection override not re-enforced after an admin bypass event"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs where the surface remains active beyond its declared lifetime or scope",
+      "evidence_rule": "Revocation drift detection is EVIDENCE_ONLY — it classifies affected epochs as illegitimate; it does not create legitimacy"
+    },
+    {
+      "drift_id": "SD-004",
+      "drift_class": "UNDECLARED_ROOT_SURFACE",
+      "classification": "ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL",
+      "description": "A bypass-capable root authority surface was detected that is not present in ROOT_AUTHORITY_INVENTORY.json. The surface exercises governance-bypassing authority without being declared or classified.",
+      "example_triggers": [
+        "New GitHub Actions workflow with deploy authority added outside governed pipeline, not in inventory",
+        "New Cloudflare surface with Workers:Write capability not present in ROOT_AUTHORITY_INVENTORY.json",
+        "New secret or token with production mutation capability not declared in any source document"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "All epochs where the undeclared surface is active",
+      "evidence_rule": "Undeclared surface detection forces ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL — containment has an unknown boundary"
+    },
+    {
+      "drift_id": "SD-005",
+      "drift_class": "ROOT_AUTHORITY_TREATED_AS_AUTHORIZING",
+      "classification": "ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL",
+      "description": "Root authority evidence was used to derive, authorize, or create merge legitimacy, deploy legitimacy, execution authorization, or proof — violating the non-authorizing invariant.",
+      "example_triggers": [
+        "Admin bypass used to assert merge legitimacy for an epoch",
+        "Root deploy event used to assert deploy legitimacy without canonical chain completion",
+        "Federation evidence treated as legitimacy authority rather than EVIDENCE_ONLY"
+      ],
+      "containment_result": "LEGITIMACY_NULL",
+      "affected_scope": "The specific epoch where root authority was treated as authorizing",
+      "evidence_rule": "The root authority event may only invalidate the affected epoch — not create legitimacy"
+    }
+  ],
+  "canonical_compression": {
+    "rule_1": "Sovereignty drift -> NULL.",
+    "rule_2": "Every drift class has exactly one containment_result: LEGITIMACY_NULL.",
+    "rule_3": "Drift detection may invalidate. Drift detection may not create legitimacy.",
+    "rule_4": "scope expansion -> ROOT_AUTHORITY_SCOPE_DRIFT.",
+    "rule_5": "delegation expansion -> ROOT_AUTHORITY_DELEGATION_DRIFT.",
+    "rule_6": "revocation failure -> ROOT_AUTHORITY_REVOCATION_DRIFT.",
+    "rule_7": "undeclared surface -> ROOT_AUTHORITY_AMBIGUITY_FORCES_NULL."
+  }
+}

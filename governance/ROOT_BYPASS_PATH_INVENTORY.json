@@ -1,0 +1,222 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "root_bypass_path_inventory",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "declared_bypass_path_inventory",
+  "issue_reference": "#1639",
+  "declaration_semantics": {
+    "statement": "This inventory declares known bypass paths with their governance classification. It does not assert that these paths are currently active or currently monitored. A declared bypass path is acknowledged to exist; its declared_containment_class reflects the governance classification assigned by source documents.",
+    "bypass_source_structure": {
+      "required_fields": ["entry_id", "registry", "path_type", "target_surface", "evidence_hash"],
+      "disallowed_fields": ["raw_token", "raw_secret", "secret_value", "token_value", "credential"],
+      "semantics": "bypass_source entries reference structured evidence. They must never contain raw credential or secret values."
+    }
+  },
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false
+  },
+  "bypass_path_invariant": "Declaring a bypass path does not authorize its use. Detecting bypass path use forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL for the affected epoch.",
+  "bypass_paths": [
+    {
+      "bypass_id": "RBP-001",
+      "surface_id": "RAS-005",
+      "path_type": "direct_deploy",
+      "name": "Cloudflare Git Integration automatic deploy on push",
+      "declared_bypass_targets": ["governed_deploy_pipeline", "canonical_chain", "proof_registry_binding"],
+      "declared_preconditions": [
+        "Cloudflare Git Integration enabled at account level",
+        "Push to tracked branch"
+      ],
+      "declared_containment_class": "CONTAINMENT_REQUIRED",
+      "declared_break_glass": false,
+      "declared_observability": "Cloudflare dashboard deploy log only — no MindShift proof registry binding",
+      "declared_closure_condition": "Cloudflare Git Integration disabled at Cloudflare account level — account administrator action required",
+      "declared_legitimacy_effect": "Deploy via this path forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL for the affected epoch",
+      "bypass_source": {
+        "entry_id": "RBP-001",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "direct_deploy",
+        "target_surface": "RAS-005",
+        "evidence_hash": "declared:cloudflare-git-integration-auto-deploy"
+      }
+    },
+    {
+      "bypass_id": "RBP-002",
+      "surface_id": "RAS-007",
+      "path_type": "token_escape",
+      "name": "Direct wrangler deploy via CLOUDFLARE_API_TOKEN outside governed workflow",
+      "declared_bypass_targets": ["governed_deploy_pipeline", "canonical_chain", "proof_binding"],
+      "declared_preconditions": [
+        "Credential with Workers:Write scope available",
+        "Local wrangler CLI access"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": true,
+      "declared_break_glass_class": "EXPLICIT_ROOT_AUTHORITY",
+      "declared_observability": "Cloudflare dashboard deploy log — no MindShift proof registry binding unless governed workflow ran",
+      "declared_closure_condition": "Token scoped to GitHub Actions OIDC only — no static credential capable of production deploy",
+      "declared_legitimacy_effect": "Deploy via this path outside governed workflow forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL",
+      "bypass_source": {
+        "entry_id": "RBP-002",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "token_escape",
+        "target_surface": "RAS-007",
+        "evidence_hash": "declared:cloudflare-api-token-direct-deploy"
+      }
+    },
+    {
+      "bypass_id": "RBP-003",
+      "surface_id": "RAS-006",
+      "path_type": "local_operator_deploy",
+      "name": "Local governed-deploy.ts with production token and governed context",
+      "declared_bypass_targets": ["governed_deploy_pipeline"],
+      "declared_preconditions": [
+        "Credential with Workers:Write scope available locally",
+        "MINDSHIFT_GOVERNED_DEPLOY_CONTEXT=github_actions_governed set locally",
+        "Valid canonical chain artifact (requires live /session through /proof endpoints)"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": true,
+      "declared_break_glass_class": "LOCAL_ROOT_AUTHORITY_WITH_CANONICAL_CHAIN",
+      "declared_observability": "deploy_audit_registry.json — governed-deploy.ts emits entry for all invocations including rejections",
+      "declared_closure_condition": "Resolved by RBP-002 closure — no local static token means no local production deploy",
+      "declared_legitimacy_effect": "Residual local root authority path forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT if executed outside governed workflow; full containment requires OIDC-only token binding",
+      "bypass_source": {
+        "entry_id": "RBP-003",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "local_operator_deploy",
+        "target_surface": "RAS-006",
+        "evidence_hash": "declared:local-governed-deploy-with-token"
+      }
+    },
+    {
+      "bypass_id": "RBP-004",
+      "surface_id": "RAS-001",
+      "path_type": "admin_override",
+      "name": "GitHub admin workflow modification and admin-merged bypass",
+      "declared_bypass_targets": ["merge_governance", "branch_protection_enforcement", "workflow_execution_gates"],
+      "declared_preconditions": [
+        "GitHub repository admin access",
+        "Ability to bypass branch protection or merge without PREO"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": false,
+      "declared_observability": "GitHub audit log — admin bypass events observable; constitutional-integrity.yml detects workflow changes as sovereignty drift",
+      "declared_closure_condition": "Branch protection enforcement with no admin override path; admin bypass policy disabled",
+      "declared_legitimacy_effect": "Admin bypass of merge governance forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL for the affected merge epoch",
+      "bypass_source": {
+        "entry_id": "RBP-004",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "admin_override",
+        "target_surface": "RAS-001",
+        "evidence_hash": "declared:github-admin-workflow-modification"
+      }
+    },
+    {
+      "bypass_id": "RBP-005",
+      "surface_id": "RAS-004",
+      "path_type": "secret_mutation",
+      "name": "GitHub repository secrets mutation — MINDSHIFT_WORKER_URL or credential redirect",
+      "declared_bypass_targets": ["canonical_chain_routing", "deploy_legitimacy", "runtime_authority"],
+      "declared_preconditions": [
+        "GitHub repository admin or environments admin access",
+        "Ability to mutate MINDSHIFT_WORKER_URL, MINDSHIFT_API_KEY, or CLOUDFLARE_API_TOKEN secrets"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": false,
+      "declared_observability": "GitHub audit log only — no internal MindShift visibility into secret mutation events",
+      "declared_closure_condition": "Secret write authority restricted to designated administrators; secret rotation and integrity policy enforced",
+      "declared_legitimacy_effect": "Secret mutation outside governed change management forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT for all deploy epochs using the mutated secret",
+      "bypass_source": {
+        "entry_id": "RBP-005",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "secret_mutation",
+        "target_surface": "RAS-004",
+        "evidence_hash": "declared:github-secrets-mutation-redirect"
+      }
+    },
+    {
+      "bypass_id": "RBP-006",
+      "surface_id": "RAS-002",
+      "path_type": "admin_override",
+      "name": "Branch protection bypass merge",
+      "declared_bypass_targets": ["branch_protection_enforcement", "required_review_gates", "required_status_checks"],
+      "declared_preconditions": [
+        "Repository admin with branch protection override capability",
+        "Ability to merge without required PREO reviews or status checks"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": false,
+      "declared_observability": "GitHub audit log and pull request event log; merge-governance-check.yml detects unprotected merges",
+      "declared_closure_condition": "Branch protection rules enforced with no admin override; all merges require PREO and passing status checks",
+      "declared_legitimacy_effect": "Branch protection bypass forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL for the affected merge epoch",
+      "bypass_source": {
+        "entry_id": "RBP-006",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "admin_override",
+        "target_surface": "RAS-002",
+        "evidence_hash": "declared:branch-protection-bypass-merge"
+      }
+    },
+    {
+      "bypass_id": "RBP-007",
+      "surface_id": "RAS-008",
+      "path_type": "source_mutation",
+      "name": "Canonical serialization code mutation outside governed change",
+      "declared_bypass_targets": ["legitimacy_identity_integrity", "governance_mutation_containment"],
+      "declared_preconditions": [
+        "Commit access to governance or canonical serialization code paths",
+        "Merge without PREO or CODEOWNERS review"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": false,
+      "declared_observability": "Git commit history — CODEOWNERS review requirement; constitutional-integrity.yml",
+      "declared_closure_condition": "CODEOWNERS enforcement on all governance and serialization paths; required PREO review for any governance mutation",
+      "declared_legitimacy_effect": "Serialization code mutation outside governed pipeline forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL for subsequent epochs",
+      "bypass_source": {
+        "entry_id": "RBP-007",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "source_mutation",
+        "target_surface": "RAS-008",
+        "evidence_hash": "declared:serialization-code-mutation"
+      }
+    },
+    {
+      "bypass_id": "RBP-008",
+      "surface_id": "RAS-009",
+      "path_type": "federation_authority_escalation",
+      "name": "Federation evidence treated as legitimacy authority",
+      "declared_bypass_targets": ["local_legitimacy_chain", "proof_registry"],
+      "declared_preconditions": [
+        "Federation evidence available from external source",
+        "Attempt to use federation evidence to override local legitimacy determination"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_break_glass": false,
+      "declared_observability": "Governance documents — declared EVIDENCE_ONLY boundary in FEDERATED_RECONCILIATION_SPEC.json",
+      "declared_closure_condition": "Federation evidence permanently classified EVIDENCE_ONLY; no execution path treats federation evidence as authoritative",
+      "declared_legitimacy_effect": "Treating federation evidence as authoritative forces ROOT_AUTHORITY_BYPASS_PATH_PRESENT and LEGITIMACY_NULL for the affected epoch",
+      "bypass_source": {
+        "entry_id": "RBP-008",
+        "registry": "ROOT_BYPASS_PATH_INVENTORY",
+        "path_type": "federation_authority_escalation",
+        "target_surface": "RAS-009",
+        "evidence_hash": "declared:federation-evidence-treated-as-authority"
+      }
+    }
+  ],
+  "declared_closure_requirements": [
+    "RBP-001: Disable Cloudflare Git Integration at account level — CONTAINMENT_REQUIRED, pending account action",
+    "RBP-002: Scope credential to GitHub Actions OIDC only — resolves RBP-003 as a consequence",
+    "RBP-003: Resolved by RBP-002 closure — no local static credential means no local production deploy",
+    "RBP-004: Branch protection with no admin override; monitor via constitutional-integrity.yml",
+    "RBP-005: Restrict secret write access; enforce rotation and integrity policy",
+    "RBP-006: Enforce required PREO and status checks with no bypass path on main branch",
+    "RBP-007: Enforce CODEOWNERS and required PREO for all governance mutations",
+    "RBP-008: Permanent EVIDENCE_ONLY classification; no authorizing use path"
+  ]
+}

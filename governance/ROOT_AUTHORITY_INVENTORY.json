@@ -1,0 +1,224 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "root_authority_inventory",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "declared_root_authority_inventory",
+  "issue_reference": "#1639",
+  "declaration_semantics": {
+    "statement": "This inventory declares known root authority surfaces and their governance classifications. It does not validate live runtime state. A surface appearing here with declared_containment_class CLASSIFIED_OPEN means that surface is acknowledged to exist and is classified — not that it is currently monitored or actively constrained at runtime.",
+    "inventory_ne_validation": "inventory = declared classification of known surfaces; validation = runtime enforcement (out of scope for this artifact)",
+    "declared_containment_class_definition": "The declared_containment_class is the governance classification assigned by the referenced source documents — not a live-state assertion.",
+    "source_primacy": "declared_classification_basis lists the source documents that define each surface's classification. Those documents are authoritative; this inventory is a consolidation reference."
+  },
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "merge_authorization": false,
+    "deploy_authorization": false,
+    "proof_generation": false
+  },
+  "surfaces": [
+    {
+      "surface_id": "RAS-001",
+      "surface_name": "repository_admin_authority",
+      "authority_class": "RA-0_ABSOLUTE_ROOT",
+      "description": "GitHub repository owner/admin authority — branch protection bypass, force-push, workflow mutation, settings mutation, secrets write",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "merge_governance",
+        "branch_protection_enforcement",
+        "workflow_execution_gates",
+        "secret_write_control"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/root_authority_registry.json#RA-001",
+        "governance/SOVEREIGNTY_ASSUMPTION_REGISTRY.json"
+      ],
+      "evidence_paths": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/root_authority_registry.json"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — admin bypass evidence may classify an epoch as illegitimate; it may not create merge or deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-002",
+      "surface_name": "branch_protection_authority",
+      "authority_class": "RA-3_REPOSITORY_ROOT",
+      "description": "GitHub branch protection rules — enforcement, bypass conditions, required reviewers, status checks",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "merge_governance",
+        "required_review_gates",
+        "required_status_checks"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/ROOT_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "evidence_paths": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/ROOT_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — branch protection bypass evidence forces NULL for the affected merge epoch; it may not create merge legitimacy"
+    },
+    {
+      "surface_id": "RAS-003",
+      "surface_name": "workflow_dispatch_authority",
+      "authority_class": "RA-3_REPOSITORY_ROOT",
+      "description": "GitHub Actions workflow_dispatch — invocation of governed or ungoverned workflows with inputs",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "deploy_legitimacy_chain",
+        "canonical_chain_validation_via_fabricated_inputs"
+      ],
+      "declared_containment_class": "GOVERNED",
+      "declared_classification_basis": [
+        "governance/BYPASS_CAPABLE_SURFACES.json",
+        "governance/ROOT_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "evidence_paths": [
+        ".github/workflows/prepare-governed-deploy.yml",
+        ".github/workflows/governed-deploy.yml"
+      ],
+      "declared_evidence_rule": "GOVERNED — dispatch is constrained by canonical chain validation; residual risk exists if canonical chain endpoints are compromised"
+    },
+    {
+      "surface_id": "RAS-004",
+      "surface_name": "environment_secret_authority",
+      "authority_class": "RA-4_SECRET_ROOT",
+      "description": "GitHub repository and environment secrets write authority — CLOUDFLARE_API_TOKEN, MINDSHIFT_WORKER_URL, MINDSHIFT_API_KEY, MINDSHIFT_DEPLOY_SECRET",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "deploy_legitimacy",
+        "runtime_canonical_chain_routing",
+        "governed_endpoint_targeting"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/ROOT_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "evidence_paths": [
+        ".github/workflows/governed-deploy.yml",
+        ".github/workflows/prepare-governed-deploy.yml"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — secret mutation evidence classifies affected epochs as illegitimate; it may not create deploy or execution legitimacy"
+    },
+    {
+      "surface_id": "RAS-005",
+      "surface_name": "cloudflare_deploy_authority",
+      "authority_class": "RA-2_DEPLOYMENT_ROOT",
+      "description": "Cloudflare account-level deploy authority — Git Integration (automatic deploy on push), API-level deploy, Workers & Pages admin",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "governed_deploy_pipeline",
+        "canonical_chain",
+        "proof_registry_binding"
+      ],
+      "declared_containment_class": "CONTAINMENT_REQUIRED",
+      "declared_classification_basis": [
+        "governance/ROOT_AUTHORITY_CLASSIFICATION.json",
+        "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "evidence_paths": [
+        "wrangler.toml",
+        "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — Cloudflare deploy events outside governed pipeline classify affected epochs as illegitimate; they do not create deploy legitimacy",
+      "declared_open_action": "Disable Cloudflare Git Integration at Cloudflare account level — requires account administrator action"
+    },
+    {
+      "surface_id": "RAS-006",
+      "surface_name": "local_wrangler_authority",
+      "authority_class": "RA-6_LOCAL_OPERATOR_ROOT",
+      "description": "Authenticated local wrangler CLI session — direct production deploy capability outside governed pipeline",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "governed_deploy_pipeline",
+        "canonical_chain",
+        "proof_registry_binding"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/root_authority_registry.json#RA-009",
+        "governance/BYPASS_CAPABLE_SURFACES.json"
+      ],
+      "evidence_paths": [
+        "package.json",
+        "scripts/governed-deploy.ts"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — local wrangler deploy events classify affected epochs as illegitimate; they do not create deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-007",
+      "surface_name": "token_authority",
+      "authority_class": "RA-1_INFRASTRUCTURE_ADMIN",
+      "description": "CLOUDFLARE_API_TOKEN and equivalent credential authority — Workers:Write scope, scoping, rotation, and OIDC binding",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "governed_deploy_pipeline",
+        "proof_binding"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/root_authority_registry.json#RA-008",
+        "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json#CF-002"
+      ],
+      "evidence_paths": [
+        "governance/root_authority_registry.json",
+        "governance/runtime/CLOUDFLARE_AUTHORITY_CLASSIFICATION.json"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — token-based deploy events outside governed pipeline classify affected epochs as illegitimate"
+    },
+    {
+      "surface_id": "RAS-008",
+      "surface_name": "infrastructure_mutation_authority",
+      "authority_class": "RA-8_GOVERNANCE_MUTATION_ROOT",
+      "description": "Local terminal shell and canonical serialization code mutation — direct infrastructure mutation outside governed pipeline",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "governance_mutation_containment",
+        "legitimacy_identity_integrity",
+        "governed_deploy_pipeline"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/root_authority_registry.json#RA-016",
+        "governance/root_authority_registry.json#RA-021"
+      ],
+      "evidence_paths": [
+        "governance/root_authority_registry.json"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — infrastructure mutation events classify affected epochs as illegitimate; they do not create execution or deploy legitimacy"
+    },
+    {
+      "surface_id": "RAS-009",
+      "surface_name": "federation_root_authority",
+      "authority_class": "RA-9_UNKNOWN_ROOT",
+      "description": "Federated legitimacy roots — external federation evidence that might be treated as authoritative",
+      "bypass_capable": true,
+      "declared_bypass_targets": [
+        "local_legitimacy_chain",
+        "proof_registry"
+      ],
+      "declared_containment_class": "CLASSIFIED_OPEN",
+      "declared_classification_basis": [
+        "governance/runtime/FEDERATED_RECONCILIATION_SPEC.json",
+        "governance/recursive/RECURSIVE_GOVERNANCE_CONTAINMENT_MODEL.json"
+      ],
+      "evidence_paths": [
+        "governance/runtime/FEDERATED_RECONCILIATION_SPEC.json"
+      ],
+      "declared_evidence_rule": "EVIDENCE_ONLY — federation evidence may classify distributed state; it may not create legitimacy"
+    }
+  ],
+  "inventory_completeness": {
+    "surfaces_declared": 9,
+    "audit_surfaces_ref": "governance/ROOT_AUTHORITY_CONTAINMENT_CLOSURE_AUDIT_SPEC.json#audit_surfaces",
+    "all_audit_surfaces_covered": true,
+    "gap_report": {
+      "undeclared_surfaces_detected": false,
+      "gaps": []
+    }
+  }
+}
