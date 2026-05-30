@@ -1,0 +1,186 @@
+{
+  "issue_reference": "#1637",
+  "schema_version": 1,
+  "document": "DEPLOY_LEGITIMACY_CLOSURE_AUDIT_SPEC",
+  "purpose": "Define the closure audit requirements for end-to-end deployment legitimacy verification across the governed deployment topology. The audit classifies deployment lineage as closed, open, or failed. It does not deploy, create authority, generate proof, or execute.",
+
+  "upstream_input": {
+    "source": "MERGE_LEGITIMACY_CLOSED",
+    "issue_reference": "#1636",
+    "required_field": "merge_legitimacy_closure_hash",
+    "core_invariant": "Closed merge lineage must be the source of the deployed object."
+  },
+
+  "canonical_chain": [
+    "prepare-governed-deploy",
+    "session",
+    "continuity",
+    "authority",
+    "compile",
+    "validate",
+    "execute",
+    "proof",
+    "deployment_artifact"
+  ],
+
+  "audit_chain": {
+    "links": [
+      "session_active",
+      "continuity_active",
+      "authority_active",
+      "compile_hash_binding",
+      "validate_hash_binding",
+      "nonce_reservation",
+      "execute_lineage",
+      "replay_protection",
+      "proof_generation",
+      "deployment_proof_binding"
+    ]
+  },
+
+  "deploy_source_binding": {
+    "chain": [
+      "merge_legitimacy_closure_hash",
+      "merge_commit_sha",
+      "deployable_artifact_hash",
+      "validated_object_hash",
+      "deployment_hash",
+      "proof_binding_hash"
+    ],
+    "required_checks": {
+      "merge_source_commit_sha_matches_merge_legitimacy": "merge_source_commit_sha == commit_sha from MERGE_LEGITIMACY_CLOSED",
+      "validated_object_hash_equals_deployable_artifact_hash": "validated_object_hash == deployable_artifact_hash",
+      "deployment_hash_equals_validated_object_hash": "deployment_hash == validated_object_hash",
+      "proof_binding_hash_bound_to_validated_object_hash": "proof_binding_hash == canonicalHash(merge_legitimacy_closure_hash + merge_commit_sha + deployable_artifact_hash + validated_object_hash + deployment_hash + deployment_proof_id)"
+    },
+    "core_invariant": "Closed merge lineage must be the source of the deployed object."
+  },
+
+  "build_provenance": {
+    "required_fields": [
+      "build_provenance_hash",
+      "source_commit_sha",
+      "artifact_hash",
+      "build_workflow",
+      "build_run_id",
+      "builder_identity",
+      "built_at"
+    ],
+    "validation": {
+      "source_commit_sha_matches_merge": "source_commit_sha == merge_commit_sha",
+      "artifact_hash_matches_deployable": "artifact_hash == deployable_artifact_hash",
+      "build_provenance_hash_canonical": "build_provenance_hash == canonicalHash(source_commit_sha + artifact_hash + build_workflow + build_run_id + builder_identity + built_at)"
+    },
+    "core_rule": "Build system creates artifact. Deploy audit verifies the artifact's provenance."
+  },
+
+  "missing_vs_divergent_boundary": {
+    "DEPLOY_RECONCILIATION_INCOMPLETE": "Required provenance or lineage evidence is missing or cannot be replayed — field is absent or null",
+    "DEPLOY_LINEAGE_DIVERGENCE": "Required evidence exists but fields disagree — both fields present, values do not match",
+    "example": "build_provenance_hash valid + source_commit_sha != merge_commit_sha = DEPLOY_LINEAGE_DIVERGENCE"
+  },
+
+  "closure_audit_object": {
+    "object_type": "DEPLOY_LEGITIMACY_CLOSURE_REPORT",
+    "success_result": "DEPLOY_LEGITIMACY_CLOSED",
+    "failure_result": "DEPLOYMENT_LEGITIMACY_NULL",
+    "required_fields": [
+      "session_id",
+      "continuity_id",
+      "decision_id",
+      "invocation_nonce",
+      "execution_id",
+      "merge_legitimacy_closure_hash",
+      "merge_commit_sha",
+      "deployable_artifact_hash",
+      "validated_object_hash",
+      "deployment_hash",
+      "deployment_proof_id",
+      "proof_binding_hash",
+      "build_provenance"
+    ]
+  },
+
+  "build_provenance_hash_inputs": [
+    "source_commit_sha",
+    "artifact_hash",
+    "build_workflow",
+    "build_run_id",
+    "builder_identity",
+    "built_at"
+  ],
+
+  "proof_binding_hash_inputs": [
+    "merge_legitimacy_closure_hash",
+    "merge_commit_sha",
+    "deployable_artifact_hash",
+    "validated_object_hash",
+    "deployment_hash",
+    "deployment_proof_id"
+  ],
+
+  "verification_requirements": [
+    "decision_id_continuity_preserved",
+    "continuity_id_preserved",
+    "validated_object_hash_preserved",
+    "invocation_nonce_preserved",
+    "proof_binding_hash_matches",
+    "replay_protection_verified",
+    "lineage_origin_verified",
+    "deployment_lineage_drift_absent",
+    "deployment_proof_reuse_absent",
+    "fail_closed_behavior_verified"
+  ],
+
+  "outputs": {
+    "DEPLOY_LEGITIMACY_CLOSURE_REPORT": "Complete audit record of the deployment legitimacy chain",
+    "deployment_gap_inventory": "Inventory of any missing or incomplete chain links",
+    "lineage_integrity_report": "Report of lineage continuity across all chain steps",
+    "deployment_readiness_classification": "Final readiness classification from the required classifications set"
+  },
+
+  "classifications": {
+    "DEPLOY_LEGITIMACY_CLOSED": "All audit chain links are intact and verified — deployment lineage is complete, consistent, replay-safe, authority-bound, and proof-bound",
+    "DEPLOY_LEGITIMACY_OPEN": "Deployment lineage exists but merge legitimacy upstream is not yet closed",
+    "DEPLOY_LINEAGE_DIVERGENCE": "Required evidence exists but fields disagree — commit, artifact hash, or validated object hash mismatch",
+    "DEPLOY_PROOF_MISMATCH": "Proof binding hash mismatch or build provenance hash does not match canonical derivation",
+    "DEPLOY_REPLAY_DIVERGENCE": "Invocation nonce replayed or deployment proof reused",
+    "DEPLOY_AUTHORITY_INVALID": "Session, continuity, or authority validation failed",
+    "DEPLOY_RECONCILIATION_INCOMPLETE": "Required provenance or lineage evidence is missing or cannot be replayed"
+  },
+
+  "fail_closed_semantics": {
+    "failure_result": "DEPLOYMENT_LEGITIMACY_NULL",
+    "missing_evidence": "DEPLOYMENT_LEGITIMACY_NULL",
+    "divergent_evidence": "DEPLOYMENT_LEGITIMACY_NULL",
+    "replay_detected": "DEPLOYMENT_LEGITIMACY_NULL",
+    "proof_mismatch": "DEPLOYMENT_LEGITIMACY_NULL",
+    "authority_invalid": "DEPLOYMENT_LEGITIMACY_NULL",
+    "open_upstream": "DEPLOYMENT_LEGITIMACY_NULL"
+  },
+
+  "non_operability": {
+    "authority_creation": false,
+    "execution_trigger": false,
+    "deployment_mutation": false,
+    "proof_generation": false,
+    "registry_mutation": false
+  },
+
+  "non_goals": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_proof": false
+  },
+
+  "canonical_compression": {
+    "rule_1": "Deployment legitimacy is not deployment.",
+    "rule_2": "Authority continuity. Hash continuity. Replay safety. Proof lineage.",
+    "rule_3": "Missing evidence → NULL.",
+    "rule_4": "Conflicting evidence → NULL.",
+    "rule_5": "Replay ambiguity → NULL.",
+    "rule_6": "Proof drift → NULL.",
+    "rule_7": "DEPLOY_LEGITIMACY_CLOSURE_REPORT is recorded finality audit, not deployment authorization."
+  }
+}
