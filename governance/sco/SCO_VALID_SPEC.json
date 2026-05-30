@@ -1,0 +1,131 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sco_valid_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "validity_transition_specification",
+  "scope": {
+    "name": "SCO_VALID",
+    "purpose": "Define the canonical validity transition gate that determines whether an SCO_CANDIDATE becomes SCO_VALID or SCO_INVALID before any governed mutation is considered legitimate.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "transition_model": {
+    "input_state": "SCO_CANDIDATE",
+    "output_states": ["SCO_VALID", "SCO_INVALID"],
+    "default_output": "SCO_INVALID",
+    "governed_mutation_without_sco_valid": "NULL",
+    "sco_candidate_alone_as_legitimacy": "forbidden",
+    "deterministic_artifact_required": true
+  },
+  "sco_valid_object": {
+    "object_type": "SCO_VALID",
+    "defined": true,
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "sco_valid_id",
+      "sco_candidate_id",
+      "sco_candidate_hash",
+      "head_sha",
+      "repository",
+      "governed_files_hash",
+      "mutation_classes",
+      "target_surfaces",
+      "risk_class",
+      "scope_containment_verified",
+      "transition_result",
+      "transition_errors",
+      "validated_at"
+    ],
+    "transition_result_enum": ["SCO_VALID", "SCO_INVALID"],
+    "default_result": "SCO_INVALID"
+  },
+  "sco_valid_requires": {
+    "exact_changed_file_binding": {
+      "rule": "The SCO_VALID object must bind to the exact set of governed files declared in the SCO_CANDIDATE. Any mismatch between declared and actual governed files fails closed.",
+      "failure_result": "SCO_INVALID"
+    },
+    "governed_path_classification": {
+      "rule": "Each governed file must be classified against the static Mutation Surface Registry. Paths not present in the registry must result in GOVERNANCE_UNKNOWN -> SCO_INVALID.",
+      "unknown_path_result": "SCO_INVALID",
+      "registry_spec": "governance/sco/MUTATION_SURFACE_REGISTRY_SPEC.json",
+      "canonical_snapshot_schema": "schemas/mutation-surface.schema.json"
+    },
+    "mutation_class_validation": {
+      "rule": "The declared mutation_classes in the SCO_CANDIDATE must exactly match the classes derived from the static Mutation Surface Registry for the set of governed files. Undeclared or misclassified mutation classes fail closed.",
+      "failure_result": "SCO_INVALID"
+    },
+    "target_surface_validation": {
+      "rule": "The declared target_surfaces in the SCO_CANDIDATE must exactly match the surfaces defined in the static Mutation Surface Registry for the classified mutation classes.",
+      "failure_result": "SCO_INVALID"
+    },
+    "scope_containment_validation": {
+      "rule": "The mutation must not exceed its declared scope. Any file change that introduces an undeclared mutation class or target surface constitutes scope expansion and fails closed.",
+      "scope_expansion_result": "SCO_INVALID"
+    },
+    "risk_class_validation": {
+      "rule": "The risk_class declared in the SCO_CANDIDATE must equal the highest risk_class of all registry-classified mutation classes for the governed files. Underestimated risk fails closed.",
+      "underestimated_risk_result": "SCO_INVALID"
+    }
+  },
+  "sco_invalid_requires": {
+    "governed_file_mismatch": {
+      "rule": "If requires_sco is true but governed_files is empty, or if requires_sco is false but governed_files is non-empty, the result is SCO_INVALID.",
+      "result": "SCO_INVALID"
+    },
+    "scope_expansion_detected": {
+      "rule": "If the candidate declares mutation classes that do not match the registry-derived classes for the governed files, the result is SCO_INVALID.",
+      "result": "SCO_INVALID"
+    },
+    "undeclared_mutation_surface": {
+      "rule": "If any governed file maps to a path not in the static registry, or if a dynamic scan discovers a consumer not present in the registry, the result is SCO_INVALID.",
+      "governance_unknown_result": "SCO_INVALID",
+      "result": "SCO_INVALID"
+    },
+    "target_surface_mismatch": {
+      "rule": "If the declared target_surfaces do not match the surfaces derived from registry classification of the governed files, the result is SCO_INVALID.",
+      "result": "SCO_INVALID"
+    },
+    "risk_classification_failure": {
+      "rule": "If the declared risk_class is lower than the highest risk class derived from registry classification, the result is SCO_INVALID.",
+      "result": "SCO_INVALID"
+    }
+  },
+  "merge_legitimacy_gate": {
+    "relationship": "PREO_VALID ∧ SCO_VALID required for merge legitimacy",
+    "sco_valid_independent_of_preo_valid": true,
+    "governed_mutation_without_sco_valid": "NULL",
+    "sco_candidate_as_substitute_for_sco_valid": "forbidden"
+  },
+  "mutation_surface_registry": {
+    "type": "static_registry",
+    "spec": "governance/sco/MUTATION_SURFACE_REGISTRY_SPEC.json",
+    "canonical_snapshot_schema": "schemas/mutation-surface.schema.json",
+    "principle": "Registry defines legitimacy. Dynamic scan detects drift.",
+    "unknown_consumer_result": "GOVERNANCE_UNKNOWN",
+    "governance_unknown_result": "SCO_INVALID"
+  },
+  "fail_closed_semantics": {
+    "default_result": "SCO_INVALID",
+    "missing_input": "SCO_INVALID",
+    "unknown_mutation_class": "SCO_INVALID",
+    "scope_expansion": "SCO_INVALID",
+    "undeclared_surface": "SCO_INVALID",
+    "ambiguous_classification": "SCO_INVALID"
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical SCO_CANDIDATE inputs against the same static Mutation Surface Registry must produce identical SCO_VALID or SCO_INVALID outputs. The transition result must be reproducible from the SCO_CANDIDATE and the registry alone.",
+    "registry_hash_must_be_stable": true,
+    "audit_logic_must_not_depend_on_runtime_state": true
+  }
+}
