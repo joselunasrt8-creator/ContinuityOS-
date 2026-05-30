@@ -1,8 +1,19 @@
 {
+  "object_type": "AEO",
+  "aeo_id": "aeo-fixture-001",
+  "decision_id": "decision-fixture-001",
+  "authority_id": "auth-fixture-001",
+  "session_id": "session-fixture-001",
+  "continuity_id": "continuity-fixture-001",
+  "runtime_id": "runtime-local-fixture",
   "intent": "governed_production_deploy",
   "scope": {
-    "environment": "production",
-    "repo": "joselunasrt8-creator/mindshift-demo",
+    "repo": "mindshift-demo",
+    "branch": "main",
+    "workflow": "governed-deploy.yml"
+  },
+  "target": {
+    "repo": "mindshift-demo",
     "branch": "main",
     "workflow": "governed-deploy.yml"
   },
@@ -13,13 +24,10 @@
     "require_exact_object_hash": true,
     "require_session_continuity": true
   },
-  "target": {
-    "system": "cloudflare_worker",
-    "action": "wrangler_deploy"
-  },
   "finality": {
     "proof_required": true,
     "proof_type": "governed_deploy_proof",
     "registry_required": true
-  }
+  },
+  "nonce": "nonce-aeo-fixture-001"
 }

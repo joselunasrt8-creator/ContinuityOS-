@@ -289,7 +289,12 @@ function isActiveStatus(status: unknown): boolean {
 }
 
 function isRevocationBarriered(entry: RevocationLineageEntry): boolean {
-  return !isActiveStatus(entry.status) || Boolean(entry.revoked_at)
+  if (!isActiveStatus(entry.status) || Boolean(entry.revoked_at)) return true
+  if (entry.expires_at) {
+    const ms = Date.parse(String(entry.expires_at))
+    if (Number.isFinite(ms) && ms <= Date.now()) return true
+  }
+  return false
 }
 
 function buildChildrenMap(entries: readonly RevocationLineageEntry[]): Map<string, string[]> {
