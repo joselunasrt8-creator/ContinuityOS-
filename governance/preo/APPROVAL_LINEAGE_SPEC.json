@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "approval_lineage_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "approval_lineage_specification",
+  "closes": "#1633",
+  "depends_on": ["#1630", "#1632"],
+  "scope": {
+    "name": "APPROVAL_LINEAGE",
+    "purpose": "Define the canonical approval lineage object that binds reviewer identity, exact PR head_sha, and current review state into deterministic, replay-safe input for PREO_VALID. Approval is not legitimacy by itself — it becomes merge-relevant only when fully bound.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "approval_lineage_object": {
+    "object_type": "APPROVAL_LINEAGE",
+    "defined": true,
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "pr_number",
+      "repo",
+      "head_sha",
+      "reviewer_identity",
+      "review_state",
+      "review_submitted_at",
+      "review_commit_sha",
+      "current_head_sha_match",
+      "stale_review_rejected"
+    ],
+    "output_fields": [
+      "approval_lineage_hash",
+      "approval_legitimacy_status",
+      "approval_binding_evidence"
+    ],
+    "approval_legitimacy_status_enum": [
+      "APPROVAL_LINEAGE_VALID",
+      "APPROVAL_LINEAGE_INVALID"
+    ],
+    "default_status": "APPROVAL_LINEAGE_INVALID"
+  },
+  "approval_lineage_valid_requires": {
+    "reviewer_identity_present": {
+      "rule": "reviewer_identity must be a non-empty, known identity bound to the reviewer registry. Unknown or anonymous reviewers are not permitted.",
+      "failure_result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "head_sha_match": {
+      "rule": "review_commit_sha must equal the current head_sha of the PR at the time of evaluation. Any mismatch indicates a stale or displaced approval.",
+      "failure_result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "review_state_approved": {
+      "rule": "review_state must be APPROVED. CHANGES_REQUESTED, DISMISSED, COMMENTED, and PENDING states do not satisfy approval lineage.",
+      "failure_result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "stale_review_rejected": {
+      "rule": "If the PR head has advanced since the approval was submitted (review_commit_sha !== current head_sha), the approval is stale and must be rejected.",
+      "failure_result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "approval_visible_to_preo": {
+      "rule": "The approval must be present and resolvable in the canonical EvidenceSnapshot consumed by PREO_VALID. Approvals not captured in the snapshot are not valid lineage inputs.",
+      "failure_result": "APPROVAL_LINEAGE_INVALID"
+    }
+  },
+  "invalid_conditions": {
+    "approval_without_head_sha_match": {
+      "condition": "review_commit_sha does not equal current head_sha",
+      "result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "dismissed_or_stale_review": {
+      "condition": "review_state is DISMISSED, or approval was submitted against a prior commit SHA",
+      "result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "approval_reused_after_head_change": {
+      "condition": "A previously valid approval is reused after the PR head SHA has changed",
+      "result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "reviewer_identity_missing": {
+      "condition": "reviewer_identity is absent, null, empty, or not found in the reviewer registry",
+      "result": "APPROVAL_LINEAGE_INVALID"
+    },
+    "approval_not_visible_to_preo": {
+      "condition": "Approval is not captured in the canonical EvidenceSnapshot available to PREO_VALID",
+      "result": "APPROVAL_LINEAGE_INVALID"
+    }
+  },
+  "preo_integration": {
+    "approval_lineage_as_preo_input": "APPROVAL_LINEAGE_VALID objects are deterministic inputs to the PREO_VALID transition. APPROVAL_LINEAGE_INVALID blocks PREO_VALID.",
+    "failure_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "approval_count_is_not_legitimacy": "The count of approvals alone does not establish merge legitimacy. Each approval must independently satisfy approval lineage requirements.",
+    "workflow_success_not_substitute": "Workflow success is not a substitute for APPROVAL_LINEAGE_VALID."
+  },
+  "canonical_compression": {
+    "rule_1": "Approval is not legitimacy by itself.",
+    "rule_2": "Approval becomes merge-relevant only when bound to: reviewer identity, exact PR head_sha, current review state, and PREO lineage.",
+    "rule_3": "Stale approval reuse → NULL."
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical approval inputs must produce identical APPROVAL_LINEAGE_VALID or APPROVAL_LINEAGE_INVALID outputs. The lineage hash must be reproducible from the bound fields alone.",
+    "lineage_hash_must_be_deterministic": true,
+    "audit_logic_must_not_depend_on_provider_specific_ordering": true
+  },
+  "fail_closed_semantics": {
+    "default_status": "APPROVAL_LINEAGE_INVALID",
+    "missing_reviewer_identity": "APPROVAL_LINEAGE_INVALID",
+    "missing_head_sha": "APPROVAL_LINEAGE_INVALID",
+    "missing_review_commit_sha": "APPROVAL_LINEAGE_INVALID",
+    "ambiguous_reviewer_resolution": "APPROVAL_LINEAGE_INVALID",
+    "snapshot_missing_approval": "APPROVAL_LINEAGE_INVALID"
+  }
+}

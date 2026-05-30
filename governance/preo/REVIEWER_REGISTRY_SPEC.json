@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "reviewer_registry_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "reviewer_registry_specification",
+  "closes": "#1633",
+  "scope": {
+    "name": "ReviewerRegistry",
+    "purpose": "Define the canonical reviewer registry model that governs role-based approval authority for APPROVAL_LINEAGE_VALID determination. Role membership is explicit — no implicit hierarchy, no inherited authority unless explicitly declared.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "reviewer_registry_model": {
+    "description": "Each reviewer entry binds a reviewer identity to an explicit set of roles. No role inheritance or implicit hierarchy is permitted.",
+    "reviewer_entry_shape": {
+      "reviewer_id": "string — canonical reviewer identity",
+      "roles": "array of strings — explicit role assignments only"
+    },
+    "example_entry": {
+      "reviewer_id": "alice",
+      "roles": ["MAINTAINER", "SECURITY_OFFICER"]
+    }
+  },
+  "role_resolution": {
+    "rule": "required_role must appear in reviewer.roles. No hierarchy expansion. No inheritance.",
+    "formula": "required_role ∈ reviewer.roles",
+    "implicit_hierarchy_permitted": false,
+    "inherited_authority_permitted": false,
+    "inherited_authority_exception": "Authority may only be inherited when an explicit declaration is present in the registry entry."
+  },
+  "mutation_class_requirements": {
+    "description": "Each mutation class declares the exact roles whose approval satisfies the APPROVAL_LINEAGE requirement for that class. Satisfying the count of approvals from lower roles does not substitute for a required role.",
+    "classes": {
+      "authority_mutation": {
+        "required_roles": ["SECURITY_OFFICER"],
+        "count_substitution_permitted": false
+      },
+      "runtime_mutation": {
+        "required_roles": ["MAINTAINER"],
+        "count_substitution_permitted": false
+      },
+      "topology_mutation": {
+        "required_roles": ["INFRASTRUCTURE_ENGINEER"],
+        "count_substitution_permitted": false
+      }
+    },
+    "approval_count_not_role_authority": "A mutation class requiring SECURITY_OFFICER approval is not satisfied by any number of MAINTAINER approvals unless SECURITY_OFFICER is explicitly present in the reviewer's role list."
+  },
+  "validation_rule": {
+    "check": "required_role ∈ reviewer.roles",
+    "authority_derivation": "explicit_only",
+    "role_expansion": "none"
+  },
+  "fail_closed_requirements": {
+    "unknown_reviewer": "APPROVAL_LINEAGE_INVALID",
+    "unknown_mutation_class": "APPROVAL_LINEAGE_INVALID",
+    "missing_role_mapping": "APPROVAL_LINEAGE_INVALID",
+    "missing_required_role": "APPROVAL_LINEAGE_INVALID",
+    "approval_head_sha_mismatch": "APPROVAL_LINEAGE_INVALID",
+    "stale_approval": "APPROVAL_LINEAGE_INVALID"
+  },
+  "boundary_clarifications": {
+    "approval_count_is_not_role_authority": "Approval count does not substitute for role authority.",
+    "security_officer_not_implied_by_maintainer": "SECURITY_OFFICER ≠ MAINTAINER unless both roles are explicitly assigned.",
+    "no_merge_permission_implied": "This registry does not create merge permission, authority, execution claims, or deployment eligibility."
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical reviewer registry + mutation class + approval inputs must produce identical APPROVAL_LINEAGE_VALID or APPROVAL_LINEAGE_INVALID outputs.",
+    "registry_lookup_must_be_deterministic": true
+  },
+  "non_goals": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_merge_permission": false
+  }
+}
