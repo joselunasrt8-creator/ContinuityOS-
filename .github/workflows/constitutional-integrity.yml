@@ -1,4 +1,8 @@
 name: constitutional-integrity
+# owner: #1616
+# policy: CONSTITUTIONAL_GOVERNANCE_RULES
+# policy-path: runtime/constitutional_governance_rules.json
+# issue-lineage: #1616 → #1601
 
 on:
   pull_request:

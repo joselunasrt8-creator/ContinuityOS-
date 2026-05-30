@@ -1,4 +1,8 @@
 name: prepare-governed-deploy
+# owner: #1616
+# policy: DEPLOY_POLICY
+# policy-path: runtime/governance/DEPLOY_POLICY.json
+# issue-lineage: #1616 → #1601
 
 on:
   workflow_dispatch:

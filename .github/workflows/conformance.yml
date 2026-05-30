@@ -1,4 +1,8 @@
 name: conformance-pack-v1
+# owner: #1616
+# policy: GOVERNANCE_REQUIREMENTS
+# policy-path: GOVERNANCE_REQUIREMENTS.json
+# issue-lineage: #1616 → #1601
 
 on:
   push:
