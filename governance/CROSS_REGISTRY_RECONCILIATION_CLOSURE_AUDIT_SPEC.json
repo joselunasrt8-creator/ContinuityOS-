@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "cross_registry_reconciliation_closure_audit_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "cross_registry_closure_audit_specification",
+  "closes": "#1638",
+  "depends_on": ["#1636", "#1637"],
+  "scope": {
+    "name": "CROSS_REGISTRY_RECONCILIATION_CLOSURE_AUDIT",
+    "purpose": "Define the canonical closure audit that verifies cross-registry reconciliation cannot create authority and that ambiguity fails closed. Merge legitimacy and deployment legitimacy may appear locally coherent while cross-registry drift remains unresolved. This audit detects drift without fabricating convergence, repairing records automatically, or creating authority.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false,
+    "record_repair": false
+  },
+  "non_goals": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_merge_permission": false,
+    "creates_proof": false,
+    "repairs_records": false
+  },
+  "audit_surfaces": [
+    "merge_legitimacy_registry",
+    "deploy_legitimacy_registry",
+    "proof_lineage_registry",
+    "replay_registry",
+    "topology_reconciliation_registry",
+    "governance_inventory_registry",
+    "federation_reconciliation_evidence"
+  ],
+  "verification_requirements": {
+    "proof_lineage_drift_detected": {
+      "rule": "If proof lineage hashes disagree across merge_legitimacy_registry, deploy_legitimacy_registry, and proof_lineage_registry for the same audit epoch, classify as PROOF_LINEAGE_DRIFT and fail closed to LEGITIMACY_NULL.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "replay_drift_detected": {
+      "rule": "If replay_registry and deploy_legitimacy_registry hold conflicting replay conclusions for the same invocation_nonce, classify as REPLAY_DRIFT. The same invocation_nonce cannot be simultaneously PENDING and CONSUMED/COMPLETE within the same reconciliation epoch.",
+      "failure_result": "LEGITIMACY_NULL",
+      "replay_classification_boundary": {
+        "REGISTRY_RECONCILIATION_INCOMPLETE": "Required evidence is missing or state cannot be reconstructed. Classify as AMBIGUITY_FORCES_NULL.",
+        "REGISTRY_REPLAY_DIVERGENCE": "Required evidence is present but replay conclusions disagree. Classify as REPLAY_DRIFT."
+      }
+    },
+    "topology_drift_detected": {
+      "rule": "If topology_reconciliation_registry indicates topology hash divergence, classify as TOPOLOGY_DRIFT and fail closed to LEGITIMACY_NULL.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "governance_inventory_drift_detected": {
+      "rule": "If governance_inventory_registry indicates governance hash divergence, classify as GOVERNANCE_DIVERGENCE and fail closed to LEGITIMACY_NULL.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "merge_deploy_equivalence_checked": {
+      "rule": "merge_legitimacy_registry and deploy_legitimacy_registry must agree on the lineage hash for the audited epoch. Disagreement is PROOF_LINEAGE_DRIFT.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "registry_hashes_reconciled": {
+      "rule": "All registry lineage hashes for the audit epoch must be mutually consistent. Any hash conflict is PROOF_LINEAGE_DRIFT.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "ambiguity_forces_NULL": {
+      "rule": "Any unresolvable ambiguity in registry state (missing required inputs, indeterminate state, unknown registry) forces classification to AMBIGUITY_FORCES_NULL and LEGITIMACY_NULL.",
+      "failure_result": "LEGITIMACY_NULL"
+    },
+    "reconciliation_does_not_authorize_execution": {
+      "rule": "A RECONCILED_EVIDENCE_ONLY classification does not authorize any execution.",
+      "value": false
+    },
+    "reconciliation_does_not_authorize_merge": {
+      "rule": "A RECONCILED_EVIDENCE_ONLY classification does not authorize any merge.",
+      "value": false
+    },
+    "reconciliation_does_not_authorize_deploy": {
+      "rule": "A RECONCILED_EVIDENCE_ONLY classification does not authorize any deployment.",
+      "value": false
+    },
+    "reconciliation_does_not_create_proof": {
+      "rule": "Reconciliation does not generate or create proof objects.",
+      "value": false
+    },
+    "reconciliation_does_not_repair_records_automatically": {
+      "rule": "Reconciliation never mutates or repairs registry records. It classifies distributed state only.",
+      "value": false
+    }
+  },
+  "outputs": {
+    "CROSS_REGISTRY_RECONCILIATION_CLOSURE_REPORT": {
+      "defined": true,
+      "required_fields": [
+        "classification",
+        "legitimacy_status",
+        "drift_inventory",
+        "unresolved_ambiguity_inventory",
+        "registry_hashes_reconciled",
+        "merge_deploy_equivalence",
+        "replay_divergence_classification",
+        "reconciliation_creates_authority",
+        "reconciliation_creates_execution",
+        "reconciliation_creates_deployment",
+        "reconciliation_creates_merge_permission",
+        "reconciliation_creates_proof",
+        "reconciliation_repairs_records",
+        "audit_type"
+      ],
+      "default_result": "LEGITIMACY_NULL"
+    },
+    "registry_drift_inventory": {
+      "defined": true,
+      "description": "List of detected drift events with registry, drift_type, and conflicting evidence."
+    },
+    "unresolved_ambiguity_inventory": {
+      "defined": true,
+      "description": "List of unresolvable ambiguities that force LEGITIMACY_NULL."
+    },
+    "reconciliation_legitimacy_classification": {
+      "defined": true,
+      "description": "The final classification of the reconciliation audit epoch."
+    }
+  },
+  "classifications": {
+    "RECONCILED_EVIDENCE_ONLY": {
+      "condition": "All audit surfaces agree on lineage hashes, no drift detected, no ambiguity, federation evidence is evidence-only.",
+      "legitimacy_status": "RECONCILED_EVIDENCE_ONLY",
+      "authorizes_execution": false,
+      "authorizes_merge": false,
+      "authorizes_deployment": false
+    },
+    "PROOF_LINEAGE_DRIFT": {
+      "condition": "Lineage hashes disagree across merge_legitimacy_registry, deploy_legitimacy_registry, or proof_lineage_registry for the same epoch.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "REPLAY_DRIFT": {
+      "condition": "Replay registry and deploy registry hold conflicting replay conclusions for the same invocation_nonce. Evidence is present; conclusions disagree (REGISTRY_REPLAY_DIVERGENCE).",
+      "legitimacy_status": "LEGITIMACY_NULL",
+      "replay_divergence_classification": "REGISTRY_REPLAY_DIVERGENCE"
+    },
+    "TOPOLOGY_DRIFT": {
+      "condition": "topology_reconciliation_registry indicates topology hash divergence.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "GOVERNANCE_DIVERGENCE": {
+      "condition": "governance_inventory_registry indicates governance hash divergence, or federation_reconciliation_evidence is treated as authority.",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    },
+    "AMBIGUITY_FORCES_NULL": {
+      "condition": "Required registry input is missing, state cannot be reconstructed, or reconciliation state is indeterminate (REGISTRY_RECONCILIATION_INCOMPLETE).",
+      "legitimacy_status": "LEGITIMACY_NULL"
+    }
+  },
+  "failure_result": "LEGITIMACY_NULL",
+  "cross_registry_closure_requirement": {
+    "rule": "CROSS_REGISTRY_RECONCILIATION_CLOSED requires merge registry = deploy registry = proof registry = authority registry = replay registry for the audited lineage epoch. If replay state disagrees across registries, CROSS_REGISTRY_RECONCILIATION_CLOSED cannot be derived.",
+    "closed_derivation": "CROSS_REGISTRY_RECONCILIATION_CLOSED",
+    "failure": "LEGITIMACY_NULL"
+  },
+  "canonical_compression": {
+    "rule_1": "Reconciliation is not convergence.",
+    "rule_2": "Cross-registry agreement may support evidence.",
+    "rule_3": "Cross-registry drift must invalidate legitimacy.",
+    "rule_4": "Cross-registry ambiguity must fail closed.",
+    "rule_5": "Reconciliation may classify. Reconciliation may not authorize.",
+    "rule_6": "Incomplete = no answer. Divergence = competing answers.",
+    "rule_7": "The audit classifies distributed state. It does not reconcile registries. It does not create convergence. It does not mutate registry state."
+  },
+  "fail_closed_semantics": {
+    "default_result": "LEGITIMACY_NULL",
+    "missing_required_input": "LEGITIMACY_NULL",
+    "proof_lineage_drift": "LEGITIMACY_NULL",
+    "replay_divergence": "LEGITIMACY_NULL",
+    "topology_drift": "LEGITIMACY_NULL",
+    "governance_divergence": "LEGITIMACY_NULL",
+    "unresolvable_ambiguity": "LEGITIMACY_NULL",
+    "federation_evidence_treated_as_authority": "LEGITIMACY_NULL"
+  }
+}
