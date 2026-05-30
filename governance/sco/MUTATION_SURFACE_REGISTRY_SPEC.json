@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "sco_mutation_surface_registry_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "registry_specification",
+  "scope": {
+    "name": "MutationSurfaceRegistry",
+    "purpose": "Define the canonical static registry of governed mutation surfaces consumed by the SCO_VALID transition. The registry is the authoritative source for mutation class, target surface, and risk class classification of governed file paths.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "registry_principle": {
+    "legitimacy_source": "Registry defines legitimacy.",
+    "drift_source": "Dynamic dependency scan detects drift.",
+    "conflict_resolution": "Registry wins on conflict. Dynamic scan evidence does not override registry classification.",
+    "unknown_consumer_rule": "A file path not present in the registry must result in GOVERNANCE_UNKNOWN -> SCO_INVALID.",
+    "undeclared_consumer_rule": "A consumer discovered by dynamic scan but not present in the registry must result in SCO_INVALID."
+  },
+  "entry_model": {
+    "required_fields": ["path_pattern", "mutation_class", "target_surface", "risk_class"],
+    "path_pattern_semantics": "Prefix match. A pattern ending with '/' matches any path beginning with that prefix. An exact pattern matches only the exact path.",
+    "mixed_purpose_rule": "When a file matches multiple registry entries, the entry with the highest risk_class wins. When consumers disagree, risk wins."
+  },
+  "canonical_entries": [
+    {
+      "path_pattern": "governance/",
+      "mutation_class": "governance_mutation",
+      "target_surface": "governance_runtime",
+      "risk_class": "P2",
+      "note": "Includes documentation files under governance/. Files in governance/ are classified as governance_mutation regardless of file type."
+    },
+    {
+      "path_pattern": ".github/workflows/",
+      "mutation_class": "workflow_mutation",
+      "target_surface": "source_control_governance",
+      "risk_class": "P3"
+    },
+    {
+      "path_pattern": "src/",
+      "mutation_class": "runtime_mutation",
+      "target_surface": "runtime_boundary",
+      "risk_class": "P3"
+    },
+    {
+      "path_pattern": "schema.sql",
+      "mutation_class": "schema_mutation",
+      "target_surface": "database_schema",
+      "risk_class": "P2"
+    },
+    {
+      "path_pattern": "migrations/",
+      "mutation_class": "migration_mutation",
+      "target_surface": "database_migration",
+      "risk_class": "P2"
+    },
+    {
+      "path_pattern": "wrangler.toml",
+      "mutation_class": "deployment_config_mutation",
+      "target_surface": "deployment_configuration",
+      "risk_class": "P2"
+    }
+  ],
+  "fail_closed_rule": "Any governed file path not matched by a canonical entry must be classified GOVERNANCE_UNKNOWN and the SCO_VALID transition must produce SCO_INVALID.",
+  "drift_detection": {
+    "principle": "Dynamic scan is evidence-only. It does not grant legitimacy.",
+    "scan_discovers_unlisted_consumer": "SCO_INVALID",
+    "scan_result_overrides_registry": false
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindshift.local/schemas/mutation-surface.schema.json",
+  "title": "MutationSurface",
+  "description": "Canonical mutation surface classification evidence consumed by the SCO_VALID transition. Produced by classifying SCO_CANDIDATE governed files against the static Mutation Surface Registry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchor",
+    "file_classifications",
+    "derived_mutation_classes",
+    "derived_target_surfaces",
+    "derived_risk_class",
+    "unclassified_files",
+    "classification_timestamp"
+  ],
+  "properties": {
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "head_sha", "sco_candidate_id"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "head_sha": { "type": "string", "minLength": 40, "maxLength": 40 },
+        "sco_candidate_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "file_classifications": {
+      "type": "array",
+      "description": "Classification result for each governed file. Each entry binds the file to its highest-risk registry match.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file_path", "matched_pattern", "mutation_class", "target_surface", "risk_class"],
+        "properties": {
+          "file_path": { "type": "string", "minLength": 1 },
+          "matched_pattern": { "type": "string", "minLength": 1 },
+          "mutation_class": { "type": "string", "minLength": 1 },
+          "target_surface": { "type": "string", "minLength": 1 },
+          "risk_class": { "type": "string", "enum": ["P1", "P2", "P3"] }
+        }
+      }
+    },
+    "derived_mutation_classes": {
+      "type": "array",
+      "description": "Deduplicated set of mutation classes derived from file_classifications. Must exactly match SCO_CANDIDATE mutation_classes for SCO_VALID.",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "derived_target_surfaces": {
+      "type": "array",
+      "description": "Deduplicated set of target surfaces derived from file_classifications. Must exactly match SCO_CANDIDATE target_surfaces for SCO_VALID.",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "derived_risk_class": {
+      "type": "string",
+      "description": "Highest risk class across all file_classifications. SCO_CANDIDATE risk_class must not be lower than this value.",
+      "enum": ["P1", "P2", "P3"]
+    },
+    "unclassified_files": {
+      "type": "array",
+      "description": "Governed files that matched no registry entry. Any entry here forces GOVERNANCE_UNKNOWN -> SCO_INVALID.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "classification_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
