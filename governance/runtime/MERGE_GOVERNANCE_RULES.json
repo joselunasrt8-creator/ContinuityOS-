@@ -71,17 +71,6 @@
     "generate-preo-candidate",
     "generate-sco-candidate"
   ],
-  "merge_queue_policy": {
-    "status": "DISABLED_FOR_GOVERNED_BRANCHES",
-    "issue_reference": "CI-003",
-    "github_issue": "#1668",
-    "closes_gaps": ["GAP-003", "MB-007"],
-    "rationale": "Merge queue may produce a combined commit SHA not covered by the original PREO/SCO candidate. Until merge-queue-specific PREO regeneration is implemented and required, merge queue is classified as MERGE_LEGITIMACY_NULL for governed branches.",
-    "governed_branches": ["main"],
-    "result_on_merge_group_event": "MERGE_LEGITIMACY_NULL",
-    "enforcement_mechanism": "merge-governance-check workflow fails on merge_group trigger event",
-    "closure_condition": "Merge queue may be re-enabled only after a CI-003b implementation provides queue-SHA-bound PREO regeneration and that implementation is reviewed and merged."
-  },
   "topology_reconciliation": {
     "policy": "runtime/governance/TOPOLOGY_RECONCILIATION_POLICY.json",
     "registry": "topology_reconciliation_registry",

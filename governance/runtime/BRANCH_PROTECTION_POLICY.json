@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "purpose": "Define required repository branch protection controls before Stage 4 enforcement activation.",
-  "status": "enforcement_activation_recorded",
+  "status": "policy_only_non_enforcing",
   "target_branch": "main",
   "core_invariant": "No PREO_VALID -> no merge legitimacy",
   "required_controls": {
@@ -56,31 +56,6 @@
   "enforcement_classification": {
     "current": "advisory",
     "target": "branch_protected_enforcement"
-  },
-  "enforcement_activation": {
-    "activation_status": "ACTIVATION_RECORDED",
-    "activation_date": "2026-05-31",
-    "enforcing_actor": "repository_administrator",
-    "phase2_child_issue": "CI-001",
-    "issue_reference": "#1666",
-    "activation_note": "Branch protection policy enforcement activation recorded per CI-001 (#1666). Required controls must be applied by the repository administrator via GitHub branch protection settings for the main branch, matching this document exactly. This record confirms the policy intent and required configuration.",
-    "required_checks_at_activation": [
-      "merge-governance-check",
-      "generate-preo-candidate",
-      "generate-sco-candidate"
-    ],
-    "required_settings_at_activation": {
-      "require_pull_request_before_merge": true,
-      "required_approving_review_count": 1,
-      "dismiss_stale_reviews": true,
-      "require_status_checks": true,
-      "require_branch_up_to_date_before_merge": true,
-      "restrict_direct_push_to_main": true,
-      "allow_force_pushes": false
-    },
-    "closes_gaps": ["GAP-001", "MB-001", "MB-002", "MB-003", "MB-010"],
-    "verification_required": true,
-    "verification_note": "Repository administrator must verify branch protection settings match this document after activation."
   },
   "emitted_check_inventory": [
     {

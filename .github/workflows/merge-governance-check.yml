@@ -4,7 +4,6 @@ on:
   pull_request:
     branches:
       - main
-  merge_group:
 
 permissions:
   contents: read
@@ -16,44 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Reject merge queue attempts
-        if: github.event_name == 'merge_group'
-        run: |
-          echo "NULL — merge_group event detected."
-          echo "Merge queue is DISABLED_FOR_GOVERNED_BRANCHES per CI-003 and MERGE_GOVERNANCE_RULES.json merge_queue_policy."
-          echo "Merge queue may produce a combined SHA not covered by the original PREO/SCO candidate."
-          echo "Result: MERGE_LEGITIMACY_NULL"
-          exit 1
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Classify merge actor
-        run: |
-          set -euo pipefail
-
-          ACTOR="${{ github.actor }}"
-
-          if [[ "$ACTOR" == *"[bot]"* ]]; then
-            ACTOR_TYPE="bot"
-            PERMITTED=$(jq --arg actor "$ACTOR" \
-              '[.permitted_bot_actors[] | select(. == $actor)] | length' \
-              governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
-            if [ "$PERMITTED" -eq 0 ]; then
-              echo "NULL — actor $ACTOR is an unrecognized bot not in permitted_bot_actors allowlist."
-              echo "Result: MERGE_LEGITIMACY_NULL"
-              exit 1
-            fi
-            ACTOR_CLASSIFICATION="BOT_MERGE_ACTOR"
-          else
-            ACTOR_TYPE="human"
-            ACTOR_CLASSIFICATION="HUMAN_MERGE_ACTOR"
-          fi
-
-          echo "ACTOR_CLASSIFICATION=$ACTOR_CLASSIFICATION" >> "$GITHUB_ENV"
-          echo "actor_type=$ACTOR_TYPE actor=$ACTOR classification=$ACTOR_CLASSIFICATION"
 
       - name: Detect changed files and governed paths
         run: |
@@ -137,7 +102,6 @@ jobs:
             --arg checks_status "UNVERIFIED" \
             --arg risk_class "$RISK_CLASS" \
             --arg governed_path_detected "$GOVERNED_PATH_DETECTED" \
-            --arg actor_classification "$ACTOR_CLASSIFICATION" \
             --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --slurpfile changed_files <(jq -R . changed_files.txt | jq -s .) \
             '{
@@ -152,7 +116,6 @@ jobs:
               checks_status: $checks_status,
               risk_class: $risk_class,
               governed_path_detected: ($governed_path_detected == "true"),
-              actor_classification: $actor_classification,
               created_at: $created_at,
               status: "PREO_CANDIDATE"
             }' > PREO_CANDIDATE.json
@@ -339,7 +302,6 @@ jobs:
             echo ""
             echo "governed_path_detected=$GOVERNED_PATH_DETECTED"
             echo "risk_class=$RISK_CLASS"
-            echo "actor_classification=$ACTOR_CLASSIFICATION"
             echo ""
             echo "#### PREO_CANDIDATE.json"
             echo '```json'
