@@ -1,0 +1,618 @@
+{
+  "artifact": "TOPOLOGY_OBSERVATION_EMISSION_RULES_SPEC",
+  "issue": "#1642",
+  "version": "1.0.0",
+  "status": "SPEC_READY",
+  "planning_status": [
+    "SPEC_READY",
+    "EMISSION_MODEL_STABILIZED",
+    "READY_FOR_#1644"
+  ],
+  "planning_only": true,
+  "non_goals": [
+    "No implementation.",
+    "No runtime mutation.",
+    "No authority creation.",
+    "No proof generation.",
+    "No reconciliation execution claim.",
+    "No topology convergence claim."
+  ],
+  "parent_issues": {
+    "#1640": "Runtime Topology Intelligence Planning — decides observation relevance.",
+    "#1641": "Classified Observation Object Spec — defines the observation object shape."
+  },
+  "core_purpose": "Topology Observation Emission Rules = deterministic lifecycle rules for topology-visible observations. Not: validator result, authority decision, reconciliation closure, execution permission, or proof generation.",
+  "core_invariants": {
+    "state_change_ne_emission": "State change != Emission. Topology-relevant transition = Emission candidate.",
+    "scope_invariant": "No observation may be broadcast beyond its verified topology scope.",
+    "certainty_invariant": "No observation may imply more certainty than its evidence supports.",
+    "determinism_invariant": "Identical topology state must not produce new observation emissions unless classification changed."
+  },
+  "non_authoritative_boundary": {
+    "emission_rules_control": "observation emission only",
+    "emission_rules_may_not": [
+      "create validity",
+      "create authority",
+      "create execution eligibility",
+      "create reconciliation closure",
+      "generate proof",
+      "mutate registries",
+      "trigger reconciliation execution"
+    ],
+    "observer_lifecycle": [
+      "observe",
+      "classify visibility",
+      "evaluate emission eligibility",
+      "emit or suppress"
+    ],
+    "forbidden_observer_lifecycle": [
+      "observe",
+      "validate legitimacy",
+      "mutate registry",
+      "authorize execution"
+    ]
+  },
+  "emission_eligibility": {
+    "core_rule": "A node may emit a topology-visible observation only if the observation contains all required classification fields.",
+    "required_fields_for_topology_visible_emission": [
+      "classification",
+      "verification_status",
+      "lineage_status",
+      "proof_status",
+      "authority_status",
+      "topology_scope",
+      "confidence_source",
+      "legitimacy_effect"
+    ],
+    "forbidden_emission_example": {
+      "observation_state": "AUTHORITY_REVOKED"
+    },
+    "required_emission_pattern_example": {
+      "observation_state": "AUTHORITY_REVOKED_SIGNAL",
+      "classification": "OBSERVATIONAL",
+      "verification_status": "UNVERIFIED",
+      "lineage_status": "UNKNOWN",
+      "proof_status": "UNKNOWN",
+      "authority_status": "UNKNOWN",
+      "topology_scope": "LOCAL",
+      "confidence_source": "LOCAL_OBSERVATION",
+      "legitimacy_effect": "REQUIRES_RECONCILIATION"
+    },
+    "emission_candidates": [
+      "observation changes classification",
+      "observation creates an observation gap",
+      "observation closes an observation gap",
+      "observation detects conflicting evidence",
+      "observation detects stale evidence",
+      "observation records authority, replay, or proof transition",
+      "observation changes gap bridgeability classification",
+      "observation changes topology_view_id coverage"
+    ]
+  },
+  "emission_states": [
+    {
+      "id": "EMIT_IMMEDIATELY",
+      "description": "Bypass debounce. Applies to irreversible or critical legitimacy-relevant transitions.",
+      "rule": "Do not delay legitimacy-critical transitions."
+    },
+    {
+      "id": "EMIT_AFTER_STABILITY_WINDOW",
+      "description": "Defer emission until transition persists past a stability window.",
+      "rule": "Use for reversible visibility churn where premature emission would create noise."
+    },
+    {
+      "id": "EMIT_AGGREGATED",
+      "description": "Compress multiple flapping events into one bounded visibility event.",
+      "rule": "Emit after recovery with a bounded window record. Do not emit every individual flap."
+    },
+    {
+      "id": "SUPPRESS",
+      "description": "Do not emit. Applies to operational repetition without legitimacy relevance.",
+      "rule": "Suppress operational repetition. Emit legitimacy-relevant transitions."
+    }
+  ],
+  "immediate_triggers": {
+    "rule": "These transitions bypass debounce because they represent irreversible or critical legitimacy-relevant state changes.",
+    "triggers": [
+      "AUTHORITY_REVOCATION",
+      "REPLAY_NONCE_CONSUMED",
+      "PROOF_HASH_MISMATCH",
+      "ROOT_BYPASS_DETECTED",
+      "LINEAGE_CONFLICT",
+      "TOPOLOGY_CONFLICTED"
+    ],
+    "examples": [
+      {
+        "event": "authority revocation observed",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Irreversible authority lifecycle transition."
+      },
+      {
+        "event": "replay nonce consumed",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Nonce consumption is irreversible and affects replay safety."
+      },
+      {
+        "event": "proof hash mismatch detected",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Proof integrity failure is a critical legitimacy surface event."
+      },
+      {
+        "event": "root bypass path observed",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Root bypass detection is a critical governance event."
+      },
+      {
+        "event": "conflicting lineage hash observed",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Lineage conflict is a critical reconciliation-relevant transition."
+      },
+      {
+        "event": "topology conflict detected",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Topology conflict requires immediate visibility for reconciliation."
+      }
+    ]
+  },
+  "stability_window_rules": {
+    "core_rule": "A transition becomes emission-eligible only if: (1) it persists past a stability window, OR (2) it affects a critical legitimacy surface, OR (3) it creates an irreversible lineage transition.",
+    "default_model": {
+      "critical_surfaces": "immediate or 1 confirmation",
+      "normal_topology_gaps": "30-60 seconds stable",
+      "flapping_surfaces": "emit aggregated window after recovery",
+      "duplicate_state_changes": "suppress"
+    },
+    "examples": [
+      {
+        "scenario": "validator restart with no observation gap",
+        "emission_state": "SUPPRESS",
+        "reason": "Transient restart with no legitimacy visibility impairment."
+      },
+      {
+        "scenario": "validator unavailable beyond stability threshold",
+        "emission_state": "EMIT_AFTER_STABILITY_WINDOW",
+        "reason": "Persistent unavailability impairs legitimacy visibility."
+      },
+      {
+        "scenario": "authority revocation observed",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Critical legitimacy-relevant transition, no debounce."
+      },
+      {
+        "scenario": "critical transition detected inside an active gap window",
+        "emission_state": "EMIT_IMMEDIATELY",
+        "reason": "Critical transitions are not deferred regardless of gap state."
+      }
+    ]
+  },
+  "suppression_criteria": {
+    "core_rule": "Suppress operational repetition. Emit legitimacy-relevant transitions.",
+    "suppressed_events": [
+      "HEARTBEAT_CONFIRMATION",
+      "DUPLICATE_REGISTRY_READ",
+      "UNCHANGED_TOPOLOGY_STATE",
+      "LOCAL_RESOURCE_CHURN",
+      "ROUTINE_PROCESS_RESTART_WITH_NO_VISIBILITY_GAP",
+      "RESOURCE_UTILIZATION_CHANGE"
+    ],
+    "suppression_test": "If the observation cannot materially affect execution eligibility, authority interpretation, replay safety, proof binding, or reconciliation outcome — suppress."
+  },
+  "flapping_aggregation": {
+    "core_rule": "Do not emit every individual flap. Emit one bounded visibility event after the flapping window.",
+    "forbidden_pattern": [
+      "TOPOLOGY_PARTIAL",
+      "TOPOLOGY_VISIBLE",
+      "TOPOLOGY_PARTIAL",
+      "TOPOLOGY_VISIBLE",
+      "TOPOLOGY_PARTIAL"
+    ],
+    "required_pattern": {
+      "classification": "TOPOLOGY_PARTIAL",
+      "observation_type": "OBSERVATION_GAP_DETECTED",
+      "affected_window": {
+        "start": "first_unavailable_at",
+        "end": "last_recovered_at"
+      },
+      "flap_count": "integer",
+      "stability_window_applied": true,
+      "observer_action": "EMIT_ONLY"
+    },
+    "compression_rule": "Do not emit every flap. Emit the bounded visibility event.",
+    "exception": "If a critical transition (EMIT_IMMEDIATELY trigger) occurs inside a flapping window, emit it immediately without waiting for window close."
+  },
+  "deterministic_hash_model": {
+    "description": "For aggregated emissions, the evidence_hash must cover the full bounded window, not only the final stable state.",
+    "evidence_hash_inputs": [
+      "affected_window.start",
+      "affected_window.end",
+      "flap_count",
+      "transition_sequence_hashes",
+      "final_stable_state_hash",
+      "topology_view_id",
+      "target_surface"
+    ],
+    "required_component_hashes": {
+      "transition_sequence_hashes": [
+        "sha256:<transition_1>",
+        "sha256:<transition_2>",
+        "sha256:<transition_3>"
+      ],
+      "final_stable_state_hash": "sha256:<final_state>"
+    },
+    "hash_rules": {
+      "aggregate_hash_binds_window": "Aggregated emission hash binds the full bounded window.",
+      "transition_hashes_preserve_history": "Transition hashes preserve the individual flap history.",
+      "final_state_hash_confirms_recovery": "Final state hash confirms recovery state.",
+      "forbidden": "evidence_hash = final stable state only (loses flap history)"
+    },
+    "determinism_requirements": {
+      "identical_inputs_identical_hash": "Identical aggregated window inputs must produce identical evidence_hash.",
+      "changed_inputs_change_hash": "Changing affected_window, flap_count, transition_sequence_hashes, final_stable_state_hash, topology_view_id, or target_surface must change evidence_hash."
+    }
+  },
+  "gap_emission_logic": {
+    "evidence_type": "TOPOLOGY_GAP",
+    "emit_only_when": [
+      "visibility impairment persists",
+      "bridgeability classification changes",
+      "gap closes",
+      "critical transition occurs inside the gap window"
+    ],
+    "gap_emissions_must_be": "factual and non-authoritative",
+    "allowed_gap_emission_fields": {
+      "observed_state": "UNOBSERVABLE",
+      "gap_reconciliation_status": "UNKNOWN",
+      "affected_window": "object with start and end"
+    },
+    "forbidden_gap_emission_fields": {
+      "authority_invalid": true,
+      "lineage_invalid": true,
+      "execution_ineligible": true
+    },
+    "core_rule": "Gap emissions describe observed impairment. They must not assert legitimacy conclusions."
+  },
+  "propagation_scope_classifications": [
+    {
+      "id": "LOCAL_ONLY",
+      "description": "Observation may not be broadcast beyond the originating node.",
+      "applies_to": [
+        "local-only observations with no governance relevance",
+        "observations missing required classification fields",
+        "observations with topology_scope = LOCAL and no reconciliation trigger"
+      ]
+    },
+    {
+      "id": "TOPOLOGY_VISIBLE",
+      "description": "Observation may be broadcast to topology-visible circulation with full classification metadata.",
+      "applies_to": [
+        "governance-relevant observations with complete classification fields",
+        "proof-present observations with verified lineage",
+        "verified-global observations with SIGNED_PROOF or SIGNED_REVOCATION confidence_source"
+      ]
+    },
+    {
+      "id": "RECONCILIATION_REQUIRED",
+      "description": "Observation may propagate but requires reconciliation before any closure can be derived.",
+      "applies_to": [
+        "reconciliation-relevant observations",
+        "unverified revocation signals",
+        "observed active state with missing lineage",
+        "proof-missing observations",
+        "conflict-state observations"
+      ]
+    },
+    {
+      "id": "PROPAGATION_BLOCKED",
+      "description": "Observation must not propagate. Blocked due to missing fields, conflicting state, or suppression criteria.",
+      "applies_to": [
+        "observations missing required classification metadata",
+        "observations triggering suppression criteria",
+        "raw state observations without classification wrapper"
+      ]
+    },
+    {
+      "id": "VERIFIED_GLOBAL",
+      "description": "Observation has been verified and may propagate at global topology scope.",
+      "applies_to": [
+        "observations with confidence_source = SIGNED_PROOF or RECONCILIATION_RESULT",
+        "observations with verification_status = VERIFIED and proof_status = PRESENT",
+        "observations with topology_scope = GLOBAL"
+      ]
+    }
+  ],
+  "emission_boundary_rules_by_scenario": [
+    {
+      "scenario": "local-only observations",
+      "propagation_scope": "LOCAL_ONLY",
+      "emission_state": "SUPPRESS",
+      "reason": "No legitimacy relevance beyond originating node."
+    },
+    {
+      "scenario": "governance-relevant observations",
+      "propagation_scope": "TOPOLOGY_VISIBLE",
+      "emission_state": "EMIT_IMMEDIATELY or EMIT_AFTER_STABILITY_WINDOW depending on criticality",
+      "reason": "Governance lifecycle events may affect distributed legitimacy interpretation.",
+      "required_fields": [
+        "classification",
+        "verification_status",
+        "lineage_status",
+        "proof_status",
+        "authority_status",
+        "topology_scope",
+        "confidence_source",
+        "legitimacy_effect"
+      ]
+    },
+    {
+      "scenario": "reconciliation-relevant observations",
+      "propagation_scope": "RECONCILIATION_REQUIRED",
+      "emission_state": "EMIT_IMMEDIATELY",
+      "reason": "Reconciliation-relevant transitions are critical and must be visible immediately."
+    },
+    {
+      "scenario": "unverified revocation signals",
+      "propagation_scope": "RECONCILIATION_REQUIRED",
+      "emission_state": "EMIT_IMMEDIATELY",
+      "reason": "Revocation signals must propagate immediately but must not assert verified authority state.",
+      "safe_pattern": {
+        "observation_state": "AUTHORITY_REVOKED_SIGNAL",
+        "classification": "OBSERVATIONAL",
+        "verification_status": "UNVERIFIED",
+        "lineage_status": "UNKNOWN",
+        "proof_status": "UNKNOWN",
+        "authority_status": "UNKNOWN",
+        "topology_scope": "LOCAL",
+        "confidence_source": "LOCAL_OBSERVATION",
+        "legitimacy_effect": "REQUIRES_RECONCILIATION"
+      }
+    },
+    {
+      "scenario": "observed active state with missing lineage",
+      "propagation_scope": "RECONCILIATION_REQUIRED",
+      "emission_state": "EMIT_AFTER_STABILITY_WINDOW",
+      "reason": "Active state without lineage cannot confirm legitimacy. Requires reconciliation.",
+      "safe_pattern": {
+        "observation_state": "DEPLOYMENT_ACTIVE",
+        "classification": "OBSERVATIONAL",
+        "verification_status": "UNVERIFIED",
+        "lineage_status": "MISSING",
+        "proof_status": "MISSING",
+        "authority_status": "UNKNOWN",
+        "topology_scope": "LOCAL",
+        "confidence_source": "LOCAL_OBSERVATION",
+        "legitimacy_effect": "REQUIRES_RECONCILIATION"
+      }
+    },
+    {
+      "scenario": "proof-present observations",
+      "propagation_scope": "TOPOLOGY_VISIBLE",
+      "emission_state": "EMIT_IMMEDIATELY",
+      "reason": "Proof presence is a positive legitimacy signal and should propagate.",
+      "safe_pattern": {
+        "observation_state": "PROOF_OBSERVED",
+        "classification": "VERIFIED",
+        "verification_status": "VERIFIED",
+        "lineage_status": "COMPLETE",
+        "proof_status": "PRESENT",
+        "authority_status": "ACTIVE",
+        "topology_scope": "GLOBAL",
+        "confidence_source": "SIGNED_PROOF",
+        "legitimacy_effect": "CONFIRM"
+      }
+    },
+    {
+      "scenario": "proof-missing observations",
+      "propagation_scope": "RECONCILIATION_REQUIRED",
+      "emission_state": "EMIT_AFTER_STABILITY_WINDOW",
+      "reason": "Missing proof is a gap that requires reconciliation. Must not assert invalidity.",
+      "safe_pattern": {
+        "observation_state": "PROOF_MISSING_SIGNAL",
+        "classification": "OBSERVATIONAL",
+        "verification_status": "UNVERIFIED",
+        "lineage_status": "UNKNOWN",
+        "proof_status": "MISSING",
+        "authority_status": "UNKNOWN",
+        "topology_scope": "LOCAL",
+        "confidence_source": "LOCAL_OBSERVATION",
+        "legitimacy_effect": "REQUIRES_RECONCILIATION"
+      }
+    },
+    {
+      "scenario": "conflict-state observations",
+      "propagation_scope": "RECONCILIATION_REQUIRED",
+      "emission_state": "EMIT_IMMEDIATELY",
+      "reason": "Conflicting state must propagate immediately for reconciliation resolution.",
+      "safe_pattern": {
+        "observation_state": "LINEAGE_CONFLICT_SIGNAL",
+        "classification": "CONFLICTED",
+        "verification_status": "FAILED",
+        "lineage_status": "CONFLICTED",
+        "proof_status": "UNKNOWN",
+        "authority_status": "CONFLICTED",
+        "topology_scope": "PARTIAL",
+        "confidence_source": "LOCAL_OBSERVATION",
+        "legitimacy_effect": "SUSPEND"
+      }
+    },
+    {
+      "scenario": "partition-suspected observations",
+      "propagation_scope": "RECONCILIATION_REQUIRED",
+      "emission_state": "EMIT_AFTER_STABILITY_WINDOW",
+      "reason": "Partition suspicion without confirmation should be deferred past stability window before propagation.",
+      "safe_pattern": {
+        "observation_state": "TOPOLOGY_PARTIAL_SIGNAL",
+        "classification": "OBSERVATIONAL",
+        "verification_status": "UNVERIFIED",
+        "lineage_status": "UNKNOWN",
+        "proof_status": "UNKNOWN",
+        "authority_status": "UNKNOWN",
+        "topology_scope": "PARTIAL",
+        "confidence_source": "LOCAL_OBSERVATION",
+        "legitimacy_effect": "REQUIRES_RECONCILIATION"
+      }
+    }
+  ],
+  "downgrade_semantics": {
+    "core_rule": "When conflicting higher-precedence evidence is heard, the observation classification must downgrade rather than maintain false certainty.",
+    "downgrade_triggers": [
+      "conflicting lineage hash received from higher-precedence source",
+      "signed revocation heard after VERIFIED emission",
+      "proof hash mismatch detected after CONFIRM legitimacy_effect",
+      "topology conflict received after TOPOLOGY_VISIBLE classification"
+    ],
+    "downgrade_path": {
+      "VERIFIED": "CONFLICTED",
+      "CONFIRM": "REQUIRES_RECONCILIATION or SUSPEND",
+      "TOPOLOGY_VISIBLE": "TOPOLOGY_CONFLICTED or RECONCILIATION_REQUIRED",
+      "VERIFIED_GLOBAL": "RECONCILIATION_REQUIRED if conflicting evidence heard"
+    },
+    "forbidden_on_downgrade": [
+      "retain previous VERIFIED classification without re-verification",
+      "assert CONFIRM legitimacy_effect when conflicting evidence exists",
+      "block downgrade when higher-precedence revocation is received"
+    ],
+    "certainty_inflation_prevention_fields": [
+      "verification_status",
+      "lineage_status",
+      "proof_status",
+      "authority_status",
+      "confidence_source",
+      "legitimacy_effect"
+    ]
+  },
+  "reconciliation_safety_rule": {
+    "condition": "active flapping window + reconciliation requested",
+    "result": "do not derive closure",
+    "safe_behavior": {
+      "if_critical_transition_observed": "process immediately",
+      "if_non_critical_flapping_active": "hold closure derivation",
+      "if_bridgeable_independent_evidence_exists": "reconciliation may proceed using lineage-bound evidence",
+      "if_not_bridgeable": "REGISTRY_RECONCILIATION_INCOMPLETE"
+    },
+    "core_rule": "Flapping topology cannot produce closure. Only stable topology or bridgeable lineage-bound evidence can support reconciliation."
+  },
+  "relationship_to_parent_issues": {
+    "#1640": {
+      "role": "decides observation relevance and taxonomy",
+      "this_spec_derives_from": [
+        "emission_trigger_model",
+        "stability_window_and_flapping_model",
+        "observation_taxonomy"
+      ]
+    },
+    "#1641": {
+      "role": "defines the classified observation object shape",
+      "this_spec_derives_from": [
+        "required classification fields",
+        "propagation safety patterns",
+        "forbidden raw-state emission rules"
+      ]
+    },
+    "compression": {
+      "#1640": "decides relevance",
+      "#1641": "defines the object",
+      "#1642": "decides whether the object should exist (emit or suppress)"
+    }
+  },
+  "fate_tests": [
+    {
+      "id": "FATE-EMIT-001",
+      "description": "immediate trigger emits immediately",
+      "given": "AUTHORITY_REVOCATION observed",
+      "expect": "emission_state = EMIT_IMMEDIATELY, no stability window applied"
+    },
+    {
+      "id": "FATE-EMIT-002",
+      "description": "non-critical short flap suppresses",
+      "given": "validator restart with no visibility gap, duration < stability window",
+      "expect": "emission_state = SUPPRESS"
+    },
+    {
+      "id": "FATE-EMIT-003",
+      "description": "persistent gap emits after stability window",
+      "given": "validator unavailable > stability threshold",
+      "expect": "emission_state = EMIT_AFTER_STABILITY_WINDOW"
+    },
+    {
+      "id": "FATE-EMIT-004",
+      "description": "flapping emits one aggregated event",
+      "given": "TOPOLOGY_PARTIAL/TOPOLOGY_VISIBLE repeated flapping observed",
+      "expect": "emission_state = EMIT_AGGREGATED, single bounded visibility event with affected_window"
+    },
+    {
+      "id": "FATE-HASH-001",
+      "description": "aggregated evidence_hash changes when flap_count changes",
+      "given": "same affected_window and transition_sequence_hashes but different flap_count",
+      "expect": "evidence_hash differs"
+    },
+    {
+      "id": "FATE-HASH-002",
+      "description": "aggregated evidence_hash changes when transition_sequence_hashes change",
+      "given": "same flap_count and affected_window but different transition_sequence_hashes",
+      "expect": "evidence_hash differs"
+    },
+    {
+      "id": "FATE-HASH-003",
+      "description": "final_stable_state_hash required for aggregated recovery",
+      "given": "aggregated emission without final_stable_state_hash",
+      "expect": "emission rejected as incomplete"
+    },
+    {
+      "id": "FATE-SUPPRESS-001",
+      "description": "unchanged topology state suppresses duplicate emission",
+      "given": "identical topology state observed again with no classification change",
+      "expect": "emission_state = SUPPRESS"
+    },
+    {
+      "id": "FATE-GAP-001",
+      "description": "critical transition inside gap emits immediately",
+      "given": "active TOPOLOGY_GAP window, AUTHORITY_REVOCATION observed inside gap",
+      "expect": "AUTHORITY_REVOCATION emits immediately, does not wait for gap window close"
+    },
+    {
+      "id": "FATE-RECONCILE-001",
+      "description": "active non-bridgeable flapping blocks reconciliation closure",
+      "given": "active flapping window, reconciliation requested, no bridgeable independent evidence",
+      "expect": "reconciliation result = REGISTRY_RECONCILIATION_INCOMPLETE, closure not derived"
+    },
+    {
+      "id": "FATE-BOUNDARY-001",
+      "description": "non-operability flags enforced — emission rules may not create authority",
+      "given": "any emission rule evaluation",
+      "expect": "no authority_valid, legitimacy_valid, or execution_eligible fields produced"
+    },
+    {
+      "id": "FATE-PROPAGATION-001",
+      "description": "raw state emission blocked without classification fields",
+      "given": "observation emitted with observation_state only, no classification fields",
+      "expect": "propagation_scope = PROPAGATION_BLOCKED"
+    },
+    {
+      "id": "FATE-DOWNGRADE-001",
+      "description": "conflicting higher-precedence evidence triggers downgrade",
+      "given": "VERIFIED observation, conflicting lineage hash received from Tier 1 source",
+      "expect": "classification downgraded to CONFLICTED, legitimacy_effect changed to REQUIRES_RECONCILIATION"
+    }
+  ],
+  "acceptance_criteria": [
+    "Emission rules artifact exists",
+    "Emission states defined: EMIT_IMMEDIATELY, EMIT_AFTER_STABILITY_WINDOW, EMIT_AGGREGATED, SUPPRESS",
+    "Immediate triggers defined: AUTHORITY_REVOCATION, REPLAY_NONCE_CONSUMED, PROOF_HASH_MISMATCH, ROOT_BYPASS_DETECTED, LINEAGE_CONFLICT, TOPOLOGY_CONFLICTED",
+    "Stability window rules defined with default model",
+    "Suppression criteria defined",
+    "Flapping aggregation semantics defined",
+    "Aggregated evidence_hash model defined",
+    "transition_sequence_hashes preserved in aggregated hash model",
+    "final_stable_state_hash preserved in aggregated hash model",
+    "Gap emission logic defined",
+    "Reconciliation safety rule defined",
+    "Non-authoritative boundaries enforced",
+    "Propagation scope classifications defined: LOCAL_ONLY, TOPOLOGY_VISIBLE, RECONCILIATION_REQUIRED, PROPAGATION_BLOCKED, VERIFIED_GLOBAL",
+    "Emission boundary rules defined for all planning scenarios",
+    "Downgrade semantics defined",
+    "Safe emission examples provided for unverified observations",
+    "Safe emission examples provided for verified observations",
+    "Relationship to #1640 and #1641 defined",
+    "FATE tests defined covering all acceptance criteria scenarios"
+  ]
+}
