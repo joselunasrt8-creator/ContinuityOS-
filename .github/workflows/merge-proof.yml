@@ -238,7 +238,9 @@ jobs:
           MERGED_AT=$(jq -r .canonical_payload.merged_at MERGE_PROOF.json)
           PR_NUMBER=$(jq -r .canonical_payload.pr_number MERGE_PROOF.json)
 
-          jq -cn \
+          # Build the entry once; append it inside the retry loop to avoid
+          # rebase conflicts when two runs commit at the same EOF position.
+          ENTRY=$(jq -cn \
             --arg proof_id "$PROOF_ID" \
             --arg proof_hash "$PROOF_HASH" \
             --argjson pr_number "$PR_NUMBER" \
@@ -253,24 +255,37 @@ jobs:
               merge_commit_sha: $merge_commit_sha,
               merged_at: $merged_at,
               appended_at: $appended_at
-            }' >> governance/merge-legitimacy/merge_proof_registry.jsonl
+            }')
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add governance/merge-legitimacy/merge_proof_registry.jsonl
-          if git diff --cached --quiet; then
-            echo "No registry changes detected; entry may already be present"
-            exit 0
-          fi
-          git commit -m "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}"
 
           MAX_RETRIES=5
           for attempt in $(seq 1 $MAX_RETRIES); do
+            # Pull before committing so there are never local commits during the
+            # fetch — avoids the EOF-conflict that arises when rebasing two
+            # concurrent JSONL appends on top of each other.
             git pull --rebase origin main
+
+            # Idempotency: another concurrent run may have already persisted this entry.
+            if grep -qF "$PROOF_ID" governance/merge-legitimacy/merge_proof_registry.jsonl 2>/dev/null; then
+              echo "Proof entry $PROOF_ID already present in registry; skipping append"
+              exit 0
+            fi
+
+            echo "$ENTRY" >> governance/merge-legitimacy/merge_proof_registry.jsonl
+            git add governance/merge-legitimacy/merge_proof_registry.jsonl
+            git commit -m "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}"
+
             if git push; then
               echo "Proof registry push succeeded on attempt $attempt"
               exit 0
             fi
+
+            # Push failed (another run landed between our pull and push).
+            # Reset the local commit so the next pull is a clean fast-forward.
+            git reset --hard HEAD~1
+
             if [ "$attempt" -lt "$MAX_RETRIES" ]; then
               SLEEP_TIME=$((2 ** attempt))
               echo "Push failed on attempt $attempt, retrying in ${SLEEP_TIME}s..."
