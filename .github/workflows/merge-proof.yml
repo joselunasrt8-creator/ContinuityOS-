@@ -92,10 +92,23 @@ jobs:
               REVIEW_SUBMITTED_AT=$(echo "$LATEST_ANY" | jq -r '.submitted_at')
               REVIEWED_HEAD_SHA=$(echo "$LATEST_ANY" | jq -r '.commit_id')
               FAILURE_REASONS='["reviewed_head_sha_mismatch"]'
+              REVIEW_STATUS="LEGITIMACY_NULL"
             else
-              FAILURE_REASONS='["no_approved_review_from_non_author"]'
+              IS_SELF_CERTIFIER=$(jq --arg author "$PR_AUTHOR" \
+                '(.single_contributor_policy.permitted_self_certifiers // []) | map(select(. == $author)) | length > 0' \
+                governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+              if [ "$IS_SELF_CERTIFIER" = "true" ]; then
+                REVIEWER_LOGIN="$PR_AUTHOR"
+                REVIEWED_HEAD_SHA="$HEAD_SHA"
+                AUTHORITY_ROLE_REQUIRED="single_contributor_self_certification"
+                AUTHORITY_ROLE_VALID="true"
+                REVIEW_AUTHORITY_RESULT="true"
+                REVIEW_STATUS="OWNER_SELF_CERTIFIED"
+              else
+                FAILURE_REASONS='["no_approved_review_from_non_author"]'
+                REVIEW_STATUS="LEGITIMACY_NULL"
+              fi
             fi
-            REVIEW_STATUS="LEGITIMACY_NULL"
           fi
 
           CANONICAL_INPUTS=$(jq -cn \
@@ -154,8 +167,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Fail closed: do not emit proof if legitimacy is not APPROVED
-          if [ "$REVIEW_STATUS" != "APPROVED" ]; then
+          # Fail closed: emit proof only for APPROVED or OWNER_SELF_CERTIFIED
+          if [ "$REVIEW_STATUS" != "APPROVED" ] && [ "$REVIEW_STATUS" != "OWNER_SELF_CERTIFIED" ]; then
             echo "NULL — reviewer legitimacy is $REVIEW_STATUS; proof cannot be emitted"
             jq -c .failure_reasons review_legitimacy_result.json
             exit 1

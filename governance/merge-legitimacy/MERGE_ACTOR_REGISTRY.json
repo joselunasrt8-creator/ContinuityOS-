@@ -25,6 +25,15 @@
     "sovereignty_review": [],
     "note": "Sovereignty-review authority roles are empty until explicitly populated by repository administrator. P3-risk PRs (touching .github/workflows/ or src/) require at least one reviewer with a declared sovereignty-review authority role. An empty allowlist means no reviewer satisfies the P3 authority requirement and PREO review_status will be LEGITIMACY_NULL for P3 PRs."
   },
+  "single_contributor_policy": {
+    "description": "Single-contributor exception: repository owner may self-certify changes when no peer reviewer is available. Applies only when there is no approved review from any non-author — stale reviews still resolve LEGITIMACY_NULL. Self-certified merges produce OWNER_SELF_CERTIFIED review_status, which is distinct from peer-reviewed APPROVED and is recorded as such in all proof artifacts.",
+    "permitted_self_certifiers": [
+      "joselunasrt8-creator"
+    ],
+    "self_certification_review_status": "OWNER_SELF_CERTIFIED",
+    "authority_role_assigned": "single_contributor_self_certification",
+    "note": "OWNER_SELF_CERTIFIED is not equivalent to peer review. It records that a declared single-contributor owner explicitly self-certified the change in the absence of any peer reviewers."
+  },
   "forbidden_actor_patterns": [
     {
       "pattern": "ELEVATED_SCOPE_TOKEN",

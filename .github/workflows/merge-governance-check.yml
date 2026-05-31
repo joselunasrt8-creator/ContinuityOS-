@@ -166,10 +166,18 @@ jobs:
             if [ "$ANY_APPROVED" -gt 0 ]; then
               STALE_REVIEW="true"
               FAILURE_REASONS='["reviewed_head_sha_mismatch"]'
+              REVIEW_STATUS="LEGITIMACY_NULL"
             else
-              FAILURE_REASONS='["no_approved_review_from_non_author"]'
+              IS_SELF_CERTIFIER=$(jq --arg author "$PR_AUTHOR" \
+                '(.single_contributor_policy.permitted_self_certifiers // []) | map(select(. == $author)) | length > 0' \
+                governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+              if [ "$IS_SELF_CERTIFIER" = "true" ]; then
+                REVIEW_STATUS="OWNER_SELF_CERTIFIED"
+              else
+                FAILURE_REASONS='["no_approved_review_from_non_author"]'
+                REVIEW_STATUS="LEGITIMACY_NULL"
+              fi
             fi
-            REVIEW_STATUS="LEGITIMACY_NULL"
           fi
 
           echo "REVIEW_STATUS=$REVIEW_STATUS" >> "$GITHUB_ENV"
