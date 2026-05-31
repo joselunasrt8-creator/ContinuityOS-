@@ -123,14 +123,14 @@ jobs:
           MERGED_AT=$(jq -r .merged_at MERGE_PROOF.json)
           PR_NUMBER=$(jq -r .pr_number MERGE_PROOF.json)
 
-          jq -c \
+          jq -cn \
             --arg proof_id "$PROOF_ID" \
             --arg proof_hash "$PROOF_HASH" \
             --argjson pr_number "$PR_NUMBER" \
             --arg merge_commit_sha "$MERGE_COMMIT_SHA" \
             --arg merged_at "$MERGED_AT" \
             --arg appended_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            'null | {
+            '{
               _record_type: "proof_entry",
               proof_id: $proof_id,
               proof_hash: $proof_hash,
@@ -143,6 +143,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add governance/merge-legitimacy/merge_proof_registry.jsonl
+          if git diff --cached --quiet; then
+            echo "No registry changes detected; entry may already be present"
+            exit 0
+          fi
           git commit -m "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}"
           git push
 
