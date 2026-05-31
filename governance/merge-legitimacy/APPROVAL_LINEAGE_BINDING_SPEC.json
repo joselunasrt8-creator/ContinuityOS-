@@ -1,0 +1,192 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "approval_lineage_binding_spec",
+  "issue_reference": "#1604",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "lineage_binding_specification",
+  "generated_at": "2026-05-31",
+  "scope": {
+    "purpose": "Define the required binding chain for approval lineage, ensuring a merge proof can reconstruct the complete review → approval → validation → merge → proof chain with hash-verified continuity.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "core_invariant": "reviewed_object == merged_object — no mutation may occur between approval and merge",
+  "lineage_chain": [
+    {
+      "position": 1,
+      "stage": "review",
+      "object_type": "PULL_REQUEST_REVIEW",
+      "required_bindings": [
+        "pr_number",
+        "head_sha",
+        "reviewer_identity",
+        "review_state",
+        "review_submitted_at"
+      ],
+      "binding_semantics": "The review object must bind the exact head_sha of the PR at the time the review was submitted. A review submitted against a prior head_sha is stale and cannot contribute to merge legitimacy.",
+      "stale_review_result": "NULL",
+      "missing_review_result": "NULL",
+      "hash_binding_required": true
+    },
+    {
+      "position": 2,
+      "stage": "approval",
+      "object_type": "PREO_CANDIDATE",
+      "required_bindings": [
+        "preo_id",
+        "pr_number",
+        "head_sha",
+        "review_status",
+        "governed_path_detected",
+        "risk_class",
+        "created_at",
+        "changed_files",
+        "status"
+      ],
+      "binding_semantics": "The PREO_CANDIDATE must be generated against the exact PR head_sha at merge time. Any push after PREO generation invalidates the PREO unless checks re-run against the new head_sha. The preo_id must be unique per PR + head_sha combination.",
+      "stale_preo_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+      "missing_preo_result": "NULL",
+      "hash_binding_required": true,
+      "nonce_required": true
+    },
+    {
+      "position": 3,
+      "stage": "validation",
+      "object_type": "SCO_CANDIDATE",
+      "required_bindings": [
+        "sco_id",
+        "pr_number",
+        "head_sha",
+        "governed_files",
+        "mutation_classes",
+        "target_surfaces",
+        "requires_sco",
+        "risk_class",
+        "created_at",
+        "status"
+      ],
+      "binding_semantics": "The SCO_CANDIDATE must be generated against the exact PR head_sha. For PRs touching governed paths (governance/**, .github/workflows/**, src/**, schema.sql, migrations/**, wrangler.toml), SCO is required. SCO absence for governed-path mutations produces NULL merge legitimacy.",
+      "missing_sco_when_required_result": "NULL",
+      "sco_scope_mismatch_result": "NULL",
+      "hash_binding_required": true,
+      "conditional": "required only when governed_path_detected = true"
+    },
+    {
+      "position": 4,
+      "stage": "topology_reconciliation",
+      "object_type": "TOPOLOGY_RECONCILIATION_SIGNAL",
+      "required_bindings": [
+        "reconciliation_id",
+        "classification",
+        "merge_signal",
+        "evidence_only",
+        "remote_authority_denied",
+        "replay_neutral",
+        "mutation_capable",
+        "direct_merge_authority"
+      ],
+      "binding_semantics": "Topology reconciliation must emit SAFE_TO_MERGE signal. This signal is evidence only — it may block a merge but cannot authorize one. direct_merge_authority must always be false. TOPOLOGY_DRIFT, GOVERNANCE_DIVERGENCE, or UNDECLARED_EXECUTION_SURFACE signals produce MERGE_LEGITIMACY_NULL.",
+      "drift_signal_result": "MERGE_LEGITIMACY_NULL",
+      "missing_signal_result": "NULL",
+      "evidence_only": true,
+      "may_authorize_merge": false
+    },
+    {
+      "position": 5,
+      "stage": "merge",
+      "object_type": "MERGE_EVENT",
+      "required_bindings": [
+        "pr_number",
+        "head_sha",
+        "merge_commit_sha",
+        "merged_by",
+        "merged_at",
+        "merge_method"
+      ],
+      "binding_semantics": "The merge event must record both the reviewed head_sha and the resulting merge_commit_sha. For squash and rebase merges, merge_commit_sha will differ from head_sha — both must be captured. The merge_commit_sha is the canonical identifier of what actually entered main.",
+      "sha_mismatch_result": "MERGE_LEGITIMACY_NULL",
+      "missing_merge_commit_sha_result": "NULL",
+      "exact_object_check": "merge_commit_sha must be verified to derive from head_sha with no intervening unauthorized mutation"
+    },
+    {
+      "position": 6,
+      "stage": "proof",
+      "object_type": "MERGE_PROOF",
+      "required_bindings": [
+        "pr_number",
+        "head_sha",
+        "merge_commit_sha",
+        "review_status",
+        "checks_status",
+        "merged_by",
+        "merged_at",
+        "preo_id",
+        "sco_id",
+        "topology_reconciliation_id",
+        "invocation_nonce",
+        "proof_hash"
+      ],
+      "binding_semantics": "The merge proof must bind all prior lineage objects by their identifiers and hashes. The proof is the terminal record of the full review → approval → validation → merge chain. Each proof is single-use — reuse of a merge proof against a different merge event produces NULL.",
+      "replay_result": "NULL",
+      "missing_proof_result": "NULL — merge without proof is not a governed merge",
+      "nonce_required": true,
+      "single_use": true
+    }
+  ],
+  "lineage_reconstruction_requirements": {
+    "description": "A merge proof must allow full reconstruction of the approval lineage chain from position 1 through 6.",
+    "required_properties": [
+      "Each stage object must be independently hash-verifiable",
+      "Each stage binding must reference the exact head_sha or merge_commit_sha as appropriate",
+      "No implicit or inferred lineage bindings are permitted",
+      "Missing any stage binding produces NULL merge legitimacy for the chain",
+      "Lineage chain must be deterministically canonicalized (deterministic JSON canonicalization)"
+    ],
+    "forbidden_lineage_sources": [
+      "implicit_reviewer_authority",
+      "unbound_human_approval",
+      "workflow_success_without_preo_binding",
+      "deployment_success_without_proof_binding",
+      "reused_preo_or_sco",
+      "reused_nonce",
+      "branch_name_alone",
+      "unverified_topology_signal"
+    ]
+  },
+  "exact_object_admission": {
+    "invariant": "reviewed_object == merged_object",
+    "enforcement_mechanism": "PREO head_sha binding — the PREO is generated against the exact head_sha; if a push occurs after PREO generation, the PREO is invalidated unless re-run against the new head_sha",
+    "squash_rebase_handling": "For squash and rebase merges, the proof must bind both head_sha (the reviewed object) and merge_commit_sha (the merged object). The merge_commit_sha must be derivable from head_sha without intervening unauthorized mutation.",
+    "merge_queue_gap": "Merge queue may produce a combined commit SHA not directly derivable from the reviewed PR head_sha — this represents an exact-object gap requiring merge-queue-specific PREO regeneration to close",
+    "violation_result": "MERGE_LEGITIMACY_NULL"
+  },
+  "replay_controls": {
+    "stale_approval_prevention": "PREO head_sha binding ensures the approval is against the current head_sha — any push after approval requires re-run of required checks",
+    "approval_reuse_prevention": "Each PREO binds a unique pr_number + head_sha combination; reuse produces PREO_INVALID",
+    "merge_lineage_uniqueness": "Each merge proof binds a unique merge_commit_sha and invocation_nonce; replay of a prior proof against a new merge event produces NULL",
+    "replay_safe_admission": "A merge is replay-safe only if: (1) PREO nonce is single-use, (2) merge_commit_sha is unique per merge event, (3) proof invocation_nonce is fresh",
+    "replay_detected_result": "NULL"
+  },
+  "failure_semantics": {
+    "missing_review": "NULL",
+    "stale_review": "NULL",
+    "missing_preo": "NULL",
+    "stale_preo": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "missing_sco_when_required": "NULL",
+    "topology_drift": "MERGE_LEGITIMACY_NULL",
+    "missing_merge_commit_sha": "NULL",
+    "missing_proof": "NULL",
+    "replay_detected": "NULL",
+    "hash_mismatch_at_any_stage": "NULL"
+  }
+}
