@@ -312,12 +312,23 @@
     },
     {
       "id": "VERIFIED_GLOBAL",
-      "description": "Observation has been verified and may propagate at global topology scope.",
+      "description": "Observation may propagate at global topology scope. Requires externally-derived verification — the observer alone may not self-classify as VERIFIED_GLOBAL.",
+      "observer_cannot_emit_directly": true,
+      "requires_external_verification_source": true,
+      "allowed_confidence_sources": [
+        "SIGNED_PROOF",
+        "RECONCILIATION_RESULT"
+      ],
+      "forbidden_confidence_sources": [
+        "LOCAL_OBSERVATION",
+        "REGISTRY_ARTIFACT"
+      ],
       "applies_to": [
         "observations with confidence_source = SIGNED_PROOF or RECONCILIATION_RESULT",
         "observations with verification_status = VERIFIED and proof_status = PRESENT",
         "observations with topology_scope = GLOBAL"
-      ]
+      ],
+      "core_rule": "VERIFIED_GLOBAL cannot be asserted by observer alone. It requires confidence_source = SIGNED_PROOF or RECONCILIATION_RESULT, produced downstream of verification — not by local observation."
     }
   ],
   "emission_boundary_rules_by_scenario": [
