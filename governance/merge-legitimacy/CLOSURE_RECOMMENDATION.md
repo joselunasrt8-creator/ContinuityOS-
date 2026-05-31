@@ -7,6 +7,46 @@
 
 ---
 
+## Closure Type Classification
+
+```text
+#1604 closure type:
+PLANNING_CLOSURE_COMPLETE
+
+Enforcement closure status:
+ENFORCEMENT_CLOSURE_NOT_ELIGIBLE
+```
+
+**Stage mapping** (`governance/runtime/ENFORCED_BOUNDARY_ROADMAP.json`):
+
+| Stage | Name | Current |
+|---|---|---|
+| Stage 1 | Visibility | ✓ Complete — all artifacts exist |
+| Stage 2 | Advisory checks | ✓ Current — workflows run; checks not required by branch protection |
+| Stage 3 | Required status checks | Planned — branch protection must be activated |
+| Stage 4 | Branch-protected enforcement | Target — direct push restricted, PRs required, required checks must pass |
+| Stage 5 | Runtime-boundary enforcement | Future |
+| Stage 6 | Non-bypassable enforcement | Future |
+
+**Child issue requirement:**
+
+Enforcement closure requires 5 child enforcement issues plus Phase 1 (#1601):
+
+```text
+CI-001 — Activate and verify branch protection (GAP-001)
+CI-002 — Implement merge proof generation (GAP-005)
+CI-003 — Merge queue containment (GAP-003)
+CI-004 — Merge actor classification (GAP-004)
+CI-005 — Reviewer legitimacy enforcement (GAP-010)
+```
+
+See `PHASE2_CLOSURE_MATRIX.md` for complete child issue definitions and closure sequence.
+
+**#1604 is an audit gate, not an implementation task.** It closes only after all child issues
+are verified closed and Phase 1 (#1601) is confirmed closed.
+
+---
+
 ## Closure Condition Evaluation
 
 Issue #1604 defines two required exit criteria:
