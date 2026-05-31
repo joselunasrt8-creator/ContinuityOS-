@@ -601,6 +601,50 @@
       "classification": "TOPOLOGY_VISIBLE_OPEN",
       "topology_visible": true,
       "detail": "admin or ruleset bypass may mutate main outside legitimacy evidence"
+    },
+    {
+      "session_id": null,
+      "decision_id": null,
+      "invocation_nonce": null,
+      "timestamp": "2026-05-31T00:00:00.000Z",
+      "event_type": "cicd_surface_closure_audit",
+      "deployment_target": null,
+      "validated_object_hash": null,
+      "deployment_hash": null,
+      "rejection_reason": null,
+      "execution_surface": "github_governed_production_deploy",
+      "governed_context": "issue_1502_closure",
+      "break_glass_invoked": false,
+      "proof_binding_hash": null,
+      "proof_id": null,
+      "issue": "#1502",
+      "closure_state": "LOCKED",
+      "canonical_deploy_entrypoint": ".github/workflows/governed-deploy.yml",
+      "direct_deploy_classification": "BREAK_GLASS",
+      "invariant": "deploy without valid AEO → NULL",
+      "acceptance_criteria": {
+        "governed_workflow_is_canonical_entrypoint": {
+          "status": "VERIFIED",
+          "evidence": ".github/workflows/governed-deploy.yml enforces full /session → /continuity → /authority → /compile → /validate → /execute → /proof chain; workflow_dispatch is the only trigger; caller_workflow_ref check prevents indirect invocation"
+        },
+        "direct_wrangler_deploy_classified_as_bypass": {
+          "status": "VERIFIED",
+          "evidence": "BYPASS_PATHS.json: direct_wrangler_deploy classified as BREAK_GLASS; fail_closed_response ROOT_AUTHORITY_CONTAINMENT_REQUIRED → NULL; runtime/bypass_paths.json classifies bypass:wrangler_direct_deploy as BREAK_GLASS"
+        },
+        "deploy_proof_contains_commit_lineage": {
+          "status": "VERIFIED",
+          "evidence": "governed-deploy.yml /proof step binds: run_id=$WORKFLOW_RUN_ID, commit_sha=${{ github.sha }}, workflow=governed-deploy.yml, branch, repo, decision_id, validated_object_hash, execution_id, session_id, continuity_id; proof aeo_hash verified against validated_object_hash before acceptance"
+        },
+        "replay_safe_deploy_semantics_enforced": {
+          "status": "VERIFIED",
+          "evidence": "governed-deploy.yml REPLAY_TEST step re-issues /execute with same nonce after success and asserts NULL/INVALID with reason replay_detected or authority_not_reserved; invocation_registry PRIMARY KEY (decision_id, validated_object_hash, invocation_nonce) enforces single-use nonce; authority transitions RESERVED → EXECUTED → CONSUMED block reuse"
+        }
+      },
+      "bypass_inventory_reference": "BYPASS_PATHS.json, runtime/bypass_paths.json, runtime/REVERSE_CLOSURE_MUTATION_MAP.json",
+      "workflow_reference": ".github/workflows/governed-deploy.yml",
+      "classification": "ENFORCED",
+      "topology_visible": true,
+      "detail": "GitHub CI/CD deploy surface formally locked behind ContinuityOS execution boundary. governed-deploy.yml is the sole canonical production deploy entrypoint. All acceptance criteria for issue #1502 verified against repository state."
     }
   ]
 }
