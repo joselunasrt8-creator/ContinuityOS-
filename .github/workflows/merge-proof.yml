@@ -39,13 +39,20 @@ jobs:
             pr_reviews.json)
 
           if [ "$VALID_APPROVED" -gt 0 ]; then
-            REVIEWER=$(jq -r --arg author "$PR_AUTHOR" \
-              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last | .user.login' \
+            LATEST_REVIEW=$(jq -c --arg author "$PR_AUTHOR" \
+              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last' \
               pr_reviews.json)
-            REVIEW_TS=$(jq -r --arg author "$PR_AUTHOR" \
-              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last | .submitted_at' \
-              pr_reviews.json)
-            echo "REVIEW_STATUS=APPROVED" >> "$GITHUB_ENV"
+            REVIEWER=$(echo "$LATEST_REVIEW" | jq -r '.user.login')
+            REVIEW_TS=$(echo "$LATEST_REVIEW" | jq -r '.submitted_at')
+
+            COMMITS_AFTER=$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits" | \
+              jq --arg ts "$REVIEW_TS" '[.[] | select(.commit.committer.date > $ts)] | length')
+
+            if [ "$COMMITS_AFTER" -gt 0 ]; then
+              echo "REVIEW_STATUS=STALE_APPROVAL" >> "$GITHUB_ENV"
+            else
+              echo "REVIEW_STATUS=APPROVED" >> "$GITHUB_ENV"
+            fi
             echo "REVIEWER_LOGIN=$REVIEWER" >> "$GITHUB_ENV"
             echo "REVIEW_SUBMITTED_AT=$REVIEW_TS" >> "$GITHUB_ENV"
           else
@@ -66,10 +73,10 @@ jobs:
           NONCE=$(cat /proc/sys/kernel/random/uuid)
           PREO_ID="PREO-${PR_NUMBER}-${HEAD_SHA}"
           PROOF_ID="PROOF-${PR_NUMBER}-${MERGE_COMMIT_SHA:0:8}"
+          GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
           jq -n \
             --arg proof_id "$PROOF_ID" \
-            --arg invocation_nonce "$NONCE" \
             --argjson pr_number "$PR_NUMBER" \
             --arg repo "${{ github.repository }}" \
             --arg base_branch "${{ github.event.pull_request.base.ref }}" \
@@ -79,16 +86,14 @@ jobs:
             --arg review_status "$REVIEW_STATUS" \
             --arg reviewer_identity "$REVIEWER_LOGIN" \
             --arg review_submitted_at "$REVIEW_SUBMITTED_AT" \
-            --arg checks_status "PASSING" \
+            --arg checks_status "UNVERIFIED" \
             --arg preo_id "$PREO_ID" \
             --arg preo_head_sha "$HEAD_SHA" \
-            --arg preo_status "PREO_CANDIDATE" \
+            --arg preo_status "UNVERIFIED" \
             --arg merged_by "${MERGED_BY:-unknown}" \
             --arg merged_at "${MERGED_AT:-}" \
-            --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               proof_id: $proof_id,
-              invocation_nonce: $invocation_nonce,
               pr_number: $pr_number,
               repo: $repo,
               base_branch: $base_branch,
@@ -104,14 +109,19 @@ jobs:
               preo_status: $preo_status,
               merged_by: $merged_by,
               merged_at: $merged_at,
-              generated_at: $generated_at,
               record_type: "MERGE_PROOF"
-            }' > MERGE_PROOF_NOHASH.json
+            }' > MERGE_PROOF_CANONICAL.json
 
-          PROOF_HASH=$(sha256sum MERGE_PROOF_NOHASH.json | cut -d' ' -f1)
-          jq --arg proof_hash "$PROOF_HASH" '. + {proof_hash: $proof_hash}' MERGE_PROOF_NOHASH.json > MERGE_PROOF.json
+          CANONICAL_HASH=$(sha256sum MERGE_PROOF_CANONICAL.json | cut -d' ' -f1)
 
-          echo "PROOF_HASH=$PROOF_HASH" >> "$GITHUB_ENV"
+          jq \
+            --arg canonical_hash "$CANONICAL_HASH" \
+            --arg invocation_nonce "$NONCE" \
+            --arg generated_at "$GENERATED_AT" \
+            '. + {canonical_hash: $canonical_hash, invocation_nonce: $invocation_nonce, generated_at: $generated_at}' \
+            MERGE_PROOF_CANONICAL.json > MERGE_PROOF.json
+
+          echo "PROOF_HASH=$CANONICAL_HASH" >> "$GITHUB_ENV"
           echo "PR_NUMBER_FOR_COMMIT=$PR_NUMBER" >> "$GITHUB_ENV"
 
       - name: Append proof to registry
@@ -148,7 +158,22 @@ jobs:
             exit 0
           fi
           git commit -m "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}"
-          git push
+
+          MAX_RETRIES=5
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            git pull --rebase origin main
+            if git push; then
+              echo "Proof registry push succeeded on attempt $attempt"
+              exit 0
+            fi
+            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
+              SLEEP_TIME=$((2 ** attempt))
+              echo "Push failed on attempt $attempt, retrying in ${SLEEP_TIME}s..."
+              sleep "$SLEEP_TIME"
+            fi
+          done
+          echo "NULL — proof registry push failed after $MAX_RETRIES attempts; proof entry not persisted"
+          exit 1
 
       - name: Upload merge proof artifact
         uses: actions/upload-artifact@v4

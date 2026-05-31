@@ -56,6 +56,7 @@ jobs:
           echo "actor_type=$ACTOR_TYPE actor=$ACTOR classification=$ACTOR_CLASSIFICATION"
 
       - name: Detect changed files and governed paths
+        if: github.event_name != 'merge_group'
         run: |
           set -euo pipefail
 
@@ -68,51 +69,59 @@ jobs:
           GOVERNED_PATH_DETECTED="false"
           RISK_CLASS="P1"
 
+          rank_risk() {
+            case "$1" in P3) echo 3;; P2) echo 2;; P1) echo 1;; *) echo 0;; esac
+          }
+
           while IFS= read -r file; do
+            FILE_RISK="P1"
             case "$file" in
               governance/*)
                 echo "$file" >> governed_files.txt
                 echo "governance_mutation" >> mutation_classes.txt
                 echo "governance_runtime" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P2"
+                FILE_RISK="P2"
                 ;;
               .github/workflows/*)
                 echo "$file" >> governed_files.txt
                 echo "workflow_mutation" >> mutation_classes.txt
                 echo "source_control_governance" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P3"
+                FILE_RISK="P3"
                 ;;
               src/*)
                 echo "$file" >> governed_files.txt
                 echo "runtime_mutation" >> mutation_classes.txt
                 echo "runtime_boundary" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P3"
+                FILE_RISK="P3"
                 ;;
               schema.sql)
                 echo "$file" >> governed_files.txt
                 echo "schema_mutation" >> mutation_classes.txt
                 echo "database_schema" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P2"
+                FILE_RISK="P2"
                 ;;
               migrations/*)
                 echo "$file" >> governed_files.txt
                 echo "migration_mutation" >> mutation_classes.txt
                 echo "database_migration" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P2"
+                FILE_RISK="P2"
                 ;;
               wrangler.toml)
                 echo "$file" >> governed_files.txt
                 echo "deployment_config_mutation" >> mutation_classes.txt
                 echo "deployment_configuration" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P2"
+                FILE_RISK="P2"
                 ;;
             esac
+            if [ "$(rank_risk "$FILE_RISK")" -gt "$(rank_risk "$RISK_CLASS")" ]; then
+              RISK_CLASS="$FILE_RISK"
+            fi
           done < changed_files.txt
 
           sort -u governed_files.txt -o governed_files.txt
@@ -122,7 +131,59 @@ jobs:
           echo "GOVERNED_PATH_DETECTED=$GOVERNED_PATH_DETECTED" >> "$GITHUB_ENV"
           echo "RISK_CLASS=$RISK_CLASS" >> "$GITHUB_ENV"
 
+      - name: Validate reviewer legitimacy
+        if: github.event_name != 'merge_group'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          REPO="${{ github.repository }}"
+
+          gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" > pr_reviews_gov.json
+
+          VALID_APPROVED=$(jq --arg author "$PR_AUTHOR" \
+            '[.[] | select(.state == "APPROVED" and .user.login != $author)] | length' \
+            pr_reviews_gov.json)
+
+          REVIEW_STATUS="UNVERIFIED"
+
+          if [ "$VALID_APPROVED" -gt 0 ]; then
+            LATEST_REVIEW=$(jq -c --arg author "$PR_AUTHOR" \
+              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last' \
+              pr_reviews_gov.json)
+
+            REVIEWER_LOGIN=$(echo "$LATEST_REVIEW" | jq -r '.user.login')
+            REVIEW_SUBMITTED_AT=$(echo "$LATEST_REVIEW" | jq -r '.submitted_at')
+
+            COMMITS_AFTER=$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits" | \
+              jq --arg ts "$REVIEW_SUBMITTED_AT" '[.[] | select(.commit.committer.date > $ts)] | length')
+
+            if [ "$COMMITS_AFTER" -gt 0 ]; then
+              REVIEW_STATUS="LEGITIMACY_NULL"
+              echo "LEGITIMACY_NULL — stale approval: $COMMITS_AFTER commit(s) pushed after approval at $REVIEW_SUBMITTED_AT"
+            elif [ "$RISK_CLASS" = "P3" ]; then
+              HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
+                '(.authority_roles.sovereignty_review // []) | map(select(. == $reviewer)) | length > 0' \
+                governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+              if [ "$HAS_AUTHORITY" = "true" ]; then
+                REVIEW_STATUS="APPROVED"
+              else
+                REVIEW_STATUS="LEGITIMACY_NULL"
+                echo "LEGITIMACY_NULL — P3 risk class: reviewer $REVIEWER_LOGIN not in sovereignty_review authority roles"
+              fi
+            else
+              REVIEW_STATUS="APPROVED"
+            fi
+          fi
+
+          echo "REVIEW_STATUS=$REVIEW_STATUS" >> "$GITHUB_ENV"
+          echo "reviewer_legitimacy_status=$REVIEW_STATUS"
+
       - name: Generate bound PREO candidate
+        if: github.event_name != 'merge_group'
         run: |
           set -euo pipefail
 
@@ -133,7 +194,7 @@ jobs:
             --arg base_branch "${{ github.base_ref }}" \
             --arg head_branch "${{ github.head_ref }}" \
             --arg head_sha "${{ github.event.pull_request.head.sha }}" \
-            --arg review_status "UNVERIFIED" \
+            --arg review_status "$REVIEW_STATUS" \
             --arg checks_status "UNVERIFIED" \
             --arg risk_class "$RISK_CLASS" \
             --arg governed_path_detected "$GOVERNED_PATH_DETECTED" \
@@ -158,6 +219,7 @@ jobs:
             }' > PREO_CANDIDATE.json
 
       - name: Generate bound SCO candidate
+        if: github.event_name != 'merge_group'
         run: |
           set -euo pipefail
 
@@ -193,6 +255,7 @@ jobs:
             }' > SCO_CANDIDATE.json
 
       - name: Validate PREO/SCO binding
+        if: github.event_name != 'merge_group'
         run: |
           set -euo pipefail
 
@@ -321,6 +384,7 @@ jobs:
           NODE
 
       - name: Upload merge governance candidates
+        if: github.event_name != 'merge_group'
         uses: actions/upload-artifact@v4
         with:
           name: MERGE_GOVERNANCE_CANDIDATES
@@ -332,6 +396,7 @@ jobs:
             governed_files.txt
 
       - name: Emit merge governance summary
+        if: github.event_name != 'merge_group'
         run: |
           set -euo pipefail
           {

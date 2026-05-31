@@ -35,16 +35,18 @@ jobs:
           # Detect risk class for P3 authority check
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" > pr_changed_files_tmp.txt
           QUICK_RISK_CLASS="P1"
+          rank_risk() {
+            case "$1" in P3) echo 3;; P2) echo 2;; P1) echo 1;; *) echo 0;; esac
+          }
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/*|src/*)
-                QUICK_RISK_CLASS="P3"
-                break
-                ;;
-              governance/*|schema.sql|migrations/*|wrangler.toml)
-                QUICK_RISK_CLASS="P2"
-                ;;
+              .github/workflows/*|src/*) FILE_RISK="P3" ;;
+              governance/*|schema.sql|migrations/*|wrangler.toml) FILE_RISK="P2" ;;
+              *) FILE_RISK="P1" ;;
             esac
+            if [ "$(rank_risk "$FILE_RISK")" -gt "$(rank_risk "$QUICK_RISK_CLASS")" ]; then
+              QUICK_RISK_CLASS="$FILE_RISK"
+            fi
           done < pr_changed_files_tmp.txt
 
           # Fetch PR reviews
@@ -103,13 +105,27 @@ jobs:
           GOVERNED_PATH_DETECTED="false"
           RISK_CLASS="P1"
 
+          rank_risk() {
+            case "$1" in P3) echo 3;; P2) echo 2;; P1) echo 1;; *) echo 0;; esac
+          }
+
           while IFS= read -r file; do
             case "$file" in
-              governance/*|.github/workflows/*|src/*|schema.sql|migrations/*|wrangler.toml)
+              .github/workflows/*|src/*)
                 GOVERNED_PATH_DETECTED="true"
-                RISK_CLASS="P3"
+                FILE_RISK="P3"
+                ;;
+              governance/*|schema.sql|migrations/*|wrangler.toml)
+                GOVERNED_PATH_DETECTED="true"
+                FILE_RISK="P2"
+                ;;
+              *)
+                FILE_RISK="P1"
                 ;;
             esac
+            if [ "$(rank_risk "$FILE_RISK")" -gt "$(rank_risk "$RISK_CLASS")" ]; then
+              RISK_CLASS="$FILE_RISK"
+            fi
           done < changed_files.txt
 
           jq -n \
