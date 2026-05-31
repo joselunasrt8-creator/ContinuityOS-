@@ -115,5 +115,17 @@
     "squash_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
     "rebase_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
     "gap_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+  },
+  "proof_registry_bypass": {
+    "status": "REQUIRED_NOT_YET_CONFIGURED",
+    "description": "The merge-proof.yml workflow appends proof entries to governance/merge-legitimacy/merge_proof_registry.jsonl via a direct git push to main after each merge. Branch protection activation (CI-001) blocks this push with GH013. The workflow must be granted a bypass so it can persist proofs without going through a PR.",
+    "required_admin_action": "In GitHub repository Settings → Rules → Rulesets, add 'github-actions[bot]' (type: Integration) as a bypass actor for the 'Require a pull request before merging' rule on the main branch ruleset.",
+    "bypass_actor": "github-actions[bot]",
+    "bypass_actor_type": "Integration",
+    "bypass_scope": "proof_registry_append_only",
+    "bypass_rationale": "The proof registry append is itself a post-merge governance action, not a code change requiring review. It records audit evidence of merges that have already passed all governance checks. Blocking it defeats the audit trail the governance model requires.",
+    "failure_mode": "Without bypass: merge-proof.yml fails with GH013 on every merge; proof entries are not persisted to the registry; the canonical audit trail is broken.",
+    "workaround_until_configured": "Proof artifacts are still uploaded as workflow artifacts (MERGE_PROOF artifact per run) and can be reconciled into the registry once bypass is configured.",
+    "governance_note": "This bypass is scoped to the github-actions[bot] integration only. It does not grant human actors or other bots the ability to bypass branch protection."
   }
 }

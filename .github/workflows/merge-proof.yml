@@ -290,15 +290,30 @@ jobs:
             git add governance/merge-legitimacy/merge_proof_registry.jsonl
             git commit -m "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}"
 
-            if git push; then
+            # Capture stderr so we can distinguish permanent from transient failures.
+            PUSH_OUT=$(git push 2>&1) && {
               echo "Proof registry push succeeded on attempt $attempt"
               exit 0
-            fi
+            }
 
-            # Push failed (another run landed between our pull and push).
-            # Reset the local commit so the next pull is a clean fast-forward.
+            # Reset before any exit or retry so the tree is clean.
             git reset --hard HEAD~1
 
+            # Permanent failure: branch protection ruleset (GH013) blocks all direct
+            # pushes to main. Retrying will not help — fail immediately with an
+            # actionable message.
+            if echo "$PUSH_OUT" | grep -q "GH013\|push declined due to repository rule violations"; then
+              echo "NULL — proof registry push blocked by repository ruleset (GH013)."
+              echo "Branch protection requires all changes to go through a pull request."
+              echo "Admin action required: add 'github-actions[bot]' as a bypass actor"
+              echo "for the 'Require a pull request before merging' rule in the repository"
+              echo "ruleset settings."
+              echo "See proof_registry_bypass in governance/runtime/BRANCH_PROTECTION_POLICY.json"
+              exit 1
+            fi
+
+            # Transient failure: another run landed between our pull and push.
+            # Retry with exponential backoff.
             if [ "$attempt" -lt "$MAX_RETRIES" ]; then
               SLEEP_TIME=$((2 ** attempt))
               echo "Push failed on attempt $attempt, retrying in ${SLEEP_TIME}s..."
