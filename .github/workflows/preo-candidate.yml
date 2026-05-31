@@ -50,7 +50,16 @@ jobs:
           FAILURE_REASONS="[]"
           CHANGED_P3_FILES_JSON="[]"
           REVIEWER_SCOPE_PATHS_JSON="[]"
-          SCOPE_COVERAGE_VALID="false"
+          SCOPE_COVERAGE_REQUIRED="false"
+          SCOPE_COVERAGE_VALID="true"
+          SCOPE_COVERAGE_REASON="not_required_for_non_p3"
+
+          # Scope coverage is required for all P3 PRs; set pessimistic defaults before review evaluation
+          if [ "$QUICK_RISK_CLASS" = "P3" ]; then
+            SCOPE_COVERAGE_REQUIRED="true"
+            SCOPE_COVERAGE_VALID="false"
+            SCOPE_COVERAGE_REASON="scope_coverage_not_evaluated"
+          fi
 
           # A3: require APPROVED review where commit_id == current head SHA (object identity, not timestamp)
           APPROVED_ON_HEAD=$(jq -c \
@@ -85,7 +94,7 @@ jobs:
                 REVIEWER_SCOPE_PATHS_JSON=$(jq -c --arg reviewer "$REVIEWER_LOGIN" \
                   '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | .[0].scope_paths // []' \
                   governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
-                SCOPE_COVERAGE_VALID="true"
+                all_covered="true"
                 while IFS= read -r file; do
                   [ -z "$file" ] && continue
                   covered="false"
@@ -93,17 +102,22 @@ jobs:
                     [ -z "$pattern" ] && continue
                     if [[ "$file" == $pattern ]]; then covered="true"; break; fi
                   done < <(printf '%s' "$REVIEWER_SCOPE_PATHS_JSON" | jq -r '.[]')
-                  if [ "$covered" = "false" ]; then SCOPE_COVERAGE_VALID="false"; break; fi
+                  if [ "$covered" = "false" ]; then all_covered="false"; break; fi
                 done < <(printf '%s' "$CHANGED_P3_FILES_JSON" | jq -r '.[]')
-                if [ "$SCOPE_COVERAGE_VALID" = "true" ]; then
+                if [ "$all_covered" = "true" ]; then
+                  SCOPE_COVERAGE_VALID="true"
+                  SCOPE_COVERAGE_REASON="all_changed_p3_files_within_reviewer_scope"
                   AUTHORITY_ROLE_VALID="true"
                   REVIEW_AUTHORITY_RESULT="true"
                   REVIEW_STATUS="APPROVED"
                 else
+                  SCOPE_COVERAGE_VALID="false"
+                  SCOPE_COVERAGE_REASON="p3_files_outside_reviewer_scope"
                   FAILURE_REASONS='["p3_files_outside_reviewer_scope"]'
                   REVIEW_STATUS="LEGITIMACY_NULL"
                 fi
               else
+                SCOPE_COVERAGE_REASON="reviewer_not_in_sovereignty_review_for_p3"
                 FAILURE_REASONS='["reviewer_not_in_sovereignty_review_for_p3"]'
                 REVIEW_STATUS="LEGITIMACY_NULL"
               fi
@@ -172,7 +186,9 @@ jobs:
             --argjson failure_reasons "$FAILURE_REASONS" \
             --argjson changed_p3_files "$CHANGED_P3_FILES_JSON" \
             --argjson reviewer_scope_paths "$REVIEWER_SCOPE_PATHS_JSON" \
+            --argjson scope_coverage_required "$SCOPE_COVERAGE_REQUIRED" \
             --argjson scope_coverage_valid "$SCOPE_COVERAGE_VALID" \
+            --arg scope_coverage_reason "$SCOPE_COVERAGE_REASON" \
             '{
               version: $version,
               pr_number: $pr_number,
@@ -191,7 +207,9 @@ jobs:
               failure_reasons: $failure_reasons,
               changed_p3_files: $changed_p3_files,
               reviewer_scope_paths: $reviewer_scope_paths,
-              scope_coverage_valid: $scope_coverage_valid
+              scope_coverage_required: $scope_coverage_required,
+              scope_coverage_valid: $scope_coverage_valid,
+              scope_coverage_reason: $scope_coverage_reason
             }' > review_legitimacy_result.json
 
           LEGITIMACY_RESULT_HASH=$(sha256sum review_legitimacy_result.json | cut -d' ' -f1)
