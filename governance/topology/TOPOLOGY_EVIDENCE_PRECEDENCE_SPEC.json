@@ -1,0 +1,426 @@
+{
+  "schema_version": "1.0",
+  "artifact": "TOPOLOGY_EVIDENCE_PRECEDENCE_SPEC",
+  "artifact_id": "topology_evidence_precedence_spec",
+  "status": "SPEC_READY",
+  "planning_status": [
+    "SPEC_READY",
+    "ARBITRATION_MODEL_STABILIZED",
+    "TOPOLOGY_INTELLIGENCE_STACK_COMPLETE",
+    "READY_FOR_RECONCILIATION_CONSUMPTION"
+  ],
+  "closes": "#1644",
+  "depends_on": ["#1640", "#1641", "#1642", "#1643"],
+  "planning_only": true,
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false,
+    "legitimacy_creation": false,
+    "reconciliation_execution": false,
+    "topology_mutation": false
+  },
+  "non_goals": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_merge_permission": false,
+    "creates_proof": false,
+    "repairs_evidence": false,
+    "rewrites_registries": false,
+    "creates_legitimacy": false,
+    "creates_execution_eligibility": false,
+    "creates_reconciliation_closure": false,
+    "mutates_topology": false,
+    "validates_execution": false
+  },
+  "scope": {
+    "name": "TOPOLOGY_EVIDENCE_PRECEDENCE",
+    "purpose": "Define deterministic evidence-precedence semantics for distributed reconciliation so conflicting topology reports resolve through lineage-bound artifacts rather than node voting, raw observation, or inferred legitimacy.",
+    "execution_surface": "none",
+    "operational_effect": "none",
+    "arbitration_role": "compare, rank, arbitrate, classify — not repair, rewrite, create authority, or create legitimacy"
+  },
+  "core_invariants": {
+    "more_evidence_beats_more_nodes": "More evidence beats more nodes.",
+    "visibility_ne_truth": "Visibility ≠ Truth",
+    "observation_ne_finality": "Observation ≠ Finality",
+    "arbitration_ne_truth_creation": "Arbitration ≠ Truth creation",
+    "arbitration_ne_legitimacy_creation": "Arbitration ≠ Legitimacy creation",
+    "bridgeable_ne_stronger": "Bridgeable evidence ≠ Stronger evidence",
+    "determinism_requirement": "identical inputs → identical arbitration output"
+  },
+  "convergence_requirements": {
+    "description": "Reconciliation convergence requires all three conditions.",
+    "conditions": [
+      "same artifacts",
+      "same traversal rules",
+      "same precedence rules"
+    ],
+    "result": "same legitimacy classification"
+  },
+  "decisive_artifact_requirements": {
+    "description": "A conflict may converge only when a decisive legitimacy artifact exists and can be:",
+    "requirements": [
+      "verified",
+      "lineage-bound",
+      "replayed deterministically",
+      "scoped to the affected object",
+      "interpreted by canonical precedence rules"
+    ],
+    "no_decisive_artifact_fallback": {
+      "classification": "UNRESOLVED",
+      "execution_allowed": false,
+      "replay_allowed": false,
+      "reconciliation_required": true
+    }
+  },
+  "evidence_tiers": {
+    "description": "Canonical evidence artifact classes with deterministic precedence order. Verified Tier 1 > Tier 2 > Tier 3 > Tier 4.",
+    "tiers": [
+      {
+        "tier": 1,
+        "label": "TIER_1",
+        "name": "Verified Immutable Lineage Anchors",
+        "description": "Cryptographically verified, append-only ledger entries with confirmed integrity. Highest precedence only when integrity verifies.",
+        "properties": [
+          "immutable",
+          "lineage-bound",
+          "hash-verifiable",
+          "integrity-checked"
+        ],
+        "examples": [
+          "signed_revocation_record",
+          "continuity_invalidation_record",
+          "authority_registry_transition",
+          "proof_lineage_record",
+          "replay_consumption_record",
+          "epoch_transition_record",
+          "merge_legitimacy_closure_hash",
+          "deploy_legitimacy_closure_hash",
+          "proof_hash",
+          "append_only_ledger_entry"
+        ],
+        "can_produce_deterministic_convergence": true,
+        "can_downgrade_or_suspend_legitimacy": true,
+        "can_invalidate_execution_eligibility": true,
+        "can_confirm_legitimacy_without_proof_lineage": false
+      },
+      {
+        "tier": 2,
+        "label": "TIER_2",
+        "name": "Signed Registry State",
+        "description": "Current registry state with verified signatures. Mutable representation that may challenge Tier 1 integrity but may not override verified Tier 1 evidence.",
+        "properties": [
+          "current state",
+          "signed state",
+          "mutable representation"
+        ],
+        "examples": [
+          "replay_registry_state",
+          "authority_registry_state",
+          "proof_registry_state",
+          "deployment_registry_state",
+          "execution_record",
+          "validation_record",
+          "settlement_record"
+        ],
+        "can_produce_deterministic_convergence": true,
+        "can_downgrade_or_suspend_legitimacy": true,
+        "can_invalidate_execution_eligibility": true,
+        "can_confirm_legitimacy_without_proof_lineage": false,
+        "tier2_may_challenge_tier1_integrity": true,
+        "tier2_may_not_override_verified_tier1": true
+      },
+      {
+        "tier": 3,
+        "label": "TIER_3",
+        "name": "Topology Observations",
+        "description": "Runtime topology intelligence observations. Observer-derived, non-authoritative visibility evidence. Never overrides registry state.",
+        "properties": [
+          "visibility evidence",
+          "observer-derived",
+          "non-authoritative"
+        ],
+        "examples": [
+          "classified_observation_object",
+          "TOPOLOGY_VISIBLE",
+          "TOPOLOGY_PARTIAL",
+          "TOPOLOGY_STALE",
+          "TOPOLOGY_CONFLICTED",
+          "RUNTIME_TOPOLOGY_OBSERVATION"
+        ],
+        "can_produce_deterministic_convergence": false,
+        "can_downgrade_or_suspend_legitimacy": true,
+        "can_invalidate_execution_eligibility": false,
+        "topology_observations_never_override_registry_state": true
+      },
+      {
+        "tier": 4,
+        "label": "TIER_4",
+        "name": "Derived Reconstruction",
+        "description": "State derived from partial evidence when direct observation is unavailable. Lowest precedence. Never overrides observed evidence.",
+        "properties": [
+          "derived",
+          "inferential",
+          "lowest precedence"
+        ],
+        "examples": [
+          "raw_local_observation",
+          "bridgeability_reconstruction",
+          "observer_aggregation",
+          "gap_recovery_inference",
+          "partial_topology_reconstruction"
+        ],
+        "can_produce_deterministic_convergence": false,
+        "can_downgrade_or_suspend_legitimacy": false,
+        "can_invalidate_execution_eligibility": false,
+        "derived_reconstruction_never_overrides_observed_evidence": true
+      }
+    ],
+    "precedence_order": "Verified Tier 1 > Tier 2 > Tier 3 > Tier 4",
+    "integrity_suspension_boundary": "suspected Tier 1 truncation ≠ verified Tier 1 anchor"
+  },
+  "arbitration_rules": {
+    "description": "Deterministic rules for resolving conflicting evidence across tiers.",
+    "rule_a": {
+      "id": "RULE_A",
+      "name": "Verified Tier 1 vs Tier 2 Disagreement",
+      "condition": "Tier 1 integrity verifies AND Tier 2 disagrees",
+      "result": "Tier 1 wins",
+      "classification": "REGISTRY_DRIFT",
+      "reason": "current registry state is mutable/reporting state; verified lineage anchor is immutable lineage evidence"
+    },
+    "rule_b": {
+      "id": "RULE_B",
+      "name": "Tier 1 Integrity Failure",
+      "condition": "Tier 1 missing OR Tier 1 hash chain broken OR Tier 1 epoch mismatch OR Tier 1 truncation suspected",
+      "result": "No winner. Suspend closure.",
+      "classification": "LEDGER_INTEGRITY_SUSPECT",
+      "alternate_classification": "REGISTRY_RECONCILIATION_INCOMPLETE",
+      "core_rule": "Do not fall back to mutable registry truth. Suspend closure."
+    },
+    "rule_c": {
+      "id": "RULE_C",
+      "name": "Tier 2 Registry Disagreement",
+      "condition": "Tier 2 sources disagree (e.g. replay_registry = CONSUMED, authority_registry = PENDING)",
+      "result": "No closure derived",
+      "classification": "REGISTRY_DIVERGENCE"
+    },
+    "rule_d": {
+      "id": "RULE_D",
+      "name": "Tier 3 Observation Conflicts with Tier 2 Registry",
+      "condition": "Tier 3 topology observation conflicts with Tier 2 signed registry state",
+      "result": "Registry state maintains precedence",
+      "classification": "TOPOLOGY_STALE",
+      "alternate_classification": "TOPOLOGY_CONFLICTED",
+      "core_rule": "Observation never overrides registry state."
+    },
+    "rule_e": {
+      "id": "RULE_E",
+      "name": "Tier 4 Reconstruction Conflicts with Tier 1–3",
+      "condition": "Derived reconstruction conflicts with Tier 1, Tier 2, or Tier 3 evidence",
+      "result": "Reconstruction rejected",
+      "classification": "ARBITRATION_FORCES_NULL",
+      "core_rule": "Derived inference never overrides observed evidence."
+    }
+  },
+  "conflict_resolution_semantics": {
+    "description": "How conflicting evidence is ranked, classified, and prevented from creating false closure.",
+    "resolution_method": "deterministic evaluation of lineage-bound legitimacy artifacts",
+    "forbidden_resolution_methods": [
+      "majority vote",
+      "latest observation",
+      "raw state match",
+      "operator assumption",
+      "synthetic convergence",
+      "node voting"
+    ],
+    "conflicting_high_precedence_artifacts": {
+      "description": "When two verified Tier 1 artifacts conflict (e.g. revocation record vs proof lineage record for same object)",
+      "classification": "EVIDENCE_DIVERGENT",
+      "closure_derivable": false,
+      "resolution": "Suspend closure. Require reconciliation."
+    }
+  },
+  "unresolved_state_fallback_semantics": {
+    "description": "Safe outcome when precedence cannot be determined.",
+    "fallback_classification": "UNRESOLVED",
+    "execution_allowed": false,
+    "replay_allowed": false,
+    "reconciliation_required": true,
+    "propagation_allowed": false,
+    "core_rule": "Arbitration determines precedence. Arbitration does not create truth. When precedence cannot be determined, fail closed."
+  },
+  "downgrade_and_suspension_semantics": {
+    "description": "Conditions under which legitimacy is downgraded or suspended without full revocation.",
+    "downgrade_triggers": [
+      {
+        "trigger": "Tier 1 integrity check fails",
+        "effect": "suspend closure",
+        "classification": "LEDGER_INTEGRITY_SUSPECT",
+        "execution_allowed": false
+      },
+      {
+        "trigger": "Tier 2 registry sources disagree",
+        "effect": "suspend closure",
+        "classification": "REGISTRY_DIVERGENCE",
+        "execution_allowed": false
+      },
+      {
+        "trigger": "Tier 3 observation conflicts with Tier 2",
+        "effect": "downgrade observation to stale/conflicted",
+        "classification": "TOPOLOGY_STALE",
+        "execution_allowed": "unchanged — registry state governs"
+      },
+      {
+        "trigger": "No decisive artifact exists",
+        "effect": "suspend closure",
+        "classification": "UNRESOLVED",
+        "execution_allowed": false
+      }
+    ],
+    "core_rule": "Suspension does not create legitimacy. Suspension prevents false closure."
+  },
+  "conflict_examples": {
+    "case_1_revocation_vs_observation": {
+      "description": "Revocation vs Observation",
+      "node_a": "observes DEPLOYMENT_ACTIVE",
+      "node_c": "presents signed revocation record",
+      "resolution": {
+        "step_1": "revocation artifact requires verification",
+        "if_verified": "legitimacy NULL / revoked lineage detected",
+        "if_unverified": "suspend local certainty, classify conflict, require reconciliation",
+        "winning_tier_if_verified": "TIER_1",
+        "classification_if_verified": "EVIDENCE_CONVERGENT",
+        "classification_if_unverified": "LEDGER_INTEGRITY_SUSPECT"
+      }
+    },
+    "case_2_proof_missing_vs_proof_present": {
+      "description": "Proof Missing vs Proof Present",
+      "node_a": "reports PROOF_MISSING",
+      "node_b": "reports PROOF_PRESENT with proof lineage record",
+      "resolution": {
+        "proof_present_wins_if": "lineage-bound and verifiable",
+        "otherwise": "conflict remains UNRESOLVED",
+        "winning_tier_if_verifiable": "TIER_1",
+        "classification_if_verifiable": "EVIDENCE_CONVERGENT",
+        "classification_if_not_verifiable": "UNRESOLVED"
+      }
+    },
+    "case_3_state_match_missing_lineage": {
+      "description": "State Match vs Missing Lineage",
+      "scenario": "Observed reality hash equals validated object hash, proof is missing, lineage is missing",
+      "resolution": {
+        "state_match_is": "evidence only",
+        "state_match_cannot": "create legitimacy",
+        "classification": "UNRESOLVED",
+        "alternate_classification": "REGISTRY_RECONCILIATION_INCOMPLETE",
+        "core_rule": "state match is evidence only; state match cannot create legitimacy"
+      }
+    }
+  },
+  "arbitration_output_contract": {
+    "description": "Required fields in every arbitration output.",
+    "required_fields": [
+      "classification",
+      "winning_tier",
+      "winning_evidence_hash",
+      "conflicting_evidence_hashes",
+      "closure_derivable"
+    ],
+    "convergent_example": {
+      "classification": "EVIDENCE_CONVERGENT",
+      "winning_tier": "TIER_1",
+      "winning_evidence_hash": "sha256:example",
+      "conflicting_evidence_hashes": [],
+      "closure_derivable": true
+    },
+    "suspended_example": {
+      "classification": "LEDGER_INTEGRITY_SUSPECT",
+      "winning_tier": null,
+      "winning_evidence_hash": null,
+      "conflicting_evidence_hashes": ["sha256:example"],
+      "closure_derivable": false
+    }
+  },
+  "evidence_classifications": [
+    "EVIDENCE_CONVERGENT",
+    "EVIDENCE_DIVERGENT",
+    "REGISTRY_DRIFT",
+    "REGISTRY_DIVERGENCE",
+    "TOPOLOGY_STALE",
+    "TOPOLOGY_CONFLICTED",
+    "LEDGER_INTEGRITY_SUSPECT",
+    "ARBITRATION_FORCES_NULL",
+    "UNRESOLVED",
+    "REGISTRY_RECONCILIATION_INCOMPLETE"
+  ],
+  "determinism_requirements": {
+    "identical_inputs_identical_output": "identical inputs → identical arbitration output",
+    "fixed_tier_order": "fixed tier order → stable precedence",
+    "same_conflict_set": "same conflict set → same classification",
+    "same_evidence_hashes": "same evidence hashes → same winning evidence hash",
+    "changing_these_must_change_output": [
+      "Tier 1 integrity status",
+      "Tier 1 evidence hash",
+      "Tier 2 registry hash",
+      "Tier 3 observation hash",
+      "Tier 4 reconstruction hash",
+      "conflict set"
+    ]
+  },
+  "non_authoritative_boundary": {
+    "arbitration_may": [
+      "compare",
+      "rank",
+      "arbitrate",
+      "classify"
+    ],
+    "arbitration_may_not": [
+      "repair evidence",
+      "rewrite registries",
+      "create authority",
+      "create legitimacy",
+      "create execution eligibility",
+      "create reconciliation closure",
+      "mutate topology",
+      "validate execution"
+    ],
+    "core_rule": "Arbitration determines precedence. Arbitration does not create truth."
+  },
+  "relationship_to_parent_issues": {
+    "#1640": {
+      "role": "relevance",
+      "description": "Runtime Topology Intelligence Planning. Evidence precedence derives from the evidence_precedence_hierarchy and gap_bridgeability_semantics defined in #1640."
+    },
+    "#1641": {
+      "role": "observation",
+      "description": "Classified Observation Object Spec. Tier 3 evidence classes are classified_observation_objects as defined in #1641."
+    },
+    "#1642": {
+      "role": "emission",
+      "description": "Topology Emission Boundary Planning. Emission of classified observations is governed by #1642; this spec consumes emitted observations as Tier 3 evidence."
+    },
+    "#1643": {
+      "role": "conflict taxonomy",
+      "description": "Legitimacy Conflict State Taxonomy. Conflict states such as LEGITIMACY_UNKNOWN, UNRESOLVED, CONFLICTED, PARTITION_SUSPECTED, and REVOKED_LINEAGE_DETECTED from #1643 inform the classification outputs of this arbitration layer."
+    },
+    "#1644": {
+      "role": "arbitration",
+      "description": "This spec. Defines how conflicting evidence is ranked, classified, and prevented from creating false closure."
+    }
+  },
+  "stack_compression": {
+    "#1640": "relevance",
+    "#1641": "observation",
+    "#1642": "emission",
+    "#1644": "arbitration"
+  },
+  "failure_result": "LEGITIMACY_NULL"
+}
