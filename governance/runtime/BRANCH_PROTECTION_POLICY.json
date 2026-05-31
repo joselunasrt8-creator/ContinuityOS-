@@ -8,12 +8,15 @@
     "require_pull_request_before_merge": true,
     "require_approvals": true,
     "required_approving_review_count": 1,
+    "required_approving_review_count_actual": 0,
+    "required_approving_review_count_note": "Ruleset sets 0 because GitHub-level approval count is not the enforcement mechanism — merge-governance-check enforces reviewer legitimacy (APPROVED or OWNER_SELF_CERTIFIED) at workflow level. Setting 0 prevents a double-block on single-contributor PRs that self-certify. Policy intent (at least one legitimacy check) is satisfied by the workflow gate.",
     "dismiss_stale_reviews": true,
     "require_status_checks": true,
     "required_status_checks": [
       "merge-governance-check",
       "generate-preo-candidate",
-      "generate-sco-candidate"
+      "generate-sco-candidate",
+      "constitutional-integrity"
     ],
     "require_branch_up_to_date_before_merge": true,
     "restrict_direct_push_to_main": true,
@@ -54,8 +57,9 @@
     "squash or rebase merge using stale review/check evidence"
   ],
   "enforcement_classification": {
-    "current": "advisory",
-    "target": "branch_protected_enforcement"
+    "current": "partial",
+    "target": "branch_protected_enforcement",
+    "partial_status_note": "Ruleset is active and 'Require a pull request' is enforced. 'Require status checks to pass' is enabled but no checks are wired in yet — GitHub check search returns no results until the workflow jobs run at least once on a PR targeting main. Required checks must be added manually by typing exact job names: merge-governance-check, generate-preo-candidate, generate-sco-candidate."
   },
   "enforcement_activation": {
     "activation_status": "ACTIVATION_RECORDED",
@@ -88,21 +92,42 @@
       "workflow_name": "merge-governance-check",
       "job_name": "merge-governance-check",
       "emitted_check_run_name": "merge-governance-check",
-      "required_check": "merge-governance-check"
+      "required_check": "merge-governance-check",
+      "trigger": "pull_request"
     },
     {
       "workflow_file": ".github/workflows/preo-candidate.yml",
       "workflow_name": "preo-candidate",
       "job_name": "generate-preo-candidate",
       "emitted_check_run_name": "generate-preo-candidate",
-      "required_check": "generate-preo-candidate"
+      "required_check": "generate-preo-candidate",
+      "trigger": "pull_request"
     },
     {
       "workflow_file": ".github/workflows/sco-candidate.yml",
       "workflow_name": "sco-candidate",
       "job_name": "generate-sco-candidate",
       "emitted_check_run_name": "generate-sco-candidate",
-      "required_check": "generate-sco-candidate"
+      "required_check": "generate-sco-candidate",
+      "trigger": "pull_request"
+    },
+    {
+      "workflow_file": ".github/workflows/constitutional-integrity.yml",
+      "workflow_name": "constitutional-integrity",
+      "job_name": "constitutional-integrity",
+      "emitted_check_run_name": "constitutional-integrity",
+      "required_check": "constitutional-integrity",
+      "trigger": "pull_request"
+    }
+  ],
+  "non_required_checks": [
+    {
+      "workflow_file": ".github/workflows/merge-proof.yml",
+      "workflow_name": "merge-proof",
+      "job_name": "generate-merge-proof",
+      "trigger": "pull_request:closed",
+      "required_check": false,
+      "note": "POST-MERGE ONLY. This workflow runs after a PR is closed/merged. It must NOT be added to the required status checks list — doing so will block all PRs because the check never runs on an open PR (deadlock). If accidentally added to the ruleset, remove it immediately."
     }
   ],
   "governance_drift_policy": {
@@ -115,5 +140,18 @@
     "squash_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
     "rebase_merge": "allowed only when PREO/SCO/check evidence remains bound to exact PR head_sha and proof records merge_commit_sha",
     "gap_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+  },
+  "proof_registry_bypass": {
+    "status": "REQUIRED_NOT_YET_CONFIGURED",
+    "description": "The merge-proof.yml workflow appends proof entries to governance/merge-legitimacy/merge_proof_registry.jsonl via a direct git push to main after each merge. Branch protection activation (CI-001) blocks this push with GH013. The workflow must be granted a bypass so it can persist proofs without going through a PR.",
+    "required_admin_action": "PATCH /repos/joselunasrt8-creator/mindshift-demo/rulesets/16177949 — add entry to bypass_actors: {\"actor_id\": 15368, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}. Integration ID 15368 is the GitHub Actions app (same ID already used as integration_id for required status checks in this ruleset).",
+    "bypass_actor": "github-actions[bot]",
+    "bypass_actor_type": "Integration",
+    "bypass_actor_id": 15368,
+    "bypass_scope": "proof_registry_append_only",
+    "bypass_rationale": "The proof registry append is itself a post-merge governance action, not a code change requiring review. It records audit evidence of merges that have already passed all governance checks. Blocking it defeats the audit trail the governance model requires.",
+    "failure_mode": "Without bypass: merge-proof.yml fails with GH013 on every merge; proof entries are not persisted to the registry; the canonical audit trail is broken.",
+    "workaround_until_configured": "Proof artifacts are still uploaded as workflow artifacts (MERGE_PROOF artifact per run) and can be reconciled into the registry once bypass is configured.",
+    "governance_note": "This bypass is scoped to the github-actions[bot] integration only. It does not grant human actors or other bots the ability to bypass branch protection."
   }
 }
