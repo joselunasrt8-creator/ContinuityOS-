@@ -1,0 +1,453 @@
+{
+  "artifact": "CLASSIFIED_OBSERVATION_OBJECT_SPEC",
+  "issue": "#1641",
+  "parent_issue": "#1640",
+  "version": "1.0.0",
+  "status": "SPEC_READY",
+  "planning_status": [
+    "SPEC_READY",
+    "OBSERVATION_OBJECT_MODEL_STABILIZED",
+    "READY_FOR_#1642"
+  ],
+  "planning_only": true,
+  "non_goals": [
+    "No implementation.",
+    "No runtime mutation.",
+    "No authority creation.",
+    "No proof generation.",
+    "No reconciliation execution claim.",
+    "No topology convergence claim."
+  ],
+  "schema_path": "schemas/classified-observation-object.schema.json",
+  "core_purpose": "Classified Observation Object = topology-visible evidence container. Not: validator result, authority object, proof object, reconciliation object, or execution object.",
+  "core_invariant": "No observation may imply more certainty than its evidence supports.",
+  "core_invariants": {
+    "observation_ne_interpretation": "Observation is not interpretation.",
+    "interpretation_ne_legitimacy": "Interpretation is not legitimacy.",
+    "visibility_ne_authority": "Visibility is not authority."
+  },
+  "non_authoritative_boundary": {
+    "observation_object_may": [
+      "record topology visibility state",
+      "classify evidence type",
+      "record observed state in summary",
+      "emit non_operability flags",
+      "record gap bridgeability"
+    ],
+    "observation_object_may_not": [
+      "create validity",
+      "create authority",
+      "produce reconciliation closure",
+      "determine execution eligibility",
+      "decide legitimacy",
+      "mutate registry",
+      "trigger reconciliation",
+      "authorize execution"
+    ],
+    "core_boundary": "The observer records visibility state. It does not interpret authority legitimacy."
+  },
+  "canonical_object_shape": {
+    "object_type": "RUNTIME_TOPOLOGY_OBSERVATION",
+    "schema_version": "v1",
+    "observation_id": "string",
+    "lineage_hash": "hash",
+    "topology_view_id": "string",
+    "observer_id": "string",
+    "observed_at": "iso8601",
+    "reconciliation_epoch": "string",
+    "classification": "TOPOLOGY_VISIBLE | TOPOLOGY_PARTIAL | TOPOLOGY_STALE | TOPOLOGY_CONFLICTED | TOPOLOGY_UNOBSERVABLE",
+    "target_surface": "string",
+    "evidence": {
+      "evidence_type": "REGISTRY_STATE | PROOF_STATE | REPLAY_STATE | AUTHORITY_STATE | TOPOLOGY_GAP | GOVERNANCE_STATE",
+      "evidence_hash": "hash",
+      "schema_version": "string",
+      "summary": {},
+      "redacted": true,
+      "raw_evidence_ref": "optional"
+    },
+    "non_operability": {
+      "creates_validity": false,
+      "creates_authority": false,
+      "creates_execution_eligibility": false,
+      "creates_reconciliation_closure": false
+    }
+  },
+  "required_metadata_anchors": {
+    "minimum_required": [
+      "observation_id",
+      "lineage_hash",
+      "topology_view_id"
+    ],
+    "semantics": {
+      "observation_id": "identity — what is this observation?",
+      "lineage_hash": "attachment — what lineage is it about?",
+      "topology_view_id": "perspective — from whose topology view was it observed?"
+    },
+    "invariant": "Without all three anchors: OBSERVATION_OBJECT_INVALID"
+  },
+  "required_fields": {
+    "mandatory_for_all_observations": [
+      "observation_id",
+      "lineage_hash",
+      "topology_view_id",
+      "object_type",
+      "schema_version",
+      "observer_id",
+      "observed_at",
+      "classification",
+      "target_surface",
+      "evidence",
+      "non_operability"
+    ],
+    "optional_governance_relevant": [
+      "reconciliation_epoch",
+      "evidence.raw_evidence_ref",
+      "evidence.topology_gap"
+    ],
+    "mandatory_evidence_fields": [
+      "evidence_type",
+      "evidence_hash",
+      "schema_version",
+      "summary",
+      "redacted"
+    ]
+  },
+  "classification_vocabulary": {
+    "classification": {
+      "allowed_values": [
+        "TOPOLOGY_VISIBLE",
+        "TOPOLOGY_PARTIAL",
+        "TOPOLOGY_STALE",
+        "TOPOLOGY_CONFLICTED",
+        "TOPOLOGY_UNOBSERVABLE"
+      ],
+      "optional_future": ["TOPOLOGY_NOISE_IGNORED"],
+      "semantics": {
+        "TOPOLOGY_VISIBLE": "All required topology surfaces are observable and consistent.",
+        "TOPOLOGY_PARTIAL": "Some topology surfaces are observable; coverage is incomplete.",
+        "TOPOLOGY_STALE": "Topology observations exist but exceed acceptable staleness threshold.",
+        "TOPOLOGY_CONFLICTED": "Conflicting observations exist for the same topology surface.",
+        "TOPOLOGY_UNOBSERVABLE": "Required topology surfaces cannot be observed."
+      },
+      "note": "Noise should normally not emit as an observation object."
+    },
+    "evidence_type": {
+      "allowed_values": [
+        "REGISTRY_STATE",
+        "PROOF_STATE",
+        "REPLAY_STATE",
+        "AUTHORITY_STATE",
+        "TOPOLOGY_GAP",
+        "GOVERNANCE_STATE"
+      ],
+      "unknown_type_result": "OBSERVATION_OBJECT_INVALID"
+    }
+  },
+  "typed_evidence_envelope": {
+    "description": "Use a typed evidence envelope, not a free-form generic blob.",
+    "rationale": [
+      "auditability",
+      "deterministic hashing",
+      "surface-specific validation",
+      "safe redaction",
+      "future extensibility"
+    ],
+    "forbidden_pattern": {
+      "observation_data": {}
+    },
+    "required_pattern": {
+      "evidence": {
+        "evidence_type": "REPLAY_STATE",
+        "evidence_hash": "sha256:...",
+        "schema_version": "topology-evidence-v1",
+        "summary": {
+          "nonce_state": "PENDING",
+          "target_object_hash": "sha256:...",
+          "source_registry": "replay_registry"
+        },
+        "redacted": true,
+        "raw_evidence_ref": "optional_reference"
+      }
+    }
+  },
+  "summary_rules": {
+    "core_rule": "Summary describes evidence. It must not interpret legitimacy.",
+    "allowed_fields": [
+      "observed_state",
+      "observed_field",
+      "source_registry",
+      "target_object_hash",
+      "gap_type",
+      "affected_surface",
+      "duration_seconds",
+      "topology_view_id"
+    ],
+    "forbidden_fields": [
+      "is_legitimate",
+      "legitimacy_valid",
+      "authorization_granted",
+      "authority_valid",
+      "execution_authorized",
+      "execution_eligible",
+      "replay_safe",
+      "proof_valid",
+      "reconciliation_successful",
+      "convergence_achieved",
+      "validator_result",
+      "merge_allowed",
+      "deploy_allowed",
+      "policy_valid"
+    ],
+    "allowed_example": {
+      "observed_state": "CONSUMED",
+      "observed_field": "nonce_state",
+      "source_registry": "replay_registry",
+      "target_object_hash": "sha256:..."
+    },
+    "forbidden_example": {
+      "replay_safe": true,
+      "execution_eligible": true
+    }
+  },
+  "topology_gap_extension": {
+    "trigger": "evidence_type = TOPOLOGY_GAP",
+    "required_gap_fields": [
+      "gap_reconciliation_status",
+      "affected_window"
+    ],
+    "gap_reconciliation_status_values": ["BRIDGEABLE", "UNKNOWN", "UNBRIDGEABLE"],
+    "canonical_bridgeability_invariant": {
+      "missing_anchor": "UNKNOWN",
+      "conflicting_anchor": "UNBRIDGEABLE",
+      "convergent_anchor": "BRIDGEABLE"
+    },
+    "example": {
+      "evidence": {
+        "evidence_type": "TOPOLOGY_GAP",
+        "evidence_hash": "sha256:<canonical_gap_record_hash>",
+        "schema_version": "topology-evidence-v1",
+        "summary": {
+          "gap_type": "AUTHORITY_REGISTRY_VISIBILITY_GAP",
+          "affected_surface": "authority_registry",
+          "observed_field": "authority_transition_visibility",
+          "observed_state": "UNOBSERVABLE",
+          "affected_window": {
+            "start": "2026-05-30T10:12:00Z",
+            "end": "2026-05-30T10:12:45Z"
+          },
+          "duration_seconds": 45,
+          "gap_reconciliation_status": "UNKNOWN",
+          "reconstruction_sources": [
+            "authority_registry",
+            "revocation_log",
+            "delegation_log"
+          ],
+          "topology_view_id": "topology_view_123"
+        },
+        "redacted": true,
+        "raw_evidence_ref": "authority-gap-observation-evt-789",
+        "topology_gap": {
+          "gap_reconciliation_status": "UNKNOWN",
+          "affected_window": {
+            "start": "2026-05-30T10:12:00Z",
+            "end": "2026-05-30T10:12:45Z"
+          },
+          "reconstruction_sources": [
+            "authority_registry",
+            "revocation_log",
+            "delegation_log"
+          ]
+        }
+      }
+    }
+  },
+  "propagation_safe_examples": [
+    {
+      "label": "valid_topology_visible_replay_observation",
+      "object_type": "RUNTIME_TOPOLOGY_OBSERVATION",
+      "schema_version": "v1",
+      "observation_id": "obs-001",
+      "lineage_hash": "sha256:abc123",
+      "topology_view_id": "view-001",
+      "observer_id": "node-alpha",
+      "observed_at": "2026-05-30T12:00:00Z",
+      "reconciliation_epoch": "epoch-7",
+      "classification": "TOPOLOGY_VISIBLE",
+      "target_surface": "replay_registry",
+      "evidence": {
+        "evidence_type": "REPLAY_STATE",
+        "evidence_hash": "sha256:def456",
+        "schema_version": "topology-evidence-v1",
+        "summary": {
+          "observed_state": "CONSUMED",
+          "observed_field": "nonce_state",
+          "source_registry": "replay_registry"
+        },
+        "redacted": true
+      },
+      "non_operability": {
+        "creates_validity": false,
+        "creates_authority": false,
+        "creates_execution_eligibility": false,
+        "creates_reconciliation_closure": false
+      }
+    },
+    {
+      "label": "valid_topology_gap_authority_registry",
+      "object_type": "RUNTIME_TOPOLOGY_OBSERVATION",
+      "schema_version": "v1",
+      "observation_id": "obs-002",
+      "lineage_hash": "sha256:bcd234",
+      "topology_view_id": "view-002",
+      "observer_id": "node-beta",
+      "observed_at": "2026-05-30T10:12:45Z",
+      "classification": "TOPOLOGY_UNOBSERVABLE",
+      "target_surface": "authority_registry",
+      "evidence": {
+        "evidence_type": "TOPOLOGY_GAP",
+        "evidence_hash": "sha256:cde345",
+        "schema_version": "topology-evidence-v1",
+        "summary": {
+          "gap_type": "AUTHORITY_REGISTRY_VISIBILITY_GAP",
+          "observed_state": "UNOBSERVABLE",
+          "affected_surface": "authority_registry"
+        },
+        "redacted": true,
+        "topology_gap": {
+          "gap_reconciliation_status": "UNKNOWN",
+          "affected_window": {
+            "start": "2026-05-30T10:12:00Z",
+            "end": "2026-05-30T10:12:45Z"
+          },
+          "reconstruction_sources": ["authority_registry", "revocation_log"]
+        }
+      },
+      "non_operability": {
+        "creates_validity": false,
+        "creates_authority": false,
+        "creates_execution_eligibility": false,
+        "creates_reconciliation_closure": false
+      }
+    }
+  ],
+  "forbidden_raw_state_examples": [
+    {
+      "label": "forbidden_raw_state_no_classification",
+      "forbidden": { "state": "DEPLOYMENT_ACTIVE" },
+      "reason": "Raw state without classification metadata. Remote nodes may incorrectly infer DEPLOYMENT_ACTIVE -> LEGITIMATE. This creates a legitimacy jump."
+    },
+    {
+      "label": "forbidden_legitimacy_in_summary",
+      "forbidden": {
+        "evidence": {
+          "summary": {
+            "replay_safe": true,
+            "execution_eligible": true
+          }
+        }
+      },
+      "reason": "Summary interprets legitimacy instead of describing evidence."
+    }
+  ],
+  "downgrade_semantics": {
+    "description": "Observations must be downgraded when certainty cannot be supported by evidence.",
+    "rules": [
+      {
+        "condition": "lineage_hash missing",
+        "result": "OBSERVATION_OBJECT_INVALID — do not emit"
+      },
+      {
+        "condition": "lineage_status = MISSING, verification_status = UNVERIFIED",
+        "classification": "TOPOLOGY_PARTIAL or TOPOLOGY_UNOBSERVABLE",
+        "non_operability_all_false": true,
+        "note": "Active state with missing lineage must not propagate as verified."
+      },
+      {
+        "condition": "unverified revocation signal received",
+        "classification": "TOPOLOGY_CONFLICTED",
+        "evidence_type": "AUTHORITY_STATE",
+        "summary_observed_state": "REVOCATION_SIGNAL_UNVERIFIED",
+        "note": "Must not cause false topology-wide invalidation. Reconciliation layer decides."
+      },
+      {
+        "condition": "conflicting observations for same surface",
+        "classification": "TOPOLOGY_CONFLICTED",
+        "gap_reconciliation_status": "UNBRIDGEABLE",
+        "note": "Cannot produce closure until conflict resolves."
+      },
+      {
+        "condition": "topology_view_id missing",
+        "result": "OBSERVATION_OBJECT_INVALID — do not emit"
+      }
+    ]
+  },
+  "determinism_requirements": {
+    "rule": "Identical observation_id, lineage_hash, topology_view_id, classification, and evidence_hash must produce an identical observation hash.",
+    "mutation_rules": [
+      "Change to lineage_hash must change observation hash.",
+      "Change to topology_view_id must change observation hash.",
+      "Change to evidence_hash must change observation hash."
+    ],
+    "hash_input_fields": [
+      "observation_id",
+      "lineage_hash",
+      "topology_view_id",
+      "classification",
+      "evidence.evidence_hash"
+    ]
+  },
+  "relationship_to_1640": {
+    "summary": "#1640 defines what may be observed. #1641 defines the canonical object used to observe it. #1642 defines when that object may emit.",
+    "#1640_provides": [
+      "topology-relevant observation inventory",
+      "observation category taxonomy",
+      "propagation constraints",
+      "evidence precedence hierarchy",
+      "gap bridgeability semantics"
+    ],
+    "#1641_provides": [
+      "canonical Classified Observation Object shape",
+      "allowed enum values",
+      "required certainty fields",
+      "propagation-safe examples",
+      "forbidden raw-state examples",
+      "downgrade semantics",
+      "non-authoritative boundaries",
+      "deterministic hashing definition"
+    ],
+    "#1642_will_provide": [
+      "emission trigger model",
+      "selective emission logic",
+      "stability window semantics"
+    ]
+  },
+  "planning_questions_answered": {
+    "1_mandatory_fields_for_all_observations": [
+      "observation_id",
+      "lineage_hash",
+      "topology_view_id",
+      "object_type",
+      "schema_version",
+      "observer_id",
+      "observed_at",
+      "classification",
+      "target_surface",
+      "evidence",
+      "non_operability"
+    ],
+    "2_optional_but_required_for_governance": [
+      "reconciliation_epoch",
+      "evidence.raw_evidence_ref",
+      "evidence.topology_gap (required when evidence_type = TOPOLOGY_GAP)"
+    ],
+    "3_classifications_affecting_execution_eligibility": "None directly. All classifications are visibility states only. Execution eligibility is determined by the reconciliation layer, not by observation objects.",
+    "4_statuses_requiring_reconciliation_before_propagation": [
+      "TOPOLOGY_CONFLICTED — requires reconciliation to resolve conflict",
+      "TOPOLOGY_UNOBSERVABLE — requires reconciliation or gap bridging",
+      "gap_reconciliation_status = UNKNOWN — cannot produce closure",
+      "gap_reconciliation_status = UNBRIDGEABLE — cannot produce closure"
+    ],
+    "5_unverified_revocation_signals": "Classify as TOPOLOGY_CONFLICTED with evidence_type = AUTHORITY_STATE and summary.observed_state = REVOCATION_SIGNAL_UNVERIFIED. Do not cascade as AUTHORITY_INVALID. Reconciliation layer decides after verification.",
+    "6_active_state_with_missing_lineage": "Classify as TOPOLOGY_PARTIAL with evidence_type matching the surface, summary.observed_state = <active_state>, summary.lineage_status = MISSING. The non_operability block ensures all flags remain false."
+  }
+}
