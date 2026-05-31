@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "artifact_id": "merge_actor_registry",
+  "issue_reference": "CI-004",
+  "github_issue": "#1669",
+  "status": "ACTIVE",
+  "purpose": "Enumerate and authority-bound all permitted merge actors. Unclassified actors produce MERGE_LEGITIMACY_NULL.",
+  "permitted_human_roles": [
+    {
+      "role": "repository_maintainer",
+      "description": "Repository maintainer with merge authority on governed branches via approved PR flow",
+      "classification": "HUMAN_MERGE_ACTOR",
+      "merge_proof_classification": "HUMAN_MERGE_ACTOR"
+    },
+    {
+      "role": "repository_administrator",
+      "description": "Repository administrator. Merge via governed PR flow is HUMAN_MERGE_ACTOR. Admin bypass of required checks is BREAK_GLASS and does not create merge legitimacy.",
+      "classification": "HUMAN_MERGE_ACTOR_ADMIN",
+      "bypass_classification": "BREAK_GLASS",
+      "bypass_merge_legitimacy": "NULL"
+    }
+  ],
+  "permitted_bot_actors": [],
+  "authority_roles": {
+    "sovereignty_review": [],
+    "note": "Sovereignty-review authority roles are empty until explicitly populated by repository administrator. P3-risk PRs (touching .github/workflows/ or src/) require at least one reviewer with a declared sovereignty-review authority role. An empty allowlist means no reviewer satisfies the P3 authority requirement and PREO review_status will be LEGITIMACY_NULL for P3 PRs."
+  },
+  "forbidden_actor_patterns": [
+    {
+      "pattern": "ELEVATED_SCOPE_TOKEN",
+      "description": "Actions using elevated-scope personal access tokens (PATs with admin or write scope) not registered as a permitted bot actor",
+      "result": "MERGE_LEGITIMACY_NULL"
+    },
+    {
+      "pattern": "UNRECOGNIZED_BOT",
+      "description": "Any bot actor (login ending in [bot]) not explicitly listed in permitted_bot_actors",
+      "result": "MERGE_LEGITIMACY_NULL"
+    }
+  ],
+  "default_unclassified_result": "MERGE_LEGITIMACY_NULL",
+  "classification_rules": [
+    "Human actors classified by role, not individual login",
+    "Bot actors require explicit allowlist entry in permitted_bot_actors",
+    "Admin bypass of required checks is classified as BREAK_GLASS on merge proof — merge legitimacy remains NULL",
+    "Unclassified actors produce MERGE_LEGITIMACY_NULL",
+    "Empty permitted_bot_actors means no bots are permitted merge actors"
+  ],
+  "closes_gaps": ["GAP-004", "MB-009"]
+}

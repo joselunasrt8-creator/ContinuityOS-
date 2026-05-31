@@ -20,6 +20,80 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate reviewer legitimacy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          REPO="${{ github.repository }}"
+
+          # Detect risk class for P3 authority check
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > pr_changed_files_tmp.txt
+          QUICK_RISK_CLASS="P1"
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/*|src/*)
+                QUICK_RISK_CLASS="P3"
+                break
+                ;;
+              governance/*|schema.sql|migrations/*|wrangler.toml)
+                QUICK_RISK_CLASS="P2"
+                ;;
+            esac
+          done < pr_changed_files_tmp.txt
+
+          # Fetch PR reviews
+          gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" > pr_reviews_tmp.json
+
+          # Condition 1: approved review from non-author
+          VALID_APPROVED=$(jq --arg author "$PR_AUTHOR" \
+            '[.[] | select(.state == "APPROVED" and .user.login != $author)] | length' \
+            pr_reviews_tmp.json)
+
+          REVIEW_STATUS="UNVERIFIED"
+
+          if [ "$VALID_APPROVED" -gt 0 ]; then
+            LATEST=$(jq -c --arg author "$PR_AUTHOR" \
+              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last' \
+              pr_reviews_tmp.json)
+
+            REVIEWER_LOGIN=$(echo "$LATEST" | jq -r '.user.login')
+            REVIEW_SUBMITTED_AT=$(echo "$LATEST" | jq -r '.submitted_at')
+
+            # Condition 2: stale check — any commits after approval?
+            COMMITS_AFTER=$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits" | \
+              jq --arg ts "$REVIEW_SUBMITTED_AT" \
+              '[.[] | select(.commit.committer.date > $ts)] | length')
+
+            if [ "$COMMITS_AFTER" -gt 0 ]; then
+              REVIEW_STATUS="LEGITIMACY_NULL"
+              echo "LEGITIMACY_NULL — stale approval: $COMMITS_AFTER commit(s) pushed after approval at $REVIEW_SUBMITTED_AT"
+            else
+              # Condition 3: P3 authority role check
+              if [ "$QUICK_RISK_CLASS" = "P3" ]; then
+                HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
+                  '(.authority_roles.sovereignty_review // []) | map(select(. == $reviewer)) | length > 0' \
+                  governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+                if [ "$HAS_AUTHORITY" = "true" ]; then
+                  REVIEW_STATUS="APPROVED"
+                else
+                  REVIEW_STATUS="LEGITIMACY_NULL"
+                  echo "LEGITIMACY_NULL — P3 risk class: reviewer $REVIEWER_LOGIN not in sovereignty_review authority roles"
+                fi
+              else
+                REVIEW_STATUS="APPROVED"
+              fi
+            fi
+          fi
+
+          echo "REVIEW_STATUS=$REVIEW_STATUS" >> "$GITHUB_ENV"
+          echo "reviewer_legitimacy_status=$REVIEW_STATUS"
+
       - name: Generate PREO candidate
         run: |
           set -euo pipefail
@@ -45,7 +119,7 @@ jobs:
             --arg base_branch "${{ github.base_ref }}" \
             --arg head_branch "${{ github.head_ref }}" \
             --arg head_sha "${{ github.event.pull_request.head.sha }}" \
-            --arg review_status "UNVERIFIED" \
+            --arg review_status "${REVIEW_STATUS:-UNVERIFIED}" \
             --arg checks_status "UNVERIFIED" \
             --arg risk_class "$RISK_CLASS" \
             --arg governed_path_detected "$GOVERNED_PATH_DETECTED" \
@@ -112,6 +186,8 @@ jobs:
           set -euo pipefail
           {
             echo "### PREO Candidate"
+            echo ""
+            echo "reviewer_legitimacy_status=${REVIEW_STATUS:-UNVERIFIED}"
             echo ""
             echo '```json'
             cat PREO_CANDIDATE.json
