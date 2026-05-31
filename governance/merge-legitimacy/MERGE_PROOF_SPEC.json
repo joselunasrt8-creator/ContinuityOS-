@@ -1,0 +1,269 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "merge_proof_spec",
+  "issue_reference": "#1604",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "proof_specification",
+  "generated_at": "2026-05-31",
+  "scope": {
+    "purpose": "Define the specification for a valid merge proof — the terminal record of a governed merge event that binds the complete approval lineage chain and enables future audit and replay detection.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "proof_object": {
+    "type": "MERGE_PROOF",
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "decision_states": ["MERGE_PROOF_VALID", "NULL"],
+    "default_state": "NULL",
+    "single_use": true,
+    "nonce_required": true
+  },
+  "required_fields": {
+    "identity": {
+      "proof_id": {
+        "type": "string",
+        "format": "PROOF-{pr_number}-{merge_commit_sha_prefix}",
+        "description": "Unique identifier for this merge proof",
+        "missing_result": "NULL"
+      },
+      "proof_hash": {
+        "type": "string",
+        "format": "sha256_hex",
+        "description": "SHA-256 hash of the canonicalized proof object (excluding this field)",
+        "missing_result": "NULL"
+      },
+      "invocation_nonce": {
+        "type": "string",
+        "format": "uuid_v4_or_equivalent",
+        "description": "Single-use nonce bound to this proof generation event; reuse produces NULL",
+        "missing_result": "NULL",
+        "reuse_result": "NULL"
+      }
+    },
+    "pr_context": {
+      "pr_number": {
+        "type": "integer",
+        "description": "GitHub PR number that was merged",
+        "missing_result": "NULL"
+      },
+      "repo": {
+        "type": "string",
+        "description": "Repository identifier (owner/name)",
+        "missing_result": "NULL"
+      },
+      "base_branch": {
+        "type": "string",
+        "description": "Target branch into which the PR was merged (must be main for governed merges)",
+        "missing_result": "NULL"
+      },
+      "head_branch": {
+        "type": "string",
+        "description": "Source branch from which the PR was created",
+        "missing_result": "NULL"
+      }
+    },
+    "exact_object_binding": {
+      "head_sha": {
+        "type": "string",
+        "format": "40_character_git_sha",
+        "description": "The exact commit SHA of the PR head at the time PREO was generated and checks ran — the reviewed object",
+        "missing_result": "NULL"
+      },
+      "merge_commit_sha": {
+        "type": "string",
+        "format": "40_character_git_sha",
+        "description": "The exact commit SHA that entered the base branch — the merged object. For squash/rebase merges, this differs from head_sha.",
+        "missing_result": "NULL"
+      },
+      "merge_method": {
+        "type": "string",
+        "enum": ["merge", "squash", "rebase"],
+        "description": "The merge method used — determines relationship between head_sha and merge_commit_sha",
+        "missing_result": "NULL"
+      }
+    },
+    "approval_chain": {
+      "review_status": {
+        "type": "string",
+        "enum": ["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "PENDING", "NULL"],
+        "description": "Approval state of the PR at merge time — must be APPROVED for merge legitimacy",
+        "missing_result": "NULL",
+        "invalid_state_result": "NULL"
+      },
+      "reviewer_identity": {
+        "type": "string",
+        "description": "GitHub login of the approving reviewer",
+        "missing_result": "NULL"
+      },
+      "review_submitted_at": {
+        "type": "string",
+        "format": "ISO8601_UTC",
+        "description": "Timestamp of the approving review submission",
+        "missing_result": "NULL"
+      },
+      "stale_review_dismissed": {
+        "type": "boolean",
+        "description": "Whether stale review dismissal was active when the PR was merged — must be true for governed merges",
+        "false_result": "PARTIAL_GOVERNANCE_GAP"
+      }
+    },
+    "preo_binding": {
+      "preo_id": {
+        "type": "string",
+        "format": "PREO-{pr_number}-{head_sha}",
+        "description": "Identifier of the PREO_CANDIDATE that covers this merge",
+        "missing_result": "NULL"
+      },
+      "preo_head_sha": {
+        "type": "string",
+        "format": "40_character_git_sha",
+        "description": "The head_sha bound in the PREO_CANDIDATE — must match head_sha in this proof",
+        "mismatch_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+      },
+      "preo_status": {
+        "type": "string",
+        "enum": ["PREO_CANDIDATE", "PREO_VALID", "PREO_INVALID"],
+        "description": "Status of the PREO at merge time — must be PREO_CANDIDATE or PREO_VALID; PREO_INVALID produces NULL",
+        "invalid_result": "NULL"
+      },
+      "preo_risk_class": {
+        "type": "string",
+        "enum": ["P1", "P2", "P3"],
+        "description": "Risk classification assigned by the PREO_CANDIDATE",
+        "missing_result": "NULL"
+      }
+    },
+    "sco_binding": {
+      "sco_id": {
+        "type": "string",
+        "format": "SCO-{pr_number}-{head_sha}",
+        "description": "Identifier of the SCO_CANDIDATE — required when governed_path_detected is true",
+        "conditional": "required_when_governed_path_detected",
+        "missing_when_required_result": "NULL"
+      },
+      "sco_head_sha": {
+        "type": "string",
+        "format": "40_character_git_sha",
+        "description": "The head_sha bound in the SCO_CANDIDATE — must match head_sha in this proof",
+        "mismatch_result": "NULL"
+      },
+      "governed_path_detected": {
+        "type": "boolean",
+        "description": "Whether the PR touched governed paths requiring SCO"
+      },
+      "mutation_classes": {
+        "type": "array",
+        "items": "string",
+        "description": "List of mutation classes detected by the SCO (e.g., governance_mutation, runtime_mutation, workflow_mutation)"
+      }
+    },
+    "checks_binding": {
+      "checks_status": {
+        "type": "string",
+        "enum": ["PASSING", "FAILING", "PENDING", "NULL"],
+        "description": "Status of all required status checks at merge time — must be PASSING",
+        "missing_result": "NULL",
+        "failing_result": "MERGE_LEGITIMACY_NULL"
+      },
+      "required_checks_passed": {
+        "type": "array",
+        "items": "string",
+        "description": "List of required check names that passed (merge-governance-check, generate-preo-candidate, generate-sco-candidate)",
+        "missing_result": "NULL"
+      }
+    },
+    "topology_binding": {
+      "topology_reconciliation_id": {
+        "type": "string",
+        "description": "Identifier of the TOPOLOGY_RECONCILIATION_SIGNAL emitted during this merge check run",
+        "missing_result": "NULL"
+      },
+      "topology_merge_signal": {
+        "type": "string",
+        "enum": ["SAFE_TO_MERGE", "TOPOLOGY_DRIFT", "GOVERNANCE_DIVERGENCE", "UNDECLARED_EXECUTION_SURFACE"],
+        "description": "Topology reconciliation signal — must be SAFE_TO_MERGE; other values produce MERGE_LEGITIMACY_NULL",
+        "drift_result": "MERGE_LEGITIMACY_NULL"
+      },
+      "topology_evidence_only": {
+        "type": "boolean",
+        "description": "Must be true — topology reconciliation signal is evidence only and cannot authorize merge",
+        "false_result": "NULL"
+      }
+    },
+    "merge_actor": {
+      "merged_by": {
+        "type": "string",
+        "description": "GitHub login of the actor who performed the merge",
+        "missing_result": "NULL"
+      },
+      "merged_at": {
+        "type": "string",
+        "format": "ISO8601_UTC",
+        "description": "Timestamp of the merge event",
+        "missing_result": "NULL"
+      },
+      "merge_actor_classification": {
+        "type": "string",
+        "enum": ["human", "bot", "admin_override", "unknown"],
+        "description": "Classification of the merge actor — admin_override and unknown produce BREAK_GLASS classification on the proof"
+      }
+    }
+  },
+  "proof_decision": {
+    "MERGE_PROOF_VALID": {
+      "conditions": [
+        "All required fields present and non-null",
+        "head_sha matches preo_head_sha and sco_head_sha",
+        "review_status == APPROVED",
+        "checks_status == PASSING",
+        "preo_status is PREO_CANDIDATE or PREO_VALID",
+        "sco_id present when governed_path_detected == true",
+        "topology_merge_signal == SAFE_TO_MERGE",
+        "topology_evidence_only == true",
+        "invocation_nonce is fresh (not reused)",
+        "proof_hash verifies against canonicalized proof content"
+      ]
+    },
+    "NULL": {
+      "conditions": [
+        "Any required field is missing",
+        "head_sha does not match preo_head_sha or sco_head_sha",
+        "review_status != APPROVED",
+        "checks_status != PASSING",
+        "preo_status == PREO_INVALID",
+        "sco_id missing when governed_path_detected == true",
+        "topology_merge_signal != SAFE_TO_MERGE",
+        "topology_evidence_only != true",
+        "invocation_nonce reused",
+        "proof_hash mismatch"
+      ]
+    }
+  },
+  "proof_storage_requirements": {
+    "persistence": "Merge proof must be stored in a durable, append-only registry bound to the repository",
+    "registry_location": "proof registry (equivalent to proof_lineage_registry in runtime schema)",
+    "deduplication": "proof_id and invocation_nonce must be unique per registry entry",
+    "audit_access": "Proof registry must be readable for lineage reconstruction without requiring runtime mutation access",
+    "retention": "Proof must be retained for the lifetime of the repository to support retrospective audit"
+  },
+  "failure_semantics": {
+    "missing_required_field": "NULL",
+    "sha_mismatch": "NULL",
+    "stale_preo": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "missing_sco_when_required": "NULL",
+    "topology_drift": "MERGE_LEGITIMACY_NULL",
+    "replay_detected": "NULL",
+    "proof_hash_mismatch": "NULL",
+    "unauthorized_actor": "BREAK_GLASS classification on proof — merge legitimacy remains NULL if actor bypassed required controls"
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "pr_governance_gap_list",
+  "issue_reference": "#1604",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "gap_analysis",
+  "generated_at": "2026-05-31",
+  "scope": {
+    "purpose": "Enumerate all remaining governance gaps between the current PR admission state and full Phase 2 closure. Gap identification only — does not close, remediate, or authorize any operation.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "closure_criteria": {
+    "phase_2_closed_when": [
+      "all code admission == single governed merge path",
+      "no unresolved merge bypass path exists"
+    ],
+    "current_status": "OPEN — multiple gaps remain"
+  },
+  "gaps": [
+    {
+      "gap_id": "GAP-001",
+      "title": "Branch Protection Enforcement Is Advisory Only",
+      "severity": "CRITICAL",
+      "category": "enforcement",
+      "description": "BRANCH_PROTECTION_POLICY.json and MERGE_GOVERNANCE_RULES.json declare required branch protection controls (require_pull_request_before_merge, dismiss_stale_reviews, allow_force_pushes: false, etc.). However, enforcement_classification is 'advisory' — actual GitHub branch protection rules must be activated at the repository settings level by an admin. Repository code cannot verify or enforce this.",
+      "impact": "All bypass paths that depend on branch protection enforcement (MB-001, MB-002, MB-003, MB-010) remain open until branch protection is active.",
+      "required_action": "Repository admin must activate branch protection rules on main matching BRANCH_PROTECTION_POLICY.json declarations. An external audit log or verification step is needed to confirm activation.",
+      "closure_condition": "GitHub branch protection on main is active, verified externally, and all declared required controls are enforced.",
+      "blocks_closure": true,
+      "child_issue_recommended": true,
+      "child_issue_disposition": "new_child_issue",
+      "child_issue_slot": "CI-001",
+      "child_issue_title": "Activate and verify branch protection enforcement on main"
+    },
+    {
+      "gap_id": "GAP-002",
+      "title": "Admin Bypass Cannot Be Prevented by Repository Code",
+      "severity": "CRITICAL",
+      "category": "authority_containment",
+      "description": "BRANCH_PROTECTION_POLICY.json declares allow_admin_bypass: false and classifies admin bypass as root authority evidence only. However, a GitHub repository admin can override branch protection regardless of what the repository policy artifact declares. This is a structural property of GitHub's permission model, not a remediable code issue.",
+      "impact": "Admin override remains an ungoverned merge path (MB-005). Cannot be closed without external org-level enforcement.",
+      "required_action": "GitHub org-level policy must be configured to prevent admin bypass (GitHub Enterprise 'Require branch protection' enforcement at org level, or GitHub repository ruleset with bypass list set to empty). An audit log external to the repository must record admin override events.",
+      "closure_condition": "Org-level enforcement prevents admin bypass; external audit log confirms no admin bypass events occurred.",
+      "blocks_closure": true,
+      "child_issue_recommended": false,
+      "child_issue_disposition": "external_constraint",
+      "child_issue_note": "Structural GitHub permission property; cannot be addressed by repository code. Requires org-level enforcement external to this repository."
+    },
+    {
+      "gap_id": "GAP-003",
+      "title": "Merge Queue Combined SHA Not Covered by Original PREO",
+      "severity": "HIGH",
+      "category": "exact_object_admission",
+      "description": "If merge queue is enabled and batches multiple PRs, the enqueued commit SHA differs from the original PR head_sha. The existing merge-governance-check workflow runs on the pull_request event and generates PREO/SCO bound to the PR head_sha — not the enqueued combined SHA. The merged object may not equal the reviewed object.",
+      "impact": "Core invariant violated: reviewed_object != merged_object for queue-combined commits. Merge legitimacy is NULL for any commit admitted via merge queue batch.",
+      "required_action": "Either: (a) disable merge queue for governed branches, or (b) implement a merge-queue-specific governance check that regenerates PREO/SCO against the enqueued combined SHA before merge is allowed.",
+      "closure_condition": "Merge queue disabled for main, OR merge-queue PREO regeneration workflow implemented and required.",
+      "blocks_closure": true,
+      "child_issue_recommended": true,
+      "child_issue_disposition": "new_child_issue",
+      "child_issue_slot": "CI-003",
+      "child_issue_title": "Classify and contain merge queue combined-SHA gap"
+    },
+    {
+      "gap_id": "GAP-004",
+      "title": "Bot Merge Actor Not Classified or Authority-Bound",
+      "severity": "HIGH",
+      "category": "authority_classification",
+      "description": "The PR governance framework does not enumerate permitted bot actors or restrict bot token authority scopes. A bot with write:contents or admin permissions could open and merge a PR — potentially with elevated token scope that bypasses required checks. Bot identity is not validated by PREO/SCO workflows.",
+      "impact": "Bot merge via elevated token (MB-009) remains an unclassified bypass path. The merge actor field in a merge proof cannot distinguish legitimate bot merges from privileged bypasses.",
+      "required_action": "Enumerate permitted merge actors (human and bot) in the governance framework. Restrict bot token authority scope (e.g., GITHUB_TOKEN with minimum permissions). Classify bot-merged PRs as requiring human review approval.",
+      "closure_condition": "All merge actors classified; bot actor authority scope bounded; unauthorized merge actors produce MERGE_LEGITIMACY_NULL.",
+      "blocks_closure": true,
+      "child_issue_recommended": true,
+      "child_issue_disposition": "new_child_issue",
+      "child_issue_slot": "CI-004",
+      "child_issue_title": "Enumerate and authority-bound permitted merge actors"
+    },
+    {
+      "gap_id": "GAP-005",
+      "title": "No Merge Proof Generation Mechanism Exists",
+      "severity": "HIGH",
+      "category": "proof_generation",
+      "description": "MERGE_PROOF_SPEC.json and MERGE_LINEAGE_MODEL.json specify what a merge proof must contain, but no workflow or runtime component generates merge proofs after a PR is merged. The merge-governance-check workflow runs on pull_request events (before merge) and generates PREO/SCO candidates — but no post-merge workflow generates or stores the merge proof.",
+      "impact": "Without merge proofs, the approval lineage chain (review → approval → validation → merge → proof) cannot be reconstructed or audited. Governed merge semantics are declared but not proven.",
+      "required_action": "Implement a post-merge workflow (on: pull_request: types: [closed] with merged == true) that generates a merge proof binding pr_number, head_sha, merge_commit_sha, preo_id, sco_id, review_status, checks_status, merged_by, merged_at, and invocation_nonce, then stores it in a proof registry.",
+      "closure_condition": "Merge proof generation workflow implemented, storing proof to durable registry for every governed merge.",
+      "blocks_closure": true,
+      "child_issue_recommended": true,
+      "child_issue_disposition": "new_child_issue",
+      "child_issue_slot": "CI-002",
+      "child_issue_title": "Implement post-merge proof generation workflow"
+    },
+    {
+      "gap_id": "GAP-006",
+      "title": "Workflow-Dispatch Merge Surface Not Enumerated",
+      "severity": "MEDIUM",
+      "category": "surface_classification",
+      "description": "No current workflow performs a direct merge, but any workflow with write:contents permission is a potential merge surface. The governed-deploy.yml and governed-release.yml workflows operate on already-merged code. However, a modified or new workflow with write:contents could perform a direct merge or push to main — and the SCO classification only governs the PR that introduces the workflow change, not the workflow's subsequent execution.",
+      "impact": "Workflow-generated merges (MB-006) remain a partially-classified surface. A workflow mutation PR would require SCO, but the workflow's own subsequent execution is not governed.",
+      "required_action": "Enumerate all workflow files with write:contents permission. Classify each as a potential merge surface. Implement a post-merge workflow permission audit step.",
+      "closure_condition": "All write:contents workflows enumerated and classified; no workflow with direct merge capability exists outside the governed PR flow.",
+      "blocks_closure": false,
+      "child_issue_recommended": false,
+      "child_issue_disposition": "inline_resolution",
+      "child_issue_note": "Update MERGE_SURFACE_INVENTORY.json with write:contents workflow audit. No direct merge currently exists; this is a classification gap resolvable in a single artifact update."
+    },
+    {
+      "gap_id": "GAP-007",
+      "title": "Phase 1 Deploy Closure Not Yet Confirmed",
+      "severity": "HIGH",
+      "category": "dependency",
+      "description": "Issue #1604 commentary confirms that Phase 2 PR governance closure depends on Phase 1 deploy closure. The Phase 1 audit status is AUDIT_PENDING / VERIFICATION_PENDING / CLOSURE_UNDETERMINED as of 2026-05-31. Phase 2 cannot reach CLOSED while its dependency on Phase 1 remains unresolved.",
+      "impact": "Merge legitimacy depends on deploy legitimacy per the Phase 2 anchor dependency topology. An unresolved Phase 1 means the downstream Phase 2 chain cannot be closed.",
+      "required_action": "Complete Phase 1 deploy closure verification. Confirm deploy-capable execution paths are fail-closed in the absence of required legitimacy controls.",
+      "closure_condition": "Phase 1 (#1601) closure status confirmed; dependency chain resolved.",
+      "blocks_closure": true,
+      "child_issue_recommended": false,
+      "child_issue_disposition": "dependency",
+      "child_issue_note": "This gap IS issue #1601. Closes when #1601 closes. No new issue needed."
+    },
+    {
+      "gap_id": "GAP-008",
+      "title": "Stale Approval Timing Window in Auto-Merge",
+      "severity": "MEDIUM",
+      "category": "replay_containment",
+      "description": "When auto-merge is enabled, there is a timing window between review approval and the moment auto-merge fires. If a push occurs after approval but before auto-merge executes, stale-review-dismissal must be active to block the merge. The current BRANCH_PROTECTION_POLICY.json declares dismiss_stale_reviews: true, but this depends on active branch protection enforcement (see GAP-001).",
+      "impact": "Auto-merge may merge a stale object if dismiss_stale_reviews is not enforced. Core invariant violated: reviewed_object != merged_object.",
+      "required_action": "Ensure dismiss_stale_reviews is active at branch protection level (depends on GAP-001 closure). Consider disabling auto-merge on governed branches as additional containment.",
+      "closure_condition": "GAP-001 closed (branch protection active) AND dismiss_stale_reviews confirmed active for main.",
+      "blocks_closure": false,
+      "child_issue_recommended": false,
+      "child_issue_disposition": "resolves_with_gap_id",
+      "resolves_with": "GAP-001",
+      "child_issue_note": "Closes automatically when CI-001 (branch protection activation) is complete."
+    },
+    {
+      "gap_id": "GAP-009",
+      "title": "External Bot Auto-Merge Policy Not Declared",
+      "severity": "LOW",
+      "category": "surface_classification",
+      "description": "No Dependabot or Renovate configuration is present. If these services are ever activated, they may open and auto-merge PRs with elevated bot permissions. No policy exists governing this surface.",
+      "impact": "External bot auto-merge surfaces (MS-011) are UNKNOWN — not currently active but not excluded.",
+      "required_action": "Explicitly declare that external dependency updaters (Dependabot, Renovate) are either (a) disabled, or (b) classified with authority containment requirements if enabled.",
+      "closure_condition": "Policy artifact explicitly classifies external bot auto-merge surfaces as disabled or governed.",
+      "blocks_closure": false,
+      "child_issue_recommended": false,
+      "child_issue_disposition": "inline_resolution",
+      "child_issue_note": "Dependabot and Renovate are not configured. A single policy declaration updating MS-011 in MERGE_SURFACE_INVENTORY.json closes this. No full child issue needed."
+    },
+    {
+      "gap_id": "GAP-010",
+      "title": "Reviewer Legitimacy Validation Not Enforced at Merge Time",
+      "severity": "MEDIUM",
+      "category": "review_legitimacy",
+      "description": "The reviewer_legitimacy_validation spec (issue #1632) defines requirements for who can approve a PR. However, the merge-governance-check workflow does not validate reviewer identity or authority lineage at merge time — PREO_CANDIDATE records review_status as UNVERIFIED until a separate check resolves it.",
+      "impact": "A PR could be approved by an actor with insufficient authority (e.g., the PR author self-approving, or a bot approval without human review). The approval lineage chain would record an invalid approval.",
+      "required_action": "Implement reviewer legitimacy validation in the PREO/SCO generation workflow. Check that reviewer is not the PR author. Check that reviewer has appropriate authority for the PR's risk class.",
+      "closure_condition": "Reviewer legitimacy validated at merge-check time; unauthorized reviewer approval produces PREO_INVALID.",
+      "blocks_closure": false,
+      "child_issue_recommended": true,
+      "child_issue_disposition": "new_child_issue",
+      "child_issue_slot": "CI-005",
+      "child_issue_title": "Enforce reviewer legitimacy in PREO generation"
+    }
+  ],
+  "summary": {
+    "total_gaps": 10,
+    "closure_blocking": 6,
+    "high_severity_non_blocking": 2,
+    "medium_severity_non_blocking": 2,
+    "low_severity_non_blocking": 1,
+    "closure_blocking_gaps": [
+      "GAP-001 — Branch protection enforcement is advisory only",
+      "GAP-002 — Admin bypass cannot be prevented by repository code",
+      "GAP-003 — Merge queue combined SHA not covered by PREO",
+      "GAP-004 — Bot merge actor not classified or authority-bound",
+      "GAP-005 — No merge proof generation mechanism exists",
+      "GAP-007 — Phase 1 deploy closure not yet confirmed"
+    ],
+    "phase_2_closure_status": "OPEN — 6 closure-blocking gaps remain unresolved",
+    "child_issue_routing": {
+      "gaps_requiring_new_child_issues": 5,
+      "child_issue_slots": [
+        "CI-001 (GAP-001) — Activate and verify branch protection enforcement on main",
+        "CI-002 (GAP-005) — Implement post-merge proof generation workflow",
+        "CI-003 (GAP-003) — Classify and contain merge queue combined-SHA gap",
+        "CI-004 (GAP-004) — Enumerate and authority-bound permitted merge actors",
+        "CI-005 (GAP-010) — Enforce reviewer legitimacy in PREO generation"
+      ],
+      "gaps_with_external_constraint": ["GAP-002"],
+      "gaps_with_inline_resolution": ["GAP-006", "GAP-009"],
+      "gaps_with_dependency": ["GAP-007"],
+      "gaps_resolving_with_other_gap": ["GAP-008"],
+      "closure_type": "PLANNING_CLOSURE_COMPLETE — ENFORCEMENT_CLOSURE_NOT_ELIGIBLE",
+      "enforcement_closure_requires": "CI-001 through CI-005 verified closed AND #1601 verified closed"
+    }
+  }
+}

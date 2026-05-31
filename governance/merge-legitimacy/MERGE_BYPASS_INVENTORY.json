@@ -1,0 +1,217 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "merge_bypass_inventory",
+  "issue_reference": "#1604",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "bypass_inventory",
+  "generated_at": "2026-05-31",
+  "scope": {
+    "purpose": "Enumerate and classify all paths through which code could enter the main branch without traversing the governed admission path. Classification only — does not authorize, deny, or modify any operation.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "bypass_classification_key": {
+    "ACTIVE_BYPASS": "Path currently open and capable of admitting code without governance controls.",
+    "DECLARED_FORBIDDEN": "Path declared forbidden in policy artifacts; enforcement depends on external GitHub branch protection activation.",
+    "PARTIAL_BYPASS": "Path partially governed — some controls exist but legitimacy gap remains under specific conditions.",
+    "CLASSIFIED_BREAK_GLASS": "Path exists as an explicit emergency escape hatch; classified, visible, and cannot produce merge legitimacy."
+  },
+  "bypass_paths": [
+    {
+      "bypass_id": "MB-001",
+      "name": "Direct Push to main",
+      "category": "direct_push",
+      "classification": "DECLARED_FORBIDDEN",
+      "preconditions": [
+        "Repository collaborator with write or admin access",
+        "GitHub branch protection not enforced or bypassed"
+      ],
+      "governance_gap": "Cannot produce PREO_VALID. No review, no status checks, no SCO. Merge legitimacy is NULL.",
+      "detection": "Visible in git commit history and GitHub push events. Not bound to MindShift proof registry.",
+      "result_if_executed": "MERGE_LEGITIMACY_NULL — root authority evidence only",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: bypass_path_policy.direct_push_to_main",
+      "enforcement_state": "policy_declared — requires active GitHub branch protection rule to enforce",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-002",
+      "name": "Force Push to main",
+      "category": "force_push",
+      "classification": "DECLARED_FORBIDDEN",
+      "preconditions": [
+        "Repository collaborator with admin access",
+        "GitHub branch protection allows_force_pushes not enforced"
+      ],
+      "governance_gap": "Rewrites main branch history. Prior merge proofs and lineage bindings may be erased. Cannot produce PREO_VALID.",
+      "detection": "Visible in git reflog and GitHub push events. Destructive — prior commits may be unreachable.",
+      "result_if_executed": "MERGE_LEGITIMACY_NULL — root authority evidence only — prior proof lineage may be invalidated",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: bypass_path_policy.force_push_to_main; BRANCH_PROTECTION_POLICY.json: allow_force_pushes: false",
+      "enforcement_state": "policy_declared — requires active GitHub branch protection rule to enforce",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-003",
+      "name": "Stale Approval — Push After Approval Before Merge",
+      "category": "stale_approval",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "PR approved by reviewer",
+        "New commit pushed to the PR branch after approval",
+        "dismiss_stale_reviews not active or bypassed"
+      ],
+      "governance_gap": "Reviewed object is not the merged object. Core invariant violated: reviewed_object != merged_object. PREO head_sha binding detects this — but only if the required check re-runs against the new head_sha.",
+      "detection": "PREO head_sha mismatch detects if merge-governance-check re-runs on push. If branch protection does not require checks to pass on the new head before merge, gap is exploitable.",
+      "result_if_executed": "PREO_INVALID — MERGE_LEGITIMACY_NULL if PREO head_sha mismatch is enforced; BYPASS if check is not re-run",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: pr_head_sha_binding; BRANCH_PROTECTION_POLICY.json: dismiss_stale_reviews: true, require_branch_up_to_date_before_merge: true",
+      "enforcement_state": "partial — PREO head_sha binding detects staleness if checks run; enforcement depends on GitHub branch protection requiring up-to-date branch",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-004",
+      "name": "Bypassed Status Checks",
+      "category": "bypassed_status_checks",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "Required status check listed in branch protection does not match an emitted GitHub Actions job name",
+        "GitHub branch protection marks unresolved required checks as passing (does not happen by default) or check is removed from required list"
+      ],
+      "governance_gap": "A required check that does not correspond to a real emitted job name will never resolve. If GitHub treats an unresolved required check as satisfied (e.g., after check is removed from required list or renamed), the governed merge path is bypassed.",
+      "detection": "MERGE_GOVERNANCE_RULES.json validation step asserts required_status_checks match emitted job names. Drift between policy and actual required checks produces PREO_INVALID.",
+      "result_if_executed": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL if drift is detected by governance check; BYPASS if governance check itself is not required or is removed",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: deterministic_artifact_policy; BRANCH_PROTECTION_POLICY.json: required_status_checks",
+      "enforcement_state": "partial — governed by in-workflow assertion; requires GitHub branch protection to enforce that required checks must actually pass",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-005",
+      "name": "Administrative Override Without PR",
+      "category": "administrative_override",
+      "classification": "CLASSIFIED_BREAK_GLASS",
+      "preconditions": [
+        "Repository admin bypasses branch protection",
+        "Merge or push executed without going through PR flow"
+      ],
+      "governance_gap": "Admin bypass cannot produce PREO_VALID. No review binding, no SCO, no proof. Merge legitimacy is NULL.",
+      "detection": "Visible in GitHub repository event log if audit logging is enabled. Not bound to MindShift proof or PREO registry.",
+      "result_if_executed": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> MERGE_LEGITIMACY_NULL",
+      "policy_reference": "BRANCH_PROTECTION_POLICY.json: admin_bypass_policy.allow_admin_bypass: false; MERGE_GOVERNANCE_RULES.json: root_authority_policy",
+      "enforcement_state": "policy_declared — cannot be enforced from repository code alone; requires GitHub org-level policy or external audit logging",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-006",
+      "name": "Workflow-Generated Merge Without PR",
+      "category": "workflow_merge",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "A GitHub Actions workflow has write:contents permission",
+        "Workflow executes a git push or GitHub API merge call directly to main"
+      ],
+      "governance_gap": "No current workflow in the repository performs a direct merge. However, a modified or newly-added workflow with write:contents permission could do so. SCO classification for workflow mutations (governed path) requires SCO but does not prevent workflow execution.",
+      "detection": "Workflow mutations trigger SCO classification in merge-governance-check.yml. A new workflow performing a direct merge would be classified as a governance mutation and require SCO — but the SCO only applies to the PR that introduced the workflow, not to the workflow's own execution.",
+      "result_if_executed": "MERGE_LEGITIMACY_NULL for any resulting merge — the workflow execution itself is not bound by PREO/SCO",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: rules (Governance/runtime mutation -> requires SCO); sco_enforcement.required_for_paths includes .github/workflows/**",
+      "enforcement_state": "partial — SCO governs workflow-mutation PRs; does not govern workflow execution producing merges",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-007",
+      "name": "Merge Queue — Combined SHA Not Covered by Original PREO",
+      "category": "merge_queue",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "Merge queue enabled",
+        "Multiple PRs batched — queue creates a combined commit SHA",
+        "Original PREO binds original PR head_sha, not combined queue SHA"
+      ],
+      "governance_gap": "The merged object (combined queue SHA) was never individually reviewed or covered by a PREO. The reviewed_object != merged_object invariant is violated for the combined entry.",
+      "detection": "Detectable in theory if merge proofs bind merge_commit_sha and a reconciliation process compares that to the PREO-bound head_sha — but no automated detection exists in current repository.",
+      "result_if_executed": "MERGE_LEGITIMACY_NULL — combined SHA is not the reviewed object",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: merge_method_policy.merge_queue; rules: Merge queue may only preserve legitimacy when required checks run against the enqueued exact head_sha",
+      "enforcement_state": "policy_declared — no enforcement mechanism in repository code for merge queue combined SHA; depends on GitHub merge queue configuration",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-008",
+      "name": "Approval Reuse Across PRs",
+      "category": "stale_approval",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "A review approval from a previous PR is incorrectly mapped to a new or amended PR",
+        "PREO does not verify that the approval is bound to the exact PR head_sha"
+      ],
+      "governance_gap": "PREO head_sha binding prevents reuse within a single PR if checks re-run. But if a PR is closed and a near-identical PR is opened, the prior approval cannot be reused — the new PR gets a new head_sha and must go through a fresh review cycle. This is enforced by PREO head_sha binding.",
+      "detection": "PREO head_sha binding prevents approval reuse across PRs — different PR = different head_sha = new PREO required.",
+      "result_if_executed": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL — mismatched head_sha detected",
+      "policy_reference": "MERGE_GOVERNANCE_RULES.json: pr_head_sha_binding; MERGE_LINEAGE_MODEL.json: replay_controls",
+      "enforcement_state": "governed — PREO head_sha binding closes this path in theory; enforcement depends on checks running against current head_sha before merge",
+      "open": false
+    },
+    {
+      "bypass_id": "MB-009",
+      "name": "Bot Merge With Elevated Token Permissions",
+      "category": "bot_merge",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "A bot or automation has a GitHub PAT or installation token with admin or write:contents scope",
+        "Bot opens a PR and merges it programmatically, potentially bypassing required checks"
+      ],
+      "governance_gap": "Bot identity and token authority are not enumerated in the PR governance framework. A bot with sufficient permissions could merge a PR by calling the GitHub API with bypass_approvals or similar parameters.",
+      "detection": "PR merge events are visible in GitHub event log. PREO/SCO are generated for any PR that triggers the merge-governance-check workflow — but the workflow runs as a required check and could be bypassed by a bot with admin scope.",
+      "result_if_executed": "MERGE_LEGITIMACY_NULL — bot merge without PREO_VALID produces no merge legitimacy",
+      "policy_reference": "MERGE_SURFACE_INVENTORY.json: MS-006; MERGE_GOVERNANCE_RULES.json: bypass_paths",
+      "enforcement_state": "unclassified — bot actors not enumerated; authority scope not bounded",
+      "open": true
+    },
+    {
+      "bypass_id": "MB-010",
+      "name": "Auto-Merge With Stale Review After Subsequent Push",
+      "category": "stale_approval",
+      "classification": "PARTIAL_BYPASS",
+      "preconditions": [
+        "Auto-merge enabled on a PR",
+        "PR approved",
+        "Subsequent push to the PR branch occurs after approval but before auto-merge fires",
+        "dismiss_stale_reviews not active or check-run requirement not re-triggered"
+      ],
+      "governance_gap": "If auto-merge fires against a commit that was pushed after the last approval, the reviewed_object != merged_object. The timing window between approval and auto-merge execution is an inherent structural gap.",
+      "detection": "PREO head_sha binding detects this — if the merge-governance-check re-runs after the push and confirms the new head_sha, the stale review is caught. But if auto-merge fires before the new check completes, the gap may be exploited.",
+      "result_if_executed": "MERGE_LEGITIMACY_NULL if stale review is detected and dismissed; BYPASS if timing window allows auto-merge before review dismissal propagates",
+      "policy_reference": "MERGE_SURFACE_INVENTORY.json: MS-005; BRANCH_PROTECTION_POLICY.json: dismiss_stale_reviews: true",
+      "enforcement_state": "partial — timing-dependent; requires dismiss_stale_reviews enforcement to be active at GitHub branch protection level",
+      "open": true
+    }
+  ],
+  "summary": {
+    "total_bypass_paths_inventoried": 10,
+    "declared_forbidden": 2,
+    "partial_bypass": 6,
+    "classified_break_glass": 1,
+    "closed": 1,
+    "open_bypass_paths": [
+      "MB-001 — Direct Push (enforcement external)",
+      "MB-002 — Force Push (enforcement external)",
+      "MB-003 — Stale Approval (timing-dependent enforcement)",
+      "MB-004 — Bypassed Status Checks (drift-dependent)",
+      "MB-005 — Admin Override (enforcement external)",
+      "MB-006 — Workflow-Generated Merge (structural gap)",
+      "MB-007 — Merge Queue Combined SHA (no automated detection)",
+      "MB-009 — Bot Merge with Elevated Token (unclassified actor)",
+      "MB-010 — Auto-Merge Stale Review Timing Window (timing-dependent)"
+    ],
+    "closed_bypass_paths": [
+      "MB-008 — Approval Reuse Across PRs (closed by PREO head_sha binding)"
+    ],
+    "merge_bypass_closure_status": "OPEN — multiple bypass paths remain either policy-declared-only or structurally partial"
+  }
+}
