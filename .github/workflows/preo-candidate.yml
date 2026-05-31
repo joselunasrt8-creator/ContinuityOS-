@@ -48,6 +48,9 @@ jobs:
           AUTHORITY_ROLE_VALID="false"
           REVIEW_AUTHORITY_RESULT="false"
           FAILURE_REASONS="[]"
+          CHANGED_P3_FILES_JSON="[]"
+          REVIEWER_SCOPE_PATHS_JSON="[]"
+          SCOPE_COVERAGE_VALID="false"
 
           # A3: require APPROVED review where commit_id == current head SHA (object identity, not timestamp)
           APPROVED_ON_HEAD=$(jq -c \
@@ -64,12 +67,42 @@ jobs:
             if [ "$QUICK_RISK_CLASS" = "P3" ]; then
               AUTHORITY_ROLE_REQUIRED="sovereignty_review"
               HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
-                '(.authority_roles.sovereignty_review // []) | map(select(. == $reviewer)) | length > 0' \
+                '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | length > 0' \
                 governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
               if [ "$HAS_AUTHORITY" = "true" ]; then
-                AUTHORITY_ROLE_VALID="true"
-                REVIEW_AUTHORITY_RESULT="true"
-                REVIEW_STATUS="APPROVED"
+                # Build changed P3 files list
+                P3_PATTERNS=$(jq -r '.rules[] | select(.risk == "P3") | .patterns[]' governance/merge-legitimacy/RISK_CLASSIFICATION_RULES.json)
+                while IFS= read -r file; do
+                  [ -z "$file" ] && continue
+                  for pattern in $P3_PATTERNS; do
+                    if [[ "$file" == $pattern ]]; then
+                      CHANGED_P3_FILES_JSON=$(printf '%s' "$CHANGED_P3_FILES_JSON" | jq --arg f "$file" '. + [$f]')
+                      break
+                    fi
+                  done
+                done < pr_changed_files_tmp.txt
+                # Load reviewer scope paths and verify coverage
+                REVIEWER_SCOPE_PATHS_JSON=$(jq -c --arg reviewer "$REVIEWER_LOGIN" \
+                  '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | .[0].scope_paths // []' \
+                  governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+                SCOPE_COVERAGE_VALID="true"
+                while IFS= read -r file; do
+                  [ -z "$file" ] && continue
+                  covered="false"
+                  while IFS= read -r pattern; do
+                    [ -z "$pattern" ] && continue
+                    if [[ "$file" == $pattern ]]; then covered="true"; break; fi
+                  done < <(printf '%s' "$REVIEWER_SCOPE_PATHS_JSON" | jq -r '.[]')
+                  if [ "$covered" = "false" ]; then SCOPE_COVERAGE_VALID="false"; break; fi
+                done < <(printf '%s' "$CHANGED_P3_FILES_JSON" | jq -r '.[]')
+                if [ "$SCOPE_COVERAGE_VALID" = "true" ]; then
+                  AUTHORITY_ROLE_VALID="true"
+                  REVIEW_AUTHORITY_RESULT="true"
+                  REVIEW_STATUS="APPROVED"
+                else
+                  FAILURE_REASONS='["p3_files_outside_reviewer_scope"]'
+                  REVIEW_STATUS="LEGITIMACY_NULL"
+                fi
               else
                 FAILURE_REASONS='["reviewer_not_in_sovereignty_review_for_p3"]'
                 REVIEW_STATUS="LEGITIMACY_NULL"
@@ -137,6 +170,9 @@ jobs:
             --arg review_status "$REVIEW_STATUS" \
             --arg canonical_input_hash "$CANONICAL_INPUT_HASH" \
             --argjson failure_reasons "$FAILURE_REASONS" \
+            --argjson changed_p3_files "$CHANGED_P3_FILES_JSON" \
+            --argjson reviewer_scope_paths "$REVIEWER_SCOPE_PATHS_JSON" \
+            --argjson scope_coverage_valid "$SCOPE_COVERAGE_VALID" \
             '{
               version: $version,
               pr_number: $pr_number,
@@ -152,7 +188,10 @@ jobs:
               review_authority_result: $review_authority_result,
               review_status: $review_status,
               canonical_input_hash: $canonical_input_hash,
-              failure_reasons: $failure_reasons
+              failure_reasons: $failure_reasons,
+              changed_p3_files: $changed_p3_files,
+              reviewer_scope_paths: $reviewer_scope_paths,
+              scope_coverage_valid: $scope_coverage_valid
             }' > review_legitimacy_result.json
 
           LEGITIMACY_RESULT_HASH=$(sha256sum review_legitimacy_result.json | cut -d' ' -f1)
