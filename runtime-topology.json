@@ -43,6 +43,62 @@
     {
       "id": "runtime:lineage",
       "type": "CONTINUITY"
+    },
+    {
+      "id": "bypass:agent_tool_call",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "UNKNOWN",
+      "surface_category": "agent",
+      "mutation_capable": true,
+      "description": "Ungoverned agent tool call — mutation outside canonical lifecycle"
+    },
+    {
+      "id": "bypass:ci_cd_direct_dispatch",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "UNKNOWN",
+      "surface_category": "ci_cd",
+      "mutation_capable": true,
+      "description": "Direct CI/CD workflow dispatch without valid authority object"
+    },
+    {
+      "id": "bypass:wrangler_direct_deploy",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "BREAK_GLASS",
+      "surface_category": "deploy",
+      "mutation_capable": true,
+      "description": "Direct wrangler deploy outside governed workflow"
+    },
+    {
+      "id": "bypass:raw_d1_migration",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "UNKNOWN",
+      "surface_category": "database",
+      "mutation_capable": true,
+      "description": "Raw D1 migration or write outside governed schema migration path"
+    },
+    {
+      "id": "bypass:direct_git_push",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "BREAK_GLASS",
+      "surface_category": "git",
+      "mutation_capable": true,
+      "description": "Direct Git push to main outside PR/review legitimacy chain"
+    },
+    {
+      "id": "bypass:local_script_execution",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "PARTIAL",
+      "surface_category": "local",
+      "mutation_capable": true,
+      "description": "Local script execution performing mutation outside governed workflow"
+    },
+    {
+      "id": "bypass:external_webhook_mutation",
+      "type": "BYPASS_SURFACE",
+      "governance_class": "UNKNOWN",
+      "surface_category": "external",
+      "mutation_capable": true,
+      "description": "Unauthenticated external webhook mutating state without proof chain"
     }
   ],
   "edges": [
@@ -115,6 +171,48 @@
       "from": "runtime:lineage",
       "to": "continuity",
       "type": "DEPENDS_ON"
+    },
+    {
+      "from": "bypass:agent_tool_call",
+      "to": "execution",
+      "type": "BYPASSES",
+      "note": "agent tool calls may reach execution surface without authority/validation gate"
+    },
+    {
+      "from": "bypass:ci_cd_direct_dispatch",
+      "to": "execution",
+      "type": "BYPASSES",
+      "note": "direct workflow dispatch bypasses canonical /authority -> /compile -> /validate chain"
+    },
+    {
+      "from": "bypass:wrangler_direct_deploy",
+      "to": "runtime:deployment",
+      "type": "BYPASSES",
+      "note": "wrangler deploy bypasses governed-deploy.yml and canonical proof chain"
+    },
+    {
+      "from": "bypass:raw_d1_migration",
+      "to": "execution",
+      "type": "BYPASSES",
+      "note": "raw D1 write bypasses canonical execution registry and legitimacy columns"
+    },
+    {
+      "from": "bypass:direct_git_push",
+      "to": "authority",
+      "type": "BYPASSES",
+      "note": "direct git push bypasses PR/PREO/SCO legitimacy evidence chain"
+    },
+    {
+      "from": "bypass:local_script_execution",
+      "to": "execution",
+      "type": "BYPASSES",
+      "note": "local scripts may invoke mutation surfaces without governed workflow context"
+    },
+    {
+      "from": "bypass:external_webhook_mutation",
+      "to": "execution",
+      "type": "BYPASSES",
+      "note": "external webhook payload may mutate state without authority or proof binding"
     }
   ]
 }

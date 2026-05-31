@@ -1,161 +1,363 @@
 {
-  "version": "1.0",
-  "purpose": "Known and potential execution bypass paths",
+  "version": "2.0",
+  "purpose": "Known and potential execution bypass paths — classified by governance state",
+  "governance_class_taxonomy": [
+    "GOVERNED",
+    "PARTIAL",
+    "BREAK_GLASS",
+    "UNKNOWN",
+    "OBSERVABILITY_ONLY"
+  ],
+  "invariant": "unobservable mutation = ungoverned mutation",
   "fail_closed_response": "NULL",
   "bypass_paths": [
     {
+      "path": "ungoverned_agent_tool_call",
+      "bypass_id": "ungoverned_agent_tool_call",
+      "surface_category": "agent",
+      "risk": "AI/LLM agent tool call executes mutation (D1 write, deploy, schema change) outside canonical /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof lifecycle — no authority object, no proof, no replay protection",
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
+      "required_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
+      "topology_surface": "bypass:agent_tool_call",
+      "closure_condition": "All agent tool calls that perform state-changing operations must be bound to an active authority object and produce a proof record before mutation is applied"
+    },
+    {
+      "path": "local_script_execution",
+      "bypass_id": "local_script_execution",
+      "surface_category": "local",
+      "risk": "Local execution of node scripts, shell scripts, or CLI tools (outside wrangler deploy) that perform D1 writes, schema migrations, or runtime registry mutations without governed workflow context",
+      "governance_class": "PARTIAL",
+      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "topology_surface": "bypass:local_script_execution",
+      "partial_controls_present": [
+        "package.json deploy script disabled",
+        "wrangler-specific local deploy classified as BREAK_GLASS"
+      ],
+      "closure_condition": "All mutation-capable local scripts must be classified; non-governed execution produces UNDECLARED_MUTATION_SURFACE -> NULL"
+    },
+    {
+      "path": "external_webhook_unauthenticated_mutation",
+      "bypass_id": "external_webhook_unauthenticated_mutation",
+      "surface_category": "external",
+      "risk": "Unauthenticated or externally-sourced webhook payload mutates runtime state or registry entries without traversing canonical legitimacy chain — no proof, no authority validation",
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "PROOFLESS_MUTATION_PATH -> NULL",
+      "required_response": "PROOFLESS_MUTATION_PATH -> NULL",
+      "topology_surface": "bypass:external_webhook_mutation",
+      "closure_condition": "All external webhook mutation paths require authenticated caller identity and canonical proof chain"
+    },
+    {
       "path": "direct_wrangler_deploy",
       "bypass_id": "direct_wrangler_deploy",
+      "surface_category": "deploy",
       "risk": "production deploy bypass — wrangler deploy executed outside governed workflow",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:wrangler_direct_deploy"
     },
     {
       "path": "raw_d1_migration_apply",
       "bypass_id": "raw_d1_migration_apply",
+      "surface_category": "database",
       "risk": "D1 migration applied directly outside governed schema migration path",
-      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "topology_surface": "bypass:raw_d1_migration"
     },
     {
       "path": "runtime_raw_registry_write",
       "bypass_id": "runtime_raw_registry_write",
+      "surface_category": "database",
       "risk": "direct D1 registry write bypassing canonical runtime lifecycle",
-      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "topology_surface": "bypass:raw_d1_migration"
     },
     {
       "path": "manual_governed_workflow_dispatch_without_valid_object",
       "bypass_id": "manual_governed_workflow_dispatch_without_valid_object",
+      "surface_category": "ci_cd",
       "risk": "workflow_dispatch invoked without a valid compiled AEO or authorized execution object",
-      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+      "governance_class": "PARTIAL",
+      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "topology_surface": "bypass:ci_cd_direct_dispatch"
     },
     {
       "path": "webhook_mutation_demo_object",
       "bypass_id": "webhook_mutation_demo_object",
+      "surface_category": "external",
       "risk": "webhook transfer_intent object mutates state outside governed proof path",
-      "required_response": "PROOFLESS_MUTATION_PATH -> NULL"
+      "governance_class": "PARTIAL",
+      "fail_closed_response": "PROOFLESS_MUTATION_PATH -> NULL",
+      "required_response": "PROOFLESS_MUTATION_PATH -> NULL",
+      "topology_surface": "bypass:external_webhook_mutation",
+      "note": "demo context only; not production-capable"
     },
     {
       "path": "legacy_runtime_entrypoint_invocation",
       "bypass_id": "legacy_runtime_entrypoint_invocation",
+      "surface_category": "deploy",
       "risk": "legacy worker.js entrypoint invoked in production context outside governed deployment",
-      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+      "governance_class": "PARTIAL",
+      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "topology_surface": "bypass:wrangler_direct_deploy",
+      "note": "not production-capable in current state; demo only"
     },
     {
       "path": "mutation_after_validation",
       "bypass_id": "mutation_after_validation",
+      "surface_category": "runtime",
       "risk": "object mutated after validation but before or during execution, breaking exact-object invariant",
-      "required_response": "HASH_MISMATCH -> NULL"
+      "governance_class": "GOVERNED",
+      "fail_closed_response": "HASH_MISMATCH -> NULL",
+      "required_response": "HASH_MISMATCH -> NULL",
+      "topology_surface": null,
+      "note": "fail-closed hash check enforced at execution gate"
     },
     {
       "path": "proof_without_execution_lineage",
       "bypass_id": "proof_without_execution_lineage",
+      "surface_category": "runtime",
       "risk": "proof created without verifiable execution lineage or canonical execution chain",
-      "required_response": "PROOFLESS_MUTATION_PATH -> NULL"
+      "governance_class": "GOVERNED",
+      "fail_closed_response": "PROOFLESS_MUTATION_PATH -> NULL",
+      "required_response": "PROOFLESS_MUTATION_PATH -> NULL",
+      "topology_surface": null,
+      "note": "fail-closed at proof gate; lineage required"
     },
     {
       "path": "github_direct_push_to_main",
       "bypass_id": "github_direct_push_to_main",
+      "surface_category": "git",
       "risk": "source-control mutation without PREO_VALID, SCO visibility, or required GitHub checks",
-      "required_response": "MERGE_LEGITIMACY_NULL -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "MERGE_LEGITIMACY_NULL -> NULL",
+      "required_response": "MERGE_LEGITIMACY_NULL -> NULL",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "github_force_push_to_main",
       "bypass_id": "github_force_push_to_main",
+      "surface_category": "git",
       "risk": "history rewrite can discard governed proof lineage and reuse stale review state",
-      "required_response": "MERGE_LEGITIMACY_NULL -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "MERGE_LEGITIMACY_NULL -> NULL",
+      "required_response": "MERGE_LEGITIMACY_NULL -> NULL",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "github_branch_protection_bypass",
       "bypass_id": "github_branch_protection_bypass",
+      "surface_category": "git",
       "risk": "admin or ruleset bypass may mutate main outside legitimacy evidence",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "manual_workflow_dispatch",
       "bypass_id": "manual_workflow_dispatch",
-      "risk": "unauthorized execution",
-      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+      "surface_category": "ci_cd",
+      "risk": "unauthorized execution via direct workflow_dispatch without governed authority context",
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "topology_surface": "bypass:ci_cd_direct_dispatch"
     },
     {
       "path": "raw_database_write",
       "bypass_id": "raw_database_write",
+      "surface_category": "database",
       "risk": "state mutation without validation",
-      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "topology_surface": "bypass:raw_d1_migration"
     },
     {
       "path": "undeclared_mutation_surface",
       "bypass_id": "undeclared_mutation_surface",
+      "surface_category": "unknown",
       "risk": "mutation-capable path absent from canonical closure inventory",
-      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "topology_surface": null
     },
     {
       "path": "unbound_database_write",
       "bypass_id": "unbound_database_write",
+      "surface_category": "database",
       "risk": "database write absent from mutation surface inventory",
-      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "topology_surface": "bypass:raw_d1_migration"
     },
     {
       "path": "observability_mutation_escalation",
       "bypass_id": "observability_mutation_escalation",
+      "surface_category": "runtime",
       "risk": "GET-only observability route becomes executable or authoritative",
-      "required_response": "OBSERVABILITY_MUTATION_ESCALATION -> NULL"
+      "governance_class": "OBSERVABILITY_ONLY",
+      "fail_closed_response": "OBSERVABILITY_MUTATION_ESCALATION -> NULL",
+      "required_response": "OBSERVABILITY_MUTATION_ESCALATION -> NULL",
+      "topology_surface": null,
+      "note": "observability routes (/reconcile/*) are non-executable; escalation is classified and blocked"
     },
     {
       "path": "github_admin_branch_protection_root_override",
       "bypass_id": "github_admin_branch_protection_root_override",
+      "surface_category": "git",
       "risk": "An admin/settings change could weaken workflow or branch protections outside the governed deploy lifecycle.",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "github_repository_environment_secret_root_override",
       "bypass_id": "github_repository_environment_secret_root_override",
+      "surface_category": "git",
       "risk": "Secret or environment mutation could redirect runtime/deploy authority without becoming MindShift authority.",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:ci_cd_direct_dispatch"
     },
     {
       "path": "cloudflare_account_or_token_direct_deploy",
       "bypass_id": "cloudflare_account_or_token_direct_deploy",
+      "surface_category": "deploy",
       "risk": "A Cloudflare account or token holder could deploy directly outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof.",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:wrangler_direct_deploy"
     },
     {
       "path": "local_authenticated_wrangler_direct_deploy",
       "bypass_id": "local_authenticated_wrangler_direct_deploy",
+      "surface_category": "deploy",
       "risk": "A local authenticated wrangler deploy command remains a root authority escape hatch if executed outside governed workflow.",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:wrangler_direct_deploy",
+      "note": "classified as root break-glass with observable audit trail per GAP-006"
     },
     {
       "path": "direct_push_to_main",
       "bypass_id": "direct_push_to_main",
+      "surface_category": "git",
       "risk": "source-control mutation without PREO_VALID, SCO visibility, or required GitHub checks",
-      "required_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "force_push_to_main",
       "bypass_id": "force_push_to_main",
+      "surface_category": "git",
       "risk": "history rewrite can discard governed proof lineage and reuse stale review state",
-      "required_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "branch_protection_bypass",
       "bypass_id": "branch_protection_bypass",
+      "surface_category": "git",
       "risk": "admin or ruleset bypass may mutate main outside legitimacy evidence",
-      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL; never legitimacy"
+      "governance_class": "BREAK_GLASS",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL; never legitimacy",
+      "topology_surface": "bypass:direct_git_push"
     },
     {
       "path": "raw_d1_migration_apply_production",
       "bypass_id": "raw_d1_migration_apply_production",
+      "surface_category": "database",
       "risk": "wrangler d1 migrations apply executed against production database outside governed workflow or PR review process — directly mutates schema and registry structure without legitimacy evidence",
-      "required_response": "UNBOUND_DATABASE_WRITE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "required_response": "UNBOUND_DATABASE_WRITE -> NULL",
+      "topology_surface": "bypass:raw_d1_migration"
     },
     {
       "path": "undeclared_migration_schema_mutation",
       "bypass_id": "undeclared_migration_schema_mutation",
+      "surface_category": "database",
       "risk": "migration file drops or modifies required legitimacy columns, uniqueness constraints, or append-only triggers without explicit governance declaration — removes legitimacy preservation invariants",
-      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL"
+      "governance_class": "UNKNOWN",
+      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+      "topology_surface": "bypass:raw_d1_migration"
+    }
+  ],
+  "topology_surfaces": [
+    {
+      "surface_id": "bypass:agent_tool_call",
+      "description": "Ungoverned AI/LLM agent tool call surface — mutation-capable calls outside canonical lifecycle",
+      "governance_class": "UNKNOWN",
+      "mutation_capable": true,
+      "surface_category": "agent"
+    },
+    {
+      "surface_id": "bypass:ci_cd_direct_dispatch",
+      "description": "Direct CI/CD workflow dispatch without valid authority object or governed context",
+      "governance_class": "UNKNOWN",
+      "mutation_capable": true,
+      "surface_category": "ci_cd"
+    },
+    {
+      "surface_id": "bypass:wrangler_direct_deploy",
+      "description": "Direct wrangler deploy outside governed workflow — root authority break-glass surface",
+      "governance_class": "BREAK_GLASS",
+      "mutation_capable": true,
+      "surface_category": "deploy"
+    },
+    {
+      "surface_id": "bypass:raw_d1_migration",
+      "description": "Raw D1 migration or database write outside governed schema migration path",
+      "governance_class": "UNKNOWN",
+      "mutation_capable": true,
+      "surface_category": "database"
+    },
+    {
+      "surface_id": "bypass:direct_git_push",
+      "description": "Direct Git push or force push to main outside PR/review legitimacy chain",
+      "governance_class": "BREAK_GLASS",
+      "mutation_capable": true,
+      "surface_category": "git"
+    },
+    {
+      "surface_id": "bypass:local_script_execution",
+      "description": "Local script execution performing mutation outside governed workflow context",
+      "governance_class": "PARTIAL",
+      "mutation_capable": true,
+      "surface_category": "local"
+    },
+    {
+      "surface_id": "bypass:external_webhook_mutation",
+      "description": "External or unauthenticated webhook payload mutating runtime state without proof chain",
+      "governance_class": "UNKNOWN",
+      "mutation_capable": true,
+      "surface_category": "external"
     }
   ],
   "closure_verification": {
-    "issue": "342",
+    "issue": "1508",
     "inventory_artifact": "runtime/unauthorized_mutation_surface_inventory.json",
     "audit_artifact": "runtime/unauthorized_mutation_path_closure_audit.json",
     "missing_mutation_surface_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
