@@ -22,7 +22,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Fetch PR reviews
+      - name: Compute reviewer legitimacy
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -30,40 +30,136 @@ jobs:
 
           PR_NUMBER="${{ github.event.pull_request.number }}"
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
           REPO="${{ github.repository }}"
+
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed_files_proof.txt
+          RISK_CLASS="$(bash scripts/classify-risk.sh changed_files_proof.txt)"
 
           gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" > pr_reviews.json
 
-          VALID_APPROVED=$(jq --arg author "$PR_AUTHOR" \
-            '[.[] | select(.state == "APPROVED" and .user.login != $author)] | length' \
+          REVIEW_STATUS="UNVERIFIED"
+          REVIEWER_LOGIN=""
+          REVIEW_SUBMITTED_AT=""
+          REVIEWED_HEAD_SHA=""
+          STALE_REVIEW="false"
+          AUTHORITY_ROLE_REQUIRED=""
+          AUTHORITY_ROLE_VALID="false"
+          REVIEW_AUTHORITY_RESULT="false"
+          FAILURE_REASONS="[]"
+
+          # A3: require APPROVED review where commit_id == current head SHA (object identity)
+          APPROVED_ON_HEAD=$(jq -c \
+            --arg author "$PR_AUTHOR" \
+            --arg head_sha "$HEAD_SHA" \
+            '[.[] | select(.state == "APPROVED" and .user.login != $author and .commit_id == $head_sha)] | last' \
             pr_reviews.json)
 
-          if [ "$VALID_APPROVED" -gt 0 ]; then
-            LATEST_REVIEW=$(jq -c --arg author "$PR_AUTHOR" \
-              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last' \
-              pr_reviews.json)
-            REVIEWER=$(echo "$LATEST_REVIEW" | jq -r '.user.login')
-            REVIEW_TS=$(echo "$LATEST_REVIEW" | jq -r '.submitted_at')
+          if [ "$APPROVED_ON_HEAD" != "null" ] && [ -n "$APPROVED_ON_HEAD" ]; then
+            REVIEWER_LOGIN=$(echo "$APPROVED_ON_HEAD" | jq -r '.user.login')
+            REVIEW_SUBMITTED_AT=$(echo "$APPROVED_ON_HEAD" | jq -r '.submitted_at')
+            REVIEWED_HEAD_SHA=$(echo "$APPROVED_ON_HEAD" | jq -r '.commit_id')
 
-            COMMITS_AFTER=$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits" | \
-              jq --arg ts "$REVIEW_TS" '[.[] | select(.commit.committer.date > $ts)] | length')
-
-            if [ "$COMMITS_AFTER" -gt 0 ]; then
-              echo "REVIEW_STATUS=STALE_APPROVAL" >> "$GITHUB_ENV"
+            if [ "$RISK_CLASS" = "P3" ]; then
+              AUTHORITY_ROLE_REQUIRED="sovereignty_review"
+              HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
+                '(.authority_roles.sovereignty_review // []) | map(select(. == $reviewer)) | length > 0' \
+                governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+              if [ "$HAS_AUTHORITY" = "true" ]; then
+                AUTHORITY_ROLE_VALID="true"
+                REVIEW_AUTHORITY_RESULT="true"
+                REVIEW_STATUS="APPROVED"
+              else
+                FAILURE_REASONS='["reviewer_not_in_sovereignty_review_for_p3"]'
+                REVIEW_STATUS="LEGITIMACY_NULL"
+              fi
             else
-              echo "REVIEW_STATUS=APPROVED" >> "$GITHUB_ENV"
+              AUTHORITY_ROLE_VALID="true"
+              REVIEW_AUTHORITY_RESULT="true"
+              REVIEW_STATUS="APPROVED"
             fi
-            echo "REVIEWER_LOGIN=$REVIEWER" >> "$GITHUB_ENV"
-            echo "REVIEW_SUBMITTED_AT=$REVIEW_TS" >> "$GITHUB_ENV"
           else
-            echo "REVIEW_STATUS=PENDING" >> "$GITHUB_ENV"
-            echo "REVIEWER_LOGIN=" >> "$GITHUB_ENV"
-            echo "REVIEW_SUBMITTED_AT=" >> "$GITHUB_ENV"
+            ANY_APPROVED=$(jq --arg author "$PR_AUTHOR" \
+              '[.[] | select(.state == "APPROVED" and .user.login != $author)] | length' \
+              pr_reviews.json)
+            if [ "$ANY_APPROVED" -gt 0 ]; then
+              STALE_REVIEW="true"
+              LATEST_ANY=$(jq -c --arg author "$PR_AUTHOR" \
+                '[.[] | select(.state == "APPROVED" and .user.login != $author)] | sort_by(.submitted_at) | last' \
+                pr_reviews.json)
+              REVIEWER_LOGIN=$(echo "$LATEST_ANY" | jq -r '.user.login')
+              REVIEW_SUBMITTED_AT=$(echo "$LATEST_ANY" | jq -r '.submitted_at')
+              REVIEWED_HEAD_SHA=$(echo "$LATEST_ANY" | jq -r '.commit_id')
+              FAILURE_REASONS='["reviewed_head_sha_mismatch"]'
+            else
+              FAILURE_REASONS='["no_approved_review_from_non_author"]'
+            fi
+            REVIEW_STATUS="LEGITIMACY_NULL"
           fi
+
+          CANONICAL_INPUTS=$(jq -cn \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg reviewer "$REVIEWER_LOGIN" \
+            --arg reviewed_head_sha "$REVIEWED_HEAD_SHA" \
+            --arg risk_class "$RISK_CLASS" \
+            --arg review_status "$REVIEW_STATUS" \
+            '{pr_number: $pr_number, head_sha: $head_sha, reviewer: $reviewer, reviewed_head_sha: $reviewed_head_sha, risk_class: $risk_class, review_status: $review_status}')
+          CANONICAL_INPUT_HASH=$(echo "$CANONICAL_INPUTS" | sha256sum | cut -d' ' -f1)
+
+          jq -n \
+            --arg version "1.0" \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg reviewer "$REVIEWER_LOGIN" \
+            --arg review_submitted_at "$REVIEW_SUBMITTED_AT" \
+            --arg reviewed_head_sha "$REVIEWED_HEAD_SHA" \
+            --arg current_head_sha "$HEAD_SHA" \
+            --arg risk_class "$RISK_CLASS" \
+            --arg authority_role_required "$AUTHORITY_ROLE_REQUIRED" \
+            --argjson authority_role_valid "$AUTHORITY_ROLE_VALID" \
+            --argjson reviewer_is_author false \
+            --argjson stale_review "$STALE_REVIEW" \
+            --argjson review_authority_result "$REVIEW_AUTHORITY_RESULT" \
+            --arg review_status "$REVIEW_STATUS" \
+            --arg canonical_input_hash "$CANONICAL_INPUT_HASH" \
+            --argjson failure_reasons "$FAILURE_REASONS" \
+            '{
+              version: $version,
+              pr_number: $pr_number,
+              reviewer: $reviewer,
+              review_submitted_at: $review_submitted_at,
+              reviewed_head_sha: $reviewed_head_sha,
+              current_head_sha: $current_head_sha,
+              risk_class: $risk_class,
+              authority_role_required: $authority_role_required,
+              authority_role_valid: $authority_role_valid,
+              reviewer_is_author: $reviewer_is_author,
+              stale_review: $stale_review,
+              review_authority_result: $review_authority_result,
+              review_status: $review_status,
+              canonical_input_hash: $canonical_input_hash,
+              failure_reasons: $failure_reasons
+            }' > review_legitimacy_result.json
+
+          LEGITIMACY_RESULT_HASH=$(sha256sum review_legitimacy_result.json | cut -d' ' -f1)
+
+          echo "REVIEW_STATUS=$REVIEW_STATUS" >> "$GITHUB_ENV"
+          echo "REVIEWER_LOGIN=$REVIEWER_LOGIN" >> "$GITHUB_ENV"
+          echo "REVIEW_SUBMITTED_AT=$REVIEW_SUBMITTED_AT" >> "$GITHUB_ENV"
+          echo "RISK_CLASS=$RISK_CLASS" >> "$GITHUB_ENV"
+          echo "LEGITIMACY_RESULT_HASH=$LEGITIMACY_RESULT_HASH" >> "$GITHUB_ENV"
 
       - name: Generate merge proof
         run: |
           set -euo pipefail
+
+          # Fail closed: do not emit proof if legitimacy is not APPROVED
+          if [ "$REVIEW_STATUS" != "APPROVED" ]; then
+            echo "NULL — reviewer legitimacy is $REVIEW_STATUS; proof cannot be emitted"
+            jq -c .failure_reasons review_legitimacy_result.json
+            exit 1
+          fi
 
           MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
@@ -71,55 +167,64 @@ jobs:
           MERGED_BY="${{ github.event.pull_request.merged_by.login }}"
           MERGED_AT="${{ github.event.pull_request.merged_at }}"
           NONCE=$(cat /proc/sys/kernel/random/uuid)
-          PREO_ID="PREO-${PR_NUMBER}-${HEAD_SHA}"
           PROOF_ID="PROOF-${PR_NUMBER}-${MERGE_COMMIT_SHA:0:8}"
           GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          REVIEWED_HEAD_SHA=$(jq -r .reviewed_head_sha review_legitimacy_result.json)
 
+          # canonical_payload: stable governance facts only (no clock, no run-instance fields)
           jq -n \
-            --arg proof_id "$PROOF_ID" \
             --argjson pr_number "$PR_NUMBER" \
-            --arg repo "${{ github.repository }}" \
-            --arg base_branch "${{ github.event.pull_request.base.ref }}" \
-            --arg head_branch "${{ github.event.pull_request.head.ref }}" \
-            --arg head_sha "$HEAD_SHA" \
             --arg merge_commit_sha "$MERGE_COMMIT_SHA" \
+            --arg base_branch "${{ github.event.pull_request.base.ref }}" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg risk_class "$RISK_CLASS" \
+            --arg review_legitimacy_result_hash "$LEGITIMACY_RESULT_HASH" \
             --arg review_status "$REVIEW_STATUS" \
-            --arg reviewer_identity "$REVIEWER_LOGIN" \
-            --arg review_submitted_at "$REVIEW_SUBMITTED_AT" \
-            --arg checks_status "UNVERIFIED" \
-            --arg preo_id "$PREO_ID" \
-            --arg preo_head_sha "$HEAD_SHA" \
-            --arg preo_status "UNVERIFIED" \
+            --arg reviewer "$REVIEWER_LOGIN" \
+            --arg reviewed_head_sha "$REVIEWED_HEAD_SHA" \
+            --arg current_head_sha "$HEAD_SHA" \
             --arg merged_by "${MERGED_BY:-unknown}" \
             --arg merged_at "${MERGED_AT:-}" \
             '{
-              proof_id: $proof_id,
               pr_number: $pr_number,
-              repo: $repo,
-              base_branch: $base_branch,
-              head_branch: $head_branch,
-              head_sha: $head_sha,
               merge_commit_sha: $merge_commit_sha,
+              base_branch: $base_branch,
+              head_sha: $head_sha,
+              risk_class: $risk_class,
+              review_legitimacy_result_hash: $review_legitimacy_result_hash,
               review_status: $review_status,
-              reviewer_identity: $reviewer_identity,
-              review_submitted_at: $review_submitted_at,
-              checks_status: $checks_status,
-              preo_id: $preo_id,
-              preo_head_sha: $preo_head_sha,
-              preo_status: $preo_status,
+              reviewer: $reviewer,
+              reviewed_head_sha: $reviewed_head_sha,
+              current_head_sha: $current_head_sha,
               merged_by: $merged_by,
-              merged_at: $merged_at,
-              record_type: "MERGE_PROOF"
-            }' > MERGE_PROOF_CANONICAL.json
+              merged_at: $merged_at
+            }' > CANONICAL_PAYLOAD.json
 
-          CANONICAL_HASH=$(sha256sum MERGE_PROOF_CANONICAL.json | cut -d' ' -f1)
+          CANONICAL_HASH=$(sha256sum CANONICAL_PAYLOAD.json | cut -d' ' -f1)
 
-          jq \
+          jq -n \
+            --arg proof_id "$PROOF_ID" \
+            --arg repo "${{ github.repository }}" \
+            --argjson canonical_payload "$(cat CANONICAL_PAYLOAD.json)" \
             --arg canonical_hash "$CANONICAL_HASH" \
-            --arg invocation_nonce "$NONCE" \
             --arg generated_at "$GENERATED_AT" \
-            '. + {canonical_hash: $canonical_hash, invocation_nonce: $invocation_nonce, generated_at: $generated_at}' \
-            MERGE_PROOF_CANONICAL.json > MERGE_PROOF.json
+            --arg workflow_run_id "${{ github.run_id }}" \
+            --arg workflow_attempt "${{ github.run_attempt }}" \
+            --arg invocation_nonce "$NONCE" \
+            '{
+              proof_id: $proof_id,
+              repo: $repo,
+              canonical_payload: $canonical_payload,
+              canonical_hash: $canonical_hash,
+              runtime_metadata: {
+                generated_at: $generated_at,
+                workflow_run_id: $workflow_run_id,
+                workflow_attempt: $workflow_attempt,
+                generator: "merge-proof.yml",
+                invocation_nonce: $invocation_nonce
+              },
+              record_type: "MERGE_PROOF"
+            }' > MERGE_PROOF.json
 
           echo "PROOF_HASH=$CANONICAL_HASH" >> "$GITHUB_ENV"
           echo "PR_NUMBER_FOR_COMMIT=$PR_NUMBER" >> "$GITHUB_ENV"
@@ -129,9 +234,9 @@ jobs:
           set -euo pipefail
 
           PROOF_ID=$(jq -r .proof_id MERGE_PROOF.json)
-          MERGE_COMMIT_SHA=$(jq -r .merge_commit_sha MERGE_PROOF.json)
-          MERGED_AT=$(jq -r .merged_at MERGE_PROOF.json)
-          PR_NUMBER=$(jq -r .pr_number MERGE_PROOF.json)
+          MERGE_COMMIT_SHA=$(jq -r .canonical_payload.merge_commit_sha MERGE_PROOF.json)
+          MERGED_AT=$(jq -r .canonical_payload.merged_at MERGE_PROOF.json)
+          PR_NUMBER=$(jq -r .canonical_payload.pr_number MERGE_PROOF.json)
 
           jq -cn \
             --arg proof_id "$PROOF_ID" \
@@ -179,7 +284,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MERGE_PROOF
-          path: MERGE_PROOF.json
+          path: |
+            MERGE_PROOF.json
+            CANONICAL_PAYLOAD.json
+            review_legitimacy_result.json
 
       - name: Emit merge proof summary
         run: |

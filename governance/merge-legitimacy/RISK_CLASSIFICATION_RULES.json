@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "rules": [
+    {
+      "risk": "P3",
+      "patterns": [
+        ".github/workflows/**",
+        ".github/actions/**",
+        "scripts/**",
+        "src/**",
+        "runtime/**",
+        "governance/**",
+        "migrations/**",
+        "wrangler.toml",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json"
+      ]
+    },
+    {
+      "risk": "P2",
+      "patterns": [
+        "schema.sql"
+      ]
+    }
+  ],
+  "default": "P1"
+}
