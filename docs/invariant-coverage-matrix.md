@@ -24,6 +24,56 @@ This document is compression and coherence only. It does not introduce new archi
 
 ---
 
+## Primary Remaining Ambiguity Surface
+
+The governed deploy/runtime spine (INV-01 through INV-10 above) is the strongest enforced chain in the repository.
+
+However, enforcement of that chain does not constitute proof of agent/tool execution containment. Agent and tool execution operate on a separate surface. That surface is declared in issue #1624 but the non-bypassable ATAO admission gate required to enforce it has not yet been implemented.
+
+| Surface | Coverage | Gap Classification | Resolution |
+|---------|----------|--------------------|------------|
+| Agent / Tool Execution Boundary | **AMBIGUOUS** | `DECLARED_NOT_ENFORCED` | #1624 |
+
+### Canonical Flow (declared, not yet enforced)
+
+```
+Agent
+→ proposes tool action
+→ ATAO
+→ authority binding
+→ AEO
+→ Ω Validator
+→ execution boundary
+→ tool execution
+→ proof
+```
+
+### Required Closure Conditions (#1624)
+
+The admission gate is not closed until all five predicates hold at the execution boundary:
+
+| Condition | Required Outcome |
+|-----------|-----------------|
+| No valid ATAO present | → no tool invocation |
+| No `VALID` signal from Ω Validator | → no tool invocation |
+| `validated_atao_hash != execution_bound_atao_hash` | → `NULL` |
+| Replay nonce already consumed | → `NULL` |
+| Topology-visible admission record missing | → `NULL` |
+
+Until #1624 is implemented and each predicate is non-bypassable, any tool invocation that originates from agent output must be treated as operating outside the governed legitimacy chain. The current repo does not have a mechanism to prevent such invocations from bypassing ATAO capture.
+
+### Scope Boundary
+
+This matrix covers invariant enforcement across the governed deploy/runtime spine and PR governance surfaces. It does not assert that agent/tool execution is governed. That assertion cannot be made until:
+
+1. The ATAO schema for agent tool calls is defined (#1624)
+2. ATAO capture is non-bypassable for all listed surfaces (filesystem write, GitHub action, terminal command, CI/CD dispatch, deploy action)
+3. The `No ATAO → No AEO → NULL` predicate is enforced at the execution boundary
+4. ATAO objects are hashable and replay-identifiable
+5. Risk class assignment is deterministic
+
+---
+
 ## Core Invariants
 
 | ID | Invariant Statement |
@@ -193,9 +243,31 @@ This document is compression and coherence only. It does not introduce new archi
 
 ---
 
+### Agent / Tool Execution Boundary
+
+> **Coverage: AMBIGUOUS — `DECLARED_NOT_ENFORCED`**  
+> Resolution: #1624 — Governed AI Execution Gateway: ATAO Capture for Agent Tool Calls
+
+| Workflow / Surface | Enforcement Point | Failure Mode | Coverage Status |
+|--------------------|-------------------|--------------|-----------------|
+| ATAO schema | Not yet defined | Agent output treated as executable without structure | MISSING |
+| ATAO capture gate | Not yet implemented | Tool invocation proceeds without ATAO | MISSING |
+| Ω Validator binding | Not yet wired to agent surface | Validation bypass on agent-originated actions | MISSING |
+| Replay nonce assignment | Not yet applied before authority binding | Agent output replayed without detection | MISSING |
+| Topology-visible admission record | Not yet required | Tool invocation leaves no topology trace | MISSING |
+| Risk class assignment | Not yet deterministic for agent tool calls | Risk class ambiguous or absent | MISSING |
+| `No ATAO → No AEO → NULL` predicate | Not enforced | AEO constructed from non-ATAO agent output | MISSING |
+| `validated_atao_hash == execution_bound_atao_hash` | Not enforced | Hash mismatch between validation and execution objects | MISSING |
+
+Current state: every agent-originated tool call on the listed surfaces (filesystem write, GitHub issue/PR action, terminal command, CI/CD dispatch, deploy action) is **execution-adjacent without governed legitimacy**. No enforcement mechanism currently prevents ATAO bypass on these surfaces.
+
+---
+
 ## Audit Summary
 
 ### By Invariant
+
+Coverage below applies to the **governed deploy/runtime spine and PR governance surfaces only**. The Agent/Tool Execution Boundary is separately classified as `AMBIGUOUS / DECLARED_NOT_ENFORCED` pending #1624.
 
 | Invariant | Coverage Status | Open Items |
 |-----------|-----------------|------------|
@@ -209,6 +281,7 @@ This document is compression and coherence only. It does not introduce new archi
 | INV-08 — Replay safety maintained | **PASS** (SCO replay registration PARTIAL) | SCO_REPLAY_ID not persisted to replay registry at generation time |
 | INV-09 — Topology visibility maintained | **PASS** (static surface files require manual update) | `EXECUTION_SURFACES.json` updated manually; scan on every PR mitigates |
 | INV-10 — Reconciliation remains deterministic | **PASS** | None |
+| Agent/Tool Execution Boundary | **AMBIGUOUS** | All 5 required closure conditions unimplemented; see #1624 |
 
 ### By Surface
 
@@ -232,6 +305,7 @@ This document is compression and coherence only. It does not introduce new archi
 | `runtime/reconciliation/quarantine-containment-engine.js` | INV-06, INV-10 | Fail-closed contamination propagation |
 | `src/lib/aeo-governance.ts` | INV-01, INV-03 | AEO construction validation |
 | Migration stack (0005–0055) | INV-04, INV-08, INV-10 | Persistence layer enforcement |
+| **Agent / Tool Execution Boundary** | **NONE** | `DECLARED_NOT_ENFORCED`; all 5 admission predicates unimplemented; resolution: #1624 |
 
 ### Potential Bypass Paths
 
@@ -258,6 +332,7 @@ All three external-dependency bypass paths (direct_push, admin_bypass, force_pus
 | OI-02 | INV-08 | `sco-candidate.yml` | `SCO_REPLAY_ID` generated but not persisted to a replay registry; replay detection deferred to merge-governance-check head_sha binding | LOW |
 | OI-03 | INV-02 | All | Branch protection enforcement is external to repository workflows; all three hard bypass paths depend on GitHub organization-level settings | EXTERNAL |
 | OI-04 | INV-09 | `EXECUTION_SURFACES.json` | Static file requires manual update when new surfaces introduced; `constitutional-integrity.yml` scan on every PR mitigates but does not eliminate the window | LOW |
+| OI-05 | INV-01, INV-02, INV-03, INV-05, INV-08, INV-09 | Agent / Tool Execution Boundary | All 5 ATAO admission predicates unimplemented; agent-originated tool calls are execution-adjacent without governed legitimacy; no ATAO schema, no capture gate, no Ω Validator binding, no replay nonce, no topology-visible admission record | **HIGH — pending #1624** |
 
 ---
 
@@ -290,3 +365,4 @@ This document does not:
 | `src/lib/distributed-replay-convergence-enforcement.ts` | Replay convergence enforcement |
 | `tests/fate/proof-lineage-enforcement.test.mjs` | Proof lineage FATE tests |
 | `tests/issue-1464-openclaw-govern-lineage-validate-proof.test.mjs` | Govern lineage proof tests |
+| Issue #1624 | Governed AI Execution Gateway: ATAO Capture for Agent Tool Calls — defines canonical flow and required closure conditions for agent/tool execution boundary |
