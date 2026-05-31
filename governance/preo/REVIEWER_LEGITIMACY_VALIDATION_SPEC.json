@@ -1,0 +1,214 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "reviewer_legitimacy_validation_spec",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "reviewer_legitimacy_validation_specification",
+  "closes": "#1632",
+  "depends_on": ["#1630", "#1631"],
+  "scope": {
+    "name": "REVIEWER_LEGITIMACY_VALIDATION",
+    "purpose": "Define the canonical reviewer legitimacy validation layer that answers: 'Is this reviewer/review valid for this PR head and policy context?' Reviewer legitimacy is a required input for PREO_VALID but does not itself create PREO_VALID, merge permission, or authority. This spec defines the validation surface consumed before or by PREO_VALID.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "creates_authority": false,
+    "creates_execution": false,
+    "creates_deployment": false,
+    "creates_merge_permission": false,
+    "creates_proof": false,
+    "mutates_registry": false,
+    "mutates_runtime": false,
+    "triggers_merge": false
+  },
+  "reviewer_legitimacy_valid_object": {
+    "object_type": "REVIEWER_LEGITIMACY_VALID",
+    "defined": true,
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "required_fields": [
+      "pr_number",
+      "repo",
+      "reviewer_identity",
+      "review_state",
+      "review_submitted_at",
+      "review_commit_sha",
+      "current_head_sha",
+      "exact_head_sha_binding",
+      "branch_protection_compliance",
+      "current_review_visibility",
+      "approval_scope_validation",
+      "reviewer_lineage_binding",
+      "review_head_sha_binding"
+    ],
+    "output_fields": [
+      "reviewer_legitimacy_status",
+      "reviewer_lineage_binding",
+      "review_head_sha_binding",
+      "reviewer_legitimacy_hash",
+      "invalid_reason"
+    ],
+    "reviewer_legitimacy_status_enum": [
+      "REVIEWER_LEGITIMACY_VALID",
+      "REVIEWER_LEGITIMACY_INVALID"
+    ],
+    "default_status": "REVIEWER_LEGITIMACY_INVALID"
+  },
+  "reviewer_legitimacy_invalid_status": {
+    "object_type": "REVIEWER_LEGITIMACY_INVALID",
+    "defined": true,
+    "preo_consequence": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
+  },
+  "reviewer_legitimacy_valid_requires": {
+    "reviewer_identity_present": {
+      "rule": "reviewer_identity must be a non-empty string. Absent, null, or empty reviewer identity fails closed.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "reviewer_identity_missing"
+    },
+    "exact_head_sha_binding": {
+      "rule": "exact_head_sha_binding must be true and review_commit_sha must equal the current PR head SHA at evaluation time. A false binding or SHA mismatch indicates a stale review.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "stale_review"
+    },
+    "head_sha_object_match": {
+      "rule": "The current_head_sha field in the reviewer legitimacy object must match the externally provided current head SHA. Mismatch indicates head_sha_mismatch.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "head_sha_mismatch"
+    },
+    "review_state_approved": {
+      "rule": "review_state must be APPROVED. DISMISSED, CHANGES_REQUESTED, COMMENTED, and PENDING states fail closed.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_conditions": ["dismissed_review", "missing_required_approval"]
+    },
+    "review_head_sha_bound": {
+      "rule": "review_head_sha_binding must be true. A false binding indicates the review occurred before or across a topology drift event.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "review_after_topology_drift"
+    },
+    "review_visible_to_preo": {
+      "rule": "current_review_visibility must be true. Reviews not visible to the PREO evaluation surface are not valid inputs.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "review_not_visible_to_preo"
+    },
+    "branch_protection_compliant": {
+      "rule": "branch_protection_compliance must be true. Reviews from branches that violate protection rules are not legitimate.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "branch_protection_noncompliant"
+    },
+    "approval_scope_valid": {
+      "rule": "approval_scope_validation must be true. The reviewer must have approved within the declared scope of the PR.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "approval_scope_invalid"
+    },
+    "reviewer_lineage_bound": {
+      "rule": "reviewer_lineage_binding must be true. A false binding indicates the reviewer identity cannot be traced to a valid lineage.",
+      "failure_result": "REVIEWER_LEGITIMACY_INVALID",
+      "invalid_condition": "reviewer_identity_missing"
+    }
+  },
+  "invalid_conditions": {
+    "stale_review": {
+      "condition": "exact_head_sha_binding is false or review_commit_sha does not equal the current PR head SHA at evaluation time",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "head_sha_mismatch": {
+      "condition": "current_head_sha field in the reviewer legitimacy object does not match the externally provided current head SHA",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "dismissed_review": {
+      "condition": "review_state is DISMISSED",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "missing_required_approval": {
+      "condition": "review_state is not APPROVED (e.g. PENDING, CHANGES_REQUESTED, COMMENTED)",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "review_after_topology_drift": {
+      "condition": "review_head_sha_binding is false, indicating the review was submitted before or across a topology drift event",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "reviewer_identity_missing": {
+      "condition": "reviewer_identity is absent, null, empty, or reviewer_lineage_binding is false",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "review_not_visible_to_preo": {
+      "condition": "current_review_visibility is false",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "branch_protection_noncompliant": {
+      "condition": "branch_protection_compliance is false",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    },
+    "approval_scope_invalid": {
+      "condition": "approval_scope_validation is false",
+      "result": "REVIEWER_LEGITIMACY_INVALID"
+    }
+  },
+  "preo_integration": {
+    "reviewer_legitimacy_as_preo_input": "REVIEWER_LEGITIMACY_VALID is a required input for PREO_VALID. REVIEWER_LEGITIMACY_INVALID blocks PREO_VALID.",
+    "reviewer_legitimacy_creates_preo_valid": false,
+    "reviewer_legitimacy_creates_merge_permission": false,
+    "reviewer_legitimacy_creates_authority": false,
+    "failure_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL",
+    "workflow_success_not_substitute": "Workflow success is not a substitute for REVIEWER_LEGITIMACY_VALID.",
+    "github_review_state_alone_not_legitimacy": "GitHub review state alone is not reviewer legitimacy. All binding conditions must be satisfied.",
+    "approval_count_not_legitimacy": "Approval count alone does not establish reviewer legitimacy. Each review must independently satisfy all legitimacy requirements."
+  },
+  "relationship_to_1633": {
+    "issue_1632": {
+      "scope": "REVIEWER_LEGITIMACY_VALIDATION",
+      "answers": "Is this reviewer/review valid for this PR head and policy context?",
+      "artifact": "REVIEWER_LEGITIMACY_VALID or REVIEWER_LEGITIMACY_INVALID"
+    },
+    "issue_1633": {
+      "scope": "APPROVAL_LINEAGE",
+      "answers": "Can this approval be bound as deterministic merge-governance evidence?",
+      "artifact": "APPROVAL_LINEAGE_VALID or APPROVAL_LINEAGE_INVALID"
+    },
+    "distinction": "Reviewer legitimacy and approval lineage are adjacent but not identical. They must not be collapsed. Reviewer legitimacy answers the identity-and-policy question; approval lineage answers the binding-and-evidence question.",
+    "combined_with_preo_valid": "reviewer_legitimacy + approval_lineage + PREO_VALID = merge governance input. None alone creates merge permission."
+  },
+  "deterministic_artifact": {
+    "required": true,
+    "rule": "Identical reviewer legitimacy inputs must produce identical REVIEWER_LEGITIMACY_VALID or REVIEWER_LEGITIMACY_INVALID outputs. The reviewer_legitimacy_hash must be reproducible from bound fields alone.",
+    "hash_fields": [
+      "pr_number",
+      "repo",
+      "reviewer_identity",
+      "review_state",
+      "review_submitted_at",
+      "review_commit_sha",
+      "current_head_sha",
+      "branch_protection_compliance",
+      "current_review_visibility"
+    ],
+    "hash_change_required_on": [
+      "reviewer_identity change",
+      "review_state change",
+      "review_commit_sha change",
+      "current_head_sha change",
+      "branch_protection_compliance change",
+      "current_review_visibility change"
+    ],
+    "lineage_hash_must_be_deterministic": true,
+    "audit_logic_must_not_depend_on_provider_specific_ordering": true
+  },
+  "fail_closed_semantics": {
+    "default_status": "REVIEWER_LEGITIMACY_INVALID",
+    "missing_reviewer_identity": "REVIEWER_LEGITIMACY_INVALID",
+    "missing_review_commit_sha": "REVIEWER_LEGITIMACY_INVALID",
+    "missing_current_head_sha": "REVIEWER_LEGITIMACY_INVALID",
+    "missing_exact_head_sha_binding": "REVIEWER_LEGITIMACY_INVALID",
+    "missing_branch_protection_compliance": "REVIEWER_LEGITIMACY_INVALID",
+    "ambiguous_reviewer_resolution": "REVIEWER_LEGITIMACY_INVALID",
+    "missing_required_field": "REVIEWER_LEGITIMACY_INVALID"
+  },
+  "canonical_compression": {
+    "rule_1": "Reviewer legitimacy answers: Can this reviewer/review be trusted as valid input?",
+    "rule_2": "Approval is not legitimacy by itself.",
+    "rule_3": "Stale review reuse → NULL.",
+    "rule_4": "Head SHA mismatch → PREO_INVALID_AND_MERGE_LEGITIMACY_NULL.",
+    "rule_5": "Missing reviewer legitimacy → PREO_INVALID_AND_MERGE_LEGITIMACY_NULL.",
+    "rule_6": "Reviewer legitimacy does not create PREO_VALID alone.",
+    "rule_7": "Reviewer legitimacy does not create merge permission."
+  }
+}
