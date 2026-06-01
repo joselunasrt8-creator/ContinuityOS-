@@ -163,6 +163,62 @@ jobs:
           echo "RISK_CLASS=$RISK_CLASS" >> "$GITHUB_ENV"
           echo "LEGITIMACY_RESULT_HASH=$LEGITIMACY_RESULT_HASH" >> "$GITHUB_ENV"
 
+      - name: Verify exact-object admission
+        run: |
+          set -euo pipefail
+
+          REVIEWED_HEAD_SHA="$(jq -r .reviewed_head_sha review_legitimacy_result.json)"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+
+          # Detect merge method from parent count; fall back to squash_or_rebase on error
+          PARENT_COUNT="$(git cat-file -p "$MERGE_COMMIT_SHA" 2>/dev/null | grep -c '^parent' || echo '1')"
+          if [ "$PARENT_COUNT" -gt 1 ]; then
+            MERGE_METHOD="merge"
+          else
+            MERGE_METHOD="squash_or_rebase"
+          fi
+
+          export REVIEWED_HEAD_SHA HEAD_SHA MERGE_COMMIT_SHA PR_NUMBER REPO MERGE_METHOD
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+          import { checkExactObjectAdmission } from './runtime/merge-object-hash.mjs';
+
+          const changedFiles = readFileSync('changed_files_proof.txt', 'utf8').split('\n').filter(Boolean);
+
+          const result = checkExactObjectAdmission({
+            pr_number:          Number(process.env.PR_NUMBER),
+            repo:               process.env.REPO,
+            reviewed_head_sha:  process.env.REVIEWED_HEAD_SHA,
+            head_sha:           process.env.HEAD_SHA,
+            merge_commit_sha:   process.env.MERGE_COMMIT_SHA,
+            changed_files:      changedFiles,
+            review_status:      process.env.REVIEW_STATUS,
+            risk_class:         process.env.RISK_CLASS,
+            merge_method:       process.env.MERGE_METHOD,
+          });
+
+          writeFileSync('EXACT_OBJECT_ADMISSION.json', JSON.stringify(result, null, 2));
+
+          const githubEnv = process.env.GITHUB_ENV;
+          appendFileSync(githubEnv, `MERGE_LEGITIMACY_STATUS=${result.merge_legitimacy_status}\n`);
+          appendFileSync(githubEnv, `REVIEWED_OBJECT_HASH=${result.reviewed_object_hash ?? ''}\n`);
+          appendFileSync(githubEnv, `APPROVED_OBJECT_HASH=${result.approved_object_hash ?? ''}\n`);
+          appendFileSync(githubEnv, `MERGED_OBJECT_HASH=${result.merged_object_hash ?? ''}\n`);
+
+          if (result.merge_legitimacy_status === 'LEGITIMACY_NULL') {
+            console.error('NULL — exact-object admission failed: ' + result.failure_reason);
+            console.error('reviewed_head_sha=' + result.reviewed_head_sha);
+            console.error('head_sha (current)=' + result.head_sha);
+            process.exit(1);
+          }
+
+          console.log('exact_object_admission_status=' + result.merge_legitimacy_status);
+          NODE
+
       - name: Generate merge proof
         run: |
           set -euo pipefail
@@ -171,6 +227,14 @@ jobs:
           if [ "$REVIEW_STATUS" != "APPROVED" ] && [ "$REVIEW_STATUS" != "OWNER_SELF_CERTIFIED" ]; then
             echo "NULL — reviewer legitimacy is $REVIEW_STATUS; proof cannot be emitted"
             jq -c .failure_reasons review_legitimacy_result.json
+            exit 1
+          fi
+
+          # Fail closed: exact-object admission must be MERGE_LEGITIMACY_VALID or UNKNOWN
+          # LEGITIMACY_NULL was already caught in the previous step; guard here for safety
+          if [ "$MERGE_LEGITIMACY_STATUS" = "LEGITIMACY_NULL" ]; then
+            echo "NULL — exact-object admission is LEGITIMACY_NULL; proof cannot be emitted"
+            jq -c . EXACT_OBJECT_ADMISSION.json
             exit 1
           fi
 
@@ -198,6 +262,10 @@ jobs:
             --arg current_head_sha "$HEAD_SHA" \
             --arg merged_by "${MERGED_BY:-unknown}" \
             --arg merged_at "${MERGED_AT:-}" \
+            --arg reviewed_object_hash "${REVIEWED_OBJECT_HASH:-}" \
+            --arg approved_object_hash "${APPROVED_OBJECT_HASH:-}" \
+            --arg merged_object_hash "${MERGED_OBJECT_HASH:-}" \
+            --arg merge_legitimacy_status "${MERGE_LEGITIMACY_STATUS:-UNKNOWN}" \
             '{
               pr_number: $pr_number,
               merge_commit_sha: $merge_commit_sha,
@@ -210,7 +278,11 @@ jobs:
               reviewed_head_sha: $reviewed_head_sha,
               current_head_sha: $current_head_sha,
               merged_by: $merged_by,
-              merged_at: $merged_at
+              merged_at: $merged_at,
+              reviewed_object_hash: $reviewed_object_hash,
+              approved_object_hash: $approved_object_hash,
+              merged_object_hash: $merged_object_hash,
+              merge_legitimacy_status: $merge_legitimacy_status
             }' > CANONICAL_PAYLOAD.json
 
           CANONICAL_HASH=$(sha256sum CANONICAL_PAYLOAD.json | cut -d' ' -f1)
@@ -331,6 +403,7 @@ jobs:
             MERGE_PROOF.json
             CANONICAL_PAYLOAD.json
             review_legitimacy_result.json
+            EXACT_OBJECT_ADMISSION.json
 
       - name: Emit merge proof summary
         run: |
@@ -339,7 +412,14 @@ jobs:
             echo "### Merge Proof Generated"
             echo ""
             echo "proof_hash: $PROOF_HASH"
+            echo "merge_legitimacy_status: ${MERGE_LEGITIMACY_STATUS:-UNKNOWN}"
             echo ""
+            echo "#### Exact-Object Admission"
+            echo '```json'
+            cat EXACT_OBJECT_ADMISSION.json
+            echo '```'
+            echo ""
+            echo "#### MERGE_PROOF.json"
             echo '```json'
             cat MERGE_PROOF.json
             echo '```'
