@@ -134,6 +134,7 @@ jobs:
           REVIEW_STATUS="UNVERIFIED"
           STALE_REVIEW="false"
           FAILURE_REASONS="[]"
+          SCOPE_COVERAGE_VALID="true"
 
           # A3: require APPROVED review where commit_id == current head SHA (object identity, not timestamp)
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
@@ -148,11 +149,50 @@ jobs:
 
             if [ "$RISK_CLASS" = "P3" ]; then
               HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
-                '(.authority_roles.sovereignty_review // []) | map(select(. == $reviewer)) | length > 0' \
+                '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | length > 0' \
                 governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
               if [ "$HAS_AUTHORITY" = "true" ]; then
-                REVIEW_STATUS="APPROVED"
+                # AC5: path-scope coverage — every changed P3 file must match a reviewer scope_path
+                REVIEWER_SCOPE_PATHS_JSON=$(jq -c --arg reviewer "$REVIEWER_LOGIN" \
+                  '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | .[0].scope_paths // []' \
+                  governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+
+                CHANGED_P3_FILES_ARR=()
+                while IFS= read -r chfile; do
+                  while IFS= read -r p3pat; do
+                    if [[ "$chfile" == $p3pat ]]; then
+                      CHANGED_P3_FILES_ARR+=("$chfile")
+                      break
+                    fi
+                  done < <(jq -r '.rules[] | select(.risk == "P3") | .patterns[]' \
+                    governance/merge-legitimacy/RISK_CLASSIFICATION_RULES.json)
+                done < changed_files.txt
+
+                SCOPE_COVERAGE_VALID="true"
+                if [ "${#CHANGED_P3_FILES_ARR[@]}" -gt 0 ]; then
+                  for p3file in "${CHANGED_P3_FILES_ARR[@]}"; do
+                    COVERED="false"
+                    while IFS= read -r spath; do
+                      if [[ "$p3file" == $spath ]]; then
+                        COVERED="true"
+                        break
+                      fi
+                    done < <(echo "$REVIEWER_SCOPE_PATHS_JSON" | jq -r '.[]')
+                    if [ "$COVERED" = "false" ]; then
+                      SCOPE_COVERAGE_VALID="false"
+                      break
+                    fi
+                  done
+                fi
+
+                if [ "$SCOPE_COVERAGE_VALID" = "true" ]; then
+                  REVIEW_STATUS="APPROVED"
+                else
+                  REVIEW_STATUS="LEGITIMACY_NULL"
+                  FAILURE_REASONS='["p3_files_outside_reviewer_scope"]'
+                fi
               else
+                SCOPE_COVERAGE_VALID="false"
                 REVIEW_STATUS="LEGITIMACY_NULL"
                 FAILURE_REASONS='["reviewer_not_in_sovereignty_review_for_p3"]'
               fi

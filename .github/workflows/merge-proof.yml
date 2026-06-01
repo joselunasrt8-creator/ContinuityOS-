@@ -48,6 +48,9 @@ jobs:
           AUTHORITY_ROLE_VALID="false"
           REVIEW_AUTHORITY_RESULT="false"
           FAILURE_REASONS="[]"
+          CHANGED_P3_FILES_JSON='[]'
+          REVIEWER_SCOPE_PATHS_JSON='[]'
+          SCOPE_COVERAGE_VALID="true"
 
           # A3: require APPROVED review where commit_id == current head SHA (object identity)
           APPROVED_ON_HEAD=$(jq -c \
@@ -64,13 +67,56 @@ jobs:
             if [ "$RISK_CLASS" = "P3" ]; then
               AUTHORITY_ROLE_REQUIRED="sovereignty_review"
               HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
-                '(.authority_roles.sovereignty_review // []) | map(select(. == $reviewer)) | length > 0' \
+                '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | length > 0' \
                 governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
               if [ "$HAS_AUTHORITY" = "true" ]; then
-                AUTHORITY_ROLE_VALID="true"
-                REVIEW_AUTHORITY_RESULT="true"
-                REVIEW_STATUS="APPROVED"
+                # AC5: path-scope coverage — every changed P3 file must match a reviewer scope_path
+                REVIEWER_SCOPE_PATHS_JSON=$(jq -c --arg reviewer "$REVIEWER_LOGIN" \
+                  '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | .[0].scope_paths // []' \
+                  governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+
+                CHANGED_P3_FILES_ARR=()
+                while IFS= read -r chfile; do
+                  while IFS= read -r p3pat; do
+                    if [[ "$chfile" == $p3pat ]]; then
+                      CHANGED_P3_FILES_ARR+=("$chfile")
+                      break
+                    fi
+                  done < <(jq -r '.rules[] | select(.risk == "P3") | .patterns[]' \
+                    governance/merge-legitimacy/RISK_CLASSIFICATION_RULES.json)
+                done < changed_files_proof.txt
+
+                if [ "${#CHANGED_P3_FILES_ARR[@]}" -gt 0 ]; then
+                  CHANGED_P3_FILES_JSON=$(printf '%s\n' "${CHANGED_P3_FILES_ARR[@]}" | jq -R . | jq -s .)
+                fi
+
+                SCOPE_COVERAGE_VALID="true"
+                if [ "${#CHANGED_P3_FILES_ARR[@]}" -gt 0 ]; then
+                  for p3file in "${CHANGED_P3_FILES_ARR[@]}"; do
+                    COVERED="false"
+                    while IFS= read -r spath; do
+                      if [[ "$p3file" == $spath ]]; then
+                        COVERED="true"
+                        break
+                      fi
+                    done < <(echo "$REVIEWER_SCOPE_PATHS_JSON" | jq -r '.[]')
+                    if [ "$COVERED" = "false" ]; then
+                      SCOPE_COVERAGE_VALID="false"
+                      break
+                    fi
+                  done
+                fi
+
+                if [ "$SCOPE_COVERAGE_VALID" = "true" ]; then
+                  AUTHORITY_ROLE_VALID="true"
+                  REVIEW_AUTHORITY_RESULT="true"
+                  REVIEW_STATUS="APPROVED"
+                else
+                  FAILURE_REASONS='["p3_files_outside_reviewer_scope"]'
+                  REVIEW_STATUS="LEGITIMACY_NULL"
+                fi
               else
+                SCOPE_COVERAGE_VALID="false"
                 FAILURE_REASONS='["reviewer_not_in_sovereignty_review_for_p3"]'
                 REVIEW_STATUS="LEGITIMACY_NULL"
               fi
@@ -118,7 +164,8 @@ jobs:
             --arg reviewed_head_sha "$REVIEWED_HEAD_SHA" \
             --arg risk_class "$RISK_CLASS" \
             --arg review_status "$REVIEW_STATUS" \
-            '{pr_number: $pr_number, head_sha: $head_sha, reviewer: $reviewer, reviewed_head_sha: $reviewed_head_sha, risk_class: $risk_class, review_status: $review_status}')
+            --argjson scope_coverage_valid "$([ "$SCOPE_COVERAGE_VALID" = "true" ] && echo "true" || echo "false")" \
+            '{pr_number: $pr_number, head_sha: $head_sha, reviewer: $reviewer, reviewed_head_sha: $reviewed_head_sha, risk_class: $risk_class, review_status: $review_status, scope_coverage_valid: $scope_coverage_valid}')
           CANONICAL_INPUT_HASH=$(echo "$CANONICAL_INPUTS" | sha256sum | cut -d' ' -f1)
 
           jq -n \
@@ -137,6 +184,9 @@ jobs:
             --arg review_status "$REVIEW_STATUS" \
             --arg canonical_input_hash "$CANONICAL_INPUT_HASH" \
             --argjson failure_reasons "$FAILURE_REASONS" \
+            --argjson changed_p3_files "$CHANGED_P3_FILES_JSON" \
+            --argjson reviewer_scope_paths "$REVIEWER_SCOPE_PATHS_JSON" \
+            --argjson scope_coverage_valid "$([ "$SCOPE_COVERAGE_VALID" = "true" ] && echo "true" || echo "false")" \
             '{
               version: $version,
               pr_number: $pr_number,
@@ -152,7 +202,10 @@ jobs:
               review_authority_result: $review_authority_result,
               review_status: $review_status,
               canonical_input_hash: $canonical_input_hash,
-              failure_reasons: $failure_reasons
+              failure_reasons: $failure_reasons,
+              changed_p3_files: $changed_p3_files,
+              reviewer_scope_paths: $reviewer_scope_paths,
+              scope_coverage_valid: $scope_coverage_valid
             }' > review_legitimacy_result.json
 
           LEGITIMACY_RESULT_HASH=$(sha256sum review_legitimacy_result.json | cut -d' ' -f1)
@@ -227,6 +280,16 @@ jobs:
           if [ "$REVIEW_STATUS" != "APPROVED" ] && [ "$REVIEW_STATUS" != "OWNER_SELF_CERTIFIED" ]; then
             echo "NULL — reviewer legitimacy is $REVIEW_STATUS; proof cannot be emitted"
             jq -c .failure_reasons review_legitimacy_result.json
+            exit 1
+          fi
+
+          # Fail closed (AC7): scope_coverage_valid must be true for P3 PRs
+          # For non-P3 PRs scope_coverage_valid is vacuously true; for OWNER_SELF_CERTIFIED
+          # the scope check is bypassed and SCOPE_COVERAGE_VALID remains true.
+          PROOF_SCOPE_COVERAGE=$(jq -r .scope_coverage_valid review_legitimacy_result.json)
+          if [ "$PROOF_SCOPE_COVERAGE" = "false" ]; then
+            echo "NULL — scope_coverage_valid is false; P3 files outside reviewer scope"
+            jq -c '{changed_p3_files: .changed_p3_files, reviewer_scope_paths: .reviewer_scope_paths}' review_legitimacy_result.json
             exit 1
           fi
 

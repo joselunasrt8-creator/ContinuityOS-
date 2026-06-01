@@ -23,7 +23,13 @@
   "permitted_bot_actors": [],
   "authority_roles": {
     "sovereignty_review": [],
-    "note": "Sovereignty-review authority roles are empty until explicitly populated by repository administrator. P3-risk PRs (touching .github/workflows/ or src/) require at least one reviewer with a declared sovereignty-review authority role. An empty allowlist means no reviewer satisfies the P3 authority requirement and PREO review_status will be LEGITIMACY_NULL for P3 PRs."
+    "sovereignty_review_entry_schema": {
+      "description": "Each entry in sovereignty_review must be an object with login and scope_paths. Workflows read .login for membership and .scope_paths for AC5 coverage.",
+      "login": "string — GitHub login of the authorized sovereignty reviewer",
+      "scope_paths": ["array of glob patterns — files this reviewer is authorized to review (e.g. governance/**, .github/workflows/**)"]
+    },
+    "note": "Sovereignty-review authority roles are empty until explicitly populated by repository administrator. Each entry must carry both a login and scope_paths (glob patterns). P3-risk PRs require at least one reviewer whose login is in sovereignty_review AND whose scope_paths cover all changed P3 files (AC5: ChangedP3 ⊆ reviewer.scope.paths). Reviewer in allowlist but with scope_paths that do not cover all changed P3 files produces LEGITIMACY_NULL with failure_reason p3_files_outside_reviewer_scope. An empty allowlist means LEGITIMACY_NULL for all P3 PRs.",
+    "issue_reference": "#1677"
   },
   "single_contributor_policy": {
     "description": "Single-contributor exception: repository owner may self-certify changes when no peer reviewer is available. Applies only when there is no approved review from any non-author — stale reviews still resolve LEGITIMACY_NULL. Self-certified merges produce OWNER_SELF_CERTIFIED review_status, which is distinct from peer-reviewed APPROVED and is recorded as such in all proof artifacts.",
