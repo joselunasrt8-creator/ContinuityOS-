@@ -1,0 +1,104 @@
+{
+  "version": "1.0",
+  "phase": "phase-2",
+  "anchor_issue": "#1604",
+  "source_issue": "#1682",
+  "title": "Governance Metadata Coverage Specification",
+  "description": "Canonical metadata requirements for legitimacy-affecting workflows. Establishes owner, policy, policy-path, and issue-lineage as required fields for all governance-critical workflow surfaces.",
+  "pattern_origin": "#1616",
+  "canonical_metadata_fields": [
+    "owner",
+    "policy",
+    "policy-path",
+    "issue-lineage"
+  ],
+  "coverage_determination": "COMPLETE",
+  "coverage_prior_state": "PARTIAL",
+  "total_workflows_audited": 9,
+  "workflow_inventory": [
+    {
+      "workflow": "conformance.yml",
+      "coverage": "COVERED",
+      "owner": "#1616",
+      "policy": "GOVERNANCE_REQUIREMENTS",
+      "policy_path": "GOVERNANCE_REQUIREMENTS.json",
+      "issue_lineage": "#1616 → #1601"
+    },
+    {
+      "workflow": "constitutional-integrity.yml",
+      "coverage": "COVERED",
+      "owner": "#1616",
+      "policy": "CONSTITUTIONAL_GOVERNANCE_RULES",
+      "policy_path": "runtime/constitutional_governance_rules.json",
+      "issue_lineage": "#1616 → #1601"
+    },
+    {
+      "workflow": "prepare-governed-deploy.yml",
+      "coverage": "COVERED",
+      "owner": "#1616",
+      "policy": "DEPLOY_POLICY",
+      "policy_path": "runtime/governance/DEPLOY_POLICY.json",
+      "issue_lineage": "#1616 → #1601"
+    },
+    {
+      "workflow": "governed-deploy.yml",
+      "coverage": "COVERED",
+      "owner": "#1601",
+      "policy": "AGENT_EXECUTION_GOVERNANCE_MODEL",
+      "policy_path": "governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json",
+      "issue_lineage": "#1513 → #1601",
+      "metadata_added_by": "#1682"
+    },
+    {
+      "workflow": "governed-release.yml",
+      "coverage": "COVERED",
+      "owner": "#1601",
+      "policy": "AGENT_EXECUTION_GOVERNANCE_MODEL",
+      "policy_path": "governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json",
+      "issue_lineage": "#1513 → #1601",
+      "metadata_added_by": "#1682"
+    },
+    {
+      "workflow": "merge-governance-check.yml",
+      "coverage": "COVERED",
+      "owner": "#1604",
+      "policy": "MERGE_GOVERNANCE_RULES",
+      "policy_path": "governance/runtime/MERGE_GOVERNANCE_RULES.json",
+      "issue_lineage": "#1666 → #1604",
+      "metadata_added_by": "#1682"
+    },
+    {
+      "workflow": "merge-proof.yml",
+      "coverage": "COVERED",
+      "owner": "#1667",
+      "policy": "MERGE_PROOF_SPEC",
+      "policy_path": "governance/merge-legitimacy/MERGE_PROOF_SPEC.json",
+      "issue_lineage": "#1667 → #1604",
+      "metadata_added_by": "#1682"
+    },
+    {
+      "workflow": "preo-candidate.yml",
+      "coverage": "COVERED",
+      "owner": "#1670",
+      "policy": "PREO_REQUIREMENTS",
+      "policy_path": "governance/runtime/PREO_REQUIREMENTS.json",
+      "issue_lineage": "#1670 → #1604",
+      "metadata_added_by": "#1682"
+    },
+    {
+      "workflow": "sco-candidate.yml",
+      "coverage": "COVERED",
+      "owner": "#1604",
+      "policy": "SCO_REQUIREMENTS",
+      "policy_path": "governance/runtime/SCO_REQUIREMENTS.json",
+      "issue_lineage": "#1604",
+      "metadata_added_by": "#1682"
+    }
+  ],
+  "conformance_requirement": {
+    "status": "ESTABLISHED",
+    "description": "All legitimacy-affecting or mutation-capable workflows must declare canonical governance metadata fields as header comments: owner, policy, policy-path, issue-lineage.",
+    "enforcement_note": "Metadata declarations are lineage-binding documentation. They do not alter workflow execution behavior. Coverage must be maintained as new governance-critical workflows are added."
+  },
+  "non_operative": true
+}

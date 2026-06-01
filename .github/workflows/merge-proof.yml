@@ -1,4 +1,8 @@
 name: merge-proof
+# owner: #1667
+# policy: MERGE_PROOF_SPEC
+# policy-path: governance/merge-legitimacy/MERGE_PROOF_SPEC.json
+# issue-lineage: #1667 → #1604
 
 on:
   pull_request:

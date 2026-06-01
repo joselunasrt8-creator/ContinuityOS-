@@ -1,4 +1,8 @@
 name: sco-candidate
+# owner: #1604
+# policy: SCO_REQUIREMENTS
+# policy-path: governance/runtime/SCO_REQUIREMENTS.json
+# issue-lineage: #1604
 
 on:
   pull_request:
