@@ -1,13 +1,32 @@
 {
   "audit_id": "DIRECT_PUSH_AUDIT_1604",
-  "audit_version": "2",
+  "audit_version": "3",
   "issue_reference": "#1604",
   "audit_type": "external_verification",
   "audit_subject": "direct_push_to_main admission pathway",
   "audit_date": "2026-06-01",
   "source_of_truth": "live_github_repository_configuration",
   "policy_artifacts_role": "corroboration_only",
-  "calibration_note": "Version 2 corrects v1 overreach. v1 classified direct_push_to_main as GOVERNED based on inferred bypass_actors:[] state. That inference came from commit message analysis of a PATCH API call — not from direct live ruleset inspection. With evidentiary discipline applied, PARTIAL/SUBSTANTIALLY_CONTAINED is the defensible ceiling given available tools.",
+
+  "pr_merge_ready_summary": {
+    "status": "MERGE_READY",
+    "direct_push_to_main": "PARTIAL / SUBSTANTIALLY_CONTAINED",
+    "force_push_to_main": "PARTIAL / LIKELY_CONTAINED",
+    "admin_override": "BREAK_GLASS / UNVERIFIED",
+    "directly_observed": [
+      "main branch protected: true (GitHub list_branches API)",
+      "GH013 rejection of github-actions[bot] direct push (live workflow runtime)",
+      "50/50 recent commits entered main via PR pathway (GitHub list_commits API)"
+    ],
+    "not_directly_observed": [
+      "ruleset bypass_actors list (no live ruleset GET performed)",
+      "admin bypass configuration (policy artifact only)",
+      "force-push rejection (no independent runtime signal)"
+    ],
+    "v1_commit_correction": "The v1 commit message presented bypass_actors:[] as a live GitHub API finding and classified direct_push_to_main and force_push_to_main as GOVERNED/CLOSED. Both were overstatements. bypass_actors state was inferred from commit message analysis of a PATCH API call — not a direct ruleset GET. GOVERNED requires confirmed empty bypass list; PARTIAL/SUBSTANTIALLY_CONTAINED is the correct ceiling given available tooling."
+  },
+
+  "calibration_note": "Version 3 adds pr_merge_ready_summary for PR description accuracy. v1 classified direct_push_to_main as GOVERNED and listed bypass_actors:[] as live-verified evidence — both were overstatements corrected in v2. v3 surfaces the corrected conclusions at the top of the document so they are immediately visible without reading the full evidence trail.",
 
   "evidence": {
     "1_main_branch_protection_status": {
