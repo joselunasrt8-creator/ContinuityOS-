@@ -81,6 +81,22 @@ type GovernedToolEnvelope = {
   tool_surface_descriptor: { route: string, workflow: string, executable: boolean }
 }
 
+type AgentToolCallATAO = {
+  atao_id: string
+  agent_id: string
+  session_id: string
+  intent: string
+  proposed_action: { system: string, action: string, parameters: Record<string, unknown> }
+  scope: Record<string, unknown>
+  risk_class: "P0" | "P1" | "P2" | "P3"
+  timestamp: string
+}
+
+type AgentToolCallATAOCapture = {
+  atao: AgentToolCallATAO
+  atao_hash: string
+}
+
 type GovernResult = "VALID_CANDIDATE" | "NULL"
 type GovernPredicateResolution = { ok: true, value: string } | { ok: false, reason: string }
 
@@ -124,6 +140,51 @@ function classifyToolSurface(target: Record<string, unknown>): { tool_surface: s
 async function policyClassDigest(policy_class: PolicyClass): Promise<string> {
   if (policy_class === "TOOL_UNKNOWN") return ""
   return sha256Hex(canonicalize(POLICY_REGISTRY[policy_class]))
+}
+
+function normalizeATAORiskClass(value: unknown): "P0" | "P1" | "P2" | "P3" {
+  const risk = String(value || "P2").toUpperCase()
+  return risk === "P0" || risk === "P1" || risk === "P2" || risk === "P3" ? risk : "P2"
+}
+
+function buildAgentToolCallATAOMaterial(input: { request: Request, body: unknown, candidate: GovernCandidate, candidate_hash: string, nonce: string, nonce_domain: string, timestamp: string }): AgentToolCallATAO {
+  const bodyRecord = isPlainRecord(input.body) ? input.body : {}
+  const scope = canonicalRecord(input.candidate.scope)
+  const target = canonicalRecord(input.candidate.target)
+  const targetParameters = isPlainRecord(target.parameters)
+    ? canonicalRecord(target.parameters)
+    : isPlainRecord(target.tool_parameters)
+      ? canonicalRecord(target.tool_parameters)
+      : canonicalRecord(target)
+  const proposed_action = {
+    system: String(target.system || target.tool_system || target.execution_surface || target.tool_surface || target.surface || "agent_tool"),
+    action: String(target.action || target.tool_action || input.candidate.intent),
+    parameters: targetParameters
+  }
+  const agent_id = String(input.request.headers.get("X-Agent-ID") || target.agent_id || scope.agent_id || "unknown-agent")
+  const session_id = String(input.request.headers.get("X-Session-ID") || scope.session_id || target.session_id || bodyRecord.session_id || "unknown-session")
+  return {
+    atao_id: `atao:${input.candidate_hash}:${input.nonce_domain}:${input.nonce}`,
+    agent_id,
+    session_id,
+    intent: String(input.candidate.intent || ""),
+    proposed_action,
+    scope,
+    risk_class: normalizeATAORiskClass(target.risk_class || scope.risk_class || bodyRecord.risk_class),
+    timestamp: input.timestamp
+  }
+}
+
+async function captureAgentToolCallATAO(env: Env, input: { request: Request, body: unknown, candidate: GovernCandidate, candidate_hash: string, nonce: string, nonce_domain: string, envelope_id: string, timestamp: string }): Promise<AgentToolCallATAOCapture> {
+  const atao = buildAgentToolCallATAOMaterial(input)
+  const atao_hash = await sha256Hex(canonicalize(atao))
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS agent_tool_call_atao_registry (atao_id TEXT PRIMARY KEY, atao_hash TEXT NOT NULL UNIQUE, candidate_hash TEXT NOT NULL, govern_envelope_id TEXT NOT NULL, nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, agent_id TEXT NOT NULL, session_id TEXT NOT NULL, risk_class TEXT NOT NULL CHECK (risk_class IN ('P0','P1','P2','P3')), proposed_action TEXT NOT NULL, scope TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('CAPTURED')), created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_tool_call_atao_nonce_binding ON agent_tool_call_atao_registry (candidate_hash, nonce, nonce_domain)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_call_atao_registry_append_only_update BEFORE UPDATE ON agent_tool_call_atao_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_call_atao_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_call_atao_registry_append_only_delete BEFORE DELETE ON agent_tool_call_atao_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_call_atao_registry is append-only'); END`).run()
+  await env.DB.prepare(`INSERT OR IGNORE INTO agent_tool_call_atao_registry (atao_id,atao_hash,candidate_hash,govern_envelope_id,nonce,nonce_domain,agent_id,session_id,risk_class,proposed_action,scope,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'CAPTURED',?12)`)
+    .bind(atao.atao_id, atao_hash, input.candidate_hash, input.envelope_id, input.nonce, input.nonce_domain, atao.agent_id, atao.session_id, atao.risk_class, canonicalize(atao.proposed_action), canonicalize(atao.scope), input.timestamp).run()
+  return { atao, atao_hash }
 }
 
 function parseGovernCandidate(input: unknown): { ok: true, candidate: GovernCandidate } | { ok: false, reason: string } {
@@ -7945,6 +8006,9 @@ export default {
       const envelope_id = await sha256Hex(canonicalize(envelope))
       await env.DB.prepare(`INSERT OR IGNORE INTO governed_tool_envelope_registry (envelope_id,candidate_hash,nonce_binding,policy_digest,topology_digest,lineage_pointers,timestamp,non_operative,tool_surface_descriptor,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'true',?8,?9)`)
         .bind(envelope_id, envelope.candidate_hash, envelope.nonce_binding, envelope.policy_digest, envelope.topology_digest, canonicalize(envelope.lineage_pointers), envelope.timestamp, canonicalize(envelope.tool_surface_descriptor), timestamp).run()
+      const ataoCapture = parsed.ok
+        ? await captureAgentToolCallATAO(env, { request, body, candidate, candidate_hash, nonce, nonce_domain, envelope_id, timestamp })
+        : null
       const envelope_status = result
       const envelope_reason = reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate")
       const envelope_hash = await sha256Hex(canonicalize({ candidate_hash, nonce, nonce_domain, route: "/govern", status: envelope_status }))
@@ -7954,8 +8018,8 @@ export default {
         result = "NULL"
         reason = "envelope_persist_failed"
       }
-      try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true } }) } catch {}
-      return json({ status: result, reason: reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate"), envelope_id, envelope_hash, nonce_domain, evidence: { candidate_hash, nonce, nonce_domain, timestamp, result, ...(reason ? { reason } : {}) } }, 200)
+      try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true, atao_id: ataoCapture?.atao.atao_id || null, atao_hash: ataoCapture?.atao_hash || null } }) } catch {}
+      return json({ status: result, reason: reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate"), envelope_id, envelope_hash, nonce_domain, atao_id: ataoCapture?.atao.atao_id || null, atao_hash: ataoCapture?.atao_hash || null, evidence: { candidate_hash, nonce, nonce_domain, timestamp, result, ...(ataoCapture ? { atao_id: ataoCapture.atao.atao_id, atao_hash: ataoCapture.atao_hash } : {}), ...(reason ? { reason } : {}) } }, 200)
     }
 
     if (url.pathname === "/validate" && request.method === "POST") {
