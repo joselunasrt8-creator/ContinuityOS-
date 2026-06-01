@@ -1,4 +1,8 @@
 name: preo-candidate
+# owner: #1670
+# policy: PREO_REQUIREMENTS
+# policy-path: governance/runtime/PREO_REQUIREMENTS.json
+# issue-lineage: #1670 → #1604
 
 on:
   pull_request:

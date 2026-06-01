@@ -1,4 +1,8 @@
 name: governed-deploy
+# owner: #1601
+# policy: AGENT_EXECUTION_GOVERNANCE_MODEL
+# policy-path: governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json
+# issue-lineage: #1513 → #1601
 
 on:
   workflow_dispatch:
