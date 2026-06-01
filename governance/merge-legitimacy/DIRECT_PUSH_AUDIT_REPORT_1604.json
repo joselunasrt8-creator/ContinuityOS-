@@ -1,6 +1,6 @@
 {
   "audit_id": "DIRECT_PUSH_AUDIT_1604",
-  "audit_version": "3",
+  "audit_version": "4",
   "issue_reference": "#1604",
   "audit_type": "external_verification",
   "audit_subject": "direct_push_to_main admission pathway",
@@ -13,10 +13,13 @@
     "direct_push_to_main": "PARTIAL / SUBSTANTIALLY_CONTAINED",
     "force_push_to_main": "PARTIAL / LIKELY_CONTAINED",
     "admin_override": "BREAK_GLASS / UNVERIFIED",
+    "bypass_actor_admission_path": "DETERMINED — see bypass_actor_admission_path_analysis below",
     "directly_observed": [
       "main branch protected: true (GitHub list_branches API)",
       "GH013 rejection of github-actions[bot] direct push (live workflow runtime)",
-      "50/50 recent commits entered main via PR pathway (GitHub list_commits API)"
+      "50/50 recent commits entered main via PR pathway (GitHub list_commits API)",
+      "merge_proof_registry.jsonl contains only seed record — zero github-actions[bot] direct-push entries (live)",
+      "github-actions[bot] bypass NOT YET CONFIGURED — GH013 still active per workflow fail-fast branch"
     ],
     "not_directly_observed": [
       "ruleset bypass_actors list (no live ruleset GET performed)",
@@ -26,7 +29,20 @@
     "v1_commit_correction": "The v1 commit message presented bypass_actors:[] as a live GitHub API finding and classified direct_push_to_main and force_push_to_main as GOVERNED/CLOSED. Both were overstatements. bypass_actors state was inferred from commit message analysis of a PATCH API call — not a direct ruleset GET. GOVERNED requires confirmed empty bypass list; PARTIAL/SUBSTANTIALLY_CONTAINED is the correct ceiling given available tooling."
   },
 
-  "calibration_note": "Version 3 adds pr_merge_ready_summary for PR description accuracy. v1 classified direct_push_to_main as GOVERNED and listed bypass_actors:[] as live-verified evidence — both were overstatements corrected in v2. v3 surfaces the corrected conclusions at the top of the document so they are immediately visible without reading the full evidence trail.",
+  "bypass_actor_admission_path_analysis": {
+    "analysis_artifact": "governance/merge-legitimacy/BYPASS_ACTOR_ADMISSION_PATH_ANALYSIS.json",
+    "question": "Does the configured bypass actor create an alternate admission path into main?",
+    "bypass_actor": "github-actions[bot] (Integration ID 15368)",
+    "current_configuration_state": "NOT_YET_CONFIGURED — proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED; GH013 still active",
+    "bypass_actor_creates_code_admission_path": false,
+    "bypass_actor_creates_governance_file_push_path": "PENDING_CONFIGURATION — when configured: append-only post-merge push to merge_proof_registry.jsonl only",
+    "escalation_risk": "BOUNDED — CODEOWNERS + P3 classification prevents workflow modification without owner review + sovereignty check",
+    "prior_state": "PENDING_EXTERNAL_VERIFICATION",
+    "new_state": "DETERMINED",
+    "gap_closure": "bypass_actor_verification gap from v3 remaining_closure_gaps is now RESOLVED"
+  },
+
+  "calibration_note": "Version 4 adds bypass_actor_admission_path_analysis, resolving the bypass_actor_verification remaining gap from v3. Version 3 added pr_merge_ready_summary for PR description accuracy. v1 classified direct_push_to_main as GOVERNED and listed bypass_actors:[] as live-verified evidence — both were overstatements corrected in v2. v3 surfaced the corrected conclusions at the top. v4 closes the bypass actor determination.",
 
   "evidence": {
     "1_main_branch_protection_status": {
@@ -228,31 +244,40 @@
     "repository_ruleset": "ACTIVE",
     "branch_protection": "VERIFIED",
     "remaining_closure_gaps": [
-      "bypass_actor_verification — live ruleset GET required to confirm bypass_actors list is empty and admin bypass is disabled",
-      "admin_override_verification — cannot confirm or rule out owner/admin direct push without live ruleset inspection",
-      "force_push_independent_confirmation — no observed GH013-equivalent for force push",
-      "required_status_checks_wiring — ruleset has checks enabled but specific job names not confirmed in ruleset",
-      "proof_registry_bypass — github-actions[bot] cannot persist proof entries without bypass actor configuration"
+      "bypass_actor_verification — RESOLVED (v4): bypass not configured; when configured, does not create alternate code admission path; creates only scoped post-merge append to proof registry; see BYPASS_ACTOR_ADMISSION_PATH_ANALYSIS.json",
+      "admin_override_verification — OPEN: cannot confirm or rule out owner/admin direct push without live ruleset GET; policy intent is disallow; no behavioral evidence of admin direct push",
+      "force_push_independent_confirmation — OPEN: no observed GH013-equivalent for force push; same ruleset implies containment but not independently confirmed",
+      "required_status_checks_wiring — OPEN: ruleset has checks enabled but specific job names not confirmed wired in GitHub ruleset via live inspection",
+      "proof_registry_bypass_not_configured — OPEN: admin must PATCH ruleset 16177949 to add github-actions[bot] bypass actor; until then proof entries are not persisted to registry"
     ],
     "primary_finding": "Repository-declared policy and runtime enforcement evidence now substantially agree. GH013 confirms the PR requirement is enforced at the GitHub infrastructure layer for at least one actor class (github-actions[bot]). The admission pathway through direct push is operationally blocked with high confidence. The remaining gap — whether owner/admin retains a native GitHub bypass path — requires live ruleset GET inspection to resolve definitively.",
     "issue_1604_impact": "MATERIALLY_ADVANCES_BUT_DOES_NOT_CLOSE — the PENDING_EXTERNAL_VERIFICATION items have been substantially resolved by live evidence. GOVERNED cannot be declared without direct bypass actor verification. The appropriate milestone is: direct push restriction verified as active enforcement; bypass actor gap identified as the remaining verification target."
   },
 
   "audit_metadata": {
-    "audit_version": "2",
-    "version_1_correction": "v1 classified direct_push_to_main as GOVERNED based on inferred bypass_actors:[] from commit artifact analysis. This crossed the evidence boundary. v2 preserves evidentiary discipline: inferences from policy artifacts and commit messages are labeled as such; only direct live API observations support CONFIRMED findings.",
+    "audit_version": "4",
+    "version_history": {
+      "v1": "Classified direct_push_to_main as GOVERNED based on inferred bypass_actors:[] from commit artifact analysis — overstatement corrected in v2.",
+      "v2": "Preserved evidentiary discipline; inferences from policy artifacts and commit messages labeled as such; only direct live API observations support CONFIRMED findings.",
+      "v3": "Added pr_merge_ready_summary for PR description accuracy; surfaced corrected conclusions at top of document.",
+      "v4": "Added bypass_actor_admission_path_analysis; resolved bypass_actor_verification gap; updated remaining_closure_gaps."
+    },
     "tools_used": [
       "mcp__github__list_branches (live API — main protected:true)",
-      "mcp__github__list_commits (live API — PR admission pattern)",
+      "mcp__github__list_commits (live API — PR admission pattern, 50 most recent)",
+      "mcp__github__list_commits (live API — filtered to merge_proof_registry.jsonl path)",
       "mcp__github__list_pull_requests (live API — PR merge pattern)",
       "mcp__github__search_commits (live API — merge history)",
       "mcp__github__get_file_contents (live repository — workflow source, policy)"
     ],
     "tools_not_available": [
-      "mcp__github__get_ruleset — would enable direct bypass_actors inspection",
+      "mcp__github__get_ruleset — would enable direct bypass_actors list inspection",
       "mcp__github__get_branch_protection — would enable admin bypass setting inspection"
     ],
     "auditor": "claude-sonnet-4-6 (external verification agent)",
-    "session": "claude/phase2-1604-direct-push-audit-SIsgE"
+    "sessions": [
+      "claude/phase2-1604-direct-push-audit-SIsgE (v1-v3)",
+      "claude/bypass-actor-admission-path-NDpjW (v4)"
+    ]
   }
 }
