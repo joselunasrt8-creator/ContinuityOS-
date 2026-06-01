@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { importWorker } from './helpers/import-worker.mjs'
+import { sha256Hex, canonicalize } from '../src/canonical.js'
 
 function runSqlite(args, options = {}) {
   const result = spawnSync('sqlite3', args, { encoding: 'utf8', ...options })
@@ -296,10 +297,36 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
       workflow_sha: validProvenancePayloadFixture.workflow_sha
     })
 
-    async function post(path, payload) {
+    let epochNonceCounter = 0
+    function topologyEpochFields() {
+      return {
+        topology_epoch: 0,
+        epoch_lineage_parent: 'fixture-epoch-parent',
+        epoch_nonce: `epoch-nonce-${name}-${++epochNonceCounter}`,
+        topology_visibility_state: 'VISIBLE'
+      }
+    }
+
+    function settledPartitionEvidence() {
+      const canonical_lineage_hash = 'fixture-canonical-lineage'
+      const partition_epoch = 1
+      return {
+        partition_finality_state: 'PARTITION_SETTLED',
+        partition_epoch,
+        canonical_lineage_hash,
+        partition_lineage_hash: canonical_lineage_hash,
+        partition_closure_hash: sha256Hex(canonicalize({ canonical_lineage_hash, partition_epoch })),
+        topology_visible: true,
+        reconciliation_deterministic: true,
+        reconciliation_ordering_deterministic: true,
+        partition_settlement_observed_at: new Date().toISOString()
+      }
+    }
+
+    async function post(path, payload, extraHeaders = {}) {
       const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
         method: 'POST',
-        headers,
+        headers: { ...headers, ...extraHeaders },
         body: JSON.stringify(payload)
       }), env)
       assert.equal(response.status, 200)
@@ -308,22 +335,40 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
 
     try {
       applyMigrationChain(dbPath)
+      runSqlite([dbPath, "ALTER TABLE aeo_registry ADD COLUMN govern_projection_hash TEXT NOT NULL DEFAULT ''"])
+
       const session = await post('/session', { identity_id: signer_identity })
       const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+
+      const govern = await post('/govern', {
+        intent: 'deploy_production',
+        scope: { repo: 'example/repo', branch: 'main' },
+        target: { workflow: 'governed-deploy.yml' },
+        finality: { proof_required: true },
+        policy_class: 'TOOL_RUNTIME_MUTATION',
+        policy_digest: 'a'.repeat(64),
+        topology_attestation_hash: 'b'.repeat(64)
+      }, { 'X-Nonce': `govern-nonce-${name}` })
+      assert.equal(govern.status, 'VALID_CANDIDATE', `${name} govern status`)
+      runSqlite([dbPath, `UPDATE governed_tool_envelope_registry SET non_operative='false' WHERE envelope_id='${govern.envelope_id}'`])
+
       await post('/authority', {
+        ...topologyEpochFields(),
         continuity_id: continuity.continuity_id,
         session_id: session.session_id,
         decision_id,
         owner: 'fixture-provenance-test',
         intent: 'deploy_production',
         scope: { repo: 'example/repo', branch: 'main' },
-        constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+        constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+        governed_tool_envelope_id: govern.envelope_id
       })
 
-      const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
+      const compiled = await post('/compile', { ...topologyEpochFields(), decision_id, ...snapshotFrom(provenance) })
       assert.equal(compiled.validated_object_hash, validProvenancePayloadFixture.validated_object_hash)
       await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
       await post('/validate', {
+        ...topologyEpochFields(),
         session_id: session.session_id,
         decision_id,
         validated_object_hash: compiled.validated_object_hash,
@@ -332,6 +377,8 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
       })
 
       const executePayload = {
+        ...topologyEpochFields(),
+        ...settledPartitionEvidence(),
         session_id: session.session_id,
         decision_id,
         validated_object_hash: compiled.validated_object_hash,
@@ -351,6 +398,7 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
 
       if (prove) {
         const proofPayload = {
+          ...settledPartitionEvidence(),
           session_id: session.session_id,
           execution_id: execution.execution_id,
           decision_id,
