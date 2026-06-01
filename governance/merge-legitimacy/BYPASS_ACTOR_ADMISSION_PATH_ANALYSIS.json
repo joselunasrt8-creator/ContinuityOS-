@@ -1,0 +1,159 @@
+{
+  "artifact_id": "BYPASS_ACTOR_ADMISSION_PATH_ANALYSIS",
+  "version": "1.0",
+  "issue_reference": "#1604",
+  "branch": "claude/bypass-actor-admission-path-NDpjW",
+  "analysis_date": "2026-06-01",
+  "question": "Does the configured bypass actor create an alternate admission path into main?",
+  "source_of_truth": "live_github_repository_configuration + workflow_source_analysis",
+  "prior_closure_state": "PENDING_EXTERNAL_VERIFICATION",
+
+  "bypass_actor_identity": {
+    "actor": "github-actions[bot]",
+    "actor_type": "Integration",
+    "actor_id": 15368,
+    "source": "governance/runtime/BRANCH_PROTECTION_POLICY.json — proof_registry_bypass.bypass_actor_id: 15368",
+    "ruleset_id": "16177949",
+    "bypass_mode_intended": "always",
+    "bypass_scope_declared": "proof_registry_append_only"
+  },
+
+  "current_configuration_state": {
+    "status": "NOT_YET_CONFIGURED",
+    "evidence": [
+      {
+        "item": "governance/runtime/BRANCH_PROTECTION_POLICY.json — proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED",
+        "evidence_class": "POLICY_ARTIFACT"
+      },
+      {
+        "item": "merge-proof.yml — GH013 rejection documented in fail-fast branch (lines 447-455): 'NULL — proof registry push blocked by repository ruleset (GH013). Admin action required: add github-actions[bot] as a bypass actor'",
+        "evidence_class": "WORKFLOW_SOURCE_ANALYSIS"
+      },
+      {
+        "item": "governance/merge-legitimacy/merge_proof_registry.jsonl — contains only the seed record from PR #1671; zero github-actions[bot] direct-push entries present",
+        "evidence_class": "DIRECT_OBSERVATION"
+      },
+      {
+        "item": "main branch commit history (50 most recent) — all commits carry (#PR_NUMBER) suffix; committer=web-flow in all cases; no github-actions[bot] author or committer observed",
+        "evidence_class": "DIRECT_LIVE_OBSERVATION"
+      }
+    ],
+    "determination": "CONFIRMED — the bypass actor is not currently configured. github-actions[bot] cannot push to main without GH013 rejection. No bypass actor activity is observable in main history."
+  },
+
+  "admission_path_analysis": {
+    "question": "If the bypass were configured, would it create an alternate CODE admission path into main?",
+
+    "workflow_scope_analysis": {
+      "trigger": "pull_request: types: [closed] when github.event.pull_request.merged == true",
+      "trigger_constraint": "Fires ONLY after a PR has already been merged via the canonical path. Cannot precede or circumvent PR admission.",
+      "git_add_scope": "git add governance/merge-legitimacy/merge_proof_registry.jsonl (single file, explicit path)",
+      "commit_message_scope": "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}",
+      "files_modified_per_run": 1,
+      "file_path": "governance/merge-legitimacy/merge_proof_registry.jsonl",
+      "operation_type": "append-only — idempotency guard prevents duplicate entries",
+      "permissions_declared": "contents: write (required for git push)"
+    },
+
+    "code_admission_path_determination": {
+      "result": false,
+      "rationale": [
+        "The bypass trigger is post-merge only — it cannot front-run the PR admission process or admit code before review",
+        "The git commit is scoped to a single append-only governance registry file; no source code, workflow, or policy file is touched",
+        "The bypass window opens only after the canonical PR path has already been traversed and merged",
+        "The merge-proof.yml workflow does not touch any source file, configuration, or workflow file in its push step"
+      ]
+    },
+
+    "governance_file_admission_path_determination": {
+      "result": "SCOPED_POST_MERGE_APPEND_ONLY",
+      "rationale": [
+        "When configured, github-actions[bot] can push a single append to governance/merge-legitimacy/merge_proof_registry.jsonl directly to main, bypassing the PR requirement for that one file",
+        "This is intentional: the proof registry append IS itself a post-merge governance action, not a code change requiring review",
+        "The append records audit evidence of merges that have already passed all governance checks — blocking it would break the canonical audit trail"
+      ],
+      "bypass_legitimacy_status": "NULL",
+      "note": "Per MERGE_ACTOR_REGISTRY.json: permitted_bot_actors is empty; github-actions[bot] is not listed as a permitted merge actor. The bypass creates a direct-push path, not a merge legitimacy path. Direct push by github-actions[bot] produces MERGE_LEGITIMACY_NULL per MERGE_GOVERNANCE_RULES.json. The proof registry append is post-merge governance record-keeping, not a merge admission event."
+    },
+
+    "workflow_modification_escalation_risk": {
+      "vector": "If merge-proof.yml were modified to add additional files to the git commit before pushing, the bypass actor could in theory push arbitrary content",
+      "mitigations": [
+        ".github/CODEOWNERS: /.github/workflows/** @joselunasrt8-creator — workflow changes require owner review",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — sco_enforcement.required_for_paths includes .github/workflows/** — workflow mutations require SCO before the workflow is merged",
+        "Risk class: workflow files are P3 — changes require sovereignty-review authority (per RISK_CLASSIFICATION_RULES.json)",
+        "The escalation path itself must traverse the full canonical PR admission process to take effect"
+      ],
+      "residual_risk_classification": "BOUNDED_BY_CODEOWNERS_AND_P3_GOVERNANCE",
+      "determination": "The escalation risk is real but bounded. Any modification to merge-proof.yml that would widen the push scope must itself pass P3-class governance review, CODEOWNERS approval, and required status checks before it becomes active. The bypass cannot self-escalate."
+    }
+  },
+
+  "live_evidence_summary": {
+    "DIRECT_LIVE_OBSERVATION": [
+      "main commit history: 50/50 recent commits entered via PR pathway — zero github-actions[bot] direct-push commits",
+      "merge_proof_registry.jsonl: contains only seed record (PR #1671); no runtime proof entries from github-actions[bot] direct push"
+    ],
+    "WORKFLOW_SOURCE_ANALYSIS": [
+      "merge-proof.yml git add is scoped to governance/merge-legitimacy/merge_proof_registry.jsonl only",
+      "merge-proof.yml trigger is pull_request:closed with merged==true — post-merge only",
+      "merge-proof.yml fail-fast on GH013 with admin action guidance — confirms bypass not yet active"
+    ],
+    "POLICY_ARTIFACT": [
+      "BRANCH_PROTECTION_POLICY.json — proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED",
+      "MERGE_ACTOR_REGISTRY.json — permitted_bot_actors: [] — github-actions[bot] not listed as permitted merge actor",
+      "MERGE_ACTOR_REGISTRY.json — bypass via branch protection does not confer merge legitimacy"
+    ],
+    "NOT_DIRECTLY_OBSERVED": [
+      "Live ruleset GET confirming bypass_actors list (no mcp__github__get_ruleset tool available)",
+      "Admin bypass configuration from live GitHub API"
+    ]
+  },
+
+  "formal_determination": {
+    "bypass_actor_currently_creates_alternate_admission_path": false,
+    "evidence_basis": "Bypass not yet configured; GH013 blocks all github-actions[bot] direct pushes; zero direct push commits observable in main history",
+
+    "bypass_actor_when_configured_creates_code_admission_path": false,
+    "evidence_basis": "Workflow trigger is post-merge only; git add scoped to proof registry file; cannot front-run or circumvent PR admission",
+
+    "bypass_actor_when_configured_creates_governance_file_push_path": true,
+    "scope": "governance/merge-legitimacy/merge_proof_registry.jsonl — append-only, post-merge only",
+    "legitimacy_status": "MERGE_LEGITIMACY_NULL — direct push does not create merge legitimacy",
+
+    "escalation_risk": "BOUNDED",
+    "escalation_mitigation": "CODEOWNERS + P3 risk classification + required status checks on workflow modifications",
+
+    "prior_state": "PENDING_EXTERNAL_VERIFICATION",
+    "new_state": "ANALYSED",
+
+    "answer": "The configured bypass actor (github-actions[bot]) does NOT create an alternate CODE admission path into main. It creates a narrow, post-merge, append-only direct-push path for the proof registry governance file only, which is the intended design. The bypass is not currently active. When configured, it cannot be used to introduce code changes into main because its admission window opens only after the canonical PR path has been traversed, and its git commit scope is limited to a single governance file.",
+
+    "closure_state": "DETERMINED",
+    "remaining_open_items": [
+      "bypass_actor_not_yet_configured — admin must apply PATCH to ruleset 16177949 to activate proof registry bypass",
+      "live_ruleset_GET_not_performed — mcp__github__get_ruleset tool not available; bypass_actors list not confirmed empty for non-proof-registry actors",
+      "workflow_modification_escalation — residual risk; bounded by CODEOWNERS + P3 governance; classified BOUNDED not CLOSED"
+    ]
+  },
+
+  "impact_on_1604_closure": {
+    "bypass_actor_verification_gap": "RESOLVED — bypass actor is not configured; when configured, it does not create an alternate code admission path",
+    "direct_push_to_main_pathway": "PARTIAL / SUBSTANTIALLY_CONTAINED — unchanged; admin direct push capability remains UNVERIFIED via live ruleset GET",
+    "1604_closure_eligibility": "ENFORCEMENT_CLOSURE_NOT_YET_ELIGIBLE — CI-001 through CI-005 child issues and Phase 1 dependency remain; this analysis resolves the bypass_actor_verification remaining gap from DIRECT_PUSH_AUDIT_REPORT_1604.json v3"
+  },
+
+  "audit_metadata": {
+    "auditor": "claude-sonnet-4-6",
+    "session_branch": "claude/bypass-actor-admission-path-NDpjW",
+    "tools_used": [
+      "mcp__github__list_commits (live — main, 50 most recent)",
+      "mcp__github__list_commits (live — filtered to merge_proof_registry.jsonl path)",
+      "Read (local — merge-proof.yml, BRANCH_PROTECTION_POLICY.json, MERGE_ACTOR_REGISTRY.json, MERGE_BYPASS_INVENTORY.json, DIRECT_PUSH_AUDIT_REPORT_1604.json)"
+    ],
+    "tools_not_available": [
+      "mcp__github__get_ruleset — would enable direct bypass_actors list inspection",
+      "mcp__github__get_branch_protection — would enable admin bypass setting inspection"
+    ]
+  }
+}
