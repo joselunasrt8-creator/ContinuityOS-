@@ -131,10 +131,14 @@
     }
   },
   "proof_storage_requirements": {
-    "persistence": "MERGE_PROOF.json generation is not proof persistence. Registry persistence must be proposed on proof-registry/{proof_id} and admitted by pull request targeting main.",
+    "persistence": "MERGE_PROOF.json generation is not proof persistence. Registry persistence must be proposed on proof-registry/{proof_id} and admitted by pull request targeting main. No main bypass is required.",
     "registry_location": "governance/merge-legitimacy/merge_proof_registry.jsonl",
     "admission_path": "PR_REQUIRED",
     "direct_main_push": "FORBIDDEN_NULL_NON_RETRYABLE",
+    "direct_main_bypass": "NOT_REQUIRED_FORBIDDEN",
+    "pr_creation_token": "MERGE_PROOF_PR_TOKEN",
+    "missing_pr_creation_token": "NULL — registry PR creation token missing",
+    "pr_creation_token_scope": "Explicit repository secret used only for registry gh pr list/create operations; grants PR creation only, not direct main mutation.",
     "deduplication": "Open registry PRs are keyed by proof_id; an existing PR for the same proof_id suppresses duplicate PR creation.",
     "registry_pr_required_fields": ["pr_number", "proof_id", "proof_hash", "merge_commit_sha", "merged_at"]
   },

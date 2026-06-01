@@ -250,11 +250,15 @@
     }
   },
   "proof_storage_requirements": {
-    "persistence": "Merge proof must be proposed for durable, append-only registry storage through a pull request targeting main; direct main persistence is not a valid storage path.",
+    "persistence": "Merge proof must be proposed for durable, append-only registry storage through a pull request targeting main; direct main persistence is not a valid storage path and no main bypass is required.",
     "registry_location": "governance/merge-legitimacy/merge_proof_registry.jsonl",
     "admission_path": "PR_REQUIRED",
     "persistence_branch": "proof-registry/{proof_id}",
     "direct_main_push": "FORBIDDEN_NULL_NON_RETRYABLE",
+    "direct_main_bypass": "NOT_REQUIRED_FORBIDDEN",
+    "pr_creation_token": "MERGE_PROOF_PR_TOKEN",
+    "missing_pr_creation_token": "NULL — registry PR creation token missing",
+    "pr_creation_token_scope": "Explicit repository secret used only for registry gh pr list/create operations; grants PR creation only, not direct main mutation.",
     "registry_pr_required_fields": ["pr_number", "proof_id", "proof_hash", "merge_commit_sha", "merged_at"],
     "deduplication": "proof_id and invocation_nonce must be unique per registry entry; open registry PRs are keyed by proof_id and must not be duplicated",
     "audit_access": "Proof registry must be readable for lineage reconstruction without requiring runtime mutation access",

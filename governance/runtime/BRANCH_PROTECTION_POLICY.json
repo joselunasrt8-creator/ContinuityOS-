@@ -143,14 +143,17 @@
   },
   "proof_registry_bypass": {
     "status": "NOT_REQUIRED_PR_ADMISSION",
-    "description": "The merge-proof.yml workflow must not append proof entries to governance/merge-legitimacy/merge_proof_registry.jsonl via direct git push to main. Branch protection correctly classifies direct persistence as a blocked main mutation. Registry persistence is proposed on a proof-specific branch and admitted by pull request targeting main.",
-    "required_admin_action": "None. No bypass actor is required for proof registry persistence.",
+    "description": "The merge-proof.yml workflow must not append proof entries to governance/merge-legitimacy/merge_proof_registry.jsonl via direct git push to main. Branch protection correctly classifies direct persistence as a blocked main mutation. No main bypass is required. Registry persistence is proposed on a proof-specific branch and admitted by pull request targeting main.",
+    "required_admin_action": "None. No bypass actor is required for proof registry persistence; configure MERGE_PROOF_PR_TOKEN as an explicit repository secret for registry PR creation.",
     "bypass_actor": null,
     "bypass_actor_type": null,
     "bypass_actor_id": null,
-    "persistence_path": "merge-proof.yml creates proof-registry/{proof_id}, commits the append-only JSONL entry there, pushes that branch, and opens a PR to main whose title/body include pr_number, proof_id, proof_hash, merge_commit_sha, and merged_at.",
+    "persistence_path": "merge-proof.yml creates proof-registry/{proof_id}, commits the append-only JSONL entry there, pushes that branch, and opens a PR to main with MERGE_PROOF_PR_TOKEN whose title/body include pr_number, proof_id, proof_hash, merge_commit_sha, and merged_at.",
     "deduplication": "Before creating a registry PR, merge-proof.yml searches open PR title/body for the proof_id and exits without creating a duplicate when one exists. It also skips PR creation if the proof_id is already present in the registry on main.",
-    "failure_mode": "Direct persistence to main is classified as NULL and non-retryable; retrying a direct main push would be a governance bypass attempt, not recovery.",
+    "failure_mode": "Direct persistence to main is classified as NULL and non-retryable; retrying a direct main push would be a governance bypass attempt, not recovery. Missing MERGE_PROOF_PR_TOKEN fails closed before registry PR list/create.",
+    "pr_creation_token": "MERGE_PROOF_PR_TOKEN",
+    "pr_creation_token_scope": "PR creation only for registry PR list/create operations; it must not grant or be used for direct main mutation.",
+    "missing_pr_creation_token": "NULL — registry PR creation token missing",
     "governance_note": "proof generated does not equal proof persisted. Persistence must enter through the same governed PR admission path as every other main mutation."
   }
 }
