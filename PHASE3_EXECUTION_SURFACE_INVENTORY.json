@@ -3,7 +3,8 @@
   "issue": "1693",
   "status": "COMPLETE",
   "audit_date": "2026-06-01",
-  "classification_schema_version": "phase3-v1",
+  "classification_schema_version": "phase3-v2",
+  "pass_a_registry_write_crosscheck": "COMPLETE — ground-truth write scan performed against src/index.ts; all writes reconciled to inventory",
   "purpose": "Canonical execution surface inventory for Phase 3 closure determination. Classifies all repository-controlled surfaces capable of creating execution eligibility, authority records, validation records, execution records, proof records, or mutating governance registries or runtime state.",
   "non_operative": true,
   "evidence_only": true,
@@ -17,6 +18,226 @@
     "RECONCILIATION_ENTRYPOINT": "Surface that mutates governance registries at schema or migration scope (version-gated, governed)",
     "OBSERVABILITY_ONLY": "Surface that is read-only or append-only evidence; cannot authorize execution",
     "NON_EXECUTING": "Surface incapable of state mutation: quarantined, disabled, configuration-only, or test/doc/fixture"
+  },
+
+  "pass_a_ground_truth_registry_writes": {
+    "methodology": "Codebase-first: grep INSERT/UPDATE/DELETE in src/ → normalize to owning route → compare to inventory. No inventory-first validation.",
+    "scan_targets": ["execution_registry", "authority_registry", "validation_registry", "proof_registry", "invocation_registry"],
+    "scan_scope": "src/index.ts (sole runtime handler) + all src/**/*.ts,*.js,*.mjs",
+    "non_index_writes_found": false,
+
+    "execution_registry": {
+      "writes_discovered": 1,
+      "writes": [
+        {
+          "write_id": "ER-W1",
+          "operation": "INSERT INTO execution_registry",
+          "file": "src/index.ts",
+          "line": 8140,
+          "owning_route": "/execute",
+          "purpose": "Creates canonical execution record",
+          "inventory_entry": "route:/execute — EXECUTION_ENTRYPOINT",
+          "covered": true
+        }
+      ],
+      "update_paths": "NONE",
+      "delete_paths": "NONE",
+      "coverage": "COMPLETE",
+      "inventory_claim_verified": "/execute is sole surface that creates execution records"
+    },
+
+    "authority_registry": {
+      "writes_discovered": 5,
+      "writes": [
+        {
+          "write_id": "AR-W1",
+          "operation": "INSERT INTO authority_registry",
+          "file": "src/index.ts",
+          "line": 7781,
+          "owning_route": "/authority",
+          "purpose": "Creates authority binding record",
+          "inventory_entry": "route:/authority — AUTHORITY_ENTRYPOINT",
+          "covered": true
+        },
+        {
+          "write_id": "AR-W2",
+          "operation": "UPDATE authority_registry SET status='RESERVED'",
+          "file": "src/index.ts",
+          "line": 8031,
+          "owning_route": "/validate",
+          "purpose": "Status progression: ACTIVE → RESERVED on validation",
+          "inventory_entry": "route:/validate — VALIDATION_ENTRYPOINT (status UPDATE not previously enumerated separately)",
+          "covered": true,
+          "note": "Status-progression UPDATE within canonical spine; owned by /validate handler"
+        },
+        {
+          "write_id": "AR-W3",
+          "operation": "UPDATE authority_registry SET status='EXECUTED'",
+          "file": "src/index.ts",
+          "line": 8152,
+          "owning_route": "/execute",
+          "purpose": "Status progression: RESERVED → EXECUTED on execution",
+          "inventory_entry": "route:/execute — EXECUTION_ENTRYPOINT (status UPDATE not previously enumerated separately)",
+          "covered": true,
+          "note": "Status-progression UPDATE within canonical spine; owned by /execute handler"
+        },
+        {
+          "write_id": "AR-W4",
+          "operation": "UPDATE authority_registry SET status='CONSUMED'",
+          "file": "src/index.ts",
+          "line": 8362,
+          "owning_route": "/proof",
+          "purpose": "Status finalization: EXECUTED → CONSUMED on proof persistence",
+          "inventory_entry": "route:/proof — PROOF_ENTRYPOINT (status UPDATE not previously enumerated separately)",
+          "covered": true,
+          "note": "Status-finalization UPDATE within canonical spine; owned by /proof handler"
+        },
+        {
+          "write_id": "AR-W5",
+          "operation": "UPDATE authority_registry SET status='REVOKED'",
+          "file": "src/index.ts",
+          "lines": [2705, 2736],
+          "owning_function": "invalidateContinuityLineage / cascadeSessionRevocation",
+          "call_sites": ["resolveContinuityLineage (session/continuity lifecycle)", "activeSession (expiry detection, line 6159)"],
+          "purpose": "Revocation cascade: invalidates authority on expired/revoked session or continuity lineage",
+          "standalone_route": false,
+          "called_from": "Prerequisite helpers invoked within canonical route execution (session validity checks)",
+          "bypass_path": false,
+          "covered": true,
+          "note": "Revocation-cascade UPDATE; not a standalone route. Triggered by session/continuity expiry within canonical spine execution, not from observability or admin surfaces."
+        }
+      ],
+      "coverage": "COMPLETE",
+      "inventory_claim_verified": "/authority is sole INSERT surface; status UPDATEs are owned by canonical spine routes"
+    },
+
+    "validation_registry": {
+      "writes_discovered": 2,
+      "writes": [
+        {
+          "write_id": "VR-W1",
+          "operation": "INSERT INTO validation_registry",
+          "file": "src/index.ts",
+          "line": 8030,
+          "owning_route": "/validate",
+          "purpose": "Creates validation record binding validated_object_hash and invocation_nonce",
+          "inventory_entry": "route:/validate — VALIDATION_ENTRYPOINT",
+          "covered": true
+        },
+        {
+          "write_id": "VR-W2",
+          "operation": "UPDATE validation_registry SET status='REVOKED'",
+          "file": "src/index.ts",
+          "lines": [2709, 2737],
+          "owning_function": "invalidateContinuityLineage / cascadeSessionRevocation",
+          "purpose": "Revocation cascade: invalidates validation on expired/revoked session or continuity lineage",
+          "standalone_route": false,
+          "bypass_path": false,
+          "covered": true,
+          "note": "Same revocation cascade as AR-W5; not a standalone route"
+        }
+      ],
+      "coverage": "COMPLETE",
+      "inventory_claim_verified": "/validate is sole INSERT surface; revocation UPDATEs are cascade side effects within canonical spine"
+    },
+
+    "proof_registry": {
+      "writes_discovered": 3,
+      "writes": [
+        {
+          "write_id": "PR-W1",
+          "operation": "INSERT OR IGNORE INTO proof_registry",
+          "file": "src/index.ts",
+          "line": 8354,
+          "owning_route": "/proof",
+          "purpose": "Captures full lineage proof record",
+          "inventory_entry": "route:/proof — PROOF_ENTRYPOINT",
+          "covered": true
+        },
+        {
+          "write_id": "PR-W2",
+          "operation": "UPDATE proof_registry SET decision_hash",
+          "file": "src/index.ts",
+          "line": 5140,
+          "owning_function": "backfillProofDecisionHashes",
+          "call_path": "ensureSchema (line 1614) → called from main request handler (line 7480)",
+          "purpose": "Bootstrap backfill: fills decision_hash for rows missing the column; idempotent no-op once all rows are backfilled",
+          "standalone_route": false,
+          "runtime_accessible_as_standalone_mutation": false,
+          "bypass_path": false,
+          "covered": true,
+          "note": "Bootstrap-time stabilization; idempotent; creates no authority or execution eligibility; classified in MUTATION_SURFACE_EXHAUSTIVENESS.json as db_write:proof_registry_update"
+        },
+        {
+          "write_id": "PR-W3",
+          "operation": "DELETE FROM proof_registry",
+          "file": "src/index.ts",
+          "line": 5133,
+          "owning_function": "quarantineHistoricalProofDuplicates",
+          "call_path": "ensureSchema (line 1615) → called from main request handler (line 7480)",
+          "purpose": "Bootstrap dedup: archives duplicate proof rows before deleting; duplicate is archived to proof_registry_duplicate_archive before DELETE",
+          "standalone_route": false,
+          "runtime_accessible_as_standalone_mutation": false,
+          "bypass_path": false,
+          "covered": true,
+          "note": "Bootstrap-time dedup; archive-before-delete enforced; creates no authority or execution eligibility; classified in MUTATION_SURFACE_EXHAUSTIVENESS.json as db_write:proof_registry_delete"
+        }
+      ],
+      "coverage": "COMPLETE",
+      "inventory_claim_verified": "/proof is sole runtime INSERT surface; bootstrap DELETE and UPDATE are stabilization-only"
+    },
+
+    "invocation_registry": {
+      "writes_discovered": 3,
+      "writes": [
+        {
+          "write_id": "IR-W1",
+          "operation": "INSERT OR IGNORE INTO invocation_registry",
+          "file": "src/index.ts",
+          "line": 8024,
+          "owning_route": "/validate",
+          "purpose": "Consumes single-use invocation nonce; creates RESERVED record",
+          "inventory_entry": "route:/validate — VALIDATION_ENTRYPOINT",
+          "covered": true
+        },
+        {
+          "write_id": "IR-W2",
+          "operation": "UPDATE invocation_registry SET status='EXECUTED'",
+          "file": "src/index.ts",
+          "line": 8150,
+          "owning_route": "/execute",
+          "purpose": "Marks nonce as consumed at execution",
+          "standalone_route": false,
+          "bypass_path": false,
+          "covered": true,
+          "note": "Status-progression UPDATE within canonical spine; owned by /execute handler"
+        },
+        {
+          "write_id": "IR-W3",
+          "operation": "UPDATE invocation_registry SET status='REVOKED'",
+          "file": "src/index.ts",
+          "lines": [2713, 2738],
+          "owning_function": "invalidateContinuityLineage / cascadeSessionRevocation",
+          "purpose": "Revocation cascade: releases reserved nonce on session/continuity revocation",
+          "standalone_route": false,
+          "bypass_path": false,
+          "covered": true,
+          "note": "Same revocation cascade as AR-W5 and VR-W2"
+        }
+      ],
+      "coverage": "COMPLETE",
+      "inventory_claim_verified": "/validate is sole INSERT surface; status UPDATEs are owned by /execute and revocation cascade within canonical spine"
+    },
+
+    "pass_a_summary": {
+      "total_write_paths_discovered": 14,
+      "write_paths_covered_by_inventory": 14,
+      "uncovered_write_paths": 0,
+      "non_canonical_mutation_paths": 0,
+      "write_3_unverified_status": "RESOLVED — no ambiguous or unverified write exists; all 14 paths traced to canonical ownership",
+      "coverage_verdict": "COMPLETE",
+      "key_finding": "The governed execution gateway (/compile → /validate → /execute → /proof) is the sole mutation admission path. Status-progression UPDATEs on authority_registry and invocation_registry are owned by canonical spine routes. Revocation cascades are lifecycle helpers triggered within canonical route execution, not standalone surfaces."
+    }
   },
 
   "canonical_governed_spine": [
