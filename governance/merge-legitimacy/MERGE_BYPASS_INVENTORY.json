@@ -3,260 +3,182 @@
   "phase": "phase-2",
   "anchor_issue": "#1604",
   "slice_issue": "#1681",
+  "audit_date": "2026-06-01",
   "purpose": "Process-flow inventory of merge-capable pathways into main.",
   "non_goals": [
-    "enforcement",
-    "merge blocking",
-    "authority creation",
-    "runtime mutation"
+    "Permission analysis",
+    "Actor trust analysis",
+    "Organization-level control verification"
   ],
   "classifications": [
     "GOVERNED",
     "PARTIAL",
-    "UNKNOWN",
     "BREAK_GLASS",
-    "CONTAINED",
-    "UNGOVERNED"
+    "UNKNOWN"
   ],
   "pathways": [
     {
       "pathway": "normal_pr_merge",
-      "mechanism": "Pull Request opened against main; GitHub Actions workflows merge-governance-check, generate-preo-candidate, generate-sco-candidate, and constitutional-integrity run as required status checks; reviewer legitimacy validated against MERGE_ACTOR_REGISTRY.json; PREO and SCO candidates generated and bound to exact PR head_sha; merge allowed only after all required checks pass.",
-      "actor_class": "HUMAN_MERGE_ACTOR, OWNER_SELF_CERTIFIED",
-      "required_control": [
-        "PREO_VALID generated for exact head_sha",
-        "SCO_CANDIDATE generated when governed paths changed",
-        "Approved review on exact head_sha or OWNER_SELF_CERTIFIED",
-        "Required status checks passing: merge-governance-check, generate-preo-candidate, generate-sco-candidate, constitutional-integrity",
-        "Branch up-to-date with main before merge",
-        "Merge proof generated post-merge by merge-proof.yml"
-      ],
+      "mechanism": "Pull Request opened against main. Required status checks run before merge is permitted. Reviewer legitimacy validated at check time. PREO and SCO candidates generated and bound to exact PR head_sha. Post-merge, proof entry appended to proof registry.",
+      "required_control": "PREO_VALID bound to exact PR head_sha; SCO_CANDIDATE when governed paths changed; reviewer legitimacy satisfied (APPROVED or OWNER_SELF_CERTIFIED); required status checks passing and wired in GitHub ruleset; stale review dismissal active; branch up-to-date before merge; post-merge proof persisted to registry.",
       "current_evidence": [
-        ".github/workflows/merge-governance-check.yml — enforces PREO/SCO binding and reviewer legitimacy",
-        ".github/workflows/preo-candidate.yml — generates PREO_CANDIDATE bound to PR head_sha",
-        ".github/workflows/sco-candidate.yml — generates SCO_CANDIDATE for governed path changes",
-        ".github/workflows/constitutional-integrity.yml — constitutional check runs as required status check",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json — required_controls declares required status checks, dismiss_stale_reviews, require_branch_up_to_date_before_merge",
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — permitted actor classes and single_contributor_policy",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json enforcement_classification.current = partial — required checks not yet wired in GitHub ruleset"
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — required_controls declared: require_pull_request_before_merge, dismiss_stale_reviews, allow_force_pushes: false, require_status_checks, require_branch_up_to_date_before_merge",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — emitted_check_inventory lists four required check jobs: merge-governance-check, generate-preo-candidate, generate-sco-candidate, constitutional-integrity",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — activation_status: ACTIVATION_RECORDED (2026-05-31); enforcement_classification.current: partial",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — enforcement_classification partial_status_note: required checks must be added manually by typing exact job names; not yet confirmed wired",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED",
+        ".github/workflows/merge-governance-check.yml — present; emits merge-governance-check job on pull_request to main",
+        ".github/workflows/preo-candidate.yml — present; emits generate-preo-candidate job on pull_request to main",
+        ".github/workflows/sco-candidate.yml — present; emits generate-sco-candidate job on pull_request to main",
+        ".github/workflows/constitutional-integrity.yml — present; emits constitutional-integrity job on pull_request to main",
+        ".github/workflows/merge-proof.yml — present; runs on pull_request:closed; appends proof to governance/merge-legitimacy/merge_proof_registry.jsonl",
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — permitted_bot_actors: [] (empty); single_contributor_policy.permitted_self_certifiers: ['joselunasrt8-creator']",
+        "GitHub-side enforcement of required status checks not independently verified from repository contents"
       ],
       "classification": "PARTIAL",
-      "classification_reason": "Governance workflow controls are declared and emitted. Enforcement depends on external GitHub branch protection activation: required status checks must be added to the GitHub ruleset by name, and dismiss_stale_reviews must be active. Until required checks are wired in the GitHub ruleset, the workflow gates exist but cannot block a merge. Additionally, OWNER_SELF_CERTIFIED path permits single-contributor self-review without peer approval, which is structurally weaker than a two-party review.",
-      "required_closure_action": [
-        "Activate GitHub branch protection ruleset: add merge-governance-check, generate-preo-candidate, generate-sco-candidate, constitutional-integrity as required status checks by exact job name",
-        "Verify dismiss_stale_reviews and require_branch_up_to_date_before_merge are active in GitHub ruleset",
-        "Configure github-actions[bot] bypass for proof registry append per BRANCH_PROTECTION_POLICY.json proof_registry_bypass",
-        "Document OWNER_SELF_CERTIFIED legitimacy tier relative to peer-reviewed APPROVED in merge legitimacy model"
-      ]
+      "closure_state": "OPEN"
     },
     {
       "pathway": "admin_merge_override",
-      "mechanism": "Repository administrator uses GitHub branch protection bypass capability to merge a PR or push directly to main without satisfying required status checks or review requirements. May occur via GitHub UI 'bypass required checks' option, ruleset bypass actor configuration, or GitHub API with admin scope.",
-      "actor_class": "HUMAN_MERGE_ACTOR_ADMIN",
-      "required_control": [
-        "admin_bypass_policy.allow_admin_bypass: false declared in BRANCH_PROTECTION_POLICY.json",
-        "GitHub org-level policy or external audit logging required for enforcement"
-      ],
+      "mechanism": "Repository administrator exercises GitHub branch protection bypass to merge a PR or push to main without satisfying required status checks or review requirements. Exercisable via GitHub UI bypass option, ruleset bypass actor entry, or GitHub API with admin token scope.",
+      "required_control": "allow_admin_bypass: false enforced at GitHub org or ruleset level; audit log capturing admin bypass events; formal BREAK_GLASS invocation procedure with pre- and post-action audit trail.",
       "current_evidence": [
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json admin_bypass_policy.allow_admin_bypass: false — declared policy; cannot be enforced from repository code alone",
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json bypass_classification: BREAK_GLASS, bypass_merge_legitimacy: NULL",
-        "BYPASS_PATHS.json github_admin_branch_protection_root_override: BREAK_GLASS — ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json — enforcement_classification.current: partial; cannot verify GitHub-side bypass actor list from repository contents"
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — admin_bypass_policy.allow_admin_bypass: false declared",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — admin_bypass_policy.rationale: 'Admin bypass creates alternate mutation paths outside governance visibility'",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — admin_bypass_policy.future_exception_process: 'Requires explicit governance policy artifact and audit logging'",
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — repository_administrator entry: bypass_classification: BREAK_GLASS; bypass_merge_legitimacy: NULL",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — root_authority_policy.admin_bypass_is_legitimacy: false; admin_bypass_classification: root_authority_evidence_only",
+        "governance/runtime/BYPASS_PATHS.json — github_admin_branch_protection_root_override: ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+        "No formal BREAK_GLASS invocation procedure document present in repository",
+        "GitHub-side admin bypass restriction state not independently verified from repository contents"
       ],
       "classification": "BREAK_GLASS",
-      "classification_reason": "Classified as BREAK_GLASS per MERGE_ACTOR_REGISTRY.json and BYPASS_PATHS.json. Admin bypass cannot produce PREO_VALID; merge legitimacy is NULL regardless of code content. Policy declares allow_admin_bypass: false; actual enforcement is external to this repository and cannot be fully verified from repository contents alone.",
-      "required_closure_action": [
-        "Verify GitHub org-level admin bypass restriction is active",
-        "Enable repository audit log streaming to detect admin bypass events",
-        "Document BREAK_GLASS invocation procedure with required audit trail"
-      ]
+      "closure_state": "OPEN"
     },
     {
       "pathway": "direct_push_to_main",
-      "mechanism": "Collaborator with write or admin access executes 'git push origin main' directly to the main branch, bypassing the PR workflow entirely. No status checks run, no PREO/SCO generated, no review required.",
-      "actor_class": "HUMAN_MERGE_ACTOR, HUMAN_MERGE_ACTOR_ADMIN",
-      "required_control": [
-        "GitHub branch protection restrict_direct_push_to_main: true must be active in ruleset",
-        "No write-access bypass actors in GitHub ruleset"
-      ],
+      "mechanism": "Actor with write or admin access executes git push directly to main, bypassing the PR workflow. No status checks run, no PREO or SCO generated, no review required.",
+      "required_control": "GitHub ruleset 'Require a pull request before merging' rule active on main; restrict_direct_push_to_main confirmed active; no write-access bypass actors in ruleset.",
       "current_evidence": [
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json restrict_direct_push_to_main: true — declared policy",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json enforcement_classification.current: partial — enforcement not yet fully verified as active",
-        "BYPASS_PATHS.json direct_push_to_main: BREAK_GLASS — MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
-        "BYPASS_PATHS.json github_direct_push_to_main: BREAK_GLASS — source-control mutation without PREO_VALID",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json unresolved_risks: GitHub branch protection settings cannot be fully verified from repository contents alone"
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — restrict_direct_push_to_main: true declared",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — forbidden_paths includes 'direct push to main'",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — enforcement_classification.current: partial; activation_status: ACTIVATION_RECORDED",
+        "governance/runtime/BYPASS_PATHS.json — direct_push_to_main: MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — bypass_path_policy.direct_push_to_main.allowed: false",
+        ".github/workflows/merge-proof.yml — encounters branch-protection restrictions (GH013) when attempting git push to main; direct push restriction appears active for github-actions[bot]",
+        "GitHub-side ruleset activation and bypass actor list not independently verified from repository contents"
       ],
-      "classification": "UNKNOWN",
-      "classification_reason": "Policy declares this path forbidden and classifies it as BREAK_GLASS in prior inventory artifacts. However, actual enforcement state of the GitHub branch protection ruleset cannot be verified from repository contents alone. The enforcement_classification.current is 'partial' — ruleset is active but required checks are not yet fully wired. Classification is UNKNOWN until GitHub-side enforcement is confirmed active and no bypass actors exist.",
-      "required_closure_action": [
-        "Confirm GitHub ruleset 'Require a pull request before merging' rule is active and blocks all direct pushes",
-        "Verify no collaborators have write-access bypass in the ruleset",
-        "Once enforcement confirmed, reclassify to CONTAINED or GOVERNED as appropriate"
-      ]
+      "classification": "PARTIAL",
+      "closure_state": "PENDING_EXTERNAL_VERIFICATION"
     },
     {
       "pathway": "force_push_to_main",
-      "mechanism": "Collaborator with admin access executes 'git push --force origin main', rewriting branch history. Prior merge proofs and PREO/SCO lineage bindings may be invalidated or become unreachable.",
-      "actor_class": "HUMAN_MERGE_ACTOR_ADMIN",
-      "required_control": [
-        "GitHub branch protection allow_force_pushes: false must be active in ruleset"
-      ],
+      "mechanism": "Actor with admin access executes git push --force to main, rewriting branch history. Prior merge proofs and PREO/SCO lineage bindings bound to displaced SHAs become unreachable.",
+      "required_control": "GitHub ruleset 'Block force pushes' rule active on main; allow_force_pushes confirmed false in active ruleset.",
       "current_evidence": [
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json allow_force_pushes: false — declared policy",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json enforcement_classification.current: partial",
-        "BYPASS_PATHS.json github_force_push_to_main: BREAK_GLASS — MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
-        "BYPASS_PATHS.json force_push_to_main: BREAK_GLASS — history rewrite can discard governed proof lineage",
-        "governance/runtime/GOVERNANCE_REQUIREMENTS.json unresolved_risks: GitHub branch protection settings cannot be fully verified from repository contents alone"
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — allow_force_pushes: false declared",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — forbidden_paths includes 'force push history rewrite' and 'force push to main'",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — enforcement_classification.current: partial; activation_status: ACTIVATION_RECORDED",
+        "governance/runtime/BYPASS_PATHS.json — force_push_to_main: MERGE_LEGITIMACY_NULL; ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — bypass_path_policy.force_push_to_main.allowed: false",
+        "GitHub-side 'Block force pushes' rule state not independently verified from repository contents"
       ],
-      "classification": "UNKNOWN",
-      "classification_reason": "Policy declares force pushes forbidden and prior inventory artifacts classify this as BREAK_GLASS. Actual enforcement state cannot be verified from repository contents alone. Classification is UNKNOWN until GitHub-side 'Block force pushes' rule is confirmed active in the ruleset.",
-      "required_closure_action": [
-        "Confirm GitHub ruleset 'Block force pushes' rule is active for main branch",
-        "Once enforcement confirmed, reclassify to CONTAINED"
-      ]
+      "classification": "PARTIAL",
+      "closure_state": "PENDING_EXTERNAL_VERIFICATION"
     },
     {
       "pathway": "workflow_generated_merge",
-      "mechanism": "A GitHub Actions workflow with write:contents permission executes a git push or GitHub API merge call directly to main, either as a code merge or indirectly via an automated commit. Current known instance: merge-proof.yml appends proof entries via direct git push to main (not a code merge, but uses the same push surface).",
-      "actor_class": "WORKFLOW_ACTOR (github-actions[bot])",
-      "required_control": [
-        "permitted_bot_actors allowlist in MERGE_ACTOR_REGISTRY.json must enumerate all permitted workflow actors",
-        "Workflow mutations require SCO_CANDIDATE classification before the workflow itself is merged",
-        "Proof registry bypass must be scoped to append-only operations per BRANCH_PROTECTION_POLICY.json proof_registry_bypass"
-      ],
+      "mechanism": "A GitHub Actions workflow with write:contents permission pushes directly to main. Current known instance: merge-proof.yml appends proof entries via git push after each merge. A modified workflow with write:contents could also produce a code-equivalent push bypassing the PR path.",
+      "required_control": "All workflow actors with write:contents enumerated in permitted_bot_actors with explicit scope declaration; proof_registry_bypass in GitHub ruleset scoped to append-only operations; no workflow capable of code-equivalent push to main outside the governed PR path.",
       "current_evidence": [
-        ".github/workflows/merge-proof.yml — executes git push to main for proof registry append; classified as proof-registry-only, not code merge",
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json permitted_bot_actors: [] — empty; github-actions[bot] is not yet in allowlist",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED — bypass not yet applied; merge-proof.yml pushes blocked by GH013",
-        "BYPASS_PATHS.json manual_workflow_dispatch: UNKNOWN — unauthorized execution via workflow_dispatch without governed authority context",
-        "governance/runtime/MERGE_GOVERNANCE_RULES.json — SCO required for .github/workflows/** mutations"
+        ".github/workflows/merge-proof.yml — present; declares permissions: contents: write; uses git push to main for proof registry append",
+        ".github/workflows/merge-proof.yml — encounters GH013 rejection on git push to main; push currently blocked by branch protection",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED; bypass_scope declared as proof_registry_append_only",
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — permitted_bot_actors: [] (empty); github-actions[bot] not enumerated",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — sco_enforcement.required_for_paths includes '.github/workflows/**'; workflow mutations require SCO before the workflow is merged",
+        ".github/CODEOWNERS — /.github/workflows/** @joselunasrt8-creator; workflow changes require owner review",
+        "No other workflow with contents: write permission found in .github/workflows/ inventory"
       ],
-      "classification": "UNKNOWN",
-      "classification_reason": "merge-proof.yml uses a direct push surface to main for proof persistence; permitted_bot_actors is empty and github-actions[bot] is not enumerated as a permitted actor. The proof_registry_bypass is declared required but not yet configured (GH013 blocks pushes). The distinction between proof-append write and code-merge write on the same surface is not enforced at the Git layer; it depends on workflow scope discipline. Classification is UNKNOWN until permitted_bot_actors is populated and push scope is bounded.",
-      "required_closure_action": [
-        "Add github-actions[bot] to permitted_bot_actors in MERGE_ACTOR_REGISTRY.json with explicit scope declaration",
-        "Configure proof_registry_bypass in GitHub ruleset per BRANCH_PROTECTION_POLICY.json proof_registry_bypass",
-        "Enumerate all workflows with write:contents permission and classify each by merge-capability",
-        "Verify no workflow can produce a code merge to main outside the governed PR path"
-      ]
+      "classification": "PARTIAL",
+      "closure_state": "OPEN"
     },
     {
       "pathway": "bot_merge",
-      "mechanism": "A bot actor (GitHub App installation token or PAT-based automation with write:contents or admin scope) opens a PR and merges it programmatically via the GitHub API, potentially bypassing required status checks with elevated permissions. Distinct from workflow_generated_merge in that the actor is an external bot rather than a GitHub Actions workflow.",
-      "actor_class": "BOT_MERGE_ACTOR",
-      "required_control": [
-        "Explicit allowlist entry in permitted_bot_actors in MERGE_ACTOR_REGISTRY.json",
-        "merge-governance-check workflow must run as required check and classify bot actor",
-        "No elevated-scope token bypassing required checks"
-      ],
+      "mechanism": "An external bot actor (GitHub App installation token or PAT-based automation with write:contents or admin scope) opens a PR and merges it programmatically via the GitHub API, potentially bypassing required status checks with elevated permissions.",
+      "required_control": "Explicit entry in permitted_bot_actors in MERGE_ACTOR_REGISTRY.json for each permitted bot; merge-governance-check wired as required status check in GitHub ruleset so bot actor classification runs before merge; no GitHub App or PAT with admin bypass scope active on repository.",
       "current_evidence": [
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json permitted_bot_actors: [] — no bots permitted",
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json forbidden_actor_patterns: UNRECOGNIZED_BOT → MERGE_LEGITIMACY_NULL",
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json forbidden_actor_patterns: ELEVATED_SCOPE_TOKEN → MERGE_LEGITIMACY_NULL",
-        ".github/workflows/merge-governance-check.yml — classifies bot actors against permitted_bot_actors at runtime; unrecognized bots produce MERGE_LEGITIMACY_NULL and exit 1",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json enforcement_classification.current: partial — required checks may not be enforced in GitHub ruleset yet, allowing merge before governance check runs"
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — permitted_bot_actors: [] (empty); empty allowlist means all unrecognized bots produce MERGE_LEGITIMACY_NULL per default_unclassified_result",
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — forbidden_actor_patterns: UNRECOGNIZED_BOT -> MERGE_LEGITIMACY_NULL",
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — forbidden_actor_patterns: ELEVATED_SCOPE_TOKEN -> MERGE_LEGITIMACY_NULL",
+        ".github/workflows/merge-governance-check.yml — bot actor classification present; unrecognized bots produce exit 1 at runtime",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — enforcement_classification.current: partial; merge-governance-check may not yet be wired as required check in GitHub ruleset",
+        "No Dependabot or Renovate configuration present in repository",
+        "GitHub App installations with write or admin scope on this repository not independently verifiable from repository contents"
       ],
-      "classification": "UNKNOWN",
-      "classification_reason": "Policy declares unrecognized bots produce MERGE_LEGITIMACY_NULL and the governance check workflow enforces this at runtime. However, enforcement depends on the merge-governance-check being a required status check in the GitHub ruleset. Until required checks are fully wired, a bot with admin scope could merge without the check running. Classification is UNKNOWN until GitHub ruleset enforcement is confirmed and no bot has admin bypass capability.",
-      "required_closure_action": [
-        "Activate required status checks in GitHub ruleset: merge-governance-check must be wired as a required check",
-        "Enumerate any GitHub App installations with write or admin scope on this repository",
-        "Verify no external automation has admin bypass capability"
-      ]
+      "classification": "PARTIAL",
+      "closure_state": "PENDING_EXTERNAL_VERIFICATION"
     },
     {
       "pathway": "auto_merge",
-      "mechanism": "GitHub auto-merge feature enabled on a PR. Once all required checks pass and the PR is approved, GitHub automatically triggers the merge without additional human action. Creates a timing gap: a commit pushed after approval but before auto-merge fires may produce reviewed_object != merged_object.",
-      "actor_class": "HUMAN_MERGE_ACTOR (auto-merge enabled by human; merge executed by GitHub platform)",
-      "required_control": [
-        "dismiss_stale_reviews: true must be active in GitHub branch protection to dismiss approval on new push",
-        "require_branch_up_to_date_before_merge: true must be active",
-        "PREO head_sha binding must detect reviewed_head_sha != current head_sha before merge fires"
-      ],
+      "mechanism": "GitHub auto-merge feature enabled on a PR. Once all required checks pass and the PR is approved, GitHub automatically triggers the merge without further human action. Creates a timing window: a push after approval but before auto-merge fires may produce reviewed_object != merged_object if stale-review dismissal is not active.",
+      "required_control": "dismiss_stale_reviews: true active in GitHub ruleset; require_branch_up_to_date_before_merge: true active in GitHub ruleset; PREO head_sha binding detects and rejects stale review before merge fires.",
       "current_evidence": [
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json dismiss_stale_reviews: true — declared policy",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json require_branch_up_to_date_before_merge: true — declared policy",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json enforcement_classification.current: partial",
-        ".github/workflows/merge-governance-check.yml — PREO head_sha binding detects stale review if workflow re-runs on new push",
-        "governance/merge-legitimacy/MERGE_SURFACE_INVENTORY.json MS-005 — auto-merge with stale review timing window identified"
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — dismiss_stale_reviews: true declared",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — require_branch_up_to_date_before_merge: true declared",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — enforcement_classification.current: partial; activation_status: ACTIVATION_RECORDED",
+        ".github/workflows/merge-governance-check.yml — PREO head_sha binding validates reviewed_head_sha == current head_sha; stale review produces LEGITIMACY_NULL and exit 1",
+        "governance/merge-legitimacy/MERGE_SURFACE_INVENTORY.json — MS-005: auto-merge stale review timing window identified",
+        "governance/merge-legitimacy/PR_GOVERNANCE_GAP_LIST.json — GAP-008: stale approval timing window in auto-merge; declared as resolving with GAP-001",
+        "Whether auto-merge is currently enabled or disabled on this repository not determinable from repository contents",
+        "GitHub-side dismiss_stale_reviews and require_branch_up_to_date_before_merge enforcement not independently verified from repository contents"
       ],
       "classification": "UNKNOWN",
-      "classification_reason": "Controls are declared in policy but enforcement state cannot be confirmed from repository contents. Timing gap between approval and auto-merge execution is a structural characteristic of the GitHub platform feature. Classification is UNKNOWN until dismiss_stale_reviews and require_branch_up_to_date_before_merge are confirmed active in the GitHub ruleset.",
-      "required_closure_action": [
-        "Confirm dismiss_stale_reviews is active in GitHub ruleset for main branch",
-        "Confirm require_branch_up_to_date_before_merge is active in GitHub ruleset",
-        "Document auto-merge timing gap in merge legitimacy model as a residual PARTIAL risk once controls are active"
-      ]
+      "closure_state": "PENDING_EXTERNAL_VERIFICATION"
     },
     {
       "pathway": "merge_queue",
-      "mechanism": "GitHub merge queue batches multiple PRs into a combined commit with a new SHA not present in any individual PR. The queue creates a synthetic merge commit (combined SHA) that was never individually reviewed or bound to any PREO candidate.",
-      "actor_class": "HUMAN_MERGE_ACTOR (queued by human; combined SHA produced by GitHub platform)",
-      "required_control": [
-        "Merge queue must be disabled for governed branches per merge_queue_policy",
-        "If merge queue is used, required checks must run against the enqueued exact head_sha"
-      ],
+      "mechanism": "GitHub merge queue batches multiple PRs into a combined commit with a synthetic SHA not present in any individual PR. The queue-combined SHA was not reviewed or bound to any PREO candidate, violating the reviewed_object == merged_object invariant.",
+      "required_control": "Merge queue disabled at GitHub repository settings level for main; merge-governance-check rejection of merge_group events as a fail-closed backstop.",
       "current_evidence": [
-        ".github/workflows/merge-governance-check.yml — merge_group event trigger explicitly rejected with exit 1 and MERGE_LEGITIMACY_NULL message",
-        "governance/runtime/MERGE_GOVERNANCE_RULES.json merge_queue_policy — merge queue disabled for governed branches",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json require_merge_queue_required_checks_on_enqueued_head: true — declared policy",
-        "governance/merge-legitimacy/MERGE_BYPASS_INVENTORY.json (prior version) MB-007 — merge queue combined SHA not covered by original PREO"
+        ".github/workflows/merge-governance-check.yml — merge_group event trigger present; explicitly rejected with exit 1 and message 'Merge queue is DISABLED_FOR_GOVERNED_BRANCHES per CI-003 and MERGE_GOVERNANCE_RULES.json merge_queue_policy'",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — merge_queue_policy.status: DISABLED_FOR_GOVERNED_BRANCHES; result_on_merge_group_event: MERGE_LEGITIMACY_NULL",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — merge_queue_policy.enforcement_mechanism: 'merge-governance-check workflow fails on merge_group trigger event'",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — merge_queue_policy.closure_condition: 'Merge queue may be re-enabled only after CI-003b implementation'",
+        "governance/merge-legitimacy/PR_GOVERNANCE_GAP_LIST.json — GAP-003: merge queue combined SHA not covered by original PREO; listed as closure-blocking",
+        "GitHub-side merge queue enable/disable setting for main not independently verifiable from repository contents"
       ],
-      "classification": "UNKNOWN",
-      "classification_reason": "The governance-check workflow actively rejects merge_group events at runtime. However, whether merge queue is enabled or disabled at the GitHub repository settings level cannot be verified from repository contents alone. If merge queue were enabled in GitHub settings, the workflow rejection provides a signal but the combined SHA would still be produced by the platform. Classification is UNKNOWN until GitHub-side merge queue setting is confirmed disabled for main.",
-      "required_closure_action": [
-        "Confirm merge queue is disabled in GitHub repository settings for main branch",
-        "Once confirmed, reclassify to CONTAINED (workflow rejection active + platform-level disabled)"
-      ]
+      "classification": "PARTIAL",
+      "closure_state": "OPEN"
     },
     {
       "pathway": "branch_protection_bypass",
-      "mechanism": "GitHub branch protection ruleset bypass actor configuration grants a specific actor (GitHub App, user, or team) the ability to bypass all branch protection requirements including required status checks, required reviews, and push restrictions. Bypass actors can push or merge to main without satisfying any governance controls.",
-      "actor_class": "BYPASS_ACTOR (any actor listed in ruleset bypass_actors)",
-      "required_control": [
-        "No bypass actors in GitHub ruleset except explicitly scoped service accounts",
-        "admin_bypass_policy.allow_admin_bypass: false must be active"
-      ],
+      "mechanism": "GitHub branch protection ruleset bypass actor configuration grants a specific actor (GitHub App, user, or team) the ability to bypass all branch protection requirements, including required status checks, required reviews, and push restrictions.",
+      "required_control": "No human actors in GitHub ruleset bypass_actors list; github-actions[bot] bypass, if configured, scoped strictly to proof-registry append only; all bypass actors enumerated with declared scope.",
       "current_evidence": [
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json admin_bypass_policy.allow_admin_bypass: false — declared policy",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json proof_registry_bypass — github-actions[bot] bypass is REQUIRED_NOT_YET_CONFIGURED for proof append only",
-        "BYPASS_PATHS.json branch_protection_bypass: BREAK_GLASS — ROOT_AUTHORITY_CONTAINMENT_REQUIRED; never legitimacy",
-        "BYPASS_PATHS.json github_branch_protection_bypass: BREAK_GLASS — admin or ruleset bypass may mutate main outside legitimacy evidence",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json — current bypass_actors in GitHub ruleset cannot be verified from repository contents"
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — admin_bypass_policy.allow_admin_bypass: false declared",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — proof_registry_bypass.status: REQUIRED_NOT_YET_CONFIGURED; bypass_scope: proof_registry_append_only; bypass_actor: github-actions[bot]",
+        "governance/runtime/BYPASS_PATHS.json — branch_protection_bypass: ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL; never legitimacy",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — rules: 'Branch protection bypass -> root authority evidence only and may NEVER create merge legitimacy'",
+        "governance/ROOT_BYPASS_PATH_INVENTORY.json — RBP-006: branch_protection_bypass_merge declared CLASSIFIED_OPEN; declared_legitimacy_effect: LEGITIMACY_NULL",
+        "Actual bypass_actors list in GitHub ruleset not independently verifiable from repository contents"
       ],
       "classification": "BREAK_GLASS",
-      "classification_reason": "Classified as BREAK_GLASS per BYPASS_PATHS.json. Policy explicitly states bypass cannot produce merge legitimacy (ROOT_AUTHORITY_CONTAINMENT_REQUIRED). A scoped bypass for github-actions[bot] proof-registry append is declared required but not yet configured. The bypass surface itself is inherently a BREAK_GLASS pathway; any use must be classified and audited.",
-      "required_closure_action": [
-        "Enumerate all current bypass actors in the GitHub ruleset",
-        "Verify github-actions[bot] bypass is scoped to proof-registry append only and no other write operations",
-        "Document any bypass actor as an explicit BREAK_GLASS entry with audit trail requirement",
-        "Ensure no human actor has a bypass actor entry"
-      ]
+      "closure_state": "PENDING_EXTERNAL_VERIFICATION"
     },
     {
       "pathway": "break_glass_manual_path",
-      "mechanism": "Out-of-band emergency merge executed by repository administrator outside the governed PR and workflow path. Covers scenarios where the governed admission path is non-functional (e.g., workflow infrastructure failure, GitHub Actions outage) and a merge must occur to restore service or address a critical security issue.",
-      "actor_class": "HUMAN_MERGE_ACTOR_ADMIN",
-      "required_control": [
-        "Explicit BREAK_GLASS invocation declaration",
-        "Audit trail created before and after the operation",
-        "Root authority containment documentation",
-        "Post-incident review and proof reconstruction"
-      ],
+      "mechanism": "Out-of-band emergency merge executed by repository administrator outside the governed PR and workflow path. Invoked when the governed admission path is non-functional and a merge must occur to restore service or address a critical security issue.",
+      "required_control": "Formal BREAK_GLASS invocation procedure: authorization criteria, pre-action declaration, audit trail creation, and post-invocation review and proof reconstruction process.",
       "current_evidence": [
-        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json bypass_classification: BREAK_GLASS, bypass_merge_legitimacy: NULL",
-        "BYPASS_PATHS.json github_admin_branch_protection_root_override: BREAK_GLASS — ROOT_AUTHORITY_CONTAINMENT_REQUIRED",
-        "BYPASS_PATHS.json cloudflare_account_or_token_direct_deploy: BREAK_GLASS — root authority escape hatch if executed outside governed workflow",
-        "governance/runtime/BRANCH_PROTECTION_POLICY.json admin_bypass_policy.future_exception_process: Requires explicit governance policy artifact and audit logging",
-        "No formal BREAK_GLASS invocation procedure document currently exists in repository"
+        "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json — repository_administrator entry: bypass_classification: BREAK_GLASS; bypass_merge_legitimacy: NULL",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json — admin_bypass_policy.future_exception_process: 'Requires explicit governance policy artifact and audit logging'",
+        "governance/runtime/MERGE_GOVERNANCE_RULES.json — root_authority_policy.root_authority_evidence_may_authorize_merge: false",
+        ".github/workflows/governed-release.yml — break_glass_justification input present; BREAK_GLASS classification documented as non-canonical and non-eligible for canonical release path",
+        "No formal BREAK_GLASS invocation procedure document present in repository",
+        "No authorization criteria, invocation protocol, or post-invocation review process defined in any governance artifact"
       ],
       "classification": "BREAK_GLASS",
-      "classification_reason": "Classified as BREAK_GLASS by definition: this pathway is the named emergency escape hatch. Policy declares it cannot produce merge legitimacy (ROOT_AUTHORITY_CONTAINMENT_REQUIRED). No formal invocation procedure currently exists in the repository. The pathway is visible and classified but lacks a defined invocation and audit trail protocol.",
-      "required_closure_action": [
-        "Document a formal BREAK_GLASS invocation procedure including pre-invocation declaration, audit trail requirements, and post-invocation proof reconstruction steps",
-        "Define who may authorize BREAK_GLASS invocation and under what conditions",
-        "Establish post-invocation review process to classify whether the use was legitimate and what remediation is required"
-      ]
+      "closure_state": "OPEN"
     }
   ]
 }
