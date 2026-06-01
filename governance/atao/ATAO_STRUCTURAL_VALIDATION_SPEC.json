@@ -1,0 +1,198 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "atao_structural_validation_spec",
+  "issue": "1704",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "structural_validation_specification",
+  "scope": {
+    "name": "ATAO_STRUCTURAL_VALIDATION",
+    "expansion": "Agent Tool Action Object structural validation",
+    "purpose": "Define the deterministic structural checks that classify an ATAO candidate as VALID_STRUCTURE or NULL before authority binding, AEO materialization, validation-state transition, execution, or proof generation can occur.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "execution_eligibility_creation": false
+  },
+  "canonical_position": {
+    "input_state": "ATAO_CANDIDATE",
+    "output_states": ["VALID_STRUCTURE", "NULL"],
+    "default_output": "NULL",
+    "precedes": ["authority_binding", "aeo_materialization", "runtime_validation", "execution", "proof"],
+    "does_not_substitute_for": ["authority", "AEO", "VALIDATED", "EXECUTED", "PROOF"]
+  },
+  "structural_object_model": {
+    "schema_refs": [
+      "schemas/atao.schema.json",
+      "schemas/json/continuityos/v1/atao.schema.json",
+      "runtime/legitimacy/schemas/ATAO.schema.json"
+    ],
+    "canonicalization": "deterministic_json_canonicalization_required_before_hashing",
+    "additional_properties": "forbidden",
+    "required_fields": [
+      "object_type",
+      "atao_id",
+      "agent_id",
+      "session_id",
+      "intent",
+      "proposed_action",
+      "scope",
+      "risk_class",
+      "timestamp"
+    ],
+    "runtime_schema_object_type": "ATAO",
+    "root_schema_object_type_policy": "Root public ATAO schemas may omit object_type for backward compatibility, but runtime legitimacy schema validation requires object_type=ATAO."
+  },
+  "field_requirements": {
+    "object_type": {
+      "required_for_runtime_legitimacy_schema": true,
+      "const": "ATAO",
+      "failure_result": "NULL"
+    },
+    "atao_id": {
+      "type": "non_empty_string",
+      "purpose": "Stable candidate identifier only; not an authority token.",
+      "failure_result": "NULL"
+    },
+    "agent_id": {
+      "type": "non_empty_string",
+      "purpose": "Captures proposing agent identity only; does not grant authority.",
+      "failure_result": "NULL"
+    },
+    "session_id": {
+      "type": "non_empty_string",
+      "purpose": "References an external session lineage candidate; structural presence does not prove active session continuity.",
+      "failure_result": "NULL"
+    },
+    "intent": {
+      "type": "non_empty_string",
+      "purpose": "Human- and machine-readable proposal intent.",
+      "failure_result": "NULL"
+    },
+    "proposed_action": {
+      "type": "object",
+      "additional_properties": false,
+      "required_fields": ["system", "action", "parameters"],
+      "failure_result": "NULL"
+    },
+    "proposed_action.system": {
+      "type": "non_empty_string",
+      "failure_result": "NULL"
+    },
+    "proposed_action.action": {
+      "type": "non_empty_string",
+      "failure_result": "NULL"
+    },
+    "proposed_action.parameters": {
+      "type": "object",
+      "authority_effect": "none",
+      "failure_result": "NULL"
+    },
+    "scope": {
+      "type": "object",
+      "purpose": "Bounds the proposed action; structural validity requires object shape but does not adjudicate semantic sufficiency.",
+      "failure_result": "NULL"
+    },
+    "risk_class": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2", "P3"],
+      "failure_result": "NULL"
+    },
+    "timestamp": {
+      "type": "date-time_string",
+      "purpose": "Candidate observation time; freshness and replay windows require later governance checks.",
+      "failure_result": "NULL"
+    }
+  },
+  "validation_rules": [
+    {
+      "rule_id": "ATAO-SV-001",
+      "requirement": "Input must be a JSON object, not an array, scalar, or malformed JSON.",
+      "failure_result": "NULL"
+    },
+    {
+      "rule_id": "ATAO-SV-002",
+      "requirement": "All required fields for the applicable ATAO schema profile must be present.",
+      "failure_result": "NULL"
+    },
+    {
+      "rule_id": "ATAO-SV-003",
+      "requirement": "No undeclared root or proposed_action fields may be present.",
+      "failure_result": "NULL"
+    },
+    {
+      "rule_id": "ATAO-SV-004",
+      "requirement": "All non-empty string fields must contain at least one character after JSON parsing.",
+      "failure_result": "NULL"
+    },
+    {
+      "rule_id": "ATAO-SV-005",
+      "requirement": "risk_class must be one of P0, P1, P2, or P3.",
+      "failure_result": "NULL"
+    },
+    {
+      "rule_id": "ATAO-SV-006",
+      "requirement": "timestamp must parse as a date-time string.",
+      "failure_result": "NULL"
+    },
+    {
+      "rule_id": "ATAO-SV-007",
+      "requirement": "Hash- or merkle_root-suffixed fields, if admitted by a future schema revision, must be lowercase 64-character hex strings.",
+      "failure_result": "NULL"
+    }
+  ],
+  "valid_structure_semantics": {
+    "VALID_STRUCTURE_means": [
+      "The ATAO candidate satisfies deterministic structural requirements.",
+      "The candidate can be considered for subsequent authority binding or AEO materialization by separate governed logic."
+    ],
+    "VALID_STRUCTURE_does_not_mean": [
+      "authority exists",
+      "session continuity is active",
+      "the proposed action is semantically safe",
+      "the candidate is an AEO",
+      "validation_registry state exists",
+      "execution is permitted",
+      "proof may be generated"
+    ],
+    "NULL_means": "The candidate is structurally invalid or ambiguous and must not advance to authority binding or execution eligibility."
+  },
+  "authority_boundaries": {
+    "agent_identity_grants_authority": false,
+    "session_reference_grants_authority": false,
+    "risk_class_grants_authority": false,
+    "valid_structure_grants_authority": false,
+    "authority_required_after_valid_structure": true,
+    "implicit_authority": "forbidden"
+  },
+  "replay_boundaries": {
+    "nonce_consumption": false,
+    "invocation_reservation": false,
+    "registry_write": false,
+    "replay_state_transition": false,
+    "replay_semantics": "Structural validation is replay-neutral. Replay resistance must be enforced by later governed stages that bind exact object hash, authority, invocation nonce, and proof lineage."
+  },
+  "determinism_requirements": {
+    "same_input_same_result": true,
+    "canonical_hash_required_for_lineage": true,
+    "validator_must_not_depend_on_wall_clock": true,
+    "validator_must_not_depend_on_network": true,
+    "validator_must_not_depend_on_registry_state": true
+  },
+  "failure_semantics": {
+    "missing_field": "NULL",
+    "additional_property": "NULL",
+    "type_mismatch": "NULL",
+    "enum_mismatch": "NULL",
+    "malformed_json": "NULL",
+    "ambiguous_object_type": "NULL",
+    "semantic_authority_unclear": "NULL"
+  }
+}
