@@ -142,16 +142,15 @@
     "gap_result": "PREO_INVALID_AND_MERGE_LEGITIMACY_NULL"
   },
   "proof_registry_bypass": {
-    "status": "REQUIRED_NOT_YET_CONFIGURED",
-    "description": "The merge-proof.yml workflow appends proof entries to governance/merge-legitimacy/merge_proof_registry.jsonl via a direct git push to main after each merge. Branch protection activation (CI-001) blocks this push with GH013. The workflow must be granted a bypass so it can persist proofs without going through a PR.",
-    "required_admin_action": "PATCH /repos/joselunasrt8-creator/mindshift-demo/rulesets/16177949 — add entry to bypass_actors: {\"actor_id\": 15368, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}. Integration ID 15368 is the GitHub Actions app (same ID already used as integration_id for required status checks in this ruleset).",
-    "bypass_actor": "github-actions[bot]",
-    "bypass_actor_type": "Integration",
-    "bypass_actor_id": 15368,
-    "bypass_scope": "proof_registry_append_only",
-    "bypass_rationale": "The proof registry append is itself a post-merge governance action, not a code change requiring review. It records audit evidence of merges that have already passed all governance checks. Blocking it defeats the audit trail the governance model requires.",
-    "failure_mode": "Without bypass: merge-proof.yml fails with GH013 on every merge; proof entries are not persisted to the registry; the canonical audit trail is broken.",
-    "workaround_until_configured": "Proof artifacts are still uploaded as workflow artifacts (MERGE_PROOF artifact per run) and can be reconciled into the registry once bypass is configured.",
-    "governance_note": "This bypass is scoped to the github-actions[bot] integration only. It does not grant human actors or other bots the ability to bypass branch protection."
+    "status": "NOT_REQUIRED_PR_ADMISSION",
+    "description": "The merge-proof.yml workflow must not append proof entries to governance/merge-legitimacy/merge_proof_registry.jsonl via direct git push to main. Branch protection correctly classifies direct persistence as a blocked main mutation. Registry persistence is proposed on a proof-specific branch and admitted by pull request targeting main.",
+    "required_admin_action": "None. No bypass actor is required for proof registry persistence.",
+    "bypass_actor": null,
+    "bypass_actor_type": null,
+    "bypass_actor_id": null,
+    "persistence_path": "merge-proof.yml creates proof-registry/{proof_id}, commits the append-only JSONL entry there, pushes that branch, and opens a PR to main whose title/body include pr_number, proof_id, proof_hash, merge_commit_sha, and merged_at.",
+    "deduplication": "Before creating a registry PR, merge-proof.yml searches open PR title/body for the proof_id and exits without creating a duplicate when one exists. It also skips PR creation if the proof_id is already present in the registry on main.",
+    "failure_mode": "Direct persistence to main is classified as NULL and non-retryable; retrying a direct main push would be a governance bypass attempt, not recovery.",
+    "governance_note": "proof generated does not equal proof persisted. Persistence must enter through the same governed PR admission path as every other main mutation."
   }
 }

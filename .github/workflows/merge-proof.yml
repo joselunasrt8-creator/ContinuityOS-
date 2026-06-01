@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   generate-merge-proof:
@@ -384,7 +384,9 @@ jobs:
           echo "PROOF_HASH=$CANONICAL_HASH" >> "$GITHUB_ENV"
           echo "PR_NUMBER_FOR_COMMIT=$PR_NUMBER" >> "$GITHUB_ENV"
 
-      - name: Append proof to registry
+      - name: Append proof to registry via PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -392,9 +394,35 @@ jobs:
           MERGE_COMMIT_SHA=$(jq -r .canonical_payload.merge_commit_sha MERGE_PROOF.json)
           MERGED_AT=$(jq -r .canonical_payload.merged_at MERGE_PROOF.json)
           PR_NUMBER=$(jq -r .canonical_payload.pr_number MERGE_PROOF.json)
+          REGISTRY_PATH="governance/merge-legitimacy/merge_proof_registry.jsonl"
+          BRANCH_NAME="proof-registry/${PROOF_ID}"
 
-          # Build the entry once; append it inside the retry loop to avoid
-          # rebase conflicts when two runs commit at the same EOF position.
+          echo "Direct main persistence classification: NULL (non-retryable); registry persistence must enter through PR admission."
+
+          # Idempotency 1: if a previous registry PR already covers this proof_id,
+          # do not create another branch or pull request for the same proof.
+          EXISTING_PR=$(gh pr list \
+            --state open \
+            --base main \
+            --search "$PROOF_ID in:title,body" \
+            --json number,url \
+            --jq '.[0] // empty')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Registry PR for proof_id $PROOF_ID already exists: $EXISTING_PR"
+            exit 0
+          fi
+
+          git fetch origin main
+          git checkout -B "$BRANCH_NAME" origin/main
+
+          # Idempotency 2: the registry may already contain this proof after a
+          # prior registry PR was merged. In that case proof generation succeeded
+          # and persistence is already complete.
+          if [ -f "$REGISTRY_PATH" ] && grep -qF "$PROOF_ID" "$REGISTRY_PATH"; then
+            echo "Proof entry $PROOF_ID already present in registry; skipping registry PR"
+            exit 0
+          fi
+
           ENTRY=$(jq -cn \
             --arg proof_id "$PROOF_ID" \
             --arg proof_hash "$PROOF_HASH" \
@@ -412,58 +440,34 @@ jobs:
               appended_at: $appended_at
             }')
 
+          echo "$ENTRY" >> "$REGISTRY_PATH"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$REGISTRY_PATH"
+          git commit -m "proof: propose merge proof registry entry for PR #${PR_NUMBER_FOR_COMMIT}"
+          git push --force-with-lease origin "HEAD:$BRANCH_NAME"
 
-          MAX_RETRIES=5
-          for attempt in $(seq 1 $MAX_RETRIES); do
-            # Pull before committing so there are never local commits during the
-            # fetch — avoids the EOF-conflict that arises when rebasing two
-            # concurrent JSONL appends on top of each other.
-            git pull --rebase origin main
+          PR_TITLE="proof: persist merge proof ${PROOF_ID} for PR #${PR_NUMBER}"
+          {
+            echo "## Merge proof registry persistence"
+            echo ""
+            echo "This PR proposes append-only persistence of a generated merge proof registry entry. Proof generation is complete; proof persistence is intentionally routed through governed PR admission."
+            echo ""
+            echo "- PR number: #${PR_NUMBER}"
+            echo "- proof_id: ${PROOF_ID}"
+            echo "- proof_hash: ${PROOF_HASH}"
+            echo "- merge_commit_sha: ${MERGE_COMMIT_SHA}"
+            echo "- merged_at: ${MERGED_AT}"
+            echo ""
+            echo "Governance invariant: proof generated ≠ proof persisted. Direct persistence to main is NULL and non-retryable; this branch must be admitted through the same governed path as every other main mutation."
+          } > registry_pr_body.md
 
-            # Idempotency: another concurrent run may have already persisted this entry.
-            if grep -qF "$PROOF_ID" governance/merge-legitimacy/merge_proof_registry.jsonl 2>/dev/null; then
-              echo "Proof entry $PROOF_ID already present in registry; skipping append"
-              exit 0
-            fi
-
-            echo "$ENTRY" >> governance/merge-legitimacy/merge_proof_registry.jsonl
-            git add governance/merge-legitimacy/merge_proof_registry.jsonl
-            git commit -m "proof: append merge proof entry for PR #${PR_NUMBER_FOR_COMMIT}"
-
-            # Capture stderr so we can distinguish permanent from transient failures.
-            PUSH_OUT=$(git push 2>&1) && {
-              echo "Proof registry push succeeded on attempt $attempt"
-              exit 0
-            }
-
-            # Reset before any exit or retry so the tree is clean.
-            git reset --hard HEAD~1
-
-            # Permanent failure: branch protection ruleset (GH013) blocks all direct
-            # pushes to main. Retrying will not help — fail immediately with an
-            # actionable message.
-            if echo "$PUSH_OUT" | grep -q "GH013\|push declined due to repository rule violations"; then
-              echo "NULL — proof registry push blocked by repository ruleset (GH013)."
-              echo "Branch protection requires all changes to go through a pull request."
-              echo "Admin action required: add 'github-actions[bot]' as a bypass actor"
-              echo "for the 'Require a pull request before merging' rule in the repository"
-              echo "ruleset settings."
-              echo "See proof_registry_bypass in governance/runtime/BRANCH_PROTECTION_POLICY.json"
-              exit 1
-            fi
-
-            # Transient failure: another run landed between our pull and push.
-            # Retry with exponential backoff.
-            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
-              SLEEP_TIME=$((2 ** attempt))
-              echo "Push failed on attempt $attempt, retrying in ${SLEEP_TIME}s..."
-              sleep "$SLEEP_TIME"
-            fi
-          done
-          echo "NULL — proof registry push failed after $MAX_RETRIES attempts; proof entry not persisted"
-          exit 1
+          gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "$PR_TITLE" \
+            --body-file registry_pr_body.md
 
       - name: Upload merge proof artifact
         if: always()

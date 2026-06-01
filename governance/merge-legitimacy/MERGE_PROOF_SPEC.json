@@ -250,9 +250,13 @@
     }
   },
   "proof_storage_requirements": {
-    "persistence": "Merge proof must be stored in a durable, append-only registry bound to the repository",
-    "registry_location": "proof registry (equivalent to proof_lineage_registry in runtime schema)",
-    "deduplication": "proof_id and invocation_nonce must be unique per registry entry",
+    "persistence": "Merge proof must be proposed for durable, append-only registry storage through a pull request targeting main; direct main persistence is not a valid storage path.",
+    "registry_location": "governance/merge-legitimacy/merge_proof_registry.jsonl",
+    "admission_path": "PR_REQUIRED",
+    "persistence_branch": "proof-registry/{proof_id}",
+    "direct_main_push": "FORBIDDEN_NULL_NON_RETRYABLE",
+    "registry_pr_required_fields": ["pr_number", "proof_id", "proof_hash", "merge_commit_sha", "merged_at"],
+    "deduplication": "proof_id and invocation_nonce must be unique per registry entry; open registry PRs are keyed by proof_id and must not be duplicated",
     "audit_access": "Proof registry must be readable for lineage reconstruction without requiring runtime mutation access",
     "retention": "Proof must be retained for the lifetime of the repository to support retrospective audit"
   },
@@ -264,6 +268,7 @@
     "topology_drift": "MERGE_LEGITIMACY_NULL",
     "replay_detected": "NULL",
     "proof_hash_mismatch": "NULL",
+    "direct_main_persistence": "NULL_NON_RETRYABLE",
     "unauthorized_actor": "BREAK_GLASS classification on proof — merge legitimacy remains NULL if actor bypassed required controls"
   }
 }

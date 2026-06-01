@@ -130,6 +130,14 @@
       "result": "MERGE_LEGITIMACY_NULL"
     }
   },
+  "proof_storage_requirements": {
+    "persistence": "MERGE_PROOF.json generation is not proof persistence. Registry persistence must be proposed on proof-registry/{proof_id} and admitted by pull request targeting main.",
+    "registry_location": "governance/merge-legitimacy/merge_proof_registry.jsonl",
+    "admission_path": "PR_REQUIRED",
+    "direct_main_push": "FORBIDDEN_NULL_NON_RETRYABLE",
+    "deduplication": "Open registry PRs are keyed by proof_id; an existing PR for the same proof_id suppresses duplicate PR creation.",
+    "registry_pr_required_fields": ["pr_number", "proof_id", "proof_hash", "merge_commit_sha", "merged_at"]
+  },
   "canonical_compression": {
     "rule_1": "Merge success is not proof.",
     "rule_2": "A governed merge requires proof bound to: exact validated_head_sha, resulting merge_commit_sha, preo_valid_hash, sco_valid_hash when required, approval_lineage_hash, and branch_protection_enforcement_hash.",
@@ -152,6 +160,7 @@
     "missing_branch_protection_enforcement_hash": "MERGE_LEGITIMACY_NULL",
     "missing_validator_key_id": "MERGE_LEGITIMACY_NULL",
     "missing_validator_signature": "MERGE_LEGITIMACY_NULL",
-    "proof_hash_mismatch": "MERGE_LEGITIMACY_NULL"
+    "proof_hash_mismatch": "MERGE_LEGITIMACY_NULL",
+    "direct_main_persistence": "NULL_NON_RETRYABLE"
   }
 }
