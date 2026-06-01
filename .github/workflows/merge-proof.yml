@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   generate-merge-proof:
@@ -386,7 +386,7 @@ jobs:
 
       - name: Append proof to registry via PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_PROOF_PR_TOKEN: ${{ secrets.MERGE_PROOF_PR_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -399,9 +399,14 @@ jobs:
 
           echo "Direct main persistence classification: NULL (non-retryable); registry persistence must enter through PR admission."
 
+          if [ -z "${MERGE_PROOF_PR_TOKEN:-}" ]; then
+            echo "NULL — registry PR creation token missing"
+            exit 1
+          fi
+
           # Idempotency 1: if a previous registry PR already covers this proof_id,
           # do not create another branch or pull request for the same proof.
-          EXISTING_PR=$(gh pr list \
+          EXISTING_PR=$(GH_TOKEN="$MERGE_PROOF_PR_TOKEN" gh pr list \
             --state open \
             --base main \
             --search "$PROOF_ID in:title,body" \
@@ -463,7 +468,7 @@ jobs:
             echo "Governance invariant: proof generated ≠ proof persisted. Direct persistence to main is NULL and non-retryable; this branch must be admitted through the same governed path as every other main mutation."
           } > registry_pr_body.md
 
-          gh pr create \
+          GH_TOKEN="$MERGE_PROOF_PR_TOKEN" gh pr create \
             --base main \
             --head "$BRANCH_NAME" \
             --title "$PR_TITLE" \
