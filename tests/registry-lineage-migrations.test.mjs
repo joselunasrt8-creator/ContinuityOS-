@@ -350,7 +350,6 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
         topology_attestation_hash: 'b'.repeat(64)
       }, { 'X-Nonce': `govern-nonce-${name}` })
       assert.equal(govern.status, 'VALID_CANDIDATE', `${name} govern status`)
-      runSqlite([dbPath, `UPDATE governed_tool_envelope_registry SET non_operative='false' WHERE envelope_id='${govern.envelope_id}'`])
 
       await post('/authority', {
         ...topologyEpochFields(),
@@ -424,6 +423,130 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
   await runScenario({ name: 'mutated-payload', envelope: mutatedPayloadDsseEnvelopeFixture, expectedStatus: 'NULL', expectedReason: 'invalid_provenance_attestation' })
   await runScenario({ name: 'missing-secret', envelope: validDsseEnvelopeFixture, omitEnvSecret: true, expectedStatus: 'NULL', expectedReason: 'invalid_provenance_attestation' })
   await runScenario({ name: 'no-envelope', expectedStatus: 'EXECUTED', prove: true })
+})
+
+test('governed tool envelope activates at authority binding not at validation', async () => {
+  const worker = (await importWorker()).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-activation-'))
+  const dbPath = join(dir, 'activation.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+
+  let epochNonceCounter = 0
+  function topologyEpochFields() {
+    return {
+      topology_epoch: 0,
+      epoch_lineage_parent: 'fixture-epoch-parent',
+      epoch_nonce: `epoch-nonce-activation-${++epochNonceCounter}`,
+      topology_visibility_state: 'VISIBLE'
+    }
+  }
+
+  async function post(path, payload, extraHeaders = {}) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
+      method: 'POST',
+      headers: { ...headers, ...extraHeaders },
+      body: JSON.stringify(payload)
+    }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+    runSqlite([dbPath, "ALTER TABLE aeo_registry ADD COLUMN govern_projection_hash TEXT NOT NULL DEFAULT ''"])
+
+    // --- Part 1: Happy path — /govern → /authority → /compile with no DB mutation ---
+    const session = await post('/session', { identity_id: 'activation-identity' })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: ['decision-activation-1'] })
+
+    const govern = await post('/govern', {
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      target: { workflow: 'governed-deploy.yml' },
+      finality: { proof_required: true },
+      policy_class: 'TOOL_RUNTIME_MUTATION',
+      policy_digest: 'a'.repeat(64),
+      topology_attestation_hash: 'b'.repeat(64)
+    }, { 'X-Nonce': 'govern-nonce-activation-1' })
+    assert.equal(govern.status, 'VALID_CANDIDATE')
+
+    // Envelope is non-operative immediately after /govern — activation has NOT yet occurred
+    assert.equal(
+      runSqlite([dbPath, `SELECT non_operative FROM governed_tool_envelope_registry WHERE envelope_id='${govern.envelope_id}'`]).trim(),
+      'true',
+      'envelope must be non-operative after /govern'
+    )
+
+    // /authority binds and activates the envelope — no direct DB mutation
+    const authority = await post('/authority', {
+      ...topologyEpochFields(),
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id: 'decision-activation-1',
+      owner: 'activation-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id: govern.envelope_id
+    })
+    assert.equal(authority.status, 'ACTIVE')
+
+    // Envelope is now operative — activated by /authority, before /validate
+    assert.equal(
+      runSqlite([dbPath, `SELECT non_operative FROM governed_tool_envelope_registry WHERE envelope_id='${govern.envelope_id}'`]).trim(),
+      'false',
+      'envelope must become operative at /authority binding'
+    )
+
+    // /compile succeeds because /authority already activated the envelope
+    const provenance1 = provenanceFor('decision-activation-1')
+    const compiled = await post('/compile', { ...topologyEpochFields(), decision_id: 'decision-activation-1', ...snapshotFrom(provenance1) })
+    assert.equal(compiled.status, 'COMPILED', '/compile must succeed once envelope is activated by /authority')
+
+    // --- Part 2: Rejection — non-operative envelope still causes /compile to fail ---
+    // Reset the envelope to non_operative='true' to simulate a pre-fix / unauthorized state
+    runSqlite([dbPath, `UPDATE governed_tool_envelope_registry SET non_operative='true' WHERE envelope_id='${govern.envelope_id}'`])
+
+    // A fresh second decision with the same authority record already in place
+    // We need a second authority pointing to this now-non-operative envelope.
+    // Use a separate session and continuity to avoid UNIQUE constraint on decision_id.
+    const session2 = await post('/session', { identity_id: 'activation-identity-2' })
+    const continuity2 = await post('/continuity', { session_id: session2.session_id, authority_chain: ['decision-activation-2'] })
+    const govern2 = await post('/govern', {
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      target: { workflow: 'governed-deploy.yml' },
+      finality: { proof_required: true },
+      policy_class: 'TOOL_RUNTIME_MUTATION',
+      policy_digest: 'a'.repeat(64),
+      topology_attestation_hash: 'b'.repeat(64)
+    }, { 'X-Nonce': 'govern-nonce-activation-2' })
+    assert.equal(govern2.status, 'VALID_CANDIDATE')
+
+    // /authority binds govern2 envelope and activates it
+    await post('/authority', {
+      ...topologyEpochFields(),
+      continuity_id: continuity2.continuity_id,
+      session_id: session2.session_id,
+      decision_id: 'decision-activation-2',
+      owner: 'activation-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id: govern2.envelope_id
+    })
+
+    // Deactivate the envelope to simulate non-operative state
+    runSqlite([dbPath, `UPDATE governed_tool_envelope_registry SET non_operative='true' WHERE envelope_id='${govern2.envelope_id}'`])
+
+    // /compile must reject: authority references a non-operative envelope
+    const provenance2 = provenanceFor('decision-activation-2')
+    const compiled2 = await post('/compile', { ...topologyEpochFields(), decision_id: 'decision-activation-2', ...snapshotFrom(provenance2) })
+    assert.notEqual(compiled2.status, 'COMPILED', '/compile must reject when governed envelope is non-operative')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('runtime lifecycle persists against migration-built canonical registries', async () => {
