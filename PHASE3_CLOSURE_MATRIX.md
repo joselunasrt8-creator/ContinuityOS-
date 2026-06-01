@@ -20,7 +20,7 @@ Determine whether agent-mediated execution can be demonstrated to remain bounded
 | Agent execution surface inventory complete | TBD | |
 | Agent bypass inventory complete | TBD | |
 | ATAO specification complete | TBD | |
-| AEO specification complete | TBD | |
+| AEO specification complete | COMPLETE | CANONICAL_AEO_IDENTITY_SPEC.md (#1691) |
 | Authority binding specification complete | TBD | |
 | Replay containment specification complete | TBD | |
 | Proof specification complete | TBD | |
@@ -89,7 +89,26 @@ Required fields:
 - target
 - finality
 
-**Status:** PARTIAL
+**Status:** COMPLETE
+
+**Specification:** CANONICAL_AEO_IDENTITY_SPEC.md
+
+Defines:
+- Canonical AEO schema (5-field, additionalProperties: false)
+- ATAO → AEO transformation contract
+- Canonical serialization rules (key-sorted, recursive)
+- Identity anchor generation: `SHA-256(canonicalize(aeo))`
+- Mutation invariant: immutable after hash binding
+- Authority binding target: `aeo_registry(decision_id, validated_object_hash)`
+- Ω Validator target: canonical AEO from `aeo_registry`
+- Replay target: `invocation_registry(decision_id, validated_object_hash, invocation_nonce)`
+- Proof target: `proof_registry(decision_id, validated_object_hash)`
+- Reconciliation identity anchor: `deterministic_reconciliation_anchor` derived from `validated_object_hash` lineage
+
+**Identity invariant:**
+```
+identity(validated_object) == identity(executed_object) == identity(proven_object) == identity(reconciled_object)
+```
 
 ---
 
