@@ -7,6 +7,13 @@ export const AUTHORITY_DISAGREEMENT_CLASSES = Object.freeze({
   STALE_REPLAY: 'AUTHORITY_STALE_REPLAY'
 })
 
+export const CROSS_REGISTRY_RECONCILIATION_CLASSIFICATION = Object.freeze({
+  MATCH: 'MATCH',
+  DRIFT: 'DRIFT',
+  AMBIGUOUS: 'AMBIGUOUS',
+  INSUFFICIENT_EVIDENCE: 'INSUFFICIENT_EVIDENCE'
+})
+
 export const LEGITIMACY_QUORUM_CLASSIFICATION = Object.freeze({
   AGREED_VALID: 'AGREED_VALID',
   AGREED_INVALID: 'AGREED_INVALID',
@@ -17,7 +24,7 @@ export const LEGITIMACY_QUORUM_CLASSIFICATION = Object.freeze({
   STALE_REPLAY: 'STALE_REPLAY'
 })
 
-export function reconcileCrossRegistryAuthority({ registries, expectedContinuityId, requiredRegistryCount }) {
+export function reconcileCrossRegistryAuthority({ registries = [], expectedContinuityId, requiredRegistryCount } = {}) {
   const issues = []
   const byDecision = new Map()
   for (const record of registries) {
@@ -75,19 +82,34 @@ export function reconcileCrossRegistryAuthority({ registries, expectedContinuity
   }
 
   const onlyAgreedValid = quorumClassifications.length > 0 && quorumClassifications.every((q) => q.quorum_classification === LEGITIMACY_QUORUM_CLASSIFICATION.AGREED_VALID)
-  const hasExecutableAuthority = onlyAgreedValid && normalizedDecisions.every(([, records]) =>
+  const hasExecutableAuthority = onlyAgreedValid && issues.length === 0 && normalizedDecisions.every(([, records]) =>
     records.length > 0
     && records.every((r) => String(r.authority_status) === 'AUTHORIZED')
     && records.every((r) => String(r.replay_state || 'FRESH') !== 'REPLAYED')
     && records.every((r) => String(r.continuity_status || 'ACTIVE') === 'ACTIVE')
   )
 
-  const classification = issues.length === 0 && hasExecutableAuthority ? 'PASS' : 'DRIFT'
+  const hasAmbiguousEvidence = issues.some((issue) => [
+    AUTHORITY_DISAGREEMENT_CLASSES.STATE_DISAGREEMENT,
+    AUTHORITY_DISAGREEMENT_CLASSES.CONTINUITY_MISMATCH,
+    AUTHORITY_DISAGREEMENT_CLASSES.TEMPORAL_DIVERGENCE,
+    AUTHORITY_DISAGREEMENT_CLASSES.AMBIGUOUS_LINEAGE,
+  ].includes(issue.class))
+  const hasInsufficientEvidence = normalizedDecisions.length === 0
+    || quorumClassifications.some((q) => q.quorum_classification === LEGITIMACY_QUORUM_CLASSIFICATION.PARTIAL_VISIBILITY)
+  let reconciliation_classification = CROSS_REGISTRY_RECONCILIATION_CLASSIFICATION.MATCH
+  if (hasInsufficientEvidence) reconciliation_classification = CROSS_REGISTRY_RECONCILIATION_CLASSIFICATION.INSUFFICIENT_EVIDENCE
+  else if (hasAmbiguousEvidence) reconciliation_classification = CROSS_REGISTRY_RECONCILIATION_CLASSIFICATION.AMBIGUOUS
+  else if (issues.length > 0 || !hasExecutableAuthority) reconciliation_classification = CROSS_REGISTRY_RECONCILIATION_CLASSIFICATION.DRIFT
+
+  const status = reconciliation_classification === CROSS_REGISTRY_RECONCILIATION_CLASSIFICATION.MATCH ? 'PASS' : 'DRIFT'
   return {
-    status: classification,
-    canonical_outcome: classification === 'PASS' ? 'REGISTRY_CONSENSUS' : 'NULL',
-    executable_legitimacy: classification === 'PASS' ? 'EXECUTABLE' : 'NULL',
-    fail_closed: classification !== 'PASS',
+    classification: reconciliation_classification,
+    status,
+    canonical_outcome: status === 'PASS' ? 'REGISTRY_CONSENSUS' : 'NULL',
+    executable_legitimacy: status === 'PASS' ? 'EXECUTABLE' : 'NULL',
+    legitimacy: 'NULL',
+    fail_closed: status !== 'PASS',
     quorum_classifications: quorumClassifications,
     issues
   }
