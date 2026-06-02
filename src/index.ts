@@ -2,6 +2,8 @@ type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, 
 import type { CanonicalAEO } from "./lib/aeo-governance.ts"
 import { classifyFromPredicates, classifyPartitionFinalityAdmission } from "./lib/finality-classification.js"
 import { classifyTopologyEpochAdmission } from "./lib/topology-epoch.js"
+import { interceptToolCall, classifyGatewayToolSurface, checkOmegaValidatorBoundary } from "./lib/agent-tool-gateway.ts"
+import type { AgentToolGovernanceProposal } from "./lib/agent-tool-gateway.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -370,7 +372,99 @@ async function handleAgentToolInvocationBoundary(env: Env, request: Request): Pr
   })
 }
 
+async function ensureAgentToolGatewaySchema(env: Env): Promise<void> {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS agent_tool_observation_registry (observation_id TEXT PRIMARY KEY, observation_hash TEXT NOT NULL UNIQUE, agent_id TEXT NOT NULL, session_id TEXT NOT NULL, framework TEXT NOT NULL, tool_name TEXT NOT NULL, tool_system TEXT NOT NULL, risk_class TEXT NOT NULL CHECK (risk_class IN ('P0','P1','P2','P3')), tool_input TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('OBSERVED')), created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_agent_tool_observation_session ON agent_tool_observation_registry (session_id)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_observation_registry_append_only_update BEFORE UPDATE ON agent_tool_observation_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_observation_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_observation_registry_append_only_delete BEFORE DELETE ON agent_tool_observation_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_observation_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS agent_tool_proposal_registry (proposal_id TEXT PRIMARY KEY, proposal_class TEXT NOT NULL, cip_id TEXT NOT NULL UNIQUE, observation_id TEXT NOT NULL, observation_hash TEXT NOT NULL, agent_id TEXT NOT NULL, session_id TEXT NOT NULL, framework TEXT NOT NULL, tool_name TEXT NOT NULL, tool_system TEXT NOT NULL, risk_class TEXT NOT NULL CHECK (risk_class IN ('P0','P1','P2','P3')), intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, requires_authority_binding INTEGER NOT NULL, proposal_status TEXT NOT NULL CHECK (proposal_status IN ('PENDING_AUTHORITY_REVIEW')), creates_atao INTEGER NOT NULL DEFAULT 0 CHECK (creates_atao = 0), creates_aeo INTEGER NOT NULL DEFAULT 0 CHECK (creates_aeo = 0), created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_agent_tool_proposal_observation ON agent_tool_proposal_registry (observation_id, observation_hash)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_proposal_registry_append_only_update BEFORE UPDATE ON agent_tool_proposal_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_proposal_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_proposal_registry_append_only_delete BEFORE DELETE ON agent_tool_proposal_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_proposal_registry is append-only'); END`).run()
+}
 
+async function handleAgentToolGatewayIntercept(env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE, reason: "malformed_request" })
+  const agent_id = String(b.agent_id || "")
+  const session_id = String(b.session_id || "")
+  const tool_name = String(b.tool_name || "")
+  const tool_input = (b.tool_input && typeof b.tool_input === "object" && !Array.isArray(b.tool_input)) ? b.tool_input as Record<string, unknown> : {}
+  const intent = String(b.intent || "")
+  const scope = (b.scope && typeof b.scope === "object" && !Array.isArray(b.scope)) ? b.scope as Record<string, unknown> : {}
+  const constraints = (b.constraints && typeof b.constraints === "object" && !Array.isArray(b.constraints)) ? b.constraints as Record<string, unknown> : {}
+  const timestamp = new Date().toISOString()
+
+  // Gateway intercept: Observation → CIP → GovernanceProposal (no ATAO, no AEO, no authority)
+  const outcome = interceptToolCall({ agent_id, session_id, tool_name, tool_input, intent, scope, constraints, timestamp })
+
+  if (outcome.status === "NULL") {
+    return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE, reason: outcome.reason, non_operative: true, creates_atao: false, creates_aeo: false })
+  }
+
+  await ensureAgentToolGatewaySchema(env)
+  await env.DB.prepare(`INSERT OR IGNORE INTO agent_tool_observation_registry (observation_id,observation_hash,agent_id,session_id,framework,tool_name,tool_system,risk_class,tool_input,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'OBSERVED',?10)`)
+    .bind(outcome.observation.observation_id, outcome.observation_hash, agent_id, session_id, "langchain", tool_name, outcome.observation.tool_system, outcome.observation.risk_class, JSON.stringify(tool_input), timestamp).run()
+  await env.DB.prepare(`INSERT OR IGNORE INTO agent_tool_proposal_registry (proposal_id,proposal_class,cip_id,observation_id,observation_hash,agent_id,session_id,framework,tool_name,tool_system,risk_class,intent,scope,constraints,requires_authority_binding,proposal_status,creates_atao,creates_aeo,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,'PENDING_AUTHORITY_REVIEW',0,0,?16)`)
+    .bind(outcome.proposal.proposal_id, "GOVERNANCE_PROPOSAL", outcome.cip.cip_id, outcome.observation.observation_id, outcome.observation_hash, agent_id, session_id, "langchain", tool_name, outcome.observation.tool_system, outcome.observation.risk_class, intent, JSON.stringify(scope), JSON.stringify(constraints), outcome.cip.requires_authority_binding ? 1 : 0, timestamp).run()
+
+  return json({
+    status: "INTERCEPTED",
+    result: "OK",
+    route: AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE,
+    non_operative: true,
+    creates_atao: false,
+    creates_aeo: false,
+    proposal_space: "populated",
+    authority_space: "not_populated",
+    execution_space: "not_populated",
+    observation_id: outcome.observation.observation_id,
+    observation_hash: outcome.observation_hash,
+    cip_id: outcome.cip.cip_id,
+    proposal_id: outcome.proposal.proposal_id,
+    proposal_class: "GOVERNANCE_PROPOSAL",
+    proposal_status: "PENDING_AUTHORITY_REVIEW",
+    tool_system: outcome.observation.tool_system,
+    risk_class: outcome.observation.risk_class,
+    requires_authority_binding: outcome.cip.requires_authority_binding,
+    framework: "langchain"
+  })
+}
+
+async function handleAgentToolGatewayPropose(env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE, reason: "malformed_request" })
+  const proposal_id = String(b.proposal_id || "")
+  const observation_id = String(b.observation_id || "")
+  const observation_hash = String(b.observation_hash || "")
+  if (!proposal_id || !observation_id || !observation_hash) {
+    return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE, reason: "missing_proposal_fields", non_operative: true })
+  }
+  await ensureAgentToolGatewaySchema(env)
+  const proposal = await env.DB.prepare(`SELECT * FROM agent_tool_proposal_registry WHERE proposal_id=?1 AND observation_id=?2 AND observation_hash=?3 AND proposal_status='PENDING_AUTHORITY_REVIEW'`).bind(proposal_id, observation_id, observation_hash).first<any>()
+  if (!proposal) return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE, reason: "proposal_not_found", non_operative: true })
+  return json({
+    status: "PROPOSED",
+    result: "OK",
+    route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE,
+    non_operative: true,
+    creates_atao: false,
+    creates_aeo: false,
+    proposal_id: String(proposal.proposal_id || ""),
+    proposal_class: "GOVERNANCE_PROPOSAL",
+    proposal_status: "PENDING_AUTHORITY_REVIEW",
+    cip_id: String(proposal.cip_id || ""),
+    observation_id: String(proposal.observation_id || ""),
+    observation_hash: String(proposal.observation_hash || ""),
+    tool_name: String(proposal.tool_name || ""),
+    tool_system: String(proposal.tool_system || ""),
+    risk_class: String(proposal.risk_class || ""),
+    requires_authority_binding: Boolean(proposal.requires_authority_binding),
+    next_step: "authority_review",
+    authority_space: "not_populated",
+    execution_space: "not_populated"
+  })
+}
 
 function canonicalGovernProjectionFromCandidate(candidate: GovernCandidate): GovernCandidate {
   return { intent: String(candidate.intent || ""), scope: canonicalRecord(candidate.scope), target: canonicalRecord(candidate.target), finality: canonicalRecord(candidate.finality) }
@@ -547,6 +641,8 @@ const NON_EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/session", "/continuity"] 
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const OPENCLAW_GOVERN_ROUTE = "/govern" as const
 const AGENT_TOOL_INVOCATION_ROUTE = "/agent/tool-call" as const
+const AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE = "/gateway/tool/intercept" as const
+const AGENT_TOOL_GATEWAY_PROPOSE_ROUTE = "/gateway/tool/propose" as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
@@ -7673,7 +7769,9 @@ export default {
     const governedCandidateRoute = url.pathname === OPENCLAW_GOVERN_ROUTE
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
     const agentToolInvocationRoute = url.pathname === AGENT_TOOL_INVOCATION_ROUTE
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute
+    const agentToolGatewayInterceptRoute = url.pathname === AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE
+    const agentToolGatewayProposeRoute = url.pathname === AGENT_TOOL_GATEWAY_PROPOSE_ROUTE
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
@@ -7681,6 +7779,14 @@ export default {
 
     if (agentToolInvocationRoute && request.method === "POST") {
       return handleAgentToolInvocationBoundary(env, request)
+    }
+
+    if (agentToolGatewayInterceptRoute && request.method === "POST") {
+      return handleAgentToolGatewayIntercept(env, request)
+    }
+
+    if (agentToolGatewayProposeRoute && request.method === "POST") {
+      return handleAgentToolGatewayPropose(env, request)
     }
 
     const readOnlyObservabilityRoute = request.method === "GET" && (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) || (TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) || url.pathname === RUNTIME_SOVEREIGNTY_ROUTE || url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE || [BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any))
