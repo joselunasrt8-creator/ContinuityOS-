@@ -38,6 +38,21 @@ jobs:
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
           REPO="${{ github.repository }}"
 
+          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+          fi
+          if ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$HEAD_SHA" || true
+          fi
+
+          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || \
+             ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
+            echo "Unable to resolve PR comparison commits for review legitimacy check" >&2
+            echo "BASE_SHA=$BASE_SHA" >&2
+            echo "HEAD_SHA=$HEAD_SHA" >&2
+            exit 1
+          fi
+
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed_files_proof.txt
           RISK_CLASS="$(bash scripts/classify-risk.sh changed_files_proof.txt)"
 
