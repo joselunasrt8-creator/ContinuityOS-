@@ -173,9 +173,6 @@ export type FilesystemAEOMaterializationFailure =
   | "missing_required_field"
   | "extra_field_present"
   | "authority_binding_missing"
-  | "validator_eligibility_missing"
-  | "canonical_hash_mismatch"
-  | "lineage_reference_missing"
   | "invalid_field_type"
 
 export type FilesystemAEOMaterializationResult =
@@ -208,14 +205,6 @@ export function materializeFilesystemAEO(input: unknown): FilesystemAEOMateriali
 
   const validation = validateValidation(input.validation)
   if (!validation) return { ok: false, failure: "authority_binding_missing" }
-
-  if (!isNonEmptyString(validation.decision_id) || !isNonEmptyString(validation.authority_lineage_hash)) {
-    return { ok: false, failure: "authority_binding_missing" }
-  }
-
-  if (!isNonEmptyString(validation.replay_nonce)) {
-    return { ok: false, failure: "validator_eligibility_missing" }
-  }
 
   const target = validateTarget(input.target)
   if (!target) return { ok: false, failure: "invalid_field_type" }
