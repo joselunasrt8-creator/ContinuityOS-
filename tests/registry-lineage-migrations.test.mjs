@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { importWorker } from './helpers/import-worker.mjs'
+import { canonicalize, sha256Hex } from '../src/canonical.js'
 import { sha256Hex, canonicalize } from '../src/canonical.js'
 
 function runSqlite(args, options = {}) {
@@ -82,8 +83,8 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'authority_registry', ['decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'authority_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'authority_registry must retain UNIQUE(decision_id) lifecycle guard')
 
-    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash', 'workflow_integrity_hash', 'lineage_stage', 'lineage_origin_hash'])
-    assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at'])
+    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash', 'workflow_integrity_hash', 'lineage_stage', 'lineage_origin_hash', 'govern_projection_hash'])
+    assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'govern_projection_hash'])
     assertIndex(dbPath, 'aeo_registry', 'idx_aeo_registry_decision_hash', ['decision_id', 'validated_object_hash'])
 
     assertColumns(dbPath, 'preo_registry', ['preo_id', 'decision_id', 'authority_id', 'continuity_id', 'reviewed_hash', 'canonical_preo', 'status', 'created_at', 'reviewed_tree_hash', 'merge_commit_sha'])
@@ -263,6 +264,79 @@ const validDsseEnvelopeFixture = JSON.parse(readFileSync(new URL('valid-dsse-env
 const apiKeySignedDsseEnvelopeFixture = JSON.parse(readFileSync(new URL('api-key-signed-dsse-envelope.json', provenanceFixtureRoot), 'utf8'))
 const mutatedPayloadDsseEnvelopeFixture = JSON.parse(readFileSync(new URL('mutated-payload-dsse-envelope.json', provenanceFixtureRoot), 'utf8'))
 const provenanceFixtureSecret = 'fixture-provenance-secret'
+const runtimeAdmissionPolicyDigest = 'a'.repeat(64)
+const runtimeAdmissionTopologyHash = 'b'.repeat(64)
+let runtimeAdmissionNonceCounter = 0
+
+function runtimeEpochFields(path, payload) {
+  if (!['/authority', '/compile', '/validate', '/execute'].includes(path)) return {}
+  runtimeAdmissionNonceCounter += 1
+  return {
+    topology_epoch: payload.topology_epoch ?? 0,
+    epoch_lineage_parent: payload.epoch_lineage_parent || 'genesis',
+    epoch_nonce: payload.epoch_nonce || `epoch-${runtimeAdmissionNonceCounter}-${String(payload.decision_id || 'unknown')}-${path.replace('/', '')}`,
+    topology_visibility_state: payload.topology_visibility_state || 'VISIBLE'
+  }
+}
+
+function runtimeGovernCandidateFromAuthority(payload) {
+  const constraints = payload.constraints || {}
+  const scope = payload.scope && typeof payload.scope === 'object' ? payload.scope : {}
+  return {
+    intent: String(payload.intent || 'deploy_production'),
+    scope,
+    target: {
+      repo: String(constraints.repo ?? scope.repo ?? ''),
+      branch: String(constraints.branch ?? scope.branch ?? ''),
+      workflow: String(constraints.workflow ?? 'governed-deploy.yml')
+    },
+    finality: { proof_required: true },
+    policy_class: 'TOOL_RUNTIME_MUTATION',
+    policy_digest: runtimeAdmissionPolicyDigest,
+    topology_attestation_hash: runtimeAdmissionTopologyHash,
+    topology_epoch: 0,
+    topology_observed_at: '2026-01-01T00:00:00.000Z',
+    topology_visibility_state: 'VISIBLE'
+  }
+}
+
+async function runtimePartitionFields(path, payload) {
+  if (!['/execute', '/proof'].includes(path)) return {}
+  const partition_epoch = Number(payload.partition_epoch ?? 0)
+  const canonical_lineage_hash = payload.canonical_lineage_hash || await sha256Hex(canonicalize({
+    decision_id: String(payload.decision_id || ''),
+    validated_object_hash: String(payload.validated_object_hash || ''),
+    invocation_nonce: String(payload.invocation_nonce || '')
+  }))
+  return {
+    partition_finality_state: payload.partition_finality_state || 'PARTITION_SETTLED',
+    partition_epoch,
+    canonical_lineage_hash,
+    partition_lineage_hash: payload.partition_lineage_hash || canonical_lineage_hash,
+    partition_closure_hash: payload.partition_closure_hash || await sha256Hex(canonicalize({ partition_epoch, canonical_lineage_hash })),
+    topology_visible: payload.topology_visible ?? true,
+    reconciliation_deterministic: payload.reconciliation_deterministic ?? true,
+    reconciliation_ordering_deterministic: payload.reconciliation_ordering_deterministic ?? true,
+    partition_settlement_observed_at: payload.partition_settlement_observed_at || new Date().toISOString()
+  }
+}
+
+async function prepareRuntimePayload(worker, env, headers, path, payload) {
+  const prepared = { ...runtimeEpochFields(path, payload), ...(await runtimePartitionFields(path, payload)), ...payload }
+  if (path === '/authority' && !prepared.governed_tool_envelope_id) {
+    runtimeAdmissionNonceCounter += 1
+    const governResponse = await worker.fetch(new Request('https://runtime.test/govern', {
+      method: 'POST',
+      headers: { ...headers, 'X-Nonce': `govern-${runtimeAdmissionNonceCounter}-${String(prepared.decision_id || 'unknown')}`, 'X-Nonce-Domain': 'openclaw-runtime-test' },
+      body: JSON.stringify(runtimeGovernCandidateFromAuthority(prepared))
+    }), env)
+    assert.equal(governResponse.status, 200)
+    const govern = await governResponse.json()
+    assert.equal(govern.status, 'VALID_CANDIDATE')
+    prepared.governed_tool_envelope_id = govern.envelope_id
+  }
+  return prepared
+}
 
 async function persistPreo(post, decision_id, validated_object_hash, provenance) {
   const preo = await post('/preo', {
@@ -326,6 +400,8 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
     async function post(path, payload, extraHeaders = {}) {
       const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
         method: 'POST',
+        headers,
+        body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload))
         headers: { ...headers, ...extraHeaders },
         body: JSON.stringify(payload)
       }), env)
@@ -439,7 +515,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
     const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload))
     }), env)
     assert.equal(response.status, 200)
     return response.json()
@@ -540,7 +616,7 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload))
     }), env)
     assert.equal(response.status, 200)
     return response.json()
@@ -610,7 +686,7 @@ test('compile and validate share canonical deploy target coercion semantics', as
   const decision_id = 'decision-target-coercion'
 
   async function post(path, payload) {
-    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload)) }), env)
     assert.equal(response.status, 200)
     return response.json()
   }
@@ -649,7 +725,7 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
   const decision_id = 'decision-workflow-rejection'
 
   async function post(path, payload) {
-    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload)) }), env)
     assert.equal(response.status, 200)
     return response.json()
   }
@@ -687,7 +763,7 @@ test('proof transaction rolls back proof persistence when authority consumption 
   const decision_id = 'decision-proof-rollback'
 
   async function post(path, payload) {
-    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload)) }), env)
     assert.equal(response.status, 200)
     return response.json()
   }
@@ -726,7 +802,7 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
   const decision_id = 'decision-proof-duplicates'
 
   async function post(path, payload) {
-    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload)) }), env)
     assert.equal(response.status, 200)
     return response.json()
   }
@@ -770,11 +846,12 @@ test('runtime non-session startup quarantines historical duplicate proof lineage
     runSqlite([dbPath, `CREATE TABLE proof_registry (proof_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, execution_id TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, surface TEXT, run_id TEXT, commit_sha TEXT, workflow TEXT, environment TEXT, created_at TEXT NOT NULL);`])
     runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-canonical','session-1','execution-1','decision-historical','hash-historical','github-actions','1','aaa','governed-deploy.yml','production','2026-01-01T00:00:00.000Z');`])
     runSqlite([dbPath, `INSERT INTO proof_registry (proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at) VALUES ('proof-duplicate','session-1','execution-2','decision-historical','hash-historical','github-actions','2','bbb','governed-deploy.yml','production','2026-01-02T00:00:00.000Z');`])
+    runSqlite([dbPath, `CREATE TABLE epoch_registry (epoch_id TEXT PRIMARY KEY, epoch_scope TEXT NOT NULL, topology_epoch INTEGER NOT NULL, epoch_lineage_parent TEXT NOT NULL, created_at TEXT NOT NULL);`])
 
     const response = await worker.fetch(new Request('https://runtime.test/authority', {
       method: 'POST',
       headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
-      body: JSON.stringify({ session_id: 'missing-session' })
+      body: JSON.stringify({ session_id: 'missing-session', topology_epoch: 0, epoch_lineage_parent: 'genesis', epoch_nonce: 'epoch-startup-invalid-session', topology_visibility_state: 'VISIBLE' })
     }), env)
     const payload = await response.json()
 
@@ -806,7 +883,7 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
     const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload))
     }), env)
     assert.equal(response.status, expectedStatus)
     return response.json()
@@ -873,7 +950,7 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
     const response = await worker.fetch(new Request(`https://runtime.test${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(await prepareRuntimePayload(worker, env, headers, path, payload))
     }), env)
     assert.equal(response.status, expectedStatus)
     return response.json()

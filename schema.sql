@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS aeo_registry (
   continuity_id TEXT NOT NULL,
   canonical_aeo TEXT NOT NULL,
   validated_object_hash TEXT NOT NULL,
+  govern_projection_hash TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
