@@ -36,20 +36,25 @@ jobs:
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
           REPO="${{ github.repository }}"
 
-          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
-          fi
-          if ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
-            git fetch --no-tags --depth=1 origin "$HEAD_SHA" || true
-          fi
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+          git fetch --no-tags --depth=1 origin "$HEAD_SHA" || true
+          git fetch --no-tags --depth=1 origin "$MERGE_SHA" || true
 
-          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || \
-             ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
-            echo "Unable to resolve PR comparison commits for review legitimacy check" >&2
+          missing_base=false
+          missing_head=false
+          missing_merge=false
+          git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || missing_base=true
+          git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null || missing_head=true
+          git cat-file -e "$MERGE_SHA^{commit}" 2>/dev/null || missing_merge=true
+
+          if [ "$missing_base" = "true" ] || [ "$missing_head" = "true" ] || [ "$missing_merge" = "true" ]; then
+            echo "Unable to resolve commit object required for merge proof generation" >&2
             echo "BASE_SHA=$BASE_SHA" >&2
             echo "HEAD_SHA=$HEAD_SHA" >&2
+            echo "MERGE_SHA=${MERGE_SHA:-}" >&2
             exit 1
           fi
 
@@ -241,12 +246,33 @@ jobs:
 
           REVIEWED_HEAD_SHA="$(jq -r .reviewed_head_sha review_legitimacy_result.json)"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          MERGE_COMMIT_SHA="$MERGE_SHA"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           REPO="${{ github.repository }}"
 
-          # Detect merge method from parent count; fall back to squash_or_rebase on error
-          PARENT_COUNT="$(git cat-file -p "$MERGE_COMMIT_SHA" 2>/dev/null | grep -c '^parent' || echo '1')"
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+          git fetch --no-tags --depth=1 origin "$HEAD_SHA" || true
+          git fetch --no-tags --depth=1 origin "$MERGE_SHA" || true
+
+          missing_base=false
+          missing_head=false
+          missing_merge=false
+          git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || missing_base=true
+          git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null || missing_head=true
+          git cat-file -e "$MERGE_SHA^{commit}" 2>/dev/null || missing_merge=true
+
+          if [ "$missing_base" = "true" ] || [ "$missing_head" = "true" ] || [ "$missing_merge" = "true" ]; then
+            echo "Unable to resolve commit object required for merge proof generation" >&2
+            echo "BASE_SHA=$BASE_SHA" >&2
+            echo "HEAD_SHA=$HEAD_SHA" >&2
+            echo "MERGE_SHA=${MERGE_SHA:-}" >&2
+            exit 1
+          fi
+
+          # Detect merge method from parent count after all referenced objects are locally available.
+          PARENT_COUNT="$(git cat-file -p "$MERGE_COMMIT_SHA" | grep -c '^parent' || echo '1')"
           if [ "$PARENT_COUNT" -gt 1 ]; then
             MERGE_METHOD="merge"
           else
