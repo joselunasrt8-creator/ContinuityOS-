@@ -734,6 +734,18 @@
       "governance_bound": false,
       "replay_safe": true,
       "rationale": "GET-only health check route; no mutation capability"
+    },
+    {
+      "surface_id": "db_write:agent_tool_invocation_registry",
+      "table": "agent_tool_invocation_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/agent/tool-call",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "agent_tool_invocation_registry is append-only proof-bound evidence for mutation-capable agent tool calls after canonical spine proof; it cannot create authority or execute without existing proof lineage"
     }
   ],
   "scanner": {
@@ -752,7 +764,7 @@
   },
   "classification_counts": {
     "AUTHORITATIVE": 10,
-    "EVIDENCE_ONLY": 45,
+    "EVIDENCE_ONLY": 46,
     "NON_EXECUTABLE": 8
   },
   "closure_verification": {
