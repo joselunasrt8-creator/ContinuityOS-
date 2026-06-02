@@ -229,6 +229,148 @@ function validateGovernTopologyPredicate(topology_attestation_hash: string): Gov
 }
 
 
+type AgentToolInvocationBody = {
+  policy_class?: string
+  target?: Record<string, unknown>
+  tool_surface?: string
+  execution_surface?: string
+  surface?: string
+  atao_id?: string
+  atao_hash?: string
+  session_id?: string
+  continuity_id?: string
+  authority_id?: string
+  decision_id?: string
+  validated_object_hash?: string
+  invocation_nonce?: string
+  execution_id?: string
+  proof_id?: string
+}
+
+function agentToolInvocationNull(reason: string, extras: Record<string, unknown> = {}) {
+  return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_INVOCATION_ROUTE, reason, ...extras })
+}
+
+async function ensureAgentToolInvocationRegistry(env: Env): Promise<void> {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS agent_tool_invocation_registry (invocation_id TEXT PRIMARY KEY, atao_hash TEXT NOT NULL, decision_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, invocation_nonce TEXT NOT NULL, execution_id TEXT NOT NULL, proof_id TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('PROVEN')), created_at TEXT NOT NULL, UNIQUE(atao_hash, decision_id, validated_object_hash, invocation_nonce))`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_agent_tool_invocation_decision ON agent_tool_invocation_registry (decision_id, validated_object_hash, invocation_nonce)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_invocation_registry_append_only_update BEFORE UPDATE ON agent_tool_invocation_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_invocation_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_invocation_registry_append_only_delete BEFORE DELETE ON agent_tool_invocation_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_invocation_registry is append-only'); END`).run()
+}
+
+async function handleAgentToolInvocationBoundary(env: Env, request: Request): Promise<Response> {
+  const b = await body(request) as AgentToolInvocationBody
+  const target = canonicalRecord(isPlainRecord(b.target) ? b.target : { tool_surface: b.tool_surface, execution_surface: b.execution_surface, surface: b.surface })
+  const classification = classifyToolSurface(target)
+  const policy_class = String(b.policy_class || classification.policy_class)
+
+  if (policy_class === "TOOL_RECONCILIATION_READONLY") {
+    return json({
+      status: "READONLY_OBSERVED",
+      result: "OK",
+      route: AGENT_TOOL_INVOCATION_ROUTE,
+      policy_class,
+      tool_surface: classification.tool_surface,
+      read_only: true,
+      evidence_only: true,
+      mutation_capable: false,
+      execution_authority_required: false,
+      runtime_mutated: false,
+      governance_state_altered: false
+    })
+  }
+
+  if (policy_class !== "TOOL_RUNTIME_MUTATION") return agentToolInvocationNull("policy_class_invalid", { policy_class })
+
+  const required: Array<[keyof AgentToolInvocationBody, string]> = [
+    ["atao_id", "missing_atao_id"],
+    ["atao_hash", "missing_atao_hash"],
+    ["session_id", "missing_session_id"],
+    ["continuity_id", "missing_continuity_id"],
+    ["authority_id", "missing_authority_id"],
+    ["decision_id", "missing_decision_id"],
+    ["validated_object_hash", "missing_validated_object_hash"],
+    ["invocation_nonce", "missing_invocation_nonce"],
+    ["execution_id", "missing_execution_id"],
+    ["proof_id", "missing_proof_id"]
+  ]
+  for (const [field, reason] of required) {
+    if (!String(b[field] || "")) return agentToolInvocationNull(reason, { policy_class })
+  }
+
+  const atao_id = String(b.atao_id || "")
+  const atao_hash = String(b.atao_hash || "")
+  const session_id = String(b.session_id || "")
+  const continuity_id = String(b.continuity_id || "")
+  const authority_id = String(b.authority_id || "")
+  const decision_id = String(b.decision_id || "")
+  const validated_object_hash = String(b.validated_object_hash || "")
+  const invocation_nonce = String(b.invocation_nonce || "")
+  const execution_id = String(b.execution_id || "")
+  const proof_id = String(b.proof_id || "")
+
+  const atao = await env.DB.prepare(`SELECT * FROM agent_tool_call_atao_registry WHERE atao_id=?1 AND atao_hash=?2 AND session_id=?3 AND status='CAPTURED'`).bind(atao_id, atao_hash, session_id).first<any>()
+  if (!atao) return agentToolInvocationNull("atao_missing", { policy_class, atao_id })
+
+  const session = await env.DB.prepare(`SELECT * FROM session_registry WHERE session_id=?1 AND continuity_status='ACTIVE' AND expires_at>?2`).bind(session_id, new Date().toISOString()).first<any>()
+  if (!session) return agentToolInvocationNull("invalid_session", { policy_class, session_id })
+
+  const continuity = await env.DB.prepare(`SELECT * FROM continuity_registry WHERE continuity_id=?1 AND session_id=?2 AND identity_id=?3 AND status='ACTIVE' AND revoked_at IS NULL AND expires_at>?4`).bind(continuity_id, session_id, String(session.identity_id || ""), new Date().toISOString()).first<any>()
+  if (!continuity) return agentToolInvocationNull("invalid_continuity", { policy_class, continuity_id })
+
+  const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE authority_id=?1 AND decision_id=?2 AND session_id=?3 AND continuity_id=?4`).bind(authority_id, decision_id, session_id, continuity_id).first<any>()
+  if (!authority) return agentToolInvocationNull("authority_missing", { policy_class, decision_id })
+  if (!["EXECUTED", "CONSUMED", "RESERVED", "VALIDATED"].includes(String(authority.status || ""))) return agentToolInvocationNull("authority_unusable", { policy_class, authority_status: String(authority.status || "") })
+
+  const compiled = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 AND authority_id=?2 AND continuity_id=?3 AND validated_object_hash=?4 AND status='COMPILED'`).bind(decision_id, authority_id, continuity_id, validated_object_hash).first<any>()
+  if (!compiled) return agentToolInvocationNull("compiled_aeo_missing", { policy_class, decision_id, validated_object_hash })
+
+  let canonicalAeo: unknown
+  try { canonicalAeo = JSON.parse(String(compiled.canonical_aeo || "{}")) } catch { canonicalAeo = null }
+  const exactCanonicalAeo = toCanonicalAeo(canonicalAeo)
+  const compiledHash = exactCanonicalAeo ? await sha256Hex(canonicalize(exactCanonicalAeo)) : ""
+  if (!exactCanonicalAeo || compiledHash !== validated_object_hash || compiledHash !== String(compiled.validated_object_hash || "")) return agentToolInvocationNull("compiled_aeo_hash_mismatch", { policy_class, validated_object_hash, compiled_hash: compiledHash })
+
+  const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND session_id=?4 AND continuity_id=?5 AND status='VALID' AND result='VALID'`).bind(decision_id, validated_object_hash, invocation_nonce, session_id, continuity_id).first<any>()
+  if (!validation) return agentToolInvocationNull("validation_missing", { policy_class, decision_id, validated_object_hash })
+
+  const execution = await env.DB.prepare(`SELECT * FROM execution_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 AND invocation_nonce=?4 AND session_id=?5 AND continuity_id=?6 AND status='EXECUTED'`).bind(execution_id, decision_id, validated_object_hash, invocation_nonce, session_id, continuity_id).first<any>()
+  if (!execution) return agentToolInvocationNull("execution_missing", { policy_class, decision_id, validated_object_hash })
+  if (String(validation.validated_object_hash || "") !== String(execution.validated_object_hash || "")) return agentToolInvocationNull("validated_object_execution_mismatch", { policy_class, validated_object: String(validation.validated_object_hash || ""), executed_object: String(execution.validated_object_hash || "") })
+
+  const proof = await env.DB.prepare(`SELECT * FROM proof_registry WHERE proof_id=?1 AND execution_id=?2 AND decision_id=?3 AND validated_object_hash=?4 AND session_id=?5 AND continuity_id=?6`).bind(proof_id, execution_id, decision_id, validated_object_hash, session_id, continuity_id).first<any>()
+  if (!proof) return agentToolInvocationNull("proof_missing", { policy_class, decision_id, execution_id, validated_object_hash })
+
+  await ensureAgentToolInvocationRegistry(env)
+  const insert = await env.DB.prepare(`INSERT OR IGNORE INTO agent_tool_invocation_registry (invocation_id,atao_hash,decision_id,validated_object_hash,invocation_nonce,execution_id,proof_id,status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'PROVEN',?8)`).bind(crypto.randomUUID(), atao_hash, decision_id, validated_object_hash, invocation_nonce, execution_id, proof_id, new Date().toISOString()).run()
+  if ((insert.meta?.changes || 0) !== 1) return agentToolInvocationNull("agent_tool_invocation_replay", { policy_class, decision_id, validated_object_hash, invocation_nonce })
+
+  return json({
+    status: "PROVEN",
+    result: "OK",
+    route: AGENT_TOOL_INVOCATION_ROUTE,
+    policy_class,
+    tool_surface: classification.tool_surface,
+    atao_id,
+    atao_hash,
+    session_id,
+    continuity_id,
+    authority_id,
+    decision_id,
+    validated_object_hash,
+    executed_object_hash: String(execution.validated_object_hash || ""),
+    invocation_nonce,
+    execution_id,
+    proof_id,
+    validated_object_equals_executed_object: String(validation.validated_object_hash || "") === String(execution.validated_object_hash || ""),
+    mutation_capable: true,
+    read_only: false,
+    proof_required: true,
+    proof_present: true
+  })
+}
+
+
 
 function canonicalGovernProjectionFromCandidate(candidate: GovernCandidate): GovernCandidate {
   return { intent: String(candidate.intent || ""), scope: canonicalRecord(candidate.scope), target: canonicalRecord(candidate.target), finality: canonicalRecord(candidate.finality) }
@@ -404,6 +546,7 @@ const EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/authority", "/compile", "/val
 const NON_EXECUTABLE_RUNTIME_ROUTES = Object.freeze(["/session", "/continuity"] as const)
 const GOVERNANCE_EVIDENCE_ROUTES = ["/preo"] as const
 const OPENCLAW_GOVERN_ROUTE = "/govern" as const
+const AGENT_TOOL_INVOCATION_ROUTE = "/agent/tool-call" as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
@@ -562,7 +705,7 @@ const REQUIRED_SCHEMA_COLUMNS: Record<string, string[]> = {
   session_registry: ["session_id", "identity_id", "owner", "trust_tier", "continuity_status", "created_at", "expires_at"],
   continuity_registry: ["continuity_id", "identity_id", "session_id", "parent_continuity_id", "continuity_hash", "canonical_continuity", "status", "issued_at", "expires_at", "revoked_at"],
   authority_registry: ["authority_id", "decision_id", "session_id", "owner", "intent", "scope", "constraints", "expiry", "status", "created_at", "continuity_id", "identity_id", "delegated_authority_id", "parent_authority_id", "delegation_depth", "delegation_scope_subset", "delegation_expiry", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "governed_tool_envelope_id"],
-  aeo_registry: ["aeo_id", "authority_id", "decision_id", "canonical_aeo", "validated_object_hash", "status", "created_at", "continuity_id", "delegated_authority_id", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "lineage_stage", "lineage_origin_hash", "governed_tool_envelope_id"],
+  aeo_registry: ["aeo_id", "authority_id", "decision_id", "canonical_aeo", "validated_object_hash", "govern_projection_hash", "status", "created_at", "continuity_id", "delegated_authority_id", "delegation_lineage_hash", "delegation_root_hash", "delegated_replay_chain_hash", "lineage_stage", "lineage_origin_hash", "governed_tool_envelope_id"],
   governed_tool_envelope_registry: ["envelope_id", "candidate_hash", "nonce_binding", "policy_digest", "topology_digest", "lineage_pointers", "timestamp", "non_operative", "tool_surface_descriptor", "created_at"],
   preo_registry: ["preo_id", "decision_id", "authority_id", "continuity_id", "reviewed_hash", "reviewed_tree_hash", "merge_commit_sha", "canonical_preo", "status", "created_at"],
   validation_registry: ["validation_id", "session_id", "decision_id", "validated_object_hash", "invocation_nonce", "environment", "result", "reason", "status", "created_at", "continuity_id", "delegated_authority_id", "delegated_replay_chain_hash", "parent_compilation_hash", "workflow_integrity_hash", "lineage_stage", "lineage_origin_hash"],
@@ -7529,11 +7672,16 @@ export default {
     const canonicalRuntimeRoute = CANONICAL_RUNTIME_ROUTES.includes(url.pathname as any)
     const governedCandidateRoute = url.pathname === OPENCLAW_GOVERN_ROUTE
     const governanceEvidenceRoute = GOVERNANCE_EVIDENCE_ROUTES.includes(url.pathname as any)
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute
+    const agentToolInvocationRoute = url.pathname === AGENT_TOOL_INVOCATION_ROUTE
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
     if (!hasDb(env)) return json({ status: "NULL", reason: "database_unavailable" }, 500)
+
+    if (agentToolInvocationRoute && request.method === "POST") {
+      return handleAgentToolInvocationBoundary(env, request)
+    }
 
     const readOnlyObservabilityRoute = request.method === "GET" && (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) || (TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) || url.pathname === RUNTIME_SOVEREIGNTY_ROUTE || url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE || [BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any))
     try {
@@ -7640,8 +7788,9 @@ export default {
       return json({ status: "PREO_VALID", decision_id, preo_id, reviewed_hash, reviewed_tree_hash, merge_commit_sha, pull_request_id })
     }
 
-    if (request.method === "POST" && !canonicalRuntimeRoute && !governedCandidateRoute) {
-      if (!governanceEvidenceRoute) {
+    if (request.method === "POST" && !canonicalRuntimeRoute) {
+      if (agentToolInvocationRoute) return handleAgentToolInvocationBoundary(env, request)
+      if (!governedCandidateRoute && !governanceEvidenceRoute) {
         await recordDrift(env, { drift_class: "registry_drift", severity: "HIGH", payload: { route: url.pathname, indicator: "invalid_route_invocation" } })
         return json({ status: "NULL", reason: "not_found" }, 404)
       }
