@@ -225,6 +225,52 @@ export async function resolveAgentToolTemplate(
   })
 }
 
+export type ValidatorBinding = {
+  readonly template_id: string
+  readonly schema_version: string
+  readonly predicate_set_id: string
+  readonly predicate_hash: string
+  readonly lineage_version: string
+}
+
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+// ── Phase 3A: Template-Bound Ω Validator Binding ───────────────────────────
+// Binding artifact only: template identity + predicate identity + lineage
+// visibility. This establishes deterministic predicate identity visibility
+// after template resolution and before any future predicate execution.
+//
+// Non-goals preserved here:
+//   no authority creation
+//   no validator execution
+//   no predicate execution
+//   no proof generation
+//   no replay mutation
+//   no execution authorization
+export function createValidatorBinding(
+  template_id: string | null | undefined,
+  schema_version: string | null | undefined,
+  predicate_set_id: string | null | undefined,
+  predicate_hash: string | null | undefined,
+  lineage_version: string | null | undefined,
+): ValidatorBinding | null {
+  if (!isNonBlankString(template_id)) return null
+  if (!isNonBlankString(schema_version)) return null
+  if (!isNonBlankString(predicate_set_id)) return null
+  if (!isNonBlankString(predicate_hash)) return null
+  if (!isNonBlankString(lineage_version)) return null
+
+  return Object.freeze({
+    template_id,
+    schema_version,
+    predicate_set_id,
+    predicate_hash,
+    lineage_version,
+  })
+}
+
 export type GatewayToolSystem =
   | "filesystem"
   | "github"
