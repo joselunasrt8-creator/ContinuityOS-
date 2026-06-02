@@ -33,7 +33,7 @@ test('Issue #1157: reconciles deterministic equivalent registries', () => {
     evidence_only: true,
     views: [view('b'), view('a')],
   })
-  assert.equal(result.classification, 'RECONCILED')
+  assert.equal(result.classification, 'MATCH')
   assert.deepEqual(result.deterministic_traversal, ['a', 'b'])
   assert.equal(result.evidence_only, true)
   assert.equal(result.creates_authority, false)
@@ -47,7 +47,7 @@ test('Issue #1157: split-brain classification on registry and lineage divergence
     evidence_only: true,
     views: [view('a'), view('b', { entries: [entry({ lineage_hash: 'l-2' })] })],
   })
-  assert.equal(result.classification, 'SPLIT_BRAIN')
+  assert.equal(result.classification, 'AMBIGUOUS')
 })
 
 test('Issue #1157: stale registry classification on stale lineage and epoch drift', () => {
@@ -59,7 +59,7 @@ test('Issue #1157: stale registry classification on stale lineage and epoch drif
       view('b', { registry_epoch: 9 }),
     ],
   })
-  assert.equal(result.classification, 'STALE_REGISTRY')
+  assert.equal(result.classification, 'INSUFFICIENT_EVIDENCE')
 })
 
 test('Issue #1157: replay and revocation divergence classifications', () => {
@@ -68,14 +68,14 @@ test('Issue #1157: replay and revocation divergence classifications', () => {
     evidence_only: true,
     views: [view('a'), view('b', { entries: [entry({ replay_hash: 'r-2' })] })],
   })
-  assert.equal(replay.classification, 'REPLAY_DIVERGENCE')
+  assert.equal(replay.classification, 'AMBIGUOUS')
 
   const revocation = reconcileCrossRegistryLegitimacy({
     reconciliation_id: 'r-5',
     evidence_only: true,
     views: [view('a'), view('b', { entries: [entry({ revocation_hash: 'v-2' })] })],
   })
-  assert.equal(revocation.classification, 'REVOCATION_DIVERGENCE')
+  assert.equal(revocation.classification, 'AMBIGUOUS')
 })
 
 test('Issue #1157: topology drift and partial visibility classifications', () => {
@@ -84,19 +84,19 @@ test('Issue #1157: topology drift and partial visibility classifications', () =>
     evidence_only: true,
     views: [view('a'), view('b', { entries: [entry({ topology_hash: 't-2' })] })],
   })
-  assert.equal(topology.classification, 'TOPOLOGY_DRIFT')
+  assert.equal(topology.classification, 'AMBIGUOUS')
 
   const partial = reconcileCrossRegistryLegitimacy({
     reconciliation_id: 'r-7',
     evidence_only: true,
     views: [view('a', { visibility_complete: false }), view('b')],
   })
-  assert.equal(partial.classification, 'PARTIAL_VISIBILITY')
+  assert.equal(partial.classification, 'INSUFFICIENT_EVIDENCE')
 })
 
 test('Issue #1157: fail-closed NULL and canonical hashing usage', () => {
   const nullResult = reconcileCrossRegistryLegitimacy({ reconciliation_id: 'r-8', evidence_only: true, views: [] })
-  assert.equal(nullResult.classification, 'NULL')
+  assert.equal(nullResult.classification, 'INSUFFICIENT_EVIDENCE')
 
   const result = reconcileCrossRegistryLegitimacy({
     reconciliation_id: 'r-9',

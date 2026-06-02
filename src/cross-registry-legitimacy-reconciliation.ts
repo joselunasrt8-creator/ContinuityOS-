@@ -1,15 +1,10 @@
 import { canonicalize, sha256Hex } from './canonical.js'
 
 export const CROSS_REGISTRY_RECONCILIATION_CLASSIFICATIONS = Object.freeze([
-  'RECONCILED',
-  'DIVERGED',
-  'SPLIT_BRAIN',
-  'STALE_REGISTRY',
-  'REPLAY_DIVERGENCE',
-  'REVOCATION_DIVERGENCE',
-  'PARTIAL_VISIBILITY',
-  'TOPOLOGY_DRIFT',
-  'NULL',
+  'MATCH',
+  'DRIFT',
+  'AMBIGUOUS',
+  'INSUFFICIENT_EVIDENCE',
 ] as const)
 
 export interface CrossRegistryEntry {
@@ -40,6 +35,7 @@ export interface CrossRegistryReconciliationResult {
   readonly reconciliation_id: string
   readonly classification: (typeof CROSS_REGISTRY_RECONCILIATION_CLASSIFICATIONS)[number]
   readonly equivalent: boolean
+  readonly legitimacy: 'NULL'
   readonly deterministic_traversal: readonly string[]
   readonly registry_hashes: Readonly<Record<string, string>>
   readonly lineage_hash: string
@@ -92,8 +88,9 @@ export function reconcileCrossRegistryLegitimacy(
     return Object.freeze({
       artifact_type: 'CROSS_REGISTRY_LEGITIMACY_RECONCILIATION',
       reconciliation_id: String(input?.reconciliation_id || ''),
-      classification: 'NULL',
+      classification: 'INSUFFICIENT_EVIDENCE',
       equivalent: false,
+      legitimacy: 'NULL',
       deterministic_traversal: Object.freeze([]),
       registry_hashes: Object.freeze({}),
       lineage_hash: '',
@@ -110,47 +107,52 @@ export function reconcileCrossRegistryLegitimacy(
   const deterministicTraversal = orderedViews.map((v) => String(v.registry_id || ''))
   const registryHashes: Record<string, string> = {}
   const drift = new Set<string>()
+  const ambiguous = new Set<string>()
+  const insufficient = new Set<string>()
+  const registryIds = new Set<string>()
 
   for (const view of orderedViews) {
-    registryHashes[String(view.registry_id || '')] = buildRegistryHash(view)
-    if (!view.visibility_complete) drift.add('partial_visibility')
+    const registryId = String(view.registry_id || '')
+    registryHashes[registryId] = buildRegistryHash(view)
+    if (!registryId || registryIds.has(registryId)) insufficient.add('non_deterministic_registry_identity')
+    registryIds.add(registryId)
+    if (!view.visibility_complete) insufficient.add('partial_visibility')
     if (!lineageClosureOk(view.entries || [])) drift.add('stale_lineage')
   }
 
+  if (orderedViews.length < 2) insufficient.add('single_registry_observation')
+
   const hashSet = new Set(Object.values(registryHashes))
-  if (hashSet.size > 1) drift.add('registry_hash_mismatch')
+  if (hashSet.size > 1) ambiguous.add('registry_hash_mismatch')
 
   const lineageSet = new Set(orderedViews.map((v) => sha256Hex(canonicalize(sortEntries(v.entries).map((e) => [e.object_id, e.parent_object_id, e.lineage_hash])))))
   const replaySet = new Set(orderedViews.map((v) => sha256Hex(canonicalize(sortEntries(v.entries).map((e) => [e.object_id, e.replay_hash])))))
   const revocationSet = new Set(orderedViews.map((v) => sha256Hex(canonicalize(sortEntries(v.entries).map((e) => [e.object_id, e.revocation_hash])))))
   const topologySet = new Set(orderedViews.map((v) => sha256Hex(canonicalize(sortEntries(v.entries).map((e) => [e.object_id, e.topology_hash])))))
 
-  if (lineageSet.size > 1) drift.add('lineage_divergence')
-  if (replaySet.size > 1) drift.add('replay_divergence')
-  if (revocationSet.size > 1) drift.add('revocation_divergence')
-  if (topologySet.size > 1) drift.add('topology_drift')
+  if (lineageSet.size > 1) ambiguous.add('lineage_divergence')
+  if (replaySet.size > 1) ambiguous.add('replay_divergence')
+  if (revocationSet.size > 1) ambiguous.add('revocation_divergence')
+  if (topologySet.size > 1) ambiguous.add('topology_drift')
 
   const epochs = orderedViews.map((v) => Number(v.registry_epoch || 0))
   const epochSpread = Math.max(...epochs) - Math.min(...epochs)
-  if (epochSpread > 0) drift.add('stale_registry')
+  if (epochSpread > 0) insufficient.add('stale_registry')
 
-  let classification: CrossRegistryReconciliationResult['classification'] = 'RECONCILED'
-  if (drift.has('partial_visibility')) classification = 'PARTIAL_VISIBILITY'
-  else if (drift.has('stale_registry') || drift.has('stale_lineage')) classification = 'STALE_REGISTRY'
-  else if (drift.has('topology_drift')) classification = 'TOPOLOGY_DRIFT'
-  else if (drift.has('replay_divergence')) classification = 'REPLAY_DIVERGENCE'
-  else if (drift.has('revocation_divergence')) classification = 'REVOCATION_DIVERGENCE'
-  else if (drift.has('registry_hash_mismatch') && drift.has('lineage_divergence')) classification = 'SPLIT_BRAIN'
-  else if (drift.size > 0) classification = 'DIVERGED'
+  let classification: CrossRegistryReconciliationResult['classification'] = 'MATCH'
+  if (insufficient.size > 0) classification = 'INSUFFICIENT_EVIDENCE'
+  else if (ambiguous.size > 0) classification = 'AMBIGUOUS'
+  else if (drift.size > 0) classification = 'DRIFT'
 
-  const equivalent = classification === 'RECONCILED'
-  const driftClasses = Array.from(drift).sort((a, b) => a.localeCompare(b))
+  const equivalent = classification === 'MATCH'
+  const driftClasses = Array.from(new Set([...drift, ...ambiguous, ...insufficient])).sort((a, b) => a.localeCompare(b))
 
   return Object.freeze({
     artifact_type: 'CROSS_REGISTRY_LEGITIMACY_RECONCILIATION',
     reconciliation_id: String(input.reconciliation_id || ''),
     classification,
     equivalent,
+    legitimacy: 'NULL',
     deterministic_traversal: Object.freeze(deterministicTraversal),
     registry_hashes: Object.freeze({ ...registryHashes }),
     lineage_hash: Array.from(lineageSet).sort()[0] || '',
