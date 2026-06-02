@@ -1,3 +1,14 @@
+---
+issue_lineage: #1609 topology compression; phase issue #1601/#1737 closure verification lineage
+phase_lineage: Historical Phase 3 closure matrix; predecessor inventory/closure evidence used by #1760 reduction eligibility
+status: Archived historical closure artifact; non-authoritative evidence
+archive_classification: archive/closure/phase-matrix
+relocated_from: /PHASE3_CLOSURE_MATRIX.md
+relocated_to: /artifacts/closure/phase-matrices/PHASE3_CLOSURE_MATRIX.md
+relocation_date: 2026-06-02
+authority_note: This artifact is observational/archive evidence only; it does not grant authority or alter governance enforcement.
+---
+
 # PHASE3_CLOSURE_MATRIX
 
 **Repository:** joselunasrt8-creator/mindshift-demo
