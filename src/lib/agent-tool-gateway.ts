@@ -134,6 +134,97 @@ export async function selectAEOTemplate(
   return Object.freeze({ result: "VALID_TEMPLATE" as const, template })
 }
 
+
+// ── Issue #1773: Agent Tool AEO Template Registry resolution ────────────────
+// Pure lookup boundary only. Resolution does not create/reserve authority,
+// validate execution, generate proof, execute tools, or mutate replay state.
+
+export type AgentToolAEOTemplateStatus = "ACTIVE" | "INACTIVE" | "DEPRECATED" | "DRAFT"
+
+export type AgentToolAEOTemplateDefinition = {
+  readonly template_id: string
+  readonly schema_version: string
+  readonly surface_type: string
+  readonly risk_floor: string
+  readonly predicate_set_id: string
+  readonly predicate_hash: string
+  readonly lineage_version: string
+}
+
+export interface AgentToolAEOTemplateDB {
+  prepare(sql: string): {
+    bind(...params: unknown[]): { all<T>(): Promise<{ results?: T[] } | T[]> }
+  }
+}
+
+function nonEmptyText(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+// resolveAgentToolTemplate: deterministic Phase 3A template lookup.
+//
+// Rules:
+//   missing / unknown surface_type     → NULL
+//   0 ACTIVE matches                  → NULL
+//   >1 ACTIVE matches                 → NULL
+//   INACTIVE / DEPRECATED / DRAFT     → NULL (not selected by ACTIVE lookup)
+//   missing predicate_hash            → NULL
+//   missing lineage_version           → NULL
+//   exactly 1 ACTIVE complete row     → topology-visible template definition
+//
+// Non-goals preserved here:
+//   no authority creation or reservation
+//   no Ω validator execution
+//   no tool execution
+//   no proof generation
+//   no replay mutation or replay enforcement
+export async function resolveAgentToolTemplate(
+  surface_type: string | null | undefined,
+  db: AgentToolAEOTemplateDB,
+): Promise<AgentToolAEOTemplateDefinition | null> {
+  const requestedSurfaceType = nonEmptyText(surface_type)
+  if (!requestedSurfaceType) return null
+
+  const queryResult = await db
+    .prepare(
+      `SELECT template_id, schema_version, surface_type, status, risk_floor, predicate_set_id, predicate_hash, lineage_version
+       FROM agent_tool_aeo_template_registry
+       WHERE surface_type = ?1 AND status = 'ACTIVE'
+       ORDER BY template_id ASC, schema_version ASC`,
+    )
+    .bind(requestedSurfaceType)
+    .all<Record<string, unknown>>()
+
+  const rows = Array.isArray(queryResult) ? queryResult : (queryResult.results ?? [])
+  if (rows.length !== 1) return null
+
+  const row = rows[0]
+  const status = nonEmptyText(row.status)
+  const templateSurfaceType = nonEmptyText(row.surface_type)
+  const templateId = nonEmptyText(row.template_id)
+  const schemaVersion = nonEmptyText(row.schema_version)
+  const riskFloor = nonEmptyText(row.risk_floor)
+  const predicateSetId = nonEmptyText(row.predicate_set_id)
+  const predicateHash = nonEmptyText(row.predicate_hash)
+  const lineageVersion = nonEmptyText(row.lineage_version)
+
+  if (status !== "ACTIVE") return null
+  if (templateSurfaceType !== requestedSurfaceType) return null
+  if (!templateId || !schemaVersion || !riskFloor || !predicateSetId || !predicateHash || !lineageVersion) return null
+
+  return Object.freeze({
+    template_id: templateId,
+    schema_version: schemaVersion,
+    surface_type: templateSurfaceType,
+    risk_floor: riskFloor,
+    predicate_set_id: predicateSetId,
+    predicate_hash: predicateHash,
+    lineage_version: lineageVersion,
+  })
+}
+
 export type GatewayToolSystem =
   | "filesystem"
   | "github"
