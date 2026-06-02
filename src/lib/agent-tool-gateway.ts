@@ -13,6 +13,127 @@
 
 import { hashCanonical } from '../canonical.js'
 
+// ── AEO Template Registry types ───────────────────────────────────────────────
+
+export type AEORiskClass =
+  | "P0_READ_ONLY"
+  | "P1_EXECUTION_ADJACENT"
+  | "P2_BOUNDED_MUTATION"
+  | "P3_EXTERNAL_MUTATION"
+  | "P4_PRIVILEGED_EXECUTION"
+  | "P5_AUTONOMOUS_RECURSIVE"
+
+export type AEOTemplateStatus = "ACTIVE" | "INACTIVE" | "DRAFT"
+
+export type AEOTemplate = {
+  readonly template_id: string
+  readonly schema_version: string
+  readonly surface_type: string
+  readonly status: AEOTemplateStatus
+  readonly risk_floor: string
+  readonly required_scope_fields: readonly string[]
+  readonly required_target_fields: readonly string[]
+  readonly required_validation_fields: readonly string[]
+  readonly required_finality_fields: readonly string[]
+  readonly predicate_set: readonly string[]
+  readonly failure_result: string
+  readonly created_at: string
+}
+
+export type AEOTemplateSelectResult =
+  | { readonly result: "VALID_TEMPLATE"; readonly template: AEOTemplate }
+  | { readonly result: "NULL"; readonly reason: AEOTemplateNullReason }
+
+export type AEOTemplateNullReason =
+  | "TEMPLATE_NOT_FOUND"
+  | "SCHEMA_INACTIVE"
+  | "TEMPLATE_SURFACE_MISMATCH"
+  | "RISK_FLOOR_VIOLATION"
+
+// Minimal DB interface required for template lookup
+export interface AEOTemplateDB {
+  prepare(sql: string): {
+    bind(...params: unknown[]): { first<T>(): Promise<T | null> }
+  }
+}
+
+// Extracts the numeric risk level from P0_READ_ONLY / P0 / P4_PRIVILEGED_EXECUTION / etc.
+function riskLevel(riskClass: string): number {
+  const m = riskClass.match(/P(\d+)/)
+  return m ? parseInt(m[1], 10) : -1
+}
+
+function parseJsonArray(raw: unknown): string[] {
+  if (typeof raw !== "string") return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return []
+  }
+}
+
+// selectAEOTemplate: registry-backed template selection.
+// surface_type → template_id → predicate_set → VALID_TEMPLATE | NULL
+//
+// Rules:
+//   unknown surface_type    → NULL TEMPLATE_NOT_FOUND
+//   INACTIVE template       → NULL SCHEMA_INACTIVE
+//   DRAFT template          → NULL SCHEMA_INACTIVE
+//   risk_class < risk_floor → NULL RISK_FLOOR_VIOLATION
+//   surface mismatch        → NULL TEMPLATE_SURFACE_MISMATCH
+//   ACTIVE + matching       → VALID_TEMPLATE (predicate_set loaded)
+//
+// VALID_TEMPLATE does NOT authorize execution.
+// Execution requires authority, validation, replay safety, topology visibility,
+// reconciliation, and proof.
+export async function selectAEOTemplate(
+  surface_type: string,
+  risk_class: string,
+  db: AEOTemplateDB,
+): Promise<AEOTemplateSelectResult> {
+  const row = await db
+    .prepare(`SELECT * FROM aeo_template_registry WHERE surface_type = ?1 LIMIT 1`)
+    .bind(surface_type)
+    .first<Record<string, unknown>>()
+
+  if (!row) {
+    return Object.freeze({ result: "NULL" as const, reason: "TEMPLATE_NOT_FOUND" as const })
+  }
+
+  const status = String(row.status || "")
+  if (status !== "ACTIVE") {
+    return Object.freeze({ result: "NULL" as const, reason: "SCHEMA_INACTIVE" as const })
+  }
+
+  const templateSurface = String(row.surface_type || "")
+  if (templateSurface !== surface_type) {
+    return Object.freeze({ result: "NULL" as const, reason: "TEMPLATE_SURFACE_MISMATCH" as const })
+  }
+
+  const riskFloor = String(row.risk_floor || "")
+  if (riskLevel(risk_class) < riskLevel(riskFloor)) {
+    return Object.freeze({ result: "NULL" as const, reason: "RISK_FLOOR_VIOLATION" as const })
+  }
+
+  const template: AEOTemplate = Object.freeze({
+    template_id: String(row.template_id || ""),
+    schema_version: String(row.schema_version || ""),
+    surface_type: templateSurface,
+    status: "ACTIVE" as const,
+    risk_floor: riskFloor,
+    required_scope_fields: Object.freeze(parseJsonArray(row.required_scope_fields)),
+    required_target_fields: Object.freeze(parseJsonArray(row.required_target_fields)),
+    required_validation_fields: Object.freeze(parseJsonArray(row.required_validation_fields)),
+    required_finality_fields: Object.freeze(parseJsonArray(row.required_finality_fields)),
+    predicate_set: Object.freeze(parseJsonArray(row.predicate_set)),
+    failure_result: String(row.failure_result || "NULL"),
+    created_at: String(row.created_at || ""),
+  })
+
+  return Object.freeze({ result: "VALID_TEMPLATE" as const, template })
+}
+
 export type GatewayToolSystem =
   | "filesystem"
   | "github"

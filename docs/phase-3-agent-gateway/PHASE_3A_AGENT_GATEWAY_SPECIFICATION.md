@@ -260,6 +260,32 @@ The following matrix is a specification target for validator predicate behavior.
 - **#1708 and #1709 are closed specification anchors.**
 - This artifact does not close #1627 or #1628 unless maintainers decide the current scope is specification-only.
 
+## 14. AEO Template Registry — Implementation Note
+
+The AEO Template Registry has been introduced as a registry-backed template selection layer in migration `0067_aeo_template_registry.sql` and runtime helper `selectAEOTemplate` in `src/lib/agent-tool-gateway.ts`.
+
+**What this introduces:**
+
+- `aeo_template_registry` table with append-only enforcement (UPDATE/DELETE triggers raise ABORT).
+- ACTIVE templates for: `filesystem_read_v1`, `filesystem_write_v1`, `browser_v1`, `gateway_routing_v1`, `behavioral_files_v1`.
+- DRAFT templates for: `shell_exec_v1`, `process_control_v1`, `session_spawn_v1`, `scheduled_action_v1`, `node_runtime_v1`, `network_api_v1`.
+- `selectAEOTemplate(surface_type, risk_class, db)` helper resolving `surface_type → predicate_set → VALID_TEMPLATE | NULL`.
+- Template check wired into `handleAgentToolInvocationBoundary`, using `surface_type` derived from the hash-verified compiled AEO scope — not from caller-provided input.
+
+**Anti-spoof property:** `surface_type` is derived from `exactCanonicalAeo.scope.surface_type` (authenticated by AEO hash). Caller-provided `surface_type` that disagrees with the AEO-scope-derived value is rejected as `TEMPLATE_SURFACE_MISMATCH`. A caller cannot substitute a lower-risk template by claiming a different `surface_type` than what is recorded in the authenticated AEO.
+
+**What this does NOT do:**
+
+- This does not authorize execution. `VALID_TEMPLATE` only confirms the schema predicate subject exists.
+- This does not close #1627.
+- This does not implement OpenClaw execution.
+- This does not implement framework-neutral adapters.
+- This does not enable P4/P5 execution. P4/P5 templates remain DRAFT.
+- This does not create authority.
+- This does not generate proof.
+
+Execution still requires: authority binding, AEO validation, replay safety, topology visibility, reconciliation, and proof — all enforced by the existing downstream boundary checks.
+
 ## Boundary Statement
 
 This artifact is documentation/specification only. It introduces no runtime code, validators, gateway implementation, tests, package changes, workflow changes, generated proof, registry mutation, live gateway execution, runtime legitimacy mutation, authority creation, or enforcement claim.
