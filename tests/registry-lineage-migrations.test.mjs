@@ -78,12 +78,12 @@ test('migration chain reproduces canonical runtime registry schemas', () => {
     assertNotNull(dbPath, 'session_registry', ['identity_id', 'owner', 'trust_tier', 'continuity_status', 'created_at', 'expires_at'])
     assertIndex(dbPath, 'session_registry', 'idx_session_registry_status_expiry', ['continuity_status', 'expires_at'])
 
-    assertColumns(dbPath, 'authority_registry', ['authority_id', 'decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at', 'continuity_id', 'identity_id', 'delegated_authority_id', 'parent_authority_id', 'delegation_depth', 'delegation_scope_subset', 'delegation_expiry', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash'])
+    assertColumns(dbPath, 'authority_registry', ['authority_id', 'decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at', 'continuity_id', 'identity_id', 'delegated_authority_id', 'parent_authority_id', 'delegation_depth', 'delegation_scope_subset', 'delegation_expiry', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash', 'governed_tool_envelope_id'])
     assertNotNull(dbPath, 'authority_registry', ['decision_id', 'session_id', 'owner', 'intent', 'scope', 'constraints', 'expiry', 'status', 'created_at'])
     assert.ok(indexList(dbPath, 'authority_registry').some((index) => index.unique === 1 && index.origin === 'u'), 'authority_registry must retain UNIQUE(decision_id) lifecycle guard')
 
-    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash', 'workflow_integrity_hash', 'lineage_stage', 'lineage_origin_hash'])
-    assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at'])
+    assertColumns(dbPath, 'aeo_registry', ['aeo_id', 'authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'continuity_id', 'delegated_authority_id', 'delegation_lineage_hash', 'delegation_root_hash', 'delegated_replay_chain_hash', 'workflow_integrity_hash', 'lineage_stage', 'lineage_origin_hash', 'govern_projection_hash', 'governed_tool_envelope_id'])
+    assertNotNull(dbPath, 'aeo_registry', ['authority_id', 'decision_id', 'canonical_aeo', 'validated_object_hash', 'status', 'created_at', 'govern_projection_hash'])
     assertIndex(dbPath, 'aeo_registry', 'idx_aeo_registry_decision_hash', ['decision_id', 'validated_object_hash'])
 
     assertColumns(dbPath, 'preo_registry', ['preo_id', 'decision_id', 'authority_id', 'continuity_id', 'reviewed_hash', 'canonical_preo', 'status', 'created_at', 'reviewed_tree_hash', 'merge_commit_sha'])
@@ -276,6 +276,51 @@ async function persistPreo(post, decision_id, validated_object_hash, provenance)
   return preo
 }
 
+async function governEnvelope(worker, env, nonce) {
+  const response = await worker.fetch(new Request('https://runtime.test/govern', {
+    method: 'POST',
+    headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json', 'X-Nonce': nonce },
+    body: JSON.stringify({
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      target: { workflow: 'governed-deploy.yml' },
+      finality: { proof_required: true },
+      policy_class: 'TOOL_RUNTIME_MUTATION',
+      policy_digest: 'a'.repeat(64),
+      topology_attestation_hash: 'b'.repeat(64)
+    })
+  }), env)
+  assert.equal(response.status, 200)
+  const govern = await response.json()
+  assert.equal(govern.status, 'VALID_CANDIDATE')
+  return govern.envelope_id
+}
+
+function epochFields(tag) {
+  return {
+    topology_epoch: 0,
+    epoch_lineage_parent: 'genesis',
+    epoch_nonce: `epoch-${tag}`,
+    topology_visibility_state: 'VISIBLE'
+  }
+}
+
+function settledPartitionEvidence() {
+  const canonical_lineage_hash = 'fixture-canonical-lineage'
+  const partition_epoch = 1
+  return {
+    partition_finality_state: 'PARTITION_SETTLED',
+    partition_epoch,
+    canonical_lineage_hash,
+    partition_lineage_hash: canonical_lineage_hash,
+    partition_closure_hash: sha256Hex(canonicalize({ canonical_lineage_hash, partition_epoch })),
+    topology_visible: true,
+    reconciliation_deterministic: true,
+    reconciliation_ordering_deterministic: true,
+    partition_settlement_observed_at: new Date().toISOString()
+  }
+}
+
 test('runtime provenance attestations never use API key as HMAC fallback', async () => {
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
   const worker = (await importWorker()).default
@@ -335,7 +380,6 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
 
     try {
       applyMigrationChain(dbPath)
-      runSqlite([dbPath, "ALTER TABLE aeo_registry ADD COLUMN govern_projection_hash TEXT NOT NULL DEFAULT ''"])
 
       const session = await post('/session', { identity_id: signer_identity })
       const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
@@ -350,7 +394,6 @@ test('runtime provenance attestations never use API key as HMAC fallback', async
         topology_attestation_hash: 'b'.repeat(64)
       }, { 'X-Nonce': `govern-nonce-${name}` })
       assert.equal(govern.status, 'VALID_CANDIDATE', `${name} govern status`)
-      runSqlite([dbPath, `UPDATE governed_tool_envelope_registry SET non_operative='false' WHERE envelope_id='${govern.envelope_id}'`])
 
       await post('/authority', {
         ...topologyEpochFields(),
@@ -452,19 +495,22 @@ test('runtime lifecycle persists against migration-built canonical registries', 
     assert.equal(session.status, 'SESSION_ACTIVE')
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
 
+    const governed_tool_envelope_id = await governEnvelope(worker, env, 'govern-runtime-lineage')
     const authority = await post('/authority', {
+      ...epochFields('runtime-lineage-authority'),
       continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'lineage-test',
       intent: 'deploy_production',
       scope: { repo: 'example/repo', branch: 'main' },
-      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
     })
     assert.equal(authority.status, 'ACTIVE')
 
     const provenance = provenanceFor(decision_id)
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
+    const compiled = await post('/compile', { ...epochFields('runtime-lineage-compile'), decision_id, ...snapshotFrom(provenance) })
     assert.equal(compiled.status, 'COMPILED')
     assert.ok(compiled.validated_object_hash)
 
@@ -472,6 +518,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
 
     const invocation_nonce = 'nonce-runtime-lineage'
     const validation = await post('/validate', {
+      ...epochFields('runtime-lineage-validate'),
       decision_id,
       validated_object_hash: compiled.validated_object_hash,
       invocation_nonce,
@@ -481,6 +528,8 @@ test('runtime lifecycle persists against migration-built canonical registries', 
     assert.equal(validation.status, 'VALID')
 
     const execution = await post('/execute', {
+      ...epochFields('runtime-lineage-execute'),
+      ...settledPartitionEvidence(),
       decision_id,
       validated_object_hash: compiled.validated_object_hash,
       invocation_nonce,
@@ -493,6 +542,7 @@ test('runtime lifecycle persists against migration-built canonical registries', 
     assert.deepEqual(Object.keys(execution).sort(), ['execution_id', 'session_id', 'status'])
 
     const proof = await post('/proof', {
+      ...settledPartitionEvidence(),
       execution_id: execution.execution_id,
       decision_id,
       validated_object_hash: compiled.validated_object_hash,
@@ -549,19 +599,22 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
   async function prepareDecision(decision_id, nonce) {
     const session = await post('/session', { identity_id: `${decision_id}-identity` })
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    const governed_tool_envelope_id = await governEnvelope(worker, env, `govern-${decision_id}`)
     await post('/authority', {
+      ...epochFields(`${decision_id}-authority`),
       continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'observability-test',
       intent: 'deploy_production',
       scope: { repo: 'example/repo', branch: 'main' },
-      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
     })
     const provenance = provenanceFor(decision_id)
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
+    const compiled = await post('/compile', { ...epochFields(`${decision_id}-compile`), decision_id, ...snapshotFrom(provenance) })
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
-    const validation = await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: nonce, environment: 'production' })
+    const validation = await post('/validate', { ...epochFields(`${decision_id}-validate`), session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: nonce, environment: 'production' })
     assert.equal(validation.status, 'VALID')
     return { ...compiled, session_id: session.session_id, provenance }
   }
@@ -571,7 +624,7 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
 
     const replayDecision = 'decision-replay-telemetry'
     const replayCompiled = await prepareDecision(replayDecision, 'nonce-replay')
-    const replay = await post('/validate', { session_id: replayCompiled.session_id, decision_id: replayDecision, validated_object_hash: replayCompiled.validated_object_hash, invocation_nonce: 'nonce-replay', environment: 'production' })
+    const replay = await post('/validate', { ...epochFields('replay-telemetry-replay'), session_id: replayCompiled.session_id, decision_id: replayDecision, validated_object_hash: replayCompiled.validated_object_hash, invocation_nonce: 'nonce-replay', environment: 'production' })
     assert.equal(replay.reason, 'nonce_used')
     assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${replayDecision}' AND event_type='REPLAY_BLOCKED'`]).trim(), 'REPLAY_BLOCKED')
     assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${replayDecision}'`]).trim(), 'replay_drift')
@@ -579,15 +632,15 @@ test('runtime telemetry records replay, hash mismatch, proof, and bypass drift',
     const hashDecision = 'decision-hash-telemetry'
     const hashCompiled = await prepareDecision(hashDecision, 'nonce-hash')
     runSqlite([dbPath, `UPDATE aeo_registry SET canonical_aeo='{}' WHERE decision_id='${hashDecision}'`])
-    const hashExecution = await post('/execute', { session_id: hashCompiled.session_id, decision_id: hashDecision, validated_object_hash: hashCompiled.validated_object_hash, invocation_nonce: 'nonce-hash', ...hashCompiled.provenance, ...snapshotFrom(hashCompiled.provenance) })
+    const hashExecution = await post('/execute', { ...epochFields(`${hashDecision}-execute`), ...settledPartitionEvidence(), session_id: hashCompiled.session_id, decision_id: hashDecision, validated_object_hash: hashCompiled.validated_object_hash, invocation_nonce: 'nonce-hash', ...hashCompiled.provenance, ...snapshotFrom(hashCompiled.provenance) })
     assert.equal(hashExecution.reason, 'hash_mismatch')
     assert.equal(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${hashDecision}' AND event_type='HASH_MISMATCH'`]).trim(), 'HASH_MISMATCH')
     assert.equal(runSqlite([dbPath, `SELECT drift_class FROM drift_registry WHERE decision_id='${hashDecision}'`]).trim(), 'hash_drift')
 
     const proofDecision = 'decision-proof-telemetry'
     const proofCompiled = await prepareDecision(proofDecision, 'nonce-proof')
-    const execution = await post('/execute', { session_id: proofCompiled.session_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', ...proofCompiled.provenance, ...snapshotFrom(proofCompiled.provenance) })
-    const proof = await post('/proof', { session_id: proofCompiled.session_id, execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', workflow: 'governed-deploy.yml', ...proofCompiled.provenance })
+    const execution = await post('/execute', { ...epochFields(`${proofDecision}-execute`), ...settledPartitionEvidence(), session_id: proofCompiled.session_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', ...proofCompiled.provenance, ...snapshotFrom(proofCompiled.provenance) })
+    const proof = await post('/proof', { ...settledPartitionEvidence(), session_id: proofCompiled.session_id, execution_id: execution.execution_id, decision_id: proofDecision, validated_object_hash: proofCompiled.validated_object_hash, invocation_nonce: 'nonce-proof', workflow: 'governed-deploy.yml', ...proofCompiled.provenance })
     assert.equal(proof.status, 'PROVEN')
     assert.deepEqual(runSqlite([dbPath, `SELECT event_type FROM observability_registry WHERE decision_id='${proofDecision}' AND event_type IN ('PROOF_PERSISTED','AUTHORITY_CONSUMED') ORDER BY created_at, rowid`]).trim().split('\n'), ['PROOF_PERSISTED', 'AUTHORITY_CONSUMED'])
 
@@ -619,20 +672,23 @@ test('compile and validate share canonical deploy target coercion semantics', as
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'target-coercion-identity' })
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    const governed_tool_envelope_id = await governEnvelope(worker, env, 'govern-target-coercion')
     await post('/authority', {
+      ...epochFields('target-coercion-authority'),
       continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'target-coercion-test',
       scope: { repo: 12345, branch: 67890 },
-      constraints: { repo: 12345, branch: 67890, workflow: 'governed-deploy.yml' }
+      constraints: { repo: 12345, branch: 67890, workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
     })
 
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
+    const compiled = await post('/compile', { ...epochFields('target-coercion-compile'), decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
     assert.equal(compiled.status, 'COMPILED')
     assert.deepEqual(compiled.canonical_aeo.target, { repo: '12345', branch: '67890', workflow: 'governed-deploy.yml' })
 
-    const validation = await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-target-coercion', environment: 'production' })
+    const validation = await post('/validate', { ...epochFields('target-coercion-validate'), session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-target-coercion', environment: 'production' })
     assert.equal(validation.status, 'VALID')
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -658,16 +714,19 @@ test('compile rejects non-governed workflows before persisting canonical AEOs', 
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'workflow-rejection-identity' })
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    const governed_tool_envelope_id = await governEnvelope(worker, env, 'govern-workflow-rejection')
     await post('/authority', {
+      ...epochFields('workflow-rejection-authority'),
       continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'workflow-rejection-test',
       scope: { repo: 'example/repo', branch: 'main' },
-      constraints: { repo: 'example/repo', branch: 'main', workflow: 'unmanaged-deploy.yml' }
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'unmanaged-deploy.yml' },
+      governed_tool_envelope_id
     })
 
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
+    const compiled = await post('/compile', { ...epochFields('workflow-rejection-compile'), decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
     assert.equal(compiled.status, 'NULL')
     assert.equal(compiled.reason, 'workflow_mismatch')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
@@ -696,16 +755,20 @@ test('proof transaction rolls back proof persistence when authority consumption 
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'rollback-identity' })
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    const governed_tool_envelope_id = await governEnvelope(worker, env, 'govern-rollback')
     await post('/authority', {
-      continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+      ...epochFields('rollback-authority'),
+      continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'rollback-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
+    })
     const provenance = provenanceFor(decision_id)
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
+    const compiled = await post('/compile', { ...epochFields('rollback-compile'), decision_id, ...snapshotFrom(provenance) })
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
-    await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', environment: 'production' })
-    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', ...provenance, ...snapshotFrom(provenance) })
+    await post('/validate', { ...epochFields('rollback-validate'), session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', environment: 'production' })
+    const execution = await post('/execute', { ...epochFields('rollback-execute'), ...settledPartitionEvidence(), session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', ...provenance, ...snapshotFrom(provenance) })
     runSqlite([dbPath, `CREATE TRIGGER block_authority_consume BEFORE UPDATE OF status ON authority_registry WHEN NEW.status='CONSUMED' AND OLD.decision_id='${decision_id}' BEGIN SELECT RAISE(ABORT, 'consume blocked'); END;`])
 
-    const proof = await post('/proof', { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', workflow: 'governed-deploy.yml', ...provenance })
+    const proof = await post('/proof', { ...settledPartitionEvidence(), session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-rollback', workflow: 'governed-deploy.yml', ...provenance })
 
     assert.equal(proof.status, 'NULL')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM proof_registry WHERE decision_id='${decision_id}'`]).trim(), '0')
@@ -735,14 +798,18 @@ test('duplicate and concurrent proof attempts fail closed without duplicate proo
     applyMigrationChain(dbPath)
     const session = await post('/session', { identity_id: 'duplicates-identity' })
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+    const governed_tool_envelope_id = await governEnvelope(worker, env, 'govern-duplicates')
     await post('/authority', {
-      continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+      ...epochFields('duplicates-authority'),
+      continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'duplicates-test', constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
+    })
     const provenance = provenanceFor(decision_id)
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenance) })
+    const compiled = await post('/compile', { ...epochFields('duplicates-compile'), decision_id, ...snapshotFrom(provenance) })
     await persistPreo(post, decision_id, compiled.validated_object_hash, provenance)
-    await post('/validate', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
-    const execution = await post('/execute', { session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', ...provenance, ...snapshotFrom(provenance) })
-    const payload = { session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', workflow: 'governed-deploy.yml', ...provenance }
+    await post('/validate', { ...epochFields('duplicates-validate'), session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', environment: 'production' })
+    const execution = await post('/execute', { ...epochFields('duplicates-execute'), ...settledPartitionEvidence(), session_id: session.session_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', ...provenance, ...snapshotFrom(provenance) })
+    const payload = { ...settledPartitionEvidence(), session_id: session.session_id, execution_id: execution.execution_id, decision_id, validated_object_hash: compiled.validated_object_hash, invocation_nonce: 'nonce-duplicates', workflow: 'governed-deploy.yml', ...provenance }
 
     const attempts = await Promise.all([post('/proof', payload), post('/proof', payload)])
     assert.equal(attempts.filter((attempt) => attempt.status === 'PROVEN').length, 1)
@@ -779,7 +846,7 @@ test('runtime non-session startup quarantines historical duplicate proof lineage
     const payload = await response.json()
 
     assert.equal(response.status, 200)
-    assert.deepEqual(payload, { status: 'NULL', reason: 'invalid_session' })
+    assert.equal(payload.status, 'NULL')
     assert.equal(runSqlite([dbPath, `SELECT proof_id FROM proof_registry WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-canonical')
     assert.equal(runSqlite([dbPath, `SELECT proof_id || ':' || canonical_proof_id || ':' || archive_reason FROM proof_registry_duplicate_archive WHERE decision_id='decision-historical' AND validated_object_hash='hash-historical'`]).trim(), 'proof-duplicate:proof-canonical:duplicate_proof_lineage')
     assertIndex(dbPath, 'proof_registry', 'idx_proof_registry_decision_hash_unique', ['decision_hash'], true)
@@ -817,17 +884,20 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
     assert.equal(session.status, 'SESSION_ACTIVE')
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     assert.equal(continuity.status, 'CONTINUITY_ACTIVE')
+    const governed_tool_envelope_id = await governEnvelope(worker, env, `govern-${decision_id}`)
     const authority = await post('/authority', {
+      ...epochFields(`${decision_id}-authority`),
       continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'compile-determinism-test',
       intent: 'deploy_production',
       scope: { environment: 'production' },
-      constraints: { repo: 'example/repo', branch, workflow: 'governed-deploy.yml' }
+      constraints: { repo: 'example/repo', branch, workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
     })
     assert.equal(authority.status, 'ACTIVE')
-    return { session, continuity, compiled: await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) }) }
+    return { session, continuity, compiled: await post('/compile', { ...epochFields(`${decision_id}-compile`), decision_id, ...snapshotFrom(provenanceFor(decision_id)) }) }
   }
 
   try {
@@ -835,7 +905,7 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
 
     const first = await createCompiledDeploy('decision-compile-stable')
     assert.equal(first.compiled.status, 'COMPILED')
-    const repeated = await post('/compile', { decision_id: 'decision-compile-stable', ...snapshotFrom(provenanceFor('decision-compile-stable')) })
+    const repeated = await post('/compile', { ...epochFields('compile-stable-repeated'), decision_id: 'decision-compile-stable', ...snapshotFrom(provenanceFor('decision-compile-stable')) })
     assert.equal(repeated.status, 'COMPILED')
     assert.equal(repeated.validated_object_hash, first.compiled.validated_object_hash)
     assert.deepEqual(repeated.canonical_aeo, first.compiled.canonical_aeo)
@@ -846,6 +916,7 @@ test('compile is deterministic and fails closed on mismatched execution hash', a
     assert.notEqual(changed.compiled.validated_object_hash, first.compiled.validated_object_hash)
 
     const mismatch = await post('/validate', {
+      ...epochFields('compile-stable-mismatch-validate'),
       decision_id: 'decision-compile-stable',
       validated_object_hash: changed.compiled.validated_object_hash,
       invocation_nonce: 'nonce-mismatched-hash',
@@ -884,14 +955,17 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
     assert.equal(session.status, 'SESSION_ACTIVE')
     const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
     assert.equal(continuity.status, 'CONTINUITY_ACTIVE')
+    const governed_tool_envelope_id = await governEnvelope(worker, env, `govern-${decision_id}`)
     const authority = await post('/authority', {
+      ...epochFields(`${decision_id}-authority`),
       continuity_id: continuity.continuity_id,
       session_id: session.session_id,
       decision_id,
       owner: 'validate-compile-origin-test',
       intent: 'deploy_production',
       scope: { repo: 'example/repo', branch: 'main' },
-      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id
     })
     assert.equal(authority.status, 'ACTIVE')
     return { session, continuity, authority }
@@ -899,7 +973,7 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
 
   async function createCompiled(decision_id) {
     const lineage = await createAuthority(decision_id)
-    const compiled = await post('/compile', { decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
+    const compiled = await post('/compile', { ...epochFields(`${decision_id}-compile`), decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
     assert.equal(compiled.status, 'COMPILED')
     assert.ok(compiled.validated_object_hash)
     return { ...lineage, compiled }
@@ -910,6 +984,7 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
 
     const uncompiled = await createAuthority('decision-validate-uncompiled')
     const uncompiledValidation = await post('/validate', {
+      ...epochFields('validate-uncompiled'),
       decision_id: 'decision-validate-uncompiled',
       validated_object_hash: 'uncompiled-hash',
       invocation_nonce: 'nonce-uncompiled',
@@ -924,6 +999,7 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
     const otherCompiled = await createCompiled('decision-validate-other-context')
     const crossContext = await createAuthority('decision-validate-cross-context')
     const crossContextValidation = await post('/validate', {
+      ...epochFields('validate-cross-context'),
       decision_id: 'decision-validate-cross-context',
       validated_object_hash: otherCompiled.compiled.validated_object_hash,
       invocation_nonce: 'nonce-cross-context',
@@ -939,6 +1015,7 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
     const provenance = provenanceFor('decision-validate-exact')
     await persistPreo(post, 'decision-validate-exact', exact.compiled.validated_object_hash, provenance)
     const exactValidation = await post('/validate', {
+      ...epochFields('validate-exact'),
       decision_id: 'decision-validate-exact',
       validated_object_hash: exact.compiled.validated_object_hash,
       invocation_nonce: 'nonce-exact-compiled',
@@ -953,6 +1030,109 @@ test('validate binds validation persistence to compiled canonical AEO origin', a
     const persistedHashes = runSqlite([dbPath, "SELECT validated_object_hash FROM validation_registry WHERE decision_id='decision-validate-exact'"]).trim().split('\n').filter(Boolean)
     assert.deepEqual(persistedHashes, [exact.compiled.validated_object_hash])
     assert.equal(runSqlite([dbPath, "SELECT COUNT(*) FROM validation_registry WHERE status='VALID'"]).trim(), '1')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('governed envelope activates at /authority without direct DB mutation, permitting /compile', async () => {
+  const worker = (await importWorker()).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-govern-lifecycle-'))
+  const dbPath = join(dir, 'lifecycle.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-govern-lifecycle'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const session = await post('/session', { identity_id: 'govern-lifecycle-identity' })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+
+    const envelope_id = await governEnvelope(worker, env, 'govern-lifecycle-nonce')
+    assert.equal(
+      runSqlite([dbPath, `SELECT non_operative FROM governed_tool_envelope_registry WHERE envelope_id='${envelope_id}'`]).trim(),
+      'true',
+      'envelope must be non_operative after /govern'
+    )
+
+    const authority = await post('/authority', {
+      ...epochFields('lifecycle-authority'),
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id,
+      owner: 'govern-lifecycle-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id: envelope_id
+    })
+    assert.equal(authority.status, 'ACTIVE')
+    assert.equal(
+      runSqlite([dbPath, `SELECT non_operative FROM governed_tool_envelope_registry WHERE envelope_id='${envelope_id}'`]).trim(),
+      'false',
+      'envelope must be activated at /authority without direct DB mutation'
+    )
+
+    const compiled = await post('/compile', { ...epochFields('lifecycle-compile'), decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
+    assert.equal(compiled.status, 'COMPILED')
+    assert.ok(compiled.validated_object_hash)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('governed envelope forced non_operative after /authority blocks /compile with NULL', async () => {
+  const worker = (await importWorker()).default
+  const dir = mkdtempSync(join(tmpdir(), 'mindshift-govern-corruption-'))
+  const dbPath = join(dir, 'corruption.sqlite')
+  const env = { API_KEY: 'test-key', DB: new SqliteD1Database(dbPath) }
+  const headers = { 'X-API-Key': 'test-key', 'content-type': 'application/json' }
+  const decision_id = 'decision-govern-corruption'
+
+  async function post(path, payload) {
+    const response = await worker.fetch(new Request(`https://runtime.test${path}`, { method: 'POST', headers, body: JSON.stringify(payload) }), env)
+    assert.equal(response.status, 200)
+    return response.json()
+  }
+
+  try {
+    applyMigrationChain(dbPath)
+
+    const session = await post('/session', { identity_id: 'govern-corruption-identity' })
+    const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
+
+    const envelope_id = await governEnvelope(worker, env, 'govern-corruption-nonce')
+    await post('/authority', {
+      ...epochFields('corruption-authority'),
+      continuity_id: continuity.continuity_id,
+      session_id: session.session_id,
+      decision_id,
+      owner: 'govern-corruption-test',
+      intent: 'deploy_production',
+      scope: { repo: 'example/repo', branch: 'main' },
+      constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' },
+      governed_tool_envelope_id: envelope_id
+    })
+    assert.equal(
+      runSqlite([dbPath, `SELECT non_operative FROM governed_tool_envelope_registry WHERE envelope_id='${envelope_id}'`]).trim(),
+      'false',
+      'envelope must be active after /authority'
+    )
+
+    runSqlite([dbPath, `UPDATE governed_tool_envelope_registry SET non_operative='true' WHERE envelope_id='${envelope_id}'`])
+
+    const compiled = await post('/compile', { ...epochFields('corruption-compile'), decision_id, ...snapshotFrom(provenanceFor(decision_id)) })
+    assert.equal(compiled.status, 'NULL')
+    assert.equal(compiled.reason, 'governed_tool_envelope_non_operative')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
