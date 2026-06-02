@@ -1,5 +1,6 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
 import type { CanonicalAEO } from "./lib/aeo-governance.ts"
+import { selectAEOTemplate } from "./lib/agent-tool-gateway.ts"
 import { classifyFromPredicates, classifyPartitionFinalityAdmission } from "./lib/finality-classification.js"
 import { classifyTopologyEpochAdmission } from "./lib/topology-epoch.js"
 import { interceptToolCall, classifyGatewayToolSurface, checkOmegaValidatorBoundary } from "./lib/agent-tool-gateway.ts"
@@ -239,6 +240,8 @@ type AgentToolInvocationBody = {
   tool_surface?: string
   execution_surface?: string
   surface?: string
+  surface_type?: string
+  aeo_risk_class?: string
   atao_id?: string
   atao_hash?: string
   session_id?: string
@@ -334,6 +337,36 @@ async function handleAgentToolInvocationBoundary(env: Env, request: Request): Pr
   const exactCanonicalAeo = toCanonicalAeo(canonicalAeo)
   const compiledHash = exactCanonicalAeo ? await sha256Hex(canonicalize(exactCanonicalAeo)) : ""
   if (!exactCanonicalAeo || compiledHash !== validated_object_hash || compiledHash !== String(compiled.validated_object_hash || "")) return agentToolInvocationNull("compiled_aeo_hash_mismatch", { policy_class, validated_object_hash, compiled_hash: compiledHash })
+
+  // AEO Template Registry boundary — load template before execution eligibility.
+  // surface_type is derived from the hash-verified AEO scope, NOT from caller input.
+  // Caller-provided surface_type (b.surface_type) is validated against the AEO-derived
+  // value; a mismatch is rejected to prevent spoof selection of a lower-risk template.
+  // VALID_TEMPLATE does not authorize execution — it only confirms the schema predicate
+  // subject exists. All downstream checks (authority, validation, proof) still apply.
+  const aeoScopeType = String(exactCanonicalAeo.scope.surface_type || "")
+  if (aeoScopeType) {
+    const claimedSurfaceType = String(b.surface_type || "")
+    if (claimedSurfaceType && claimedSurfaceType !== aeoScopeType) {
+      return agentToolInvocationNull("aeo_template_surface_type_mismatch", {
+        policy_class,
+        claimed_surface_type: claimedSurfaceType,
+        aeo_surface_type: aeoScopeType,
+        aeo_template_result: "NULL",
+        aeo_template_reason: "TEMPLATE_SURFACE_MISMATCH",
+      })
+    }
+    const aeoRiskClass = String(exactCanonicalAeo.scope.aeo_risk_class || b.aeo_risk_class || "P0_READ_ONLY")
+    const tmplResult = await selectAEOTemplate(aeoScopeType, aeoRiskClass, env.DB)
+    if (tmplResult.result === "NULL") {
+      return agentToolInvocationNull(`aeo_template_${tmplResult.reason.toLowerCase()}`, {
+        policy_class,
+        surface_type: aeoScopeType,
+        aeo_template_result: "NULL",
+        aeo_template_reason: tmplResult.reason,
+      })
+    }
+  }
 
   const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND session_id=?4 AND continuity_id=?5 AND status='VALID' AND result='VALID'`).bind(decision_id, validated_object_hash, invocation_nonce, session_id, continuity_id).first<any>()
   if (!validation) return agentToolInvocationNull("validation_missing", { policy_class, decision_id, validated_object_hash })
