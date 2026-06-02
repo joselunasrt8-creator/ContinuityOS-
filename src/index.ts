@@ -1,9 +1,12 @@
 type Env = { DB: D1Database, API_KEY?: string, PROVENANCE_HMAC_SECRET?: string, CANONICAL_RUNTIME_SURFACE_HASH?: string }
 import type { CanonicalAEO } from "./lib/aeo-governance.ts"
+import { selectAEOTemplate } from "./lib/agent-tool-gateway.ts"
 import { classifyFromPredicates, classifyPartitionFinalityAdmission } from "./lib/finality-classification.js"
 import { classifyTopologyEpochAdmission } from "./lib/topology-epoch.js"
 import { interceptToolCall, classifyGatewayToolSurface, checkOmegaValidatorBoundary } from "./lib/agent-tool-gateway.ts"
 import type { AgentToolGovernanceProposal } from "./lib/agent-tool-gateway.ts"
+import { conductAuthorityReview } from "./lib/authority-review.ts"
+import type { GatewayProposalLineage, AgentToolATAO } from "./lib/authority-review.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -237,6 +240,8 @@ type AgentToolInvocationBody = {
   tool_surface?: string
   execution_surface?: string
   surface?: string
+  surface_type?: string
+  aeo_risk_class?: string
   atao_id?: string
   atao_hash?: string
   session_id?: string
@@ -332,6 +337,36 @@ async function handleAgentToolInvocationBoundary(env: Env, request: Request): Pr
   const exactCanonicalAeo = toCanonicalAeo(canonicalAeo)
   const compiledHash = exactCanonicalAeo ? await sha256Hex(canonicalize(exactCanonicalAeo)) : ""
   if (!exactCanonicalAeo || compiledHash !== validated_object_hash || compiledHash !== String(compiled.validated_object_hash || "")) return agentToolInvocationNull("compiled_aeo_hash_mismatch", { policy_class, validated_object_hash, compiled_hash: compiledHash })
+
+  // AEO Template Registry boundary — load template before execution eligibility.
+  // surface_type is derived from the hash-verified AEO scope, NOT from caller input.
+  // Caller-provided surface_type (b.surface_type) is validated against the AEO-derived
+  // value; a mismatch is rejected to prevent spoof selection of a lower-risk template.
+  // VALID_TEMPLATE does not authorize execution — it only confirms the schema predicate
+  // subject exists. All downstream checks (authority, validation, proof) still apply.
+  const aeoScopeType = String(exactCanonicalAeo.scope.surface_type || "")
+  if (aeoScopeType) {
+    const claimedSurfaceType = String(b.surface_type || "")
+    if (claimedSurfaceType && claimedSurfaceType !== aeoScopeType) {
+      return agentToolInvocationNull("aeo_template_surface_type_mismatch", {
+        policy_class,
+        claimed_surface_type: claimedSurfaceType,
+        aeo_surface_type: aeoScopeType,
+        aeo_template_result: "NULL",
+        aeo_template_reason: "TEMPLATE_SURFACE_MISMATCH",
+      })
+    }
+    const aeoRiskClass = String(exactCanonicalAeo.scope.aeo_risk_class || b.aeo_risk_class || "P0_READ_ONLY")
+    const tmplResult = await selectAEOTemplate(aeoScopeType, aeoRiskClass, env.DB)
+    if (tmplResult.result === "NULL") {
+      return agentToolInvocationNull(`aeo_template_${tmplResult.reason.toLowerCase()}`, {
+        policy_class,
+        surface_type: aeoScopeType,
+        aeo_template_result: "NULL",
+        aeo_template_reason: tmplResult.reason,
+      })
+    }
+  }
 
   const validation = await env.DB.prepare(`SELECT * FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND session_id=?4 AND continuity_id=?5 AND status='VALID' AND result='VALID'`).bind(decision_id, validated_object_hash, invocation_nonce, session_id, continuity_id).first<any>()
   if (!validation) return agentToolInvocationNull("validation_missing", { policy_class, decision_id, validated_object_hash })
@@ -463,6 +498,114 @@ async function handleAgentToolGatewayPropose(env: Env, request: Request): Promis
     next_step: "authority_review",
     authority_space: "not_populated",
     execution_space: "not_populated"
+  })
+}
+
+async function ensureAuthorityReviewSchema(env: Env): Promise<void> {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS authority_review_registry (review_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL, observation_id TEXT NOT NULL, observation_hash TEXT NOT NULL, agent_id TEXT NOT NULL, session_id TEXT NOT NULL, tool_name TEXT NOT NULL, tool_system TEXT NOT NULL, risk_class TEXT NOT NULL CHECK (risk_class IN ('P0','P1','P2','P3')), reviewer_id TEXT NOT NULL, review_decision TEXT NOT NULL CHECK (review_decision IN ('APPROVED','REJECTED')), review_rationale TEXT NOT NULL, creates_atao INTEGER NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_authority_review_proposal ON authority_review_registry (proposal_id, observation_id, observation_hash)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS authority_review_registry_append_only_update BEFORE UPDATE ON authority_review_registry BEGIN SELECT RAISE(ABORT, 'authority_review_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS authority_review_registry_append_only_delete BEFORE DELETE ON authority_review_registry BEGIN SELECT RAISE(ABORT, 'authority_review_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS agent_tool_atao_registry (atao_id TEXT PRIMARY KEY, review_id TEXT NOT NULL, proposal_id TEXT NOT NULL, observation_id TEXT NOT NULL, observation_hash TEXT NOT NULL, agent_id TEXT NOT NULL, session_id TEXT NOT NULL, framework TEXT NOT NULL CHECK (framework IN ('langchain')), tool_name TEXT NOT NULL, tool_system TEXT NOT NULL, risk_class TEXT NOT NULL CHECK (risk_class IN ('P0','P1','P2','P3')), intent TEXT NOT NULL, scope TEXT NOT NULL, constraints TEXT NOT NULL, atao_status TEXT NOT NULL CHECK (atao_status IN ('FORMED')), created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_agent_tool_atao_review ON agent_tool_atao_registry (review_id, proposal_id)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_atao_registry_append_only_update BEFORE UPDATE ON agent_tool_atao_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_atao_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS agent_tool_atao_registry_append_only_delete BEFORE DELETE ON agent_tool_atao_registry BEGIN SELECT RAISE(ABORT, 'agent_tool_atao_registry is append-only'); END`).run()
+}
+
+async function handleAgentToolGatewayAuthorityReview(env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, reason: "malformed_request" })
+  const proposal_id = String(b.proposal_id || "")
+  const observation_id = String(b.observation_id || "")
+  const observation_hash = String(b.observation_hash || "")
+  const reviewer_id = String(b.reviewer_id || "")
+  const review_decision = String(b.review_decision || "")
+  const review_rationale = String(b.review_rationale || "")
+  if (!proposal_id || !observation_id || !observation_hash) {
+    return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, reason: "missing_proposal_fields" })
+  }
+  await ensureAgentToolGatewaySchema(env)
+  await ensureAuthorityReviewSchema(env)
+  const proposal = await env.DB.prepare(`SELECT * FROM agent_tool_proposal_registry WHERE proposal_id=?1 AND observation_id=?2 AND observation_hash=?3 AND proposal_status='PENDING_AUTHORITY_REVIEW'`).bind(proposal_id, observation_id, observation_hash).first<any>()
+  if (!proposal) return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, reason: "proposal_not_found" })
+  const proposalLineage: GatewayProposalLineage = {
+    proposal_id: String(proposal.proposal_id || ""),
+    cip_id: String(proposal.cip_id || ""),
+    observation_id: String(proposal.observation_id || ""),
+    observation_hash: String(proposal.observation_hash || ""),
+    agent_id: String(proposal.agent_id || ""),
+    session_id: String(proposal.session_id || ""),
+    framework: "langchain" as const,
+    tool_name: String(proposal.tool_name || ""),
+    tool_system: String(proposal.tool_system || "") as any,
+    risk_class: String(proposal.risk_class || "") as any,
+    intent: String(proposal.intent || ""),
+    scope: (() => { try { return JSON.parse(String(proposal.scope || "{}")) } catch { return {} } })(),
+    constraints: (() => { try { return JSON.parse(String(proposal.constraints || "{}")) } catch { return {} } })(),
+    requires_authority_binding: Boolean(proposal.requires_authority_binding),
+  }
+  const timestamp = new Date().toISOString()
+  const outcome = conductAuthorityReview({ proposal: proposalLineage, reviewer_id, review_decision, review_rationale, timestamp })
+  if (outcome.status === "NULL") {
+    return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, reason: outcome.reason })
+  }
+  const creates_atao = outcome.status === "APPROVED" ? 1 : 0
+  await env.DB.prepare(`INSERT OR IGNORE INTO authority_review_registry (review_id,proposal_id,observation_id,observation_hash,agent_id,session_id,tool_name,tool_system,risk_class,reviewer_id,review_decision,review_rationale,creates_atao,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)`)
+    .bind(outcome.review.review_id, proposal_id, observation_id, observation_hash, proposalLineage.agent_id, proposalLineage.session_id, proposalLineage.tool_name, proposalLineage.tool_system, proposalLineage.risk_class, reviewer_id, outcome.review.review_decision, review_rationale, creates_atao, timestamp).run()
+  if (outcome.status === "APPROVED" && outcome.atao) {
+    const atao: AgentToolATAO = outcome.atao
+    await env.DB.prepare(`INSERT OR IGNORE INTO agent_tool_atao_registry (atao_id,review_id,proposal_id,observation_id,observation_hash,agent_id,session_id,framework,tool_name,tool_system,risk_class,intent,scope,constraints,atao_status,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'langchain',?8,?9,?10,?11,?12,?13,'FORMED',?14)`)
+      .bind(atao.atao_id, atao.review_id, atao.proposal_id, atao.observation_id, atao.observation_hash, atao.agent_id, atao.session_id, atao.tool_name, atao.tool_system, atao.risk_class, atao.intent, JSON.stringify(atao.scope), JSON.stringify(atao.constraints), timestamp).run()
+    return json({
+      status: "APPROVED",
+      result: "OK",
+      route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE,
+      review_id: outcome.review.review_id,
+      review_decision: "APPROVED",
+      proposal_id,
+      observation_id,
+      observation_hash,
+      atao_id: atao.atao_id,
+      atao_status: "FORMED",
+      review_lineage: { review_id: atao.review_id, proposal_id: atao.proposal_id, observation_id: atao.observation_id },
+      tool_name: atao.tool_name,
+      tool_system: atao.tool_system,
+      risk_class: atao.risk_class,
+    })
+  }
+  return json({
+    status: "REJECTED",
+    result: "OK",
+    route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE,
+    review_id: outcome.review.review_id,
+    review_decision: "REJECTED",
+    proposal_id,
+    observation_id,
+    observation_hash,
+    atao_id: null,
+    creates_atao: false,
+  })
+}
+
+async function handleAgentToolGatewayATAO(env: Env, request: Request): Promise<Response> {
+  const url = new URL(request.url)
+  const atao_id = url.searchParams.get("atao_id") || ""
+  if (!atao_id) return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_ATAO_ROUTE, reason: "missing_atao_id" })
+  await ensureAuthorityReviewSchema(env)
+  const atao = await env.DB.prepare(`SELECT * FROM agent_tool_atao_registry WHERE atao_id=?1`).bind(atao_id).first<any>()
+  if (!atao) return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_ATAO_ROUTE, reason: "atao_not_found" })
+  return json({
+    status: "FOUND",
+    result: "OK",
+    route: AGENT_TOOL_GATEWAY_ATAO_ROUTE,
+    atao_id: String(atao.atao_id || ""),
+    review_id: String(atao.review_id || ""),
+    proposal_id: String(atao.proposal_id || ""),
+    observation_id: String(atao.observation_id || ""),
+    atao_status: "FORMED",
+    tool_name: String(atao.tool_name || ""),
+    tool_system: String(atao.tool_system || ""),
+    risk_class: String(atao.risk_class || ""),
   })
 }
 
@@ -643,6 +786,8 @@ const OPENCLAW_GOVERN_ROUTE = "/govern" as const
 const AGENT_TOOL_INVOCATION_ROUTE = "/agent/tool-call" as const
 const AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE = "/gateway/tool/intercept" as const
 const AGENT_TOOL_GATEWAY_PROPOSE_ROUTE = "/gateway/tool/propose" as const
+const AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE = "/gateway/authority/review" as const
+const AGENT_TOOL_GATEWAY_ATAO_ROUTE = "/gateway/authority/atao" as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
@@ -7771,9 +7916,12 @@ export default {
     const agentToolInvocationRoute = url.pathname === AGENT_TOOL_INVOCATION_ROUTE
     const agentToolGatewayInterceptRoute = url.pathname === AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE
     const agentToolGatewayProposeRoute = url.pathname === AGENT_TOOL_GATEWAY_PROPOSE_ROUTE
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute
+    const agentToolGatewayAuthorityReviewRoute = url.pathname === AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE
+    const agentToolGatewayAtaoRoute = url.pathname === AGENT_TOOL_GATEWAY_ATAO_ROUTE
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
+    if (agentToolGatewayAtaoRoute && request.method === "GET" && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
 
     if (!hasDb(env)) return json({ status: "NULL", reason: "database_unavailable" }, 500)
 
@@ -7787,6 +7935,14 @@ export default {
 
     if (agentToolGatewayProposeRoute && request.method === "POST") {
       return handleAgentToolGatewayPropose(env, request)
+    }
+
+    if (agentToolGatewayAuthorityReviewRoute && request.method === "POST") {
+      return handleAgentToolGatewayAuthorityReview(env, request)
+    }
+
+    if (agentToolGatewayAtaoRoute && request.method === "GET") {
+      return handleAgentToolGatewayATAO(env, request)
     }
 
     const readOnlyObservabilityRoute = request.method === "GET" && (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) || (TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) || url.pathname === RUNTIME_SOVEREIGNTY_ROUTE || url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE || [BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any))
