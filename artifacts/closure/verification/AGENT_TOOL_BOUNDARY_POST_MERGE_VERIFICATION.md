@@ -1,3 +1,14 @@
+---
+issue_lineage: #1737/#1744 post-merge verification; retained under #1609 topology compression
+phase_lineage: Historical post-merge verification evidence; predecessor artifact identified by #1760 reduction eligibility
+status: Archived historical verification; non-authoritative evidence
+archive_classification: archive/closure/post-merge-verification
+relocated_from: /AGENT_TOOL_BOUNDARY_POST_MERGE_VERIFICATION.md
+relocated_to: /artifacts/closure/verification/AGENT_TOOL_BOUNDARY_POST_MERGE_VERIFICATION.md
+relocation_date: 2026-06-02
+authority_note: This artifact is observational/archive evidence only; it does not grant authority or alter governance enforcement.
+---
+
 # Agent Tool Boundary Post-Merge Verification
 
 Verification context: repository state after merge commit `966292b Close agent tool call governance boundary (#1735)`.

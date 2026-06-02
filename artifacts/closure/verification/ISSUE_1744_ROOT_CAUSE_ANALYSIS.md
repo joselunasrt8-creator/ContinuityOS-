@@ -1,3 +1,14 @@
+---
+issue_lineage: #1744 root-cause analysis; retained under #1609 topology compression
+phase_lineage: Historical verification/root-cause evidence; predecessor artifact identified by #1760 reduction eligibility
+status: Archived historical analysis; non-authoritative evidence
+archive_classification: archive/closure/root-cause-analysis
+relocated_from: /ISSUE_1744_ROOT_CAUSE_ANALYSIS.md
+relocated_to: /artifacts/closure/verification/ISSUE_1744_ROOT_CAUSE_ANALYSIS.md
+relocation_date: 2026-06-02
+authority_note: This artifact is observational/archive evidence only; it does not grant authority or alter governance enforcement.
+---
+
 # Root Cause Analysis: Proof-Registry PR Accumulation
 
 **Issue:** #1744  
