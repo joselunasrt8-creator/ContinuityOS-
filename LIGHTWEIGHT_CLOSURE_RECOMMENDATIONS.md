@@ -26,11 +26,23 @@ Not allowed in this issue:
 - New authority surfaces
 - New execution pathways
 
+## Issue #1609 closure return
+
+| Required return item | Finding | Closure posture |
+|---|---|---|
+| 1. Repository inventory summary | 1029 scanned files across docs, governance, runtime, schemas, conformance, graph, archive, telemetry, scripts, tools, source, and tests | Captured in `ARTIFACT_INVENTORY.md`; documentation-only. |
+| 2. Drift summary | Main drift clusters are topology projection ambiguity, observation/recovery issue lineage ambiguity, duplicate inventories, schema-lineage ambiguity, stale observability links, and root ballast | Captured in `DRIFT_ANALYSIS.md`; non-operative classification. |
+| 3. Topology coherence findings | `Topology Recovery ⊂ Observation` is semantically represented, but issue/name/index lineage is incomplete | Captured in `TOPOLOGY_COHERENCE_REVIEW.md`; no authority effect. |
+| 4. Archive candidates | Opaque root bundle, archive/session logs, date-stamped exploratory analysis, and root phase artifacts | Recommend labeling/indexing, not deletion. |
+| 5. Duplicate candidates | Execution surfaces, bypass paths, authority inventories/rules, schema copies, invariant registries, cross-registry naming variants, topology maps | Recommend source-of-truth annotation, not JSON mutation. |
+| 6. Ambiguous lineage findings | #1752, #1755/CIP, generated topology outputs, validation bundle copies, root phase/root inventory placement | Recommend issue-lineage and generated-source annotations. |
+| 7. Lightweight closure recommendations | Indexing, lineage annotation, documentation consolidation, generated artifact labels, archive labels, schema lineage map | Future bounded docs slices only. |
+
 ## Recommended closure actions
 
 | Priority | Recommendation | Type | Target artifacts | Expected benefit | Operative risk |
 |---:|---|---|---|---|---|
-| 1 | Add a repository closure/topology index that maps issue #1752 and #1755 to existing artifacts. | Indexing improvement | `docs/observability-index.md`, `docs/protocols/topology-reasoning-protocol-v1.md`, `governance/topology/*`, cognition canon docs | Resolves unresolved lineage without moving or changing runtime behavior. | None if documentation-only. |
+| 1 | Add a repository closure/topology index that maps issue #1752 and #1755 to existing artifacts. | Indexing improvement | `docs/observability-index.md`, `docs/protocols/topology-reasoning-protocol-v1.md`, `governance/topology/*`, cognition canon docs | Resolves unresolved lineage without moving or changing runtime behavior; #1752 should point first to the topology reasoning protocol candidate. | None if documentation-only. |
 | 2 | Add explicit statement: `Topology Recovery ⊂ Observation`; `Observation ≠ Authority`. | Lineage annotation | Observation/topology index or a future issue-specific index | Makes containment visible and prevents topology recovery from being misread as authority. | None if documentation-only. |
 | 3 | Fix or annotate stale links in `docs/observability-index.md`. | Documentation consolidation | Missing links to passive legitimacy observability layer, install-base telemetry, install-base compression, issue-853 cleanup | Removes navigation drift. | None if documentation-only. |
 | 4 | Declare canonical source for execution surface inventories. | Reclassification | Root, governance, runtime, runtime/surfaces, validation-bundle `EXECUTION_SURFACES` copies | Reduces duplicate inventory ambiguity. | Low if annotation-only; avoid changing JSON semantics. |
@@ -62,6 +74,10 @@ Not allowed in this issue:
 | Invariant registry docs | Document root-vs-governance scope, or consolidate navigation. |
 | Cross-registry reconciliation spelling variants | Pick documented canonical filename for future references; avoid immediate deletion. |
 | Execution-surface map Markdown/Mermaid/JSON | Add projection relation: source data → rendered doc → diagram. |
+
+## Review-response hardening
+
+This revision strengthens the previous closure output by adding explicit methodology/command lineage, distinguishing text-marker absence from git-history adjacency, adding a success-criteria return matrix, and making the #1752 topology reasoning protocol placement candidate explicit. These additions remain observational and do not convert findings into enforcement.
 
 ## Ambiguous lineage findings
 

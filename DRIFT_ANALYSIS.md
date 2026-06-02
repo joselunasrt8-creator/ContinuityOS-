@@ -13,13 +13,23 @@
 - `ARCHIVAL_CANDIDATE` — artifact should likely remain available as history, but not be treated as current canon without an index.
 - `AMBIGUOUS` — artifact role, lineage, generator, or canonical relation is unclear from repository evidence.
 
+## Evidence and confidence model
+
+| Evidence class | Meaning | Confidence impact |
+|---|---|---|
+| Explicit artifact marker | Issue number or protocol name appears in file content or filename | High |
+| Canonical status declaration | Artifact declares non-operative/canonical/current role | High for classification, not authority |
+| Git-history adjacency | Recent merge/branch/commit lineage indicates issue relation | Medium; useful for placement candidates only |
+| Filename family overlap | Similar basename across directories | Medium for duplicate candidates, low for semantic equivalence |
+| Missing link / missing file | Index points to absent target | High for navigation drift |
+
 ## Drift summary
 
 | Drift class | Summary |
 |---|---|
 | Canonical topology drift | Runtime topology has several canonical-looking locations: `runtime/topology/*`, `runtime/maps/*`, `docs/topology/*`, root `runtime-topology.json`, and `graph/runtime-topology.sample.json`. The distinction between canon, projection, and generated sample is not uniformly declared. |
 | Observation lineage drift | Classified observation object, emission rules, and evidence precedence are strong formal artifacts, but issue #1755 naming is absent; observation layer and cognitive interface lineage must be inferred. |
-| Recovery lineage drift | No explicit #1752 Topology Recovery Protocol artifact was found; recovery concepts are distributed across topology reasoning, runtime topology inventory, reconciliation, and runtime topology metadata. |
+| Recovery lineage drift | No explicit #1752 Topology Recovery Protocol text marker was found; git-history adjacency and recent topology reasoning artifacts make `docs/protocols/topology-reasoning-protocol-v1.md` the strongest placement candidate. |
 | Duplicate inventory drift | Execution surface and bypass-path inventories have multiple root/governance/runtime/generated copies. |
 | Schema lineage drift | AEO/ATAO/PREO/SCO/Authority schemas exist in root/runtime/governance/namespace variants without a single visible source-of-truth index. |
 | Documentation index drift | `docs/observability-index.md` contains stale links to missing observability/install-base docs. |
@@ -29,7 +39,7 @@
 
 | Artifact / family | Exploratory artifacts | Canonical artifacts | Current repository structure | Classification | Drift finding |
 |---|---|---|---|---|---|
-| Runtime topology recovery | `runtime_topology_inventory.md`, `docs/protocols/topology-reasoning-protocol-v1.md`, `docs/analysis/topology-aware-closure-sequencing.md` | `runtime/topology/*`, `runtime/maps/*` | Spread across root docs, docs protocols, runtime metadata, graph sample | AMBIGUOUS | Topology recovery exists conceptually, but #1752 explicit lineage is missing. |
+| Runtime topology recovery | `runtime_topology_inventory.md`, `docs/protocols/topology-reasoning-protocol-v1.md`, `docs/analysis/topology-aware-closure-sequencing.md` | `runtime/topology/*`, `runtime/maps/*` | Spread across root docs, docs protocols, runtime metadata, graph sample | AMBIGUOUS | Topology recovery exists conceptually; #1752 lineage is supported by git-history adjacency, but explicit artifact metadata is missing. |
 | Observation layer | `docs/observability-index.md`, `docs/observability-boundary-review.md` | `governance/topology/CLASSIFIED_OBSERVATION_OBJECT_SPEC.json`, `TOPOLOGY_OBSERVATION_EMISSION_RULES_SPEC.json`, `TOPOLOGY_EVIDENCE_PRECEDENCE_SPEC.json` | Docs index + governance specs + schema | CURRENT | Formal observation separation is strong; stale docs index links create navigation drift. |
 | Cognitive interface protocol | `docs/analysis/cognition-governance-frontier-analysis.md`, distributed cognitive assessment | `docs/canon/formal-cognition-lineage-canon-v1.md`, `docs/analysis/cognition-governance-closure-canon.md` | Analysis/canon docs; no direct CIP-named artifact | AMBIGUOUS | Cognitive interface lineage can be inferred from cognition canon, but #1755/CIP label is absent. |
 | Classified observation object | `governance/topology/RUNTIME_TOPOLOGY_INTELLIGENCE_PLANNING_SPEC.json` | `governance/topology/CLASSIFIED_OBSERVATION_OBJECT_SPEC.json`, `schemas/classified-observation-object.schema.json` | Governance spec + schema + tests | CURRENT | Planning artifact is likely superseded lineage, not current endpoint. |
@@ -57,6 +67,16 @@
 | #1755 Observation Layer + CIP absent as explicit artifact marker | AMBIGUOUS | Lineage drift for observation/CIP work | Add lineage annotation/index row mapping #1755 to observation and cognition-interface artifacts. |
 | Root `runtime-topology.json` vs `graph/runtime-topology.sample.json` | AMBIGUOUS | Generated topology recency/source ambiguity | Add generator/source/derivative labels. |
 | Duplicate execution and bypass inventories | DUPLICATE | Readers may not know which inventory is canonical | Add source-of-truth and generated-copy metadata. |
+
+## Closure-quality gaps after review hardening
+
+| Gap | Classification | Why it remains non-operative |
+|---|---|---|
+| #1752 lacks explicit artifact metadata | AMBIGUOUS | Adding metadata would be a future docs/index slice, not a runtime change. |
+| #1755/CIP lacks explicit artifact metadata | AMBIGUOUS | Concepts are present; naming bridge would be documentation-only. |
+| Duplicate inventory canonical source is undeclared | DUPLICATE | Declaring source-of-truth should be an index/reclassification action, not JSON mutation. |
+| Observability index has missing targets | CURRENT_WITH_STALE_LINKS | Link repair should not create authority or execution effects. |
+| Generated topology and validation bundle outputs lack source labels | AMBIGUOUS | Labeling generated artifacts improves lineage but does not regenerate outputs. |
 
 ## Preservation of foundational separations
 

@@ -17,6 +17,21 @@ Preserved separations:
 - Capability ≠ Permission
 - Understanding ≠ Correction
 
+## Methodology and evidence boundary
+
+This inventory uses repository-local evidence only: file topology, text search, filename families, and recent git-history adjacency. It intentionally does not resolve missing issue metadata through external authority and does not treat a search result as enforcement truth.
+
+Evidence commands used during this closure pass:
+
+- `rg --files -g '!node_modules' -g '!dist' -g '!build'`
+- `find . -maxdepth 3 -type d -not -path './node_modules*' -not -path './.git*' -print`
+- `rg -n "1752|1755|Topology Recovery|Observation Layer|Cognitive Interface|CIP" -g '!node_modules' -g '!package-lock.json' -g '!MINDSHIFT_REPO_OBJECTS.zip'`
+- `rg -l "1752|1755|Topology Recovery Protocol|Observation Layer|Cognitive Interface Protocol|CIP" -g '!node_modules' -g '!package-lock.json' -g '!MINDSHIFT_REPO_OBJECTS.zip'`
+- `git log --oneline -5`
+- `git show --stat --oneline --name-only 6946465`
+
+Interpretation rule: a repository-text marker is stronger than filename similarity; git-history adjacency is weaker than explicit artifact metadata; recommendations remain non-operative unless a later bounded implementation object adopts them.
+
 ## Repository inventory summary
 
 | Inventory slice | Count | Classification note |
@@ -49,7 +64,7 @@ Preserved separations:
 | `governance/topology/TOPOLOGY_OBSERVATION_EMISSION_RULES_SPEC.json` | Governance topology spec | Topology observation emission rules, consumes #1641 | CURRENT | Defines emission lifecycle while preserving observation/authority separation. |
 | `governance/topology/TOPOLOGY_EVIDENCE_PRECEDENCE_SPEC.json` | Governance topology spec | Evidence precedence over topology observations | CURRENT | Clarifies observations never override registry state; important for Observation ⊂ reconciliation visibility, not authority. |
 | `governance/topology/RUNTIME_TOPOLOGY_INTELLIGENCE_PLANNING_SPEC.json` | Planning/spec artifact | Runtime topology intelligence planning | SUPERSEDED_BY_FORMAL_SPECS | Planning artifact appears upstream of classified observation/emission/evidence-precedence specs. Keep as lineage, not canonical endpoint. |
-| `docs/protocols/topology-reasoning-protocol-v1.md` | Protocol documentation | Topology reasoning protocol | CURRENT | Protocol/cognitive layer only; no runtime authority. |
+| `docs/protocols/topology-reasoning-protocol-v1.md` | Protocol documentation | Topology reasoning protocol; git-history-adjacent to session/merge lineage for #1752 | CURRENT_CANONICAL_CANDIDATE | Protocol/cognitive layer only; no runtime authority. Best available repository-local placement candidate for #1752, but the file lacks an explicit #1752 marker. |
 | `docs/analysis/topology-aware-closure-sequencing.md` | Analysis | Closure sequencing from topology perspective | CURRENT_DERIVATIVE | Supports consolidation/validation; should be indexed with closure docs. |
 | `docs/analysis/cognition-governance-frontier-analysis.md` | Exploratory analysis | Discovery artifact for cognition-governance frontier | CURRENT_DISCOVERY | Broad discovery surface; not closure canonical by itself. |
 | `docs/analysis/cognition-governance-closure-canon.md` | Closure/canon analysis | Formalization/sequencing from cognition frontier | CURRENT | Converts discovery findings into dependency ordering without runtime mutation. |
@@ -116,6 +131,14 @@ Preserved separations:
 | `tools/topology/extract-runtime-topology.ts` | Tooling | Topology extraction tool | CURRENT | Generates/updates topology observations; capability does not imply authority. |
 | `scripts/regenerate-governance-artifacts.mjs` | Tooling/generated artifact producer | Governance artifact regeneration | CURRENT_MUTATION_CAPABLE_TOOL | Tool can mutate generated artifacts when run; no execution in this issue. |
 
+## Recent issue lineage candidates
+
+| Issue / concept | Explicit marker status | Best repository-local placement candidate | Confidence | Notes |
+|---|---|---|---|---|
+| #1752 — Topology Recovery Protocol | No explicit text marker in current artifacts | `docs/protocols/topology-reasoning-protocol-v1.md`, `runtime_topology_inventory.md`, `runtime/topology/*`, `runtime/maps/*` | MEDIUM | Recent git history includes merge PR #1753 from a `session-1752` branch immediately before the topology reasoning protocol commit, so topology recovery lineage is present by adjacency but not by artifact metadata. |
+| #1755 — Observation Layer and Cognitive Interface Protocol | No explicit text marker in current artifacts | `docs/observability-index.md`, `docs/observability-boundary-review.md`, `governance/topology/*`, `docs/canon/formal-cognition-lineage-canon-v1.md`, `docs/analysis/cognition-governance-closure-canon.md` | MEDIUM_LOW | Observation and cognition-interface concepts are present, but no single artifact declares #1755 or CIP terminology. |
+| `Topology Recovery ⊂ Observation` | Not stated as a single index relation | Observation specs contain topology observation objects/emission/evidence precedence; topology reasoning is non-authoritative | MEDIUM | Semantically preserved, but navigation and issue lineage need annotation. |
+
 ## Duplicate candidates
 
 | Duplicate family | Candidate artifacts | Closure note |
@@ -143,8 +166,8 @@ Preserved separations:
 | Artifact | Finding | Notes |
 |---|---|---|
 | `docs/observability-index.md` | Stale internal links | Links to four missing docs: passive legitimacy observability layer, install-base telemetry, install-base compression, issue-853 issue graph cleanup. |
-| Issue #1752 Topology Recovery Protocol | Unresolved lineage | No explicit repository artifact or issue marker found by text search. Related topology recovery content appears distributed across runtime topology inventory, topology reasoning protocol, and governance topology specs. |
-| Issue #1755 Observation Layer + Cognitive Interface Protocol | Unresolved lineage | No explicit repository artifact or issue marker found by text search. Related observation/CIP concepts appear distributed across observability index, classified observation specs, and cognition canon docs. |
+| Issue #1752 Topology Recovery Protocol | Unresolved explicit artifact marker | No explicit repository text marker found; git-history adjacency points to `docs/protocols/topology-reasoning-protocol-v1.md` and related topology inventory/runtime topology artifacts as placement candidates. |
+| Issue #1755 Observation Layer + Cognitive Interface Protocol | Unresolved explicit artifact marker | No explicit repository text marker found; related observation/CIP concepts appear distributed across observability index, classified observation specs, and cognition canon docs. |
 | `runtime-topology.json` | Generator ambiguity | Topology artifact exists at root but generator/relationship to `graph/runtime-topology.sample.json` is not declared in nearby docs. |
 | Validation bundle copies | Generated lineage ambiguity | Bundle copies are likely generated derivatives; root source and regeneration command should be indexed. |
 
