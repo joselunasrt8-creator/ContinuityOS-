@@ -1541,6 +1541,28 @@
       "non_authoritative": true
     },
     {
+      "surface_id": "package_script:graph:view",
+      "surface_type": "package_script",
+      "source_file": "package.json",
+      "entrypoint": "graph:view: npx tsx scripts/render-topology-graph-viewer.ts",
+      "mutation_capability": false,
+      "execution_capability": false,
+      "deployment_capability": false,
+      "authority_required": "none",
+      "aeo_required": false,
+      "validation_required": false,
+      "proof_required": false,
+      "replay_semantics": "local_command_not_authoritative",
+      "drift_observable": true,
+      "proof_bound": false,
+      "governance_addressable": true,
+      "canonical_boundary_status": "NON_DEPLOY_LOCAL_OR_TEST",
+      "bypass_risk": "none",
+      "containment_status": "NON_DEPLOY",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
       "surface_id": "package_script:test",
       "surface_type": "package_script",
       "source_file": "package.json",
