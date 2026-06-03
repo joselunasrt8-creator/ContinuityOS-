@@ -106,6 +106,25 @@ test('TC-04 missing/blank required outcome fields → null', () => {
   assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, lineage_version: '   ' })), null)
 })
 
+test('TC-04b malformed/missing outcome.conditions → null', () => {
+  const outcome = makeOutcome()
+  assert.notEqual(outcome, null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: null })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: undefined })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: 'invalid' })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: 42 })), null)
+})
+
+test('TC-04c non-boolean condition value → null', () => {
+  const outcome = makeOutcome()
+  assert.notEqual(outcome, null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: { ...ALL_TRUE_CONDITIONS, valid: 1 } })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: { ...ALL_TRUE_CONDITIONS, authorized: 'yes' } })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: { ...ALL_TRUE_CONDITIONS, unused: null } })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: { ...ALL_TRUE_CONDITIONS, policy_valid: undefined } })), null)
+  assert.equal(captureExecutionBoundaryProof(Object.freeze({ ...outcome, conditions: { ...ALL_TRUE_CONDITIONS, replay_safe: 0 } })), null)
+})
+
 test('TC-05 VALID outcome → frozen proof', () => {
   const outcome = makeOutcome()
   assert.notEqual(outcome, null)

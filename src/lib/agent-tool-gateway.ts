@@ -794,6 +794,10 @@ export function captureExecutionBoundaryProof(
   if (!isNonBlankString(outcome.contract_id)) return null
   if (!isNonBlankString(outcome.predicate_hash)) return null
   if (!isNonBlankString(outcome.lineage_version)) return null
+  if (!outcome.conditions || typeof outcome.conditions !== 'object') return null
+  for (const key of OMEGA_CONDITION_KEYS) {
+    if (typeof outcome.conditions[key] !== 'boolean') return null
+  }
 
   const recomputedOutcomeId = hashCanonical({
     envelope_id: outcome.envelope_id,
