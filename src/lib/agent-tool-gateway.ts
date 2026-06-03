@@ -650,6 +650,109 @@ export function createOmegaValidatorInputEnvelope(
   })
 }
 
+// ── Issue #1791: Phase 3D Ω Validator Evaluation Context and Outcome ─────────
+// Bounded outcome formation from an OmegaValidatorInputEnvelope and evaluation
+// context. Evaluation terminates at outcome formation only.
+//
+// Topology:
+//   Ω Validator Input Envelope + Evaluation Context
+//   → Ω Validator Outcome (VALID | NULL)
+//   → Future Execution Boundary Proof (not implemented here)
+//
+// Non-goals preserved here:
+//   no authority creation
+//   no execution permission
+//   no predicate execution
+//   no proof generation
+//   no proof capture
+//   no persistence
+//   no runtime route
+//   no execution boundary invocation
+
+export type OmegaValidatorEvaluationContext = {
+  readonly conditions: OmegaValidatorConditions
+}
+
+export type OmegaValidatorOutcome = {
+  readonly outcome_id: string
+  readonly envelope_id: string
+  readonly contract_id: string
+  readonly predicate_hash: string
+  readonly lineage_version: string
+  readonly result: OmegaValidatorResult
+  readonly conditions: OmegaValidatorConditions
+}
+
+const OMEGA_CONDITION_KEYS: ReadonlyArray<keyof OmegaValidatorConditions> = [
+  'valid', 'authorized', 'unused', 'policy_valid', 'replay_safe', 'topology_visible', 'reconcilable',
+]
+
+// evaluateOmegaValidator: bounded outcome formation from envelope and conditions.
+// Recomputes envelope_id to verify envelope integrity before evaluating.
+// Uses checkOmegaValidatorBoundary to determine result from conditions.
+// Fails closed on null/missing inputs, blank fields, tampered envelope_id,
+// missing or malformed conditions, or non-boolean condition values.
+// Outcome formation does not mutate runtime state.
+export function evaluateOmegaValidator(
+  envelope: OmegaValidatorInputEnvelope | null | undefined,
+  context: OmegaValidatorEvaluationContext | null | undefined,
+): OmegaValidatorOutcome | null {
+  if (!envelope) return null
+  if (!isNonBlankString(envelope.envelope_id)) return null
+  if (!isNonBlankString(envelope.contract_id)) return null
+  if (!isNonBlankString(envelope.template_id)) return null
+  if (!isNonBlankString(envelope.predicate_set_id)) return null
+  if (!isNonBlankString(envelope.predicate_hash)) return null
+  if (!isNonBlankString(envelope.lineage_version)) return null
+
+  const recomputedEnvelopeId = hashCanonical({
+    contract_id: envelope.contract_id,
+    template_id: envelope.template_id,
+    predicate_set_id: envelope.predicate_set_id,
+    predicate_hash: envelope.predicate_hash,
+    lineage_version: envelope.lineage_version,
+  })
+  if (recomputedEnvelopeId !== envelope.envelope_id) return null
+
+  if (!context) return null
+  const conditions = context.conditions
+  if (!conditions || typeof conditions !== 'object') return null
+  for (const key of OMEGA_CONDITION_KEYS) {
+    if (typeof conditions[key] !== 'boolean') return null
+  }
+
+  const result = checkOmegaValidatorBoundary(conditions)
+
+  const frozenConditions: OmegaValidatorConditions = Object.freeze({
+    valid: conditions.valid,
+    authorized: conditions.authorized,
+    unused: conditions.unused,
+    policy_valid: conditions.policy_valid,
+    replay_safe: conditions.replay_safe,
+    topology_visible: conditions.topology_visible,
+    reconcilable: conditions.reconcilable,
+  })
+
+  const outcome_id = hashCanonical({
+    envelope_id: envelope.envelope_id,
+    contract_id: envelope.contract_id,
+    predicate_hash: envelope.predicate_hash,
+    lineage_version: envelope.lineage_version,
+    result,
+    conditions: frozenConditions,
+  })
+
+  return Object.freeze({
+    outcome_id,
+    envelope_id: envelope.envelope_id,
+    contract_id: envelope.contract_id,
+    predicate_hash: envelope.predicate_hash,
+    lineage_version: envelope.lineage_version,
+    result,
+    conditions: frozenConditions,
+  })
+}
+
 // interceptToolCall — gateway entry point.
 // Produces: Observation Artifact → CIP → GovernanceProposal
 // Does NOT produce: ATAO, AEO, authority, execution eligibility
