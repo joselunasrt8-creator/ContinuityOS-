@@ -1,0 +1,270 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "closure_audit_1626",
+  "artifact_class": "closure_audit_report",
+  "status": "non_operative_governance_artifact",
+  "issue_reference": "#1626",
+  "audit_date": "2026-06-03",
+  "branch": "claude/issue-1626-closure-audit-BUf5R",
+  "repository": "joselunasrt8-creator/mindshift-demo",
+  "scope": {
+    "name": "ISSUE_1626_CLOSURE_AUDIT",
+    "purpose": "Determine closure eligibility of Issue #1626 (Governed PR / Merge System) by evaluating repository evidence against acceptance criteria. Non-mutating evidence-only audit.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "closure_determination": {
+    "status": "CLOSURE_PARTIAL",
+    "issue_1626_criteria_met": 6,
+    "issue_1626_criteria_total": 7,
+    "issue_1626_criteria_advisory": 1,
+    "phase_2_anchor_criteria_met": false,
+    "single_governed_merge_path": false,
+    "no_unresolved_bypass": false,
+    "reason": "Issue #1626 deliverables and implementation substantially complete. Proof registry operational (42 entries). Enforcement advisory only — branch protection not activated. Phase 2 anchor criteria not met: 9 of 10 bypass paths open."
+  },
+  "issue_1626_criteria_evaluation": [
+    {
+      "criterion": "Reviewed object hash generated deterministically",
+      "status": "MET",
+      "evidence": "runtime/merge-object-hash.mjs"
+    },
+    {
+      "criterion": "Stale reviews detected when PR head changes",
+      "status": "MET",
+      "evidence": "PREO commit_id == head_sha binding; mismatch produces LEGITIMACY_NULL"
+    },
+    {
+      "criterion": "PREO generated from PR metadata without executing merge",
+      "status": "MET",
+      "evidence": ".github/workflows/merge-governance-check.yml"
+    },
+    {
+      "criterion": "Merge eligibility requires exact reviewed object match",
+      "status": "ADVISORY",
+      "evidence": "Exact-object check implemented in merge-proof.yml; not required by GitHub branch protection"
+    },
+    {
+      "criterion": "Merge proof links to PR number, head SHA, merge commit SHA, reviewer state, and PREO hash",
+      "status": "MET",
+      "evidence": ".github/workflows/merge-proof.yml; merge_proof_registry.jsonl (42 entries)"
+    },
+    {
+      "criterion": "Direct merge / bypass paths classified as OPEN, PARTIAL, UNKNOWN, or BREAK_GLASS",
+      "status": "MET",
+      "evidence": "governance/merge-legitimacy/MERGE_BYPASS_INVENTORY.json"
+    },
+    {
+      "criterion": "No merge execution introduced by this issue",
+      "status": "MET",
+      "evidence": "All artifacts are non-operative; workflows generate proofs only after merge completes"
+    }
+  ],
+  "implementation_matrix": [
+    {
+      "criterion": "PREO generation",
+      "status": "IMPLEMENTED",
+      "evidence_files": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/preo/PREO_SPEC.json",
+        "governance/preo/PREO.schema.json"
+      ]
+    },
+    {
+      "criterion": "Reviewed-object hash computation",
+      "status": "IMPLEMENTED",
+      "evidence_files": ["runtime/merge-object-hash.mjs"]
+    },
+    {
+      "criterion": "Stale review detection",
+      "status": "IMPLEMENTED",
+      "evidence_files": [
+        ".github/workflows/merge-proof.yml",
+        "governance/merge-legitimacy/MERGE_PROOF_SPEC.json"
+      ]
+    },
+    {
+      "criterion": "Merge proof generation",
+      "status": "IMPLEMENTED",
+      "evidence_files": [
+        ".github/workflows/merge-proof.yml",
+        "governance/merge-legitimacy/merge_proof_registry.jsonl"
+      ],
+      "proof_count": 42
+    },
+    {
+      "criterion": "Proof registry persistence (append-only via PR)",
+      "status": "IMPLEMENTED",
+      "evidence_files": ["governance/merge-legitimacy/merge_proof_registry.jsonl"],
+      "proof_count": 42
+    },
+    {
+      "criterion": "Replay protection",
+      "status": "IMPLEMENTED",
+      "evidence_files": [
+        "migrations/0004_execution_replay_protection.sql",
+        "migrations/0041_proof_replay_idempotency.sql"
+      ]
+    },
+    {
+      "criterion": "Bypass path classification",
+      "status": "IMPLEMENTED",
+      "evidence_files": ["governance/merge-legitimacy/MERGE_BYPASS_INVENTORY.json"],
+      "bypass_paths_total": 10,
+      "bypass_paths_closed": 1,
+      "bypass_paths_open": 9
+    },
+    {
+      "criterion": "PREO/SCO enforcement",
+      "status": "ADVISORY",
+      "evidence_files": [
+        ".github/workflows/merge-governance-check.yml",
+        "governance/runtime/BRANCH_PROTECTION_POLICY.json"
+      ],
+      "note": "Workflow runs; checks not required by branch protection"
+    },
+    {
+      "criterion": "Merge authorization",
+      "status": "NOT_IMPLEMENTED",
+      "note": "External dependency — requires GitHub branch protection activation (GAP-001)"
+    },
+    {
+      "criterion": "Fail-closed semantics",
+      "status": "IMPLEMENTED",
+      "evidence_files": [
+        "governance/merge-legitimacy/MERGE_PROOF_SPEC.json",
+        "governance/merge-legitimacy/MERGE_GOVERNANCE_RULES.json"
+      ],
+      "default_result": "MERGE_LEGITIMACY_NULL"
+    }
+  ],
+  "bypass_containment": {
+    "total_paths": 10,
+    "closed_paths": 1,
+    "open_paths": 9,
+    "paths": [
+      { "id": "MB-001", "description": "Direct push to main", "status": "OPEN", "depends_on": "GAP-001" },
+      { "id": "MB-002", "description": "Force push to main", "status": "OPEN", "depends_on": "GAP-001" },
+      { "id": "MB-003", "description": "Admin override", "status": "BREAK_GLASS", "depends_on": "GAP-002" },
+      { "id": "MB-004", "description": "Stale approval timing window", "status": "OPEN", "depends_on": "GAP-001" },
+      { "id": "MB-005", "description": "Merge without PREO", "status": "OPEN", "depends_on": "GAP-001" },
+      { "id": "MB-006", "description": "Merge without SCO", "status": "OPEN", "depends_on": "GAP-001" },
+      { "id": "MB-007", "description": "Workflow-dispatch merge surface", "status": "PARTIAL" },
+      { "id": "MB-008", "description": "Approval reuse across PRs", "status": "CLOSED", "closed_by": "PREO head_sha binding" },
+      { "id": "MB-009", "description": "Bot merge with elevated token", "status": "OPEN", "depends_on": "GAP-004" },
+      { "id": "MB-010", "description": "Merge queue combined SHA", "status": "OPEN", "depends_on": "GAP-003" }
+    ]
+  },
+  "closure_blocking_gaps": [
+    {
+      "gap_id": "GAP-001",
+      "title": "Branch Protection Enforcement Is Advisory Only",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks_closure": true,
+      "child_issue_slot": "CI-001",
+      "required_action": "Activate GitHub branch protection ruleset on main (external repository settings)"
+    },
+    {
+      "gap_id": "GAP-002",
+      "title": "Admin Bypass Cannot Be Prevented by Repository Code",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks_closure": true,
+      "child_issue_slot": null,
+      "required_action": "Organization-level policy or GitHub Enterprise enforcement (external)"
+    },
+    {
+      "gap_id": "GAP-003",
+      "title": "Merge Queue Combined SHA Not Covered by PREO",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks_closure": true,
+      "child_issue_slot": "CI-003",
+      "required_action": "Disable merge queue for main OR implement merge-queue PREO regeneration workflow"
+    },
+    {
+      "gap_id": "GAP-004",
+      "title": "Bot Merge Actor Not Classified or Authority-Bound",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks_closure": true,
+      "child_issue_slot": "CI-004",
+      "required_action": "Enumerate permitted bot actors; restrict bot token scope; classify bot-merged PRs"
+    },
+    {
+      "gap_id": "GAP-005",
+      "title": "No Merge Proof Generation Mechanism",
+      "severity": "HIGH",
+      "status": "CLOSED",
+      "blocks_closure": false,
+      "closed_evidence": "merge-proof.yml operational; 42 proofs in registry as of 2026-06-03"
+    },
+    {
+      "gap_id": "GAP-007",
+      "title": "Phase 1 Deploy Closure Not Yet Confirmed",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks_closure": true,
+      "child_issue_slot": null,
+      "required_action": "Verify Issue #1601 (Phase 1 deploy closure) is closed"
+    }
+  ],
+  "surface_classification_summary": {
+    "governed": 3,
+    "partial": 4,
+    "break_glass": 3,
+    "unknown": 1,
+    "total": 11
+  },
+  "proof_registry_summary": {
+    "total_entries": 42,
+    "first_entry": "PROOF-1712-eefe2771",
+    "first_merged_at": "2026-06-01",
+    "latest_entry": "PROOF-1807-b5be40a3",
+    "latest_merged_at": "2026-06-03",
+    "registry_path": "governance/merge-legitimacy/merge_proof_registry.jsonl"
+  },
+  "audit_artifacts_located": [
+    "governance/merge-legitimacy/MERGE_PROOF_SPEC.json",
+    "governance/merge-legitimacy/MERGE_SURFACE_INVENTORY.json",
+    "governance/merge-legitimacy/MERGE_BYPASS_INVENTORY.json",
+    "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json",
+    "governance/merge-legitimacy/APPROVAL_LINEAGE_BINDING_SPEC.json",
+    "governance/merge-legitimacy/MERGE_LINEAGE_MODEL.json",
+    "governance/merge-legitimacy/PR_GOVERNANCE_GAP_LIST.json",
+    "governance/merge-legitimacy/MERGE_GOVERNANCE_RULES.json",
+    "governance/merge-legitimacy/merge_proof_registry.jsonl",
+    "governance/merge-legitimacy/CLOSURE_RECOMMENDATION.md",
+    "governance/merge-legitimacy/RISK_CLASSIFICATION_RULES.json",
+    "governance/preo/PREO_SPEC.json",
+    "governance/preo/PREO.schema.json",
+    "governance/preo/PREO_FLOW.json",
+    "governance/preo/PREO_VALIDATION_RULES.json",
+    "governance/preo/MERGE_LEGITIMACY_CLOSURE_AUDIT_SPEC.json",
+    "governance/runtime/MERGE_GOVERNANCE_RULES.json",
+    "governance/runtime/BRANCH_PROTECTION_POLICY.json",
+    ".github/workflows/merge-governance-check.yml",
+    ".github/workflows/merge-proof.yml",
+    "runtime/merge-object-hash.mjs"
+  ],
+  "lineage_chain": [
+    { "stage": 1, "artifact": "MERGE_GOVERNANCE_RULES.json", "status": "COMPLETE" },
+    { "stage": 2, "artifact": "MERGE_PROOF_SPEC.json + MERGE_LINEAGE_MODEL.json", "status": "COMPLETE" },
+    { "stage": 3, "artifact": "merge-governance-check.yml (PREO/SCO)", "status": "IMPLEMENTED_ADVISORY" },
+    { "stage": 4, "artifact": "merge-proof.yml (post-merge proof)", "status": "IMPLEMENTED_OPERATIONAL" },
+    { "stage": 5, "artifact": "merge_proof_registry.jsonl (42 entries)", "status": "OPERATIONAL" },
+    { "stage": 6, "artifact": "BRANCH_PROTECTION_POLICY.json", "status": "DECLARED_NOT_ACTIVATED" },
+    { "stage": 7, "artifact": "MERGE_ACTOR_REGISTRY.json", "status": "PARTIAL_BOT_EMPTY" }
+  ]
+}
