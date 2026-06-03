@@ -143,10 +143,35 @@ test('proof schema conflict is represented explicitly as topology evidence', () 
 
 test('no canonical execution route expansion occurs', () => {
   const source = read('src/index.ts')
-  const routes = [...source.matchAll(/url\.pathname === "([^"]+)" && request\.method === "POST"/g)].map((match) => match[1])
+  const canonicalRoutesMatch = source.match(/const CANONICAL_RUNTIME_ROUTES = \[([^\]]+)\] as const/)
+  assert.ok(canonicalRoutesMatch, 'CANONICAL_RUNTIME_ROUTES declaration must be present')
+  const routes = [...canonicalRoutesMatch[1].matchAll(/"([^"]+)"/g)].map((match) => match[1])
   assert.deepEqual(new Set(routes), canonicalPostRoutes)
   assert.equal(routes.length, canonicalPostRoutes.size)
   assert.doesNotMatch(source, /url\.pathname === "\/proof\/propagate" && request\.method === "POST"/)
+})
+
+test('gateway tool compile is declared separately from canonical execution routes', () => {
+  const source = read('src/index.ts')
+  const inventory = JSON.parse(read('runtime/unauthorized_mutation_surface_inventory.json'))
+  const matrix = JSON.parse(read('runtime/MUTATION_SURFACE_EXHAUSTIVENESS.json'))
+  const route = inventory.surfaces.find((surface) => surface.surface_id === 'route:/gateway/tool/compile')
+  const matrixRoute = matrix.declared_surfaces.find((surface) => surface.surface_id === 'route:/gateway/tool/compile')
+
+  assert.match(source, /AGENT_TOOL_GATEWAY_COMPILE_ROUTE\s*=\s*"\/gateway\/tool\/compile"/)
+  assert.equal(canonicalPostRoutes.has('/gateway/tool/compile'), false)
+  assert.equal(route.surface_type, 'governed_gateway_compile_route')
+  assert.equal(route.compile_only, true)
+  assert.equal(route.mutation_capability, true)
+  assert.equal(route.execution_capability, false)
+  assert.equal(route.proof_generating, false)
+  assert.equal(route.deployment_capability, false)
+  assert.equal(route.creates_authority, false)
+  assert.deepEqual(route.issue_lineage, ['#1627', '#1773'])
+  assert.equal(route.closure_state, 'PARTIAL_CONTAINED')
+  assert.equal(route.containment_status, 'CONTAINED')
+  assert.equal(matrixRoute.canonical_execution_expansion, false)
+  assert.equal(matrixRoute.compile_only, true)
 })
 
 test('no deploy workflow bypass is introduced by topology evidence', () => {

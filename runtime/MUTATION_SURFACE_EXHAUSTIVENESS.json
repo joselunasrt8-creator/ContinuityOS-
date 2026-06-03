@@ -4,7 +4,7 @@
   "required_invariant": "INSERT / UPDATE / DELETE + undeclared execution surface → NULL",
   "classification_schema": {
     "AUTHORITATIVE": "canonical runtime routes that create binding state — session, continuity, authority, AEO, validation, execution, proof",
-    "EVIDENCE_ONLY": "append-only observability surfaces that cannot create authority or authorize execution",
+    "EVIDENCE_ONLY": "append-only observability and governed non-execution compile-only surfaces that cannot create authority, proof, deployment, or authorize execution",
     "NON_EXECUTABLE": "read-only or non-mutation-capable surfaces — observability routes, health, reconciliation reads"
   },
   "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
@@ -746,6 +746,150 @@
       "governance_bound": true,
       "replay_safe": true,
       "rationale": "agent_tool_invocation_registry is append-only proof-bound evidence for mutation-capable agent tool calls after canonical spine proof; it cannot create authority or execute without existing proof lineage"
+    },
+    {
+      "surface_id": "db_write:agent_tool_atao_registry",
+      "table": "agent_tool_atao_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/compile",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "gateway ATAO registry is append-only agent-tool authority-review output; compile path reads it and authority-review path forms it without execution authority"
+    },
+    {
+      "surface_id": "db_write:agent_tool_call_atao_registry",
+      "table": "agent_tool_call_atao_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/govern",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "agent tool call ATAO capture is evidence-only pre-authority observation; cannot authorize execution"
+    },
+    {
+      "surface_id": "db_write:agent_tool_observation_registry",
+      "table": "agent_tool_observation_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/intercept",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "gateway observation registry is proposal-space evidence only; no ATAO/AEO/execution authority"
+    },
+    {
+      "surface_id": "db_write:agent_tool_proposal_registry",
+      "table": "agent_tool_proposal_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/intercept",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "gateway proposal registry is pending authority-review evidence only; no ATAO/AEO/execution authority"
+    },
+    {
+      "surface_id": "db_write:authority_review_registry",
+      "table": "authority_review_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/authority/review",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "authority review registry records approved/rejected gateway review lineage; review approval alone does not execute or prove"
+    },
+    {
+      "surface_id": "db_write:govern_envelope_registry",
+      "table": "govern_envelope_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/govern",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "govern envelope registry records nonce-bound OpenClaw candidate evidence; non-authoritative and replay-neutral"
+    },
+    {
+      "surface_id": "db_write:govern_evidence_registry",
+      "table": "govern_evidence_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/govern",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "govern evidence registry records candidate admission evidence; non-authoritative and replay-neutral"
+    },
+    {
+      "surface_id": "db_write:govern_nonce_registry",
+      "table": "govern_nonce_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/govern",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "govern nonce registry records proposal nonce usage for replay visibility; cannot authorize execution"
+    },
+    {
+      "surface_id": "db_write:govern_nonce_registry_v2",
+      "table": "govern_nonce_registry_v2",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/govern",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "temporary nonce schema migration surface preserves replay visibility; non-authoritative"
+    },
+    {
+      "surface_id": "db_write:governed_tool_envelope_registry",
+      "table": "governed_tool_envelope_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/govern",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "governed tool envelope registry records non-operative/governed envelope lineage; cannot execute without canonical validation/proof"
+    },
+    {
+      "surface_id": "route:/gateway/tool/compile",
+      "table": null,
+      "operation": null,
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": null,
+      "gateway_route": "/gateway/tool/compile",
+      "issue_lineage": [
+        "#1627",
+        "#1773"
+      ],
+      "compile_only": true,
+      "mutation_capable": true,
+      "execution_capable": false,
+      "proof_generating": false,
+      "deployment_capable": false,
+      "creates_authority": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "closure_state": "PARTIAL_CONTAINED",
+      "containment_status": "CONTAINED",
+      "canonical_execution_expansion": false,
+      "rationale": "POST /gateway/tool/compile is a governed non-execution compile-only gateway route for approved agent-tool ATAO to canonical AEO compilation; it is not a canonical execution route and cannot execute, deploy, create proof, or create authority"
     }
   ],
   "scanner": {
@@ -764,7 +908,7 @@
   },
   "classification_counts": {
     "AUTHORITATIVE": 10,
-    "EVIDENCE_ONLY": 46,
+    "EVIDENCE_ONLY": 57,
     "NON_EXECUTABLE": 8
   },
   "closure_verification": {
