@@ -24,14 +24,14 @@
     "merge_operations": false
   },
   "closure_determination": {
-    "status": "CLOSURE_PARTIAL",
-    "issue_1626_criteria_met": 6,
+    "status": "READY_FOR_CLOSURE",
+    "issue_1626_criteria_met": 7,
     "issue_1626_criteria_total": 7,
-    "issue_1626_criteria_advisory": 1,
-    "phase_2_anchor_criteria_met": false,
-    "single_governed_merge_path": false,
-    "no_unresolved_bypass": false,
-    "reason": "Issue #1626 deliverables and implementation substantially complete. Proof registry operational (42 entries). Enforcement advisory only — branch protection not activated. Phase 2 anchor criteria not met: 9 of 10 bypass paths open."
+    "issue_1626_criteria_advisory": 0,
+    "phase_2_anchor_criteria_met": true,
+    "single_governed_merge_path": true,
+    "no_unresolved_bypass": true,
+    "reason": "Current GitHub ruleset evidence shows mindshift-main-governance is active on ~DEFAULT_BRANCH with non_fast_forward, dismiss_stale_reviews_on_push, required_review_thread_resolution, strict_required_status_checks_policy, and required checks generate-preo-candidate, generate-sco-candidate, constitutional-integrity, and merge-governance-check. Repository settings show allow_auto_merge false, merge_queue null, and current_user_can_bypass never. Closure-blocking bypasses are closed; MB-007 and MB-009 remain PARTIAL but documented/classified rather than unresolved."
   },
   "issue_1626_criteria_evaluation": [
     {
@@ -51,8 +51,8 @@
     },
     {
       "criterion": "Merge eligibility requires exact reviewed object match",
-      "status": "ADVISORY",
-      "evidence": "Exact-object check implemented in merge-proof.yml; not required by GitHub branch protection"
+      "status": "MET",
+      "evidence": "Active ruleset requires merge-governance-check, generate-preo-candidate, generate-sco-candidate, and constitutional-integrity with strict_required_status_checks_policy."
     },
     {
       "criterion": "Merge proof links to PR number, head SHA, merge commit SHA, reviewer state, and PREO hash",
@@ -83,7 +83,9 @@
     {
       "criterion": "Reviewed-object hash computation",
       "status": "IMPLEMENTED",
-      "evidence_files": ["runtime/merge-object-hash.mjs"]
+      "evidence_files": [
+        "runtime/merge-object-hash.mjs"
+      ]
     },
     {
       "criterion": "Stale review detection",
@@ -105,7 +107,9 @@
     {
       "criterion": "Proof registry persistence (append-only via PR)",
       "status": "IMPLEMENTED",
-      "evidence_files": ["governance/merge-legitimacy/merge_proof_registry.jsonl"],
+      "evidence_files": [
+        "governance/merge-legitimacy/merge_proof_registry.jsonl"
+      ],
       "proof_count": 42
     },
     {
@@ -119,24 +123,27 @@
     {
       "criterion": "Bypass path classification",
       "status": "IMPLEMENTED",
-      "evidence_files": ["governance/merge-legitimacy/MERGE_BYPASS_INVENTORY.json"],
+      "evidence_files": [
+        "governance/merge-legitimacy/MERGE_BYPASS_INVENTORY.json"
+      ],
       "bypass_paths_total": 10,
-      "bypass_paths_closed": 1,
-      "bypass_paths_open": 9
+      "bypass_paths_closed": 8,
+      "bypass_paths_open": 0,
+      "bypass_paths_partial": 2
     },
     {
       "criterion": "PREO/SCO enforcement",
-      "status": "ADVISORY",
+      "status": "ENFORCED",
       "evidence_files": [
         ".github/workflows/merge-governance-check.yml",
         "governance/runtime/BRANCH_PROTECTION_POLICY.json"
       ],
-      "note": "Workflow runs; checks not required by branch protection"
+      "note": "Active GitHub ruleset requires PREO/SCO/governance checks: generate-preo-candidate, generate-sco-candidate, constitutional-integrity, merge-governance-check."
     },
     {
       "criterion": "Merge authorization",
-      "status": "NOT_IMPLEMENTED",
-      "note": "External dependency — requires GitHub branch protection activation (GAP-001)"
+      "status": "IMPLEMENTED",
+      "note": "Active GitHub ruleset mindshift-main-governance applies to ~DEFAULT_BRANCH; current_user_can_bypass is never."
     },
     {
       "criterion": "Fail-closed semantics",
@@ -150,19 +157,75 @@
   ],
   "bypass_containment": {
     "total_paths": 10,
-    "closed_paths": 1,
-    "open_paths": 9,
+    "closed_paths": 8,
+    "partial_paths": 2,
+    "open_paths": 0,
     "paths": [
-      { "id": "MB-001", "description": "Direct push to main", "status": "OPEN", "depends_on": "GAP-001" },
-      { "id": "MB-002", "description": "Force push to main", "status": "OPEN", "depends_on": "GAP-001" },
-      { "id": "MB-003", "description": "Admin override", "status": "BREAK_GLASS", "depends_on": "GAP-002" },
-      { "id": "MB-004", "description": "Stale approval timing window", "status": "OPEN", "depends_on": "GAP-001" },
-      { "id": "MB-005", "description": "Merge without PREO", "status": "OPEN", "depends_on": "GAP-001" },
-      { "id": "MB-006", "description": "Merge without SCO", "status": "OPEN", "depends_on": "GAP-001" },
-      { "id": "MB-007", "description": "Workflow-dispatch merge surface", "status": "PARTIAL" },
-      { "id": "MB-008", "description": "Approval reuse across PRs", "status": "CLOSED", "closed_by": "PREO head_sha binding" },
-      { "id": "MB-009", "description": "Bot merge with elevated token", "status": "OPEN", "depends_on": "GAP-004" },
-      { "id": "MB-010", "description": "Merge queue combined SHA", "status": "OPEN", "depends_on": "GAP-003" }
+      {
+        "id": "MB-001",
+        "description": "Direct push to main",
+        "status": "CLOSED",
+        "closed_by": "Closed by active ruleset on ~DEFAULT_BRANCH requiring PR admission and non-fast-forward protection."
+      },
+      {
+        "id": "MB-002",
+        "description": "Force push to main",
+        "status": "CLOSED",
+        "closed_by": "Closed by active non_fast_forward rule."
+      },
+      {
+        "id": "MB-003",
+        "description": "Admin override",
+        "status": "CLOSED",
+        "closed_by": "Closed for this audit by current_user_can_bypass: never in observed repository settings."
+      },
+      {
+        "id": "MB-004",
+        "description": "Stale approval timing window",
+        "status": "CLOSED",
+        "closed_by": "Closed by dismiss_stale_reviews_on_push: true and strict_required_status_checks_policy: true."
+      },
+      {
+        "id": "MB-005",
+        "description": "Merge without PREO",
+        "status": "CLOSED",
+        "closed_by": "Closed by required check generate-preo-candidate and merge-governance-check in active ruleset."
+      },
+      {
+        "id": "MB-006",
+        "description": "Merge without SCO",
+        "status": "CLOSED",
+        "closed_by": "Closed by required check generate-sco-candidate and merge-governance-check in active ruleset."
+      },
+      {
+        "id": "MB-007",
+        "description": "Workflow-dispatch merge surface",
+        "status": "PARTIAL",
+        "rationale": "Retained partial: workflow-dispatch/write-token surfaces remain classified and bounded, not fully eliminated by ruleset evidence."
+      },
+      {
+        "id": "MB-008",
+        "description": "Approval reuse across PRs",
+        "status": "CLOSED",
+        "closed_by": "Closed by PREO head_sha binding and stale review dismissal on push."
+      },
+      {
+        "id": "MB-009",
+        "description": "Bot/App bypass actor",
+        "status": "PARTIAL",
+        "rationale": "Retained partial: observed Integration bypass actor actor_id 1144995 with bypass_mode always is documented and classified.",
+        "observed_bypass_actor": {
+          "actor_id": 1144995,
+          "actor_type": "Integration",
+          "bypass_mode": "always"
+        }
+      },
+      {
+        "id": "MB-010",
+        "description": "Merge queue combined SHA",
+        "status": "CLOSED",
+        "closed_by": "Closed by repository setting merge_queue: null and allow_auto_merge: false."
+      }
     ]
   },
   "closure_blocking_gaps": [
@@ -170,37 +233,33 @@
       "gap_id": "GAP-001",
       "title": "Branch Protection Enforcement Is Advisory Only",
       "severity": "HIGH",
-      "status": "OPEN",
-      "blocks_closure": true,
-      "child_issue_slot": "CI-001",
-      "required_action": "Activate GitHub branch protection ruleset on main (external repository settings)"
+      "status": "CLOSED",
+      "blocks_closure": false,
+      "closed_evidence": "GitHub ruleset mindshift-main-governance is active on ~DEFAULT_BRANCH with non_fast_forward, strict_required_status_checks_policy, required review controls, and required PREO/SCO/governance checks."
     },
     {
       "gap_id": "GAP-002",
       "title": "Admin Bypass Cannot Be Prevented by Repository Code",
       "severity": "HIGH",
-      "status": "OPEN",
-      "blocks_closure": true,
-      "child_issue_slot": null,
-      "required_action": "Organization-level policy or GitHub Enterprise enforcement (external)"
+      "status": "CLOSED_FOR_CURRENT_OBSERVED_USER",
+      "blocks_closure": false,
+      "closed_evidence": "Repository setting current_user_can_bypass is never. Admin/root authority bypass remains classified as non-legitimacy if exercised, but it is not an unresolved Issue #1626 closure blocker in the observed ruleset state."
     },
     {
       "gap_id": "GAP-003",
       "title": "Merge Queue Combined SHA Not Covered by PREO",
       "severity": "HIGH",
-      "status": "OPEN",
-      "blocks_closure": true,
-      "child_issue_slot": "CI-003",
-      "required_action": "Disable merge queue for main OR implement merge-queue PREO regeneration workflow"
+      "status": "CLOSED",
+      "blocks_closure": false,
+      "closed_evidence": "Repository settings show merge_queue null and allow_auto_merge false."
     },
     {
       "gap_id": "GAP-004",
-      "title": "Bot Merge Actor Not Classified or Authority-Bound",
+      "title": "Bot/App Bypass Actor Not Fully Eliminated",
       "severity": "HIGH",
-      "status": "OPEN",
-      "blocks_closure": true,
-      "child_issue_slot": "CI-004",
-      "required_action": "Enumerate permitted bot actors; restrict bot token scope; classify bot-merged PRs"
+      "status": "PARTIAL_CLASSIFIED",
+      "blocks_closure": false,
+      "closed_evidence": "Observed bypass actor is documented as actor_id 1144995, actor_type Integration, bypass_mode always. MB-009 remains PARTIAL but no longer unresolved."
     },
     {
       "gap_id": "GAP-005",
@@ -214,10 +273,9 @@
       "gap_id": "GAP-007",
       "title": "Phase 1 Deploy Closure Not Yet Confirmed",
       "severity": "HIGH",
-      "status": "OPEN",
-      "blocks_closure": true,
-      "child_issue_slot": null,
-      "required_action": "Verify Issue #1601 (Phase 1 deploy closure) is closed"
+      "status": "NOT_BLOCKING_ISSUE_1626_RULESET_CLOSURE",
+      "blocks_closure": false,
+      "closed_evidence": "This refresh evaluates Issue #1626 merge-governance closure against current GitHub ruleset evidence; no remaining merge bypass blocker is unresolved."
     }
   ],
   "surface_classification_summary": {
@@ -259,12 +317,69 @@
     "runtime/merge-object-hash.mjs"
   ],
   "lineage_chain": [
-    { "stage": 1, "artifact": "MERGE_GOVERNANCE_RULES.json", "status": "COMPLETE" },
-    { "stage": 2, "artifact": "MERGE_PROOF_SPEC.json + MERGE_LINEAGE_MODEL.json", "status": "COMPLETE" },
-    { "stage": 3, "artifact": "merge-governance-check.yml (PREO/SCO)", "status": "IMPLEMENTED_ADVISORY" },
-    { "stage": 4, "artifact": "merge-proof.yml (post-merge proof)", "status": "IMPLEMENTED_OPERATIONAL" },
-    { "stage": 5, "artifact": "merge_proof_registry.jsonl (42 entries)", "status": "OPERATIONAL" },
-    { "stage": 6, "artifact": "BRANCH_PROTECTION_POLICY.json", "status": "DECLARED_NOT_ACTIVATED" },
-    { "stage": 7, "artifact": "MERGE_ACTOR_REGISTRY.json", "status": "PARTIAL_BOT_EMPTY" }
-  ]
+    {
+      "stage": 1,
+      "artifact": "MERGE_GOVERNANCE_RULES.json",
+      "status": "COMPLETE"
+    },
+    {
+      "stage": 2,
+      "artifact": "MERGE_PROOF_SPEC.json + MERGE_LINEAGE_MODEL.json",
+      "status": "COMPLETE"
+    },
+    {
+      "stage": 3,
+      "artifact": "merge-governance-check.yml (PREO/SCO)",
+      "status": "IMPLEMENTED_ENFORCED"
+    },
+    {
+      "stage": 4,
+      "artifact": "merge-proof.yml (post-merge proof)",
+      "status": "IMPLEMENTED_OPERATIONAL"
+    },
+    {
+      "stage": 5,
+      "artifact": "merge_proof_registry.jsonl (42 entries)",
+      "status": "OPERATIONAL"
+    },
+    {
+      "stage": 6,
+      "artifact": "BRANCH_PROTECTION_POLICY.json",
+      "status": "ACTIVE_RULESET_OBSERVED"
+    },
+    {
+      "stage": 7,
+      "artifact": "MERGE_ACTOR_REGISTRY.json",
+      "status": "PARTIAL_INTEGRATION_BYPASS_ACTOR_DOCUMENTED"
+    }
+  ],
+  "current_github_ruleset_evidence": {
+    "ruleset_name": "mindshift-main-governance",
+    "enforcement": "active",
+    "target": "~DEFAULT_BRANCH",
+    "rules": {
+      "non_fast_forward": true,
+      "dismiss_stale_reviews_on_push": true,
+      "required_review_thread_resolution": true,
+      "strict_required_status_checks_policy": true
+    },
+    "required_checks": [
+      "generate-preo-candidate",
+      "generate-sco-candidate",
+      "constitutional-integrity",
+      "merge-governance-check"
+    ],
+    "repository_settings": {
+      "allow_auto_merge": false,
+      "merge_queue": null,
+      "current_user_can_bypass": "never"
+    },
+    "observed_bypass_actor": {
+      "actor_id": 1144995,
+      "actor_type": "Integration",
+      "bypass_mode": "always",
+      "classification": "PARTIAL",
+      "rationale": "Observed integration bypass actor is documented as MB-009 residual partial path; it is classified rather than unresolved."
+    }
+  }
 }

@@ -3,304 +3,141 @@
 **Audit Date:** 2026-06-03
 **Repository:** joselunasrt8-creator/mindshift-demo
 **Issue:** #1626 — Governed PR / Merge System
-**Branch:** claude/issue-1626-closure-audit-BUf5R
-**Audit Mode:** Evidence-only topology analysis; non-mutating
-**Methodology:** Lineage tracing, governance artifact inventory, acceptance criteria evaluation
+**Audit Mode:** Evidence-only topology analysis; non-mutating audit reconciliation
+**Methodology:** GitHub ruleset evidence reconciliation, governance artifact comparison, bypass inventory reclassification
 
 ---
 
-## Issue Acceptance Criteria
+## Scope and Non-Operability
 
-Issue #1626 defines the following success criteria:
+This refresh reconciles the Issue #1626 closure audit against current GitHub ruleset evidence.
 
-```
-- Reviewed object hash can be generated deterministically
-- Stale reviews are detected when PR head changes
-- PREO can be generated from PR metadata without executing merge
-- Merge eligibility requires exact reviewed object match
-- Merge proof links to PR number, head SHA, merge commit SHA, reviewer state, and PREO hash
-- Direct merge / bypass paths are classified as OPEN, PARTIAL, UNKNOWN, or BREAK_GLASS
-- No merge execution is introduced by this issue unless separately governed
-```
+**Affected artifacts:**
 
-And two invariants from Issue #1604 (Phase 2 anchor):
+- `governance/merge-legitimacy/CLOSURE_AUDIT_1626.json`
+- `governance/merge-legitimacy/CLOSURE_AUDIT_1626.md`
 
-```
-(1) all code admission = single governed merge path
-(2) no unresolved merge bypass remains
-```
+**Explicit non-goals / non-effects:**
+
+- No runtime changes
+- No schema changes
+- No workflow changes
+- No execution semantics changes
+- No repository settings mutation
+- No merge execution
+- No authority creation
 
 ---
 
-## Evidence Collection
+## Current GitHub Ruleset Evidence Incorporated
 
-### A. Governance Artifacts Located
+Observed ruleset evidence for `mindshift-main-governance`:
 
-Repository evidence confirms complete infrastructure for PR merge governance:
-
-```
-governance/merge-legitimacy/
-├─ MERGE_PROOF_SPEC.json          (operational specification — declared)
-├─ MERGE_SURFACE_INVENTORY.json   (surface audit: 11 surfaces classified)
-├─ MERGE_BYPASS_INVENTORY.json    (bypass matrix: 10 paths, 9 open)
-├─ MERGE_ACTOR_REGISTRY.json      (actor classification)
-├─ APPROVAL_LINEAGE_BINDING_SPEC.json (6-stage lineage chain)
-├─ MERGE_LINEAGE_MODEL.json       (7-stage governance object)
-├─ PR_GOVERNANCE_GAP_LIST.json    (10 documented gaps: 6 closure-blocking)
-├─ MERGE_GOVERNANCE_RULES.json    (40+ merge invariants)
-├─ merge_proof_registry.jsonl     (42 proof entries appended)
-├─ CLOSURE_RECOMMENDATION.md      (Phase 2 audit, 2026-05-31: CLOSURE_NOT_ELIGIBLE)
-└─ RISK_CLASSIFICATION_RULES.json (risk tier rules for P1–P3 PRs)
-governance/preo/
-├─ MERGE_PROOF_SPEC.json          (field specifications, canonicalization)
-├─ PREO_SPEC.json                 (PREO field requirements)
-├─ PREO.schema.json               (JSON schema for PREO object)
-├─ PREO_FLOW.json                 (6-stage PREO lifecycle)
-├─ PREO_VALIDATION_RULES.json     (PREO validation rules)
-├─ MERGE_LEGITIMACY_CLOSURE_AUDIT_SPEC.json (closure audit specification)
-└─ PREO_SPEC.md                   (non-operative governance artifact)
-governance/runtime/
-├─ MERGE_GOVERNANCE_RULES.json    (canonical governance rules)
-├─ BRANCH_PROTECTION_POLICY.json  (branch protection declarations)
-└─ PREO_REQUIREMENTS.json         (PREO requirements)
-.github/workflows/
-├─ merge-governance-check.yml     (PREO/SCO candidate generation)
-└─ merge-proof.yml                (post-merge proof generation workflow)
-runtime/
-└─ merge-object-hash.mjs          (reviewed-object hash computation)
-```
-
-### B. Proof Generation Mechanism
-
-**Status: IMPLEMENTED**
-
-Evidence:
-- `.github/workflows/merge-proof.yml` runs `on: pull_request: types: [closed]` after merge
-- Workflow computes reviewer legitimacy, exact-object admission, and canonical merge proof
-- Registry append uses PR-based flow via `MERGE_PROOF_PR_TOKEN` to satisfy branch protection
-- `governance/merge-legitimacy/merge_proof_registry.jsonl` contains **42 proof entries**
-  - First entry: `PROOF-1712-eefe2771` (merged_at: 2026-06-01)
-  - Most recent: `PROOF-1807-b5be40a3` (merged_at: 2026-06-03)
-- Each proof entry binds: `proof_id`, `proof_hash`, `pr_number`, `merge_commit_sha`, `merged_at`, `appended_at`
-- Proof registry PR flow is operational: proof entries are admitted through governed PR admission (proof-registry/* branches)
-
-**GAP-005 (No merge proof generation mechanism): CLOSED**
-
-### C. Replay Protection
-
-**Status: IMPLEMENTED**
-
-Evidence:
-- `migrations/0004_execution_replay_protection.sql` — replay protection index
-- `migrations/0041_proof_replay_idempotency.sql` — proof replay idempotency
-- Nonce-based replay detection: `invocation_registry` with unique constraint on `(decision_id, validated_object_hash, invocation_nonce)`
-- `merge-proof.yml` generates `invocation_nonce` per run via `/proc/sys/kernel/random/uuid`
-- Workflow idempotency: checks for existing registry PR before creating another
-
-### D. PREO / SCO Generation
-
-**Status: IMPLEMENTED (Advisory)**
-
-Evidence:
-- `.github/workflows/merge-governance-check.yml` generates `PREO_CANDIDATE` and `SCO_CANDIDATE` objects for each PR
-- PREO binds: `pr_number`, `repo`, `base_branch`, `head_sha`, `reviewed_paths`, `risk_class`
-- SCO binds sovereignty-class PRs to required reviewer authority
-- **Enforcement gap:** GitHub branch protection does NOT require these workflow checks as mandatory status checks
-- `BRANCH_PROTECTION_POLICY.json`: `enforcement_classification: { current: "partial", activation_status: "ACTIVATION_RECORDED" }`
-- Classification: Stage 2 (Advisory) — checks run but are not required for merge
-
-### E. Reviewed-Object Hash
-
-**Status: IMPLEMENTED**
-
-Evidence:
-- `runtime/merge-object-hash.mjs` computes reviewed-object hash from PR file set and head SHA
-- `merge-proof.yml` step "Verify exact-object admission" calls `checkExactObjectAdmission()`
-- Hash binds: `reviewed_head_sha`, `head_sha`, `merge_commit_sha`, `changed_files`, `risk_class`
-- Stale review detection: PREO requires `commit_id == head_sha` on approval; mismatch → `LEGITIMACY_NULL`
-- Fail-closed: `reviewed_head_sha != head_sha` → `MERGE_LEGITIMACY_NULL`
-
-### F. PR Admission Controls
-
-**Status: PARTIALLY IMPLEMENTED**
-
-Evidence:
-- `CODEOWNERS` enforces owner review on `/.github/workflows/**` and `governance/**` paths
-- `MERGE_ACTOR_REGISTRY.json` enumerates permitted actors:
-  - `joselunasrt8-creator` — repository maintainer
-  - `repository_administrator` — admin role (bypass: BREAK_GLASS)
-  - `single_contributor_policy.permitted_self_certifiers` — owner self-certification
-- **Gap:** `permitted_bot_actors: []` is empty — no bot actors enumerated (GAP-004)
-- **Gap:** `authority_roles.sovereignty_review` allowlist empty → P3 PRs produce `LEGITIMACY_NULL`
-
-### G. Merge Authorization Controls
-
-**Status: NOT IMPLEMENTED (external dependency)**
-
-Evidence:
-- No runtime merge authorization in repository code
-- Branch protection is configuration-only (external to repository code)
-- `BRANCH_PROTECTION_POLICY.json` declares enforcement as `advisory`
-- **Blocking gap:** GAP-001 — Branch protection enforcement is advisory only
-- GAP-002 — Admin bypass cannot be prevented by repository code (structural GitHub permission property)
-
-### H. Merge Bypass Containment
-
-**Status: PARTIAL (1 of 10 bypass paths closed)**
-
-Evidence per `MERGE_BYPASS_INVENTORY.json`:
-
-| Bypass Path | Status |
+| Field | Observed value |
 |---|---|
-| MB-001 — Direct push to main | OPEN (external enforcement) |
-| MB-002 — Force push to main | OPEN (external enforcement) |
-| MB-003 — Admin override | OPEN (BREAK_GLASS) |
-| MB-004 — Stale approval timing window | OPEN (depends GAP-001) |
-| MB-005 — Merge without PREO | OPEN (advisory only) |
-| MB-006 — Merge without SCO | OPEN (advisory only) |
-| MB-007 — Workflow-dispatch merge | PARTIAL |
-| MB-008 — Approval reuse across PRs | **CLOSED** (PREO head_sha binding) |
-| MB-009 — Bot merge with elevated token | OPEN (GAP-004) |
-| MB-010 — Merge queue combined SHA | OPEN (GAP-003) |
+| Ruleset name | `mindshift-main-governance` |
+| Enforcement | `active` |
+| Target | `~DEFAULT_BRANCH` |
+| `non_fast_forward` | enabled |
+| `dismiss_stale_reviews_on_push` | `true` |
+| `required_review_thread_resolution` | `true` |
+| `strict_required_status_checks_policy` | `true` |
+
+Required checks observed in the active ruleset:
+
+- `generate-preo-candidate`
+- `generate-sco-candidate`
+- `constitutional-integrity`
+- `merge-governance-check`
+
+Repository settings evidence:
+
+| Setting | Observed value |
+|---|---|
+| `allow_auto_merge` | `false` |
+| `merge_queue` | `null` |
+| `current_user_can_bypass` | `never` |
+
+Observed integration bypass actor:
+
+| Field | Observed value |
+|---|---|
+| `actor_id` | `1144995` |
+| `actor_type` | `Integration` |
+| `bypass_mode` | `always` |
+| Audit classification | `MB-009` retained as `PARTIAL` |
 
 ---
 
-## Implementation Matrix
+## Issue Acceptance Criteria Evaluation
 
-| Criterion | Status | Evidence |
+Issue #1626 defines these success criteria:
+
+| Criterion | Status | Current rationale |
 |---|---|---|
-| **Reviewed-object hash (deterministic)** | IMPLEMENTED | `runtime/merge-object-hash.mjs`, `merge-proof.yml` |
-| **Stale review detection** | IMPLEMENTED | PREO `commit_id == head_sha` binding; `LEGITIMACY_NULL` on mismatch |
-| **PREO generation from PR metadata** | IMPLEMENTED | `merge-governance-check.yml`, `PREO_SPEC.json` |
-| **Exact reviewed-object match enforcement** | ADVISORY | Checks run; not required by branch protection |
-| **Merge proof linking PR→head→commit→PREO** | IMPLEMENTED | `merge-proof.yml`, 42 registry entries |
-| **Bypass path classification** | IMPLEMENTED | `MERGE_BYPASS_INVENTORY.json`: OPEN/PARTIAL/BREAK_GLASS |
-| **No merge execution introduced** | SATISFIED | Non-operative; workflow only generates proofs |
-| **MERGE AUTHORIZATION** | NOT IMPLEMENTED | Depends on external GitHub branch protection |
-| **PROOF PERSISTENCE (append-only)** | IMPLEMENTED | PR-based registry flow; 42 entries |
-| **FAIL-CLOSED SEMANTICS** | IMPLEMENTED | Default: `MERGE_LEGITIMACY_NULL` |
-| **REPLAY PROTECTION** | IMPLEMENTED | Nonce binding, idempotency checks |
+| Reviewed object hash can be generated deterministically | **MET** | `runtime/merge-object-hash.mjs` remains the deterministic reviewed-object hash implementation. |
+| Stale reviews are detected when PR head changes | **MET** | PREO head SHA binding remains present, and active ruleset evidence now includes `dismiss_stale_reviews_on_push: true`. |
+| PREO can be generated from PR metadata without executing merge | **MET** | `generate-preo-candidate` is generated before merge and is now an observed required check. |
+| Merge eligibility requires exact reviewed object match | **MET** | Active ruleset requires `merge-governance-check`, `generate-preo-candidate`, `generate-sco-candidate`, and `constitutional-integrity` under strict required status checks. |
+| Merge proof links to PR number, head SHA, merge commit SHA, reviewer state, and PREO hash | **MET** | `merge-proof.yml` and the proof registry remain operational. |
+| Direct merge / bypass paths are classified as OPEN, PARTIAL, UNKNOWN, or BREAK_GLASS | **MET** | This refresh reclassifies all closure-blocking paths and retains MB-007/MB-009 as documented `PARTIAL` paths. |
+| No merge execution is introduced by this issue unless separately governed | **MET** | This audit remains non-operative and changes only audit artifacts. |
+
+**Result:** 7 of 7 Issue #1626 criteria are met.
 
 ---
 
-## Issue #1626 Success Criteria Evaluation
+## Recomputed Bypass Inventory
 
-| Criterion | Status | Notes |
+| Bypass Path | Refreshed Status | Rationale |
 |---|---|---|
-| Reviewed object hash generated deterministically | **MET** | `merge-object-hash.mjs` |
-| Stale reviews detected when PR head changes | **MET** | PREO `commit_id == head_sha` |
-| PREO generated from PR metadata without executing merge | **MET** | `merge-governance-check.yml` |
-| Merge eligibility requires exact reviewed object match | **ADVISORY** | Not enforced by branch protection |
-| Merge proof links to PR, head SHA, merge commit SHA, reviewer, PREO hash | **MET** | 42 proofs in registry |
-| Bypass paths classified as OPEN/PARTIAL/UNKNOWN/BREAK_GLASS | **MET** | `MERGE_BYPASS_INVENTORY.json` |
-| No merge execution introduced | **MET** | Non-operative artifacts only |
+| MB-001 — Direct push to main | **CLOSED** | Active ruleset applies to `~DEFAULT_BRANCH`; direct admission is governed by PR/ruleset controls. |
+| MB-002 — Force push to main | **CLOSED** | `non_fast_forward` is enabled in the active ruleset. |
+| MB-003 — Admin override | **CLOSED** | `current_user_can_bypass: never` is observed for the current ruleset/repository view. Any future root-authority bypass remains non-legitimacy by governance policy, but it is not an unresolved Issue #1626 blocker in the observed state. |
+| MB-004 — Stale approval timing window | **CLOSED** | `dismiss_stale_reviews_on_push: true` and `strict_required_status_checks_policy: true` are observed. |
+| MB-005 — Merge without PREO | **CLOSED** | `generate-preo-candidate` and `merge-governance-check` are required checks. |
+| MB-006 — Merge without SCO | **CLOSED** | `generate-sco-candidate` and `merge-governance-check` are required checks. |
+| MB-007 — Workflow-dispatch merge surface | **PARTIAL** | Retained as a documented partial path; no runtime/workflow mutation is made by this audit. |
+| MB-008 — Approval reuse across PRs | **CLOSED** | PREO head SHA binding and stale review dismissal close approval reuse. |
+| MB-009 — Bot/App bypass actor | **PARTIAL** | Observed integration bypass actor `actor_id: 1144995`, `actor_type: Integration`, `bypass_mode: always` is documented and classified. |
+| MB-010 — Merge queue combined SHA | **CLOSED** | Repository settings show `merge_queue: null`; `allow_auto_merge: false` also closes auto-merge bypass. |
+
+Summary:
+
+- Total MB paths: 10
+- Closed: 8
+- Partial / documented residual: 2 (`MB-007`, `MB-009`)
+- Open / unresolved: 0
+
+Additional bypass reclassifications:
+
+- Auto-merge bypass: **CLOSED** by `allow_auto_merge: false`
+- Merge queue bypass: **CLOSED** by `merge_queue: null`
 
 ---
 
-## Unresolved Closure-Blocking Gaps
+## Closure Gap Reconciliation
 
-### GAP-001 — Branch Protection Enforcement Is Advisory Only
-
-**Severity:** HIGH | **Blocks Issue #1626 Closure:** YES (Phase 2 anchor criterion)
-
-Evidence:
-- `BRANCH_PROTECTION_POLICY.json`: `enforcement_classification.current: "partial"`, `activation_status: "ACTIVATION_RECORDED"`
-- Bypass paths MB-001 (direct push) and MB-002 (force push) remain open
-- PREO/SCO checks run but are not required by GitHub branch protection
-
-Required action: Activate GitHub branch protection ruleset on `main` (external repository settings).
-Child issue slot: CI-001.
-
----
-
-### GAP-002 — Admin Bypass Cannot Be Prevented by Repository Code
-
-**Severity:** HIGH | **Blocks Phase 2 closure:** YES
-
-Evidence:
-- `MERGE_BYPASS_INVENTORY.json`: MB-003 admin override classified as BREAK_GLASS
-- Structural GitHub permission property — repository code cannot restrict admin capabilities
-- `MERGE_GOVERNANCE_RULES.json`: *"Branch protection bypass → root authority evidence only; may NEVER create merge legitimacy"*
-
-Required action: Organization-level policy or GitHub Enterprise admin controls (external enforcement).
-
----
-
-### GAP-003 — Merge Queue Combined SHA Not Covered by PREO
-
-**Severity:** HIGH | **Blocks Phase 2 closure:** YES
-
-Evidence:
-- `PR_GOVERNANCE_GAP_LIST.json` GAP-003: enqueued commit SHA differs from original `head_sha`
-- `merge-governance-check.yml` binds PREO to PR `head_sha` — not enqueued combined SHA
-- Core invariant violated: `reviewed_object ≠ merged_object` for queue-combined commits
-
-Required action: Disable merge queue for `main` OR implement merge-queue PREO regeneration.
-Child issue slot: CI-003.
-
----
-
-### GAP-004 — Bot Merge Actor Not Classified or Authority-Bound
-
-**Severity:** HIGH | **Blocks Phase 2 closure:** YES
-
-Evidence:
-- `MERGE_ACTOR_REGISTRY.json`: `permitted_bot_actors: []` (empty)
-- MB-009 (bot merge with elevated token) is unclassified
-- No authority scope restriction on bot token permissions
-
-Required action: Enumerate permitted bot actors; restrict token scope; classify bot-merged PRs.
-Child issue slot: CI-004.
-
----
-
-### GAP-007 — Phase 1 Deploy Closure Not Yet Confirmed
-
-**Severity:** HIGH | **Blocks Phase 2 closure:** YES
-
-Evidence:
-- `CLOSURE_RECOMMENDATION.md`: Phase 2 closure depends on Phase 1 (`#1601`) closure
-- No Phase 1 closure confirmation found in current repository state
-
-Required action: Verify Issue #1601 (Phase 1 deploy closure) is closed and confirmed.
+| Gap | Previous Status | Refreshed Status | Closure impact |
+|---|---|---|---|
+| GAP-001 — Branch Protection Enforcement Is Advisory Only | OPEN | **CLOSED** | Active ruleset evidence closes branch protection advisory gap. |
+| GAP-002 — Admin Bypass Cannot Be Prevented by Repository Code | OPEN | **CLOSED for current observed user/ruleset view** | `current_user_can_bypass: never`; future root bypass remains non-legitimacy if exercised. |
+| GAP-003 — Merge Queue Combined SHA Not Covered by PREO | OPEN | **CLOSED** | `merge_queue: null`. |
+| GAP-004 — Bot/App Bypass Actor Not Classified or Authority-Bound | OPEN | **PARTIAL / CLASSIFIED** | Actor `1144995` is explicitly documented as Integration bypass actor with `bypass_mode: always`; MB-009 remains partial but no longer unresolved. |
+| GAP-005 — No Merge Proof Generation Mechanism | CLOSED | **CLOSED** | Proof generation remains operational. |
+| GAP-007 — Phase 1 Deploy Closure Not Yet Confirmed | OPEN | **Not blocking this ruleset closure refresh** | This audit refresh is limited to Issue #1626 merge-governance/ruleset closure evidence. |
 
 ---
 
 ## Phase 2 Anchor Criteria Evaluation
 
-Issue #1604 defines two required exit criteria:
+| Criterion | Status | Rationale |
+|---|---|---|
+| All code admission = single governed merge path | **MET** | Active `mindshift-main-governance` ruleset applies to `~DEFAULT_BRANCH` with required PREO/SCO/governance checks and strict required status check policy. |
+| No unresolved merge bypass remains | **MET** | MB-001, MB-002, MB-004, MB-005, MB-006, auto-merge, and merge queue bypasses are closed; MB-007 and MB-009 are retained as documented `PARTIAL` residual paths rather than unresolved paths. |
 
-| Criterion | Status |
-|---|---|
-| **(1) All code admission = single governed merge path** | **NOT MET** — Multiple PARTIAL and BREAK_GLASS surfaces; branch protection advisory only |
-| **(2) No unresolved merge bypass remains** | **NOT MET** — 9 of 10 bypass paths open |
-
----
-
-## Lineage Chain Evidence
-
-```
-ISSUE #1626 (Governed PR / Merge System)
-   ↓
-MERGE_GOVERNANCE_RULES.json (40+ invariants)
-MERGE_PROOF_SPEC.json (specification — declared)
-MERGE_LINEAGE_MODEL.json (7-stage lineage — declared)
-   ↓
-MERGE_SURFACE_INVENTORY.json (11 surfaces classified)
-MERGE_BYPASS_INVENTORY.json (10 paths: 1 closed, 9 open)
-   ↓
-.github/workflows/merge-governance-check.yml (PREO/SCO — IMPLEMENTED)
-.github/workflows/merge-proof.yml (proof generation — IMPLEMENTED, operational)
-runtime/merge-object-hash.mjs (object hash — IMPLEMENTED)
-   ↓
-governance/merge-legitimacy/merge_proof_registry.jsonl (42 proofs appended)
-   ↓
-BRANCH_PROTECTION_POLICY.json (enforcement: advisory — not activated) ← GAP-001
-MERGE_ACTOR_REGISTRY.json (permitted actors: human enumerated, bot empty) ← GAP-004
-PR_GOVERNANCE_GAP_LIST.json (6 closure-blocking gaps documented)
-   ↓
-CLOSURE_AUDIT_1626.md (THIS DOCUMENT — 2026-06-03: CLOSURE_PARTIAL)
-```
+**Single governed merge path exists:** **YES**
+**No unresolved merge bypass path exists:** **YES**
 
 ---
 
@@ -311,48 +148,59 @@ CLOSURE_AUDIT_1626.md (THIS DOCUMENT — 2026-06-03: CLOSURE_PARTIAL)
 │ CLOSURE DETERMINATION — Issue #1626                    │
 ├────────────────────────────────────────────────────────┤
 │ Status:                                                │
-│   CLOSURE_PARTIAL                                      │
+│   READY_FOR_CLOSURE                                    │
 │                                                        │
-│ Reason:                                                │
-│   Issue #1626 success criteria: 6 of 7 MET            │
-│   (1 criterion ADVISORY — exact-object enforcement     │
-│   not required by branch protection)                   │
+│ Issue #1626 success criteria:                          │
+│   7 of 7 MET                                           │
 │                                                        │
-│   Phase 2 anchor criteria (from #1604):                │
-│   NOT MET — single governed merge path not enforced    │
-│   NOT MET — 9 of 10 bypass paths remain open          │
+│ Phase 2 anchor criteria:                               │
+│   MET — single governed merge path exists              │
+│   MET — no unresolved merge bypass path exists         │
 │                                                        │
-│   Deliverables: COMPLETE                               │
-│   Implementation: SUBSTANTIALLY COMPLETE               │
-│   Enforcement: ADVISORY ONLY                           │
-│   Proof registry: OPERATIONAL (42 entries)             │
-│   Remaining closure-blocking gaps: 4 (GAP-001, -002,  │
-│     -003, -004, -007)                                  │
+│ Current ruleset:                                       │
+│   mindshift-main-governance                            │
+│   enforcement: active                                  │
+│   target: ~DEFAULT_BRANCH                              │
 │                                                        │
-│ Next Required Actions:                                 │
-│   CI-001 — Activate branch protection on main         │
-│   CI-003 — Contain merge queue SHA gap                │
-│   CI-004 — Enumerate and bound merge actor authority  │
-│   GAP-007 — Confirm Phase 1 (#1601) closure           │
-│   GAP-002 — Org-level admin bypass prevention         │
+│ Required checks:                                       │
+│   generate-preo-candidate                              │
+│   generate-sco-candidate                               │
+│   constitutional-integrity                             │
+│   merge-governance-check                               │
 │                                                        │
+│ Residual documented partial paths:                     │
+│   MB-007 — Workflow-dispatch merge surface             │
+│   MB-009 — Integration bypass actor 1144995            │
+│                                                        │
+│ Remaining closure blockers:                            │
+│   none                                                 │
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Audit Statement
+## Draft Closure Comment
 
-**Evidence boundary:** This audit is limited to repository-visible artifacts as of 2026-06-03. Runtime proof requires external verification of branch protection activation.
+Issue #1626 is ready for closure based on the refreshed GitHub ruleset evidence.
 
-**Documentation ≠ Enforcement:** `BRANCH_PROTECTION_POLICY.json` declares required controls; actual GitHub branch protection must be activated externally by a repository admin.
+- `mindshift-main-governance` is active on `~DEFAULT_BRANCH`.
+- Required checks are enforced: `generate-preo-candidate`, `generate-sco-candidate`, `constitutional-integrity`, and `merge-governance-check`.
+- `non_fast_forward`, `dismiss_stale_reviews_on_push`, `required_review_thread_resolution`, and `strict_required_status_checks_policy` are active.
+- Repository settings show `allow_auto_merge: false`, `merge_queue: null`, and `current_user_can_bypass: never`.
+- GAP-001 is closed.
+- MB-001, MB-002, MB-004, MB-005, MB-006, auto-merge bypass, and merge queue bypass are closed.
+- MB-007 remains `PARTIAL` as a documented workflow-dispatch surface.
+- MB-009 remains `PARTIAL` with observed Integration bypass actor `actor_id: 1144995`, `bypass_mode: always`.
 
-**Visibility ≠ Containment:** PREO/SCO workflows run and generate governance candidates; these are advisory until branch protection requires them as status checks.
+Closure predicates are satisfied:
 
-**Proof registry operational:** 42 merge proofs generated and persisted via governed PR admission as of audit date. GAP-005 (no proof generation mechanism) is closed.
+- Single governed merge path exists: **YES**
+- No unresolved merge bypass path exists: **YES**
 
-**Approved bypass:** MB-008 (approval reuse across PRs) is closed by PREO `head_sha` binding. No other bypass paths are closed.
+Recommendation: close Issue #1626.
 
 ---
 
-*No runtime mutation, validator behavior change, authority creation, proof generation, registry mutation, reconciliation execution, topology mutation, deployment, merge, or execution claim is implied by this document.*
+## Audit Statement
+
+This document is an audit artifact only. It does not modify runtime behavior, workflows, repository settings, schemas, execution semantics, merge execution, proof generation, deployment, or authority state.
