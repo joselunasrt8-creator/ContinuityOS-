@@ -15,7 +15,11 @@ const predicateRegistryLib = readFileSync(
   new URL('../src/lib/predicate-registry.ts', import.meta.url),
   'utf8'
 )
-const { resolvePredicateDefinition } = await import('../src/lib/predicate-registry.ts')
+const purityMigration = readFileSync(
+  new URL('../migrations/0070_predicate_definition_purity.sql', import.meta.url),
+  'utf8'
+)
+const { resolvePredicateDefinition, validatePredicateDefinitionPurity } = await import('../src/lib/predicate-registry.ts')
 
 function makeRegistryDB(rows) {
   return {
@@ -51,6 +55,7 @@ function predicateDefinition(overrides = {}) {
       'check_read_only_scope',
       'check_exact_object_hash'
     ]),
+    side_effects_allowed: false,
     created_at: '2026-06-02T00:00:00.000Z',
     ...overrides
   }
@@ -66,6 +71,16 @@ test('migration 0069 creates canonical predicate_registry surface', () => {
   assert.match(migration, /created_at\s+TEXT NOT NULL/)
 })
 
+test('migration 0070 adds explicit predicate purity metadata without execution semantics', () => {
+  assert.match(purityMigration, /ALTER TABLE predicate_registry/)
+  assert.match(purityMigration, /ADD COLUMN side_effects_allowed TEXT NOT NULL DEFAULT 'false'/)
+  assert.match(purityMigration, /CHECK \(side_effects_allowed IN \('false','true'\)\)/)
+  assert.match(purityMigration, /does not load predicate implementations/i)
+  assert.match(purityMigration, /execute predicates/i)
+  assert.match(purityMigration, /create proof/i)
+  assert.match(purityMigration, /execution eligibility/i)
+})
+
 test('migration 0069 is topology-only and append-only', () => {
   assert.match(migration, /idx_predicate_registry_set_status/)
   assert.match(migration, /predicate_registry_append_only_update/)
@@ -78,6 +93,8 @@ test('migration 0069 is topology-only and append-only', () => {
 test('predicate registry lib exports pure topology lookup boundary and non-goals', () => {
   assert.match(predicateRegistryLib, /export type PredicateDefinition/)
   assert.match(predicateRegistryLib, /export async function resolvePredicateDefinition/)
+  assert.match(predicateRegistryLib, /export function validatePredicateDefinitionPurity/)
+  assert.match(predicateRegistryLib, /PREDICATE_PURITY_VIOLATION/)
   assert.match(predicateRegistryLib, /Topology-only lookup/)
   assert.match(predicateRegistryLib, /no predicate execution or evaluation/)
   assert.match(predicateRegistryLib, /no authority creation, reservation, or execution authorization/)
@@ -149,7 +166,8 @@ test('TC-09 valid ACTIVE definition → deterministic success', async () => {
       'check_surface_type',
       'check_read_only_scope',
       'check_exact_object_hash'
-    ]
+    ],
+    side_effects_allowed: false
   })
 })
 
@@ -186,4 +204,82 @@ test('TC-13 resolution does not imply Ω validator execution', async () => {
   assert.equal(Object.hasOwn(result, 'omega_validator_result'), false)
   assert.equal(Object.hasOwn(result, 'proof_id'), false)
   assert.doesNotMatch(predicateRegistryLib, /proof_registry|omegaValidator|runOmega|validateOmega/)
+})
+
+
+test('TC-14 missing side_effects_allowed → NULL PREDICATE_PURITY_VIOLATION before implementation load', async () => {
+  let implementationLoaded = false
+  let predicateExecuted = false
+  const result = validatePredicateDefinitionPurity(
+    await resolvePredicateDefinition('agent_tool_filesystem_read_predicates_v1', makeRegistryDB([
+      predicateDefinition({ side_effects_allowed: undefined })
+    ])),
+    () => {
+      implementationLoaded = true
+      predicateExecuted = true
+      return { result: 'NEXT_VALIDATION_PHASE' }
+    }
+  )
+
+  assert.deepEqual(result, {
+    result: 'NULL',
+    reason: 'PREDICATE_PURITY_VIOLATION',
+    creates_proof: false,
+    creates_execution_eligibility: false
+  })
+  assert.equal(implementationLoaded, false)
+  assert.equal(predicateExecuted, false)
+})
+
+test('TC-15 side_effects_allowed true → NULL PREDICATE_PURITY_VIOLATION before implementation load', async () => {
+  let implementationLoaded = false
+  let predicateExecuted = false
+  const result = validatePredicateDefinitionPurity(
+    await resolvePredicateDefinition('agent_tool_filesystem_read_predicates_v1', makeRegistryDB([
+      predicateDefinition({ side_effects_allowed: true })
+    ])),
+    () => {
+      implementationLoaded = true
+      predicateExecuted = true
+      return { result: 'NEXT_VALIDATION_PHASE' }
+    }
+  )
+
+  assert.equal(result.result, 'NULL')
+  assert.equal(result.reason, 'PREDICATE_PURITY_VIOLATION')
+  assert.equal(result.creates_proof, false)
+  assert.equal(result.creates_execution_eligibility, false)
+  assert.equal(implementationLoaded, false)
+  assert.equal(predicateExecuted, false)
+})
+
+test('TC-16 side_effects_allowed false → proceeds to next validation phase only', async () => {
+  let nextValidationCalls = 0
+  const result = validatePredicateDefinitionPurity(
+    await resolvePredicateDefinition('agent_tool_filesystem_read_predicates_v1', makeRegistryDB([predicateDefinition()])),
+    (purePredicateDefinition) => {
+      nextValidationCalls += 1
+      assert.equal(purePredicateDefinition.side_effects_allowed, false)
+      return Object.freeze({ result: 'NEXT_VALIDATION_PHASE', creates_proof: false, creates_execution_eligibility: false })
+    }
+  )
+
+  assert.deepEqual(result, { result: 'NEXT_VALIDATION_PHASE', creates_proof: false, creates_execution_eligibility: false })
+  assert.equal(nextValidationCalls, 1)
+})
+
+test('TC-17 purity failure does not create proof or execution eligibility', async () => {
+  const result = validatePredicateDefinitionPurity(
+    await resolvePredicateDefinition('agent_tool_filesystem_read_predicates_v1', makeRegistryDB([
+      predicateDefinition({ side_effects_allowed: true })
+    ])),
+    () => ({ result: 'VALID', proof_id: 'proof:should-not-exist', execution_eligible: true })
+  )
+
+  assert.equal(result.result, 'NULL')
+  assert.equal(result.reason, 'PREDICATE_PURITY_VIOLATION')
+  assert.equal(result.creates_proof, false)
+  assert.equal(result.creates_execution_eligibility, false)
+  assert.equal(Object.hasOwn(result, 'proof_id'), false)
+  assert.equal(Object.hasOwn(result, 'execution_eligible'), false)
 })
