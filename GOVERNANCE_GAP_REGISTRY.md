@@ -116,10 +116,12 @@ The purpose of this registry is to:
 | risk_class | P0 |
 | bypass_condition | Governance primitives mutate without governed legitimacy validation |
 | closure_condition | Runtime governance changes require recursively governed legitimacy approval |
-| current_state | PREO/SCO governance operational but recursive governance still incomplete |
+| current_state | PARTIAL — GMA (Governance Mutation Authorization) enforcement active: governance_mutation and workflow_mutation class PRs now require a valid GMA artifact with canonical lifecycle lineage (/session → /continuity → /authority → /compile). Enforcement in merge-governance-check.yml. Creation workflow: governance-mutation-authorization.yml. Spec: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json. Remaining gap: runtime proof persistence (/execute → /proof) for governance mutations not yet enforced. |
+| issue_reference | #1831 |
 | required_tests | governance mutation validation, recursive approval lineage, policy drift invalidation |
 | required_proofs | governance lineage persistence, immutable governance mutation evidence |
-| status | OPEN |
+| remaining_closure | Wire /execute → /proof stage for governance mutations; add governance_mutation_proof to proof registry |
+| status | PARTIAL |
 
 ---
 

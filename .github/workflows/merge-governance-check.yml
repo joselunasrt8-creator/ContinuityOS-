@@ -74,6 +74,9 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
+              governance/authorizations/*)
+                # GMA artifacts: authorization evidence, not governance primitives (GAP-005)
+                ;;
               governance/*)
                 echo "$file" >> governed_files.txt
                 echo "governance_mutation" >> mutation_classes.txt
@@ -298,6 +301,93 @@ jobs:
               created_at: $created_at,
               status: "SCO_CANDIDATE"
             }' > SCO_CANDIDATE.json
+
+      - name: Validate governance mutation authorization (GAP-005)
+        if: github.event_name != 'merge_group'
+        run: |
+          set -euo pipefail
+
+          # GAP-005: governance_mutation or workflow_mutation requires a valid GMA
+          # with canonical lifecycle lineage (session -> continuity -> authority -> compile)
+          HAS_GOV_MUTATION=$(grep -qE '^(governance_mutation|workflow_mutation)$' mutation_classes.txt 2>/dev/null && echo "true" || echo "false")
+
+          if [ "$HAS_GOV_MUTATION" = "false" ]; then
+            echo "No governance_mutation or workflow_mutation detected — GMA not required"
+            exit 0
+          fi
+
+          GMA_FILE="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+
+          if [ ! -f "$GMA_FILE" ]; then
+            echo "NULL — governance_mutation or workflow_mutation detected but no GMA found at $GMA_FILE"
+            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch,"
+            echo "then commit the output GMA artifact to governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+            echo "Result: MERGE_LEGITIMACY_NULL (GAP-005)"
+            exit 1
+          fi
+
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFileSync } from 'node:fs';
+
+          const gma = JSON.parse(readFileSync('governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json', 'utf8'));
+
+          // Required fields
+          const required = ['gma_id', 'decision_id', 'continuity_id', 'session_id',
+            'validated_object_hash', 'governed_files_hash', 'mutation_classes',
+            'gm_control_class', 'authority_lineage_bound', 'expires_at', 'status'];
+          for (const field of required) {
+            assert.ok(gma[field] !== undefined && gma[field] !== null && gma[field] !== '',
+              `GMA missing required field: ${field}`);
+          }
+
+          // Status check
+          assert.equal(gma.status, 'GMA_VALID', 'GMA status must be GMA_VALID');
+
+          // Expiry check
+          const now = new Date();
+          const expiry = new Date(gma.expires_at);
+          assert.ok(expiry > now, `GMA has expired at ${gma.expires_at} — rerun governance-mutation-authorization workflow`);
+
+          // Authority lineage bound
+          assert.equal(gma.authority_lineage_bound, true, 'GMA must declare authority_lineage_bound: true');
+
+          // Governed files hash check
+          const governedFiles = readFileSync('governed_files.txt', 'utf8').split('\n').filter(Boolean).sort();
+          const parts = governedFiles.map(f => {
+            let content;
+            try {
+              content = readFileSync(f);
+            } catch (_) {
+              content = Buffer.from('DELETED');
+            }
+            const hash = createHash('sha256').update(content).digest('hex');
+            return `${f}:${hash}`;
+          });
+          const combined = parts.join('\n');
+          const computedHash = createHash('sha256').update(combined).digest('hex');
+
+          assert.equal(
+            gma.governed_files_hash,
+            computedHash,
+            `GMA governed_files_hash mismatch.\nExpected: ${computedHash}\nGot: ${gma.governed_files_hash}\nThe GMA was created for a different set of governed file changes. Rerun governance-mutation-authorization.yml.`
+          );
+
+          // Mutation class coverage
+          const gmaMutationClasses = new Set(gma.mutation_classes);
+          const detectedClasses = readFileSync('mutation_classes.txt', 'utf8').split('\n').filter(Boolean);
+          for (const cls of detectedClasses) {
+            if (cls === 'governance_mutation' || cls === 'workflow_mutation') {
+              assert.ok(gmaMutationClasses.has(cls), `GMA does not cover detected mutation class: ${cls}`);
+            }
+          }
+
+          console.log(`GMA_VALID: ${gma.gma_id}`);
+          console.log(`governed_files_hash: ${gma.governed_files_hash}`);
+          console.log(`decision_id: ${gma.decision_id}`);
+          console.log('Result: GMA_VALID — governance mutation authorized via canonical lifecycle (GAP-005)');
+          NODE
 
       - name: Validate PREO/SCO binding
         if: github.event_name != 'merge_group'
