@@ -153,7 +153,7 @@ generation, or enforcement is made or implied by any entry below.
 
 **Non-claims:**
 - Compile ≠ execution. Producing an AEO from an ATAO does not authorize execution of that AEO.
-- Does not persist the compiled AEO; compilation is a bounded transformation step.
+- Does not execute the compiled AEO and does not create proof or execution rows; compilation is a bounded transformation step.
 - Does not grant execution authority.
 - Does not generate a proof object.
 - Null ATAO → null AEO; the route is fail-closed.
