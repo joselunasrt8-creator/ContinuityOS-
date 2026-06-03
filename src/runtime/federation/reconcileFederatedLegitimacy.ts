@@ -19,6 +19,20 @@ export const FEDERATION_DRIFT_CLASSES = [
 export type FederationDriftClass = (typeof FEDERATION_DRIFT_CLASSES)[number]
 export type TrustClassification = "TRUSTED" | "UNTRUSTED" | "UNKNOWN"
 
+// Distinct cross-registry reconciliation classification outcomes.
+// These five states are mutually exclusive and collectively exhaustive.
+// RECONCILED_DETERMINISTIC is only reachable when no drift classes are present.
+// All non-RECONCILED_DETERMINISTIC outcomes are fail-closed for execution eligibility.
+export const CROSS_REGISTRY_CLASSIFICATIONS = [
+  "RECONCILED_DETERMINISTIC",
+  "RECONCILIATION_REQUIRED",
+  "PARTITION_SUSPENDED",
+  "AMBIGUOUS",
+  "NULL",
+] as const
+
+export type CrossRegistryClassification = (typeof CROSS_REGISTRY_CLASSIFICATIONS)[number]
+
 export type FederatedNodeDeclaration = {
   node_id: string
   governance_version: string
@@ -50,6 +64,7 @@ export type ReconciliationFlags = Readonly<{
 export type ReconciliationResult = {
   local_node_id: string
   compared_node_id: string
+  classification: CrossRegistryClassification
   equivalent: boolean
   drift_classes: FederationDriftClass[]
   orphan_proofs: string[]
@@ -72,6 +87,43 @@ export function deterministicFederationSnapshot(snapshot: FederatedLegitimacySna
     evidence_only: true as const,
     immutable_snapshot: true as const,
   })
+}
+
+// Classifies a set of drift classes into one of the five required cross-registry
+// classification outcomes. Priority is fail-closed: the strongest failure wins.
+//
+// Priority order:
+// 1. NULL — hash comparability broken (NON_CANONICAL_HASH) or proof tree irreconcilable (ORPHAN_PROOF)
+// 2. PARTITION_SUSPENDED — remote node explicitly untrusted; execution eligibility suspended
+// 3. AMBIGUOUS — trust classification indeterminate; convergence cannot be established
+// 4. RECONCILIATION_REQUIRED — known drifts (proof, lineage, replay, topology, schema, continuity)
+// 5. RECONCILED_DETERMINISTIC — only when drift set is empty
+//
+// Invariants enforced:
+// - Proof divergence → RECONCILIATION_REQUIRED (never RECONCILED_DETERMINISTIC)
+// - Execution status divergence (replay root) → RECONCILIATION_REQUIRED
+// - Stale lineage → RECONCILIATION_REQUIRED (fail-closed)
+// - Partition-suspended → PARTITION_SUSPENDED (no execution eligibility)
+// - Ambiguous trust → AMBIGUOUS (cannot imply convergence)
+// - Local validity does not imply global convergence
+export function classifyFederatedReconciliation(
+  drifts: ReadonlySet<FederationDriftClass>,
+): CrossRegistryClassification {
+  if (drifts.size === 0) return "RECONCILED_DETERMINISTIC"
+
+  if (drifts.has("FEDERATION_NON_CANONICAL_HASH") || drifts.has("FEDERATION_ORPHAN_PROOF")) {
+    return "NULL"
+  }
+
+  if (drifts.has("FEDERATION_UNTRUSTED_NODE")) {
+    return "PARTITION_SUSPENDED"
+  }
+
+  if (drifts.has("FEDERATION_UNKNOWN_NODE")) {
+    return "AMBIGUOUS"
+  }
+
+  return "RECONCILIATION_REQUIRED"
 }
 
 export function reconcileFederatedLegitimacy(
@@ -100,10 +152,13 @@ export function reconcileFederatedLegitimacy(
     orphan_proofs.push(remote.proof_root)
   }
 
+  const classification = classifyFederatedReconciliation(drifts)
+
   return {
     local_node_id: local.node.node_id,
     compared_node_id: remote.node.node_id,
-    equivalent: drifts.size === 0,
+    classification,
+    equivalent: classification === "RECONCILED_DETERMINISTIC",
     drift_classes: Array.from(drifts).sort(),
     orphan_proofs,
     flags: {
