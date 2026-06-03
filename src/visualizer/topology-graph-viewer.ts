@@ -213,12 +213,29 @@ export function normalizeTopologyGraph(input: unknown): NormalizedTopologyGraph 
   }
 }
 
+// Canonical runtime lifecycle ordering for lane placement.
+// Types matching this list appear in lifecycle sequence; remaining types follow alphabetically.
+const CANONICAL_TYPE_ORDER = ['session', 'continuity', 'authority', 'compile', 'validate', 'execute', 'proof']
+
+function sortTypes(rawTypes: string[]): string[] {
+  return [...rawTypes].sort((a, b) => {
+    const ai = CANONICAL_TYPE_ORDER.indexOf(a)
+    const bi = CANONICAL_TYPE_ORDER.indexOf(b)
+    if (ai !== -1 && bi !== -1) return ai - bi
+    if (ai !== -1) return -1
+    if (bi !== -1) return 1
+    return a.localeCompare(b)
+  })
+}
+
 /**
  * Compute a deterministic grouped-column SVG layout by node type.
+ * Canonical lifecycle types (session → continuity → authority → compile → validate → execute → proof)
+ * appear as left-to-right lanes in lifecycle order; remaining types follow alphabetically.
  */
 export function layoutTopologyGraph(graph: NormalizedTopologyGraph): TopologyGraphLayout {
   const normalized = normalizeTopologyGraph(graph)
-  const types = [...new Set(normalized.nodes.map((node) => node.type))].sort()
+  const types = sortTypes([...new Set(normalized.nodes.map((node) => node.type))])
   const laneIndex = new Map(types.map((type, index) => [type, index]))
   const rowByType = new Map<string, number>()
   const layoutNodeById = new Map<string, TopologyGraphLayoutNode>()
@@ -283,6 +300,18 @@ function escapeHtml(value: unknown): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
+}
+
+/**
+ * Serialize a value as JSON that is safe to embed inside an HTML <script> block.
+ * HTML parsers treat </script> as a tag boundary even inside quoted JS strings, so
+ * < and > are replaced with their Unicode escape sequences (< / >).
+ * The result must NOT be passed through escapeHtml — it is already script-safe.
+ */
+export function safeInlineJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
 }
 
 function renderObservationList(observations: Readonly<Record<string, string | number | boolean>>): string {
@@ -389,6 +418,7 @@ export function renderTopologyGraphHtml(graph: NormalizedTopologyGraph): string 
     </section>
     <section class="observations" aria-label="node observations">${nodeObservationMarkup}</section>
   </main>
+  <script type="application/json" id="topology-summary">${safeInlineJson(layout.graph.summary)}</script>
 </body>
 </html>`
 }
