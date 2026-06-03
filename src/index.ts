@@ -609,6 +609,159 @@ async function handleAgentToolGatewayATAO(env: Env, request: Request): Promise<R
   })
 }
 
+
+type GatewayCompileNullReason =
+  | "malformed_request"
+  | "missing_atao_id"
+  | "missing_authority_decision_id"
+  | "atao_not_found"
+  | "authority_missing"
+  | "authority_not_active"
+  | "authority_mismatch"
+  | "authority_review_not_approved"
+  | "unknown_surface_type"
+  | "schema_inactive"
+  | "privileged_surface_blocked"
+  | "hash_mismatch"
+  | "duplicate_compile"
+  | "invalid_canonical_aeo"
+  | "compile_exception"
+
+function gatewayCompileNull(reason: GatewayCompileNullReason, extra: Record<string, unknown> = {}): Response {
+  return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, reason, ...extra })
+}
+
+function parseGatewayJsonRecord(raw: unknown): Record<string, unknown> {
+  if (typeof raw !== "string") return {}
+  try { return canonicalRecord(JSON.parse(raw)) } catch { return {} }
+}
+
+function deriveGatewaySurfaceType(atao: Record<string, unknown>): string | null {
+  const toolSystem = String(atao.tool_system || "")
+  const toolName = String(atao.tool_name || "").toLowerCase()
+  const scope = parseGatewayJsonRecord(atao.scope)
+  const constraints = parseGatewayJsonRecord(atao.constraints)
+  const hinted = String(scope.surface || scope.operation || constraints.surface || constraints.operation || toolName || "").toLowerCase()
+  if (toolSystem === "filesystem") {
+    if (hinted.includes("read") && !hinted.includes("write")) return "filesystem_read"
+    return "filesystem_write"
+  }
+  if (toolSystem === "shell") return "shell_exec"
+  if (toolSystem === "github" || toolSystem === "http_api") return "browser"
+  if (toolSystem === "ci_cd") return "gateway_routing"
+  if (toolSystem === "read_only") return "filesystem_read"
+  return null
+}
+
+function riskClassForGatewayTemplate(ataoRiskClass: string): string {
+  const normalized = String(ataoRiskClass || "").trim()
+  if (normalized === "P0") return "P0_READ_ONLY"
+  if (normalized === "P1") return "P1_EXECUTION_ADJACENT"
+  if (normalized === "P2") return "P2_BOUNDED_MUTATION"
+  if (normalized === "P3") return "P3_EXTERNAL_MUTATION"
+  return normalized
+}
+
+function templateRiskLevel(riskClass: string): number {
+  const match = String(riskClass || "").match(/P(\d+)/)
+  return match ? Number(match[1]) : -1
+}
+
+function canonicalGatewayCompileAeo(atao: Record<string, unknown>, authorityDecisionId: string, surfaceType: string): CanonicalAEO | null {
+  const ataoScope = parseGatewayJsonRecord(atao.scope)
+  const constraints = parseGatewayJsonRecord(atao.constraints)
+  const target = canonicalRecord(constraints.target) || constraints
+  const validation = canonicalRecord({
+    atao_id: String(atao.atao_id || ""),
+    authority_decision_id: authorityDecisionId,
+    require_active_authority: true,
+    require_approved_authority_review: true,
+    require_exact_object_hash: true,
+  })
+  const finality = canonicalRecord({
+    compile_only: true,
+    execution_created: false,
+    proof_created: false,
+    proof_required: true,
+  })
+  return toCanonicalAeo({
+    intent: String(atao.intent || ""),
+    scope: canonicalRecord({ ...ataoScope, surface_type: surfaceType }),
+    validation,
+    target,
+    finality,
+  })
+}
+
+async function handleAgentToolGatewayCompile(env: Env, request: Request): Promise<Response> {
+  try {
+    const b = await request.json().catch(() => null) as Record<string, unknown> | null
+    if (!b || typeof b !== "object") return gatewayCompileNull("malformed_request")
+    const atao_id = String(b.atao_id || "")
+    const authority_decision_id = String(b.authority_decision_id || "")
+    if (!atao_id) return gatewayCompileNull("missing_atao_id")
+    if (!authority_decision_id) return gatewayCompileNull("missing_authority_decision_id")
+
+    await ensureAuthorityReviewSchema(env)
+    const atao = await env.DB.prepare(`SELECT * FROM agent_tool_atao_registry WHERE atao_id=?1 AND atao_status='FORMED'`).bind(atao_id).first<any>()
+    if (!atao) return gatewayCompileNull("atao_not_found", { atao_id })
+
+    const review = await env.DB.prepare(`SELECT * FROM authority_review_registry WHERE review_id=?1 AND proposal_id=?2 AND observation_id=?3 AND observation_hash=?4`).bind(String(atao.review_id || ""), String(atao.proposal_id || ""), String(atao.observation_id || ""), String(atao.observation_hash || "")).first<any>()
+    if (!review || String(review.review_decision || "") !== "APPROVED" || Number(review.creates_atao || 0) !== 1) {
+      return gatewayCompileNull("authority_review_not_approved", { atao_id })
+    }
+
+    const authority = await env.DB.prepare(`SELECT * FROM authority_registry WHERE decision_id=?1`).bind(authority_decision_id).first<any>()
+    if (!authority) return gatewayCompileNull("authority_missing", { authority_decision_id })
+    if (String(authority.status || "") !== "ACTIVE" || (String(authority.expiry || "") && isExpired(String(authority.expiry || "")))) {
+      return gatewayCompileNull("authority_not_active", { authority_decision_id })
+    }
+    if (String(authority.session_id || "") !== String(atao.session_id || "") || String(authority.intent || "") !== String(atao.intent || "")) {
+      return gatewayCompileNull("authority_mismatch", { authority_decision_id, atao_id })
+    }
+    const authorityScope = parseGatewayJsonRecord(authority.scope)
+    const ataoScope = parseGatewayJsonRecord(atao.scope)
+    const derivedSurface = deriveGatewaySurfaceType(atao)
+    if (!derivedSurface) return gatewayCompileNull("unknown_surface_type", { atao_id })
+    const derivedScope = canonicalRecord({ ...ataoScope, surface_type: derivedSurface })
+    if (canonicalize(authorityScope) !== canonicalize(ataoScope) && canonicalize(authorityScope) !== canonicalize(derivedScope)) {
+      return gatewayCompileNull("authority_mismatch", { authority_decision_id, atao_id })
+    }
+
+    const templateResult = await selectAEOTemplate(derivedSurface, riskClassForGatewayTemplate(String(atao.risk_class || "")), env.DB)
+    if (templateResult.result === "NULL") {
+      const reason = templateResult.reason === "SCHEMA_INACTIVE" ? "schema_inactive" : "unknown_surface_type"
+      return gatewayCompileNull(reason, { surface_type: derivedSurface, aeo_template_reason: templateResult.reason })
+    }
+    if (templateRiskLevel(templateResult.template.risk_floor) >= 4) {
+      return gatewayCompileNull("privileged_surface_blocked", { surface_type: derivedSurface })
+    }
+
+    const canonicalAeo = canonicalGatewayCompileAeo(atao, authority_decision_id, derivedSurface)
+    if (!canonicalAeo) return gatewayCompileNull("invalid_canonical_aeo", { atao_id })
+    const canonical_aeo = canonicalize(canonicalAeo)
+    const validated_object_hash = await sha256Hex(canonical_aeo)
+    if (String(b.validated_object_hash || "") && String(b.validated_object_hash || "") !== validated_object_hash) {
+      return gatewayCompileNull("hash_mismatch", { expected_hash: String(b.validated_object_hash || ""), actual_hash: validated_object_hash })
+    }
+
+    const existing = await env.DB.prepare(`SELECT * FROM aeo_registry WHERE decision_id=?1 ORDER BY created_at ASC, aeo_id ASC`).bind(authority_decision_id).all<any>()
+    const existingRows = Array.isArray(existing?.results) ? existing.results : []
+    if (existingRows.length > 0) {
+      const matching = existingRows.find((row: any) => String(row.validated_object_hash || "") === validated_object_hash && String(row.canonical_aeo || "") === canonical_aeo)
+      if (matching && existingRows.length === 1) {
+        return json({ status: "COMPILED", result: "OK", route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, decision_id: authority_decision_id, authority_id: String(authority.authority_id || ""), atao_id, validated_object_hash, canonical_aeo: canonicalAeo, existing: true, executes: false, proof_created: false })
+      }
+      return gatewayCompileNull("duplicate_compile", { authority_decision_id, atao_id })
+    }
+
+    await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,canonical_aeo,validated_object_hash,status,created_at) VALUES (?1,?2,?3,?4,?5,'COMPILED',?6)`).bind(crypto.randomUUID(), String(authority.authority_id || ""), authority_decision_id, canonical_aeo, validated_object_hash, new Date().toISOString()).run()
+    return json({ status: "COMPILED", result: "OK", route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, decision_id: authority_decision_id, authority_id: String(authority.authority_id || ""), atao_id, validated_object_hash, canonical_aeo: canonicalAeo, executes: false, proof_created: false })
+  } catch {
+    return gatewayCompileNull("compile_exception")
+  }
+}
+
 function canonicalGovernProjectionFromCandidate(candidate: GovernCandidate): GovernCandidate {
   return { intent: String(candidate.intent || ""), scope: canonicalRecord(candidate.scope), target: canonicalRecord(candidate.target), finality: canonicalRecord(candidate.finality) }
 }
@@ -788,6 +941,7 @@ const AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE = "/gateway/tool/intercept" as const
 const AGENT_TOOL_GATEWAY_PROPOSE_ROUTE = "/gateway/tool/propose" as const
 const AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE = "/gateway/authority/review" as const
 const AGENT_TOOL_GATEWAY_ATAO_ROUTE = "/gateway/authority/atao" as const
+const AGENT_TOOL_GATEWAY_COMPILE_ROUTE = "/gateway/tool/compile" as const
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
@@ -7918,7 +8072,8 @@ export default {
     const agentToolGatewayProposeRoute = url.pathname === AGENT_TOOL_GATEWAY_PROPOSE_ROUTE
     const agentToolGatewayAuthorityReviewRoute = url.pathname === AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE
     const agentToolGatewayAtaoRoute = url.pathname === AGENT_TOOL_GATEWAY_ATAO_ROUTE
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute
+    const agentToolGatewayCompileRoute = url.pathname === AGENT_TOOL_GATEWAY_COMPILE_ROUTE
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute || agentToolGatewayCompileRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
     if (agentToolGatewayAtaoRoute && request.method === "GET" && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
@@ -7939,6 +8094,10 @@ export default {
 
     if (agentToolGatewayAuthorityReviewRoute && request.method === "POST") {
       return handleAgentToolGatewayAuthorityReview(env, request)
+    }
+
+    if (agentToolGatewayCompileRoute && request.method === "POST") {
+      return handleAgentToolGatewayCompile(env, request)
     }
 
     if (agentToolGatewayAtaoRoute && request.method === "GET") {
