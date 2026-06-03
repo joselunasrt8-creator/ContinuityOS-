@@ -21,7 +21,8 @@
     "graph:ingest": "python3 scripts/ingest_neo4j.py",
     "graph:aeo": "npx tsx graph/aeo/ingest_aeo_instances.ts",
     "graph:full": "npm run graph:extract && npm run graph:load && npm run graph:runtime && npm run graph:governance",
-    "governance:regenerate": "node scripts/regenerate-governance-artifacts.mjs"
+    "governance:regenerate": "node scripts/regenerate-governance-artifacts.mjs",
+    "graph:view": "npx tsx scripts/render-topology-graph-viewer.ts"
   },
   "devDependencies": {
     "tsx": "^4.22.3",
