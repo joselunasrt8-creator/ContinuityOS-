@@ -753,6 +753,82 @@ export function evaluateOmegaValidator(
   })
 }
 
+// ── Issue #1791B: Phase 3D Ω Execution-Boundary Proof Capture ────────────────
+// Captures an immutable proof artifact from a VALID OmegaValidatorOutcome.
+// Proof capture terminates at artifact formation only.
+//
+// Invariants:
+//   Outcome proof capture ≠ execution permission
+//   Proof artifact ≠ authority
+//   VALID outcome ≠ executed action
+//
+// Non-goals preserved here:
+//   no authority creation
+//   no execution permission
+//   no tool execution
+//   no runtime route
+//   no alternate execution boundary
+//   no proof persistence
+
+export type ExecutionBoundaryProof = {
+  readonly proof_id: string
+  readonly outcome_id: string
+  readonly envelope_id: string
+  readonly contract_id: string
+  readonly predicate_hash: string
+  readonly lineage_version: string
+  readonly creates_authority: false
+}
+
+// captureExecutionBoundaryProof: forms a frozen proof artifact from a VALID
+// OmegaValidatorOutcome. Recomputes outcome_id to verify integrity before
+// artifact formation. Fails closed if outcome is null, result is not VALID,
+// any required field is blank, or outcome_id integrity check fails.
+export function captureExecutionBoundaryProof(
+  outcome: OmegaValidatorOutcome | null | undefined,
+): ExecutionBoundaryProof | null {
+  if (!outcome) return null
+  if (outcome.result !== 'VALID') return null
+  if (!isNonBlankString(outcome.outcome_id)) return null
+  if (!isNonBlankString(outcome.envelope_id)) return null
+  if (!isNonBlankString(outcome.contract_id)) return null
+  if (!isNonBlankString(outcome.predicate_hash)) return null
+  if (!isNonBlankString(outcome.lineage_version)) return null
+  if (!outcome.conditions || typeof outcome.conditions !== 'object') return null
+  for (const key of OMEGA_CONDITION_KEYS) {
+    if (typeof outcome.conditions[key] !== 'boolean') return null
+  }
+
+  const recomputedOutcomeId = hashCanonical({
+    envelope_id: outcome.envelope_id,
+    contract_id: outcome.contract_id,
+    predicate_hash: outcome.predicate_hash,
+    lineage_version: outcome.lineage_version,
+    result: outcome.result,
+    conditions: outcome.conditions,
+  })
+  if (recomputedOutcomeId !== outcome.outcome_id) return null
+
+  const proof_id = hashCanonical({
+    outcome_id: outcome.outcome_id,
+    envelope_id: outcome.envelope_id,
+    contract_id: outcome.contract_id,
+    predicate_hash: outcome.predicate_hash,
+    lineage_version: outcome.lineage_version,
+    creates_authority: false,
+  })
+
+  return Object.freeze({
+    proof_id,
+    outcome_id: outcome.outcome_id,
+    envelope_id: outcome.envelope_id,
+    contract_id: outcome.contract_id,
+    predicate_hash: outcome.predicate_hash,
+    lineage_version: outcome.lineage_version,
+    creates_authority: false as const,
+  })
+}
+
 // interceptToolCall — gateway entry point.
 // Produces: Observation Artifact → CIP → GovernanceProposal
 // Does NOT produce: ATAO, AEO, authority, execution eligibility
