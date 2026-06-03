@@ -8377,8 +8377,6 @@ export default {
 
     if (url.pathname === "/authority" && request.method === "POST") {
       const b = await body(request)
-      const topologyEpochAdmission = await enforceTopologyEpochAdmission(env, b, "")
-      if (!topologyEpochAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: topologyEpochAdmission.reason }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "authority", indicator: topologyEpochAdmission.reason }, drift_class: "topology_drift" })
       const session_id = String(b.session_id || "")
       const session = await activeSession(env, session_id)
       if (!session) return rejectWithTelemetry(env, { status: "NULL", reason: "invalid_session" }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "/authority", session_id }, drift_class: "authority_drift" })
@@ -8394,6 +8392,8 @@ export default {
       if (String(currentContinuityIdentity.identity_id || "") !== String(session.identity_id || "") || String(currentContinuityIdentity.continuity_id || "") !== String(continuity_id || "")) {
         return rejectWithTelemetry(env, { status: "NULL", reason: "continuity_identity_mismatch" }, { event_type: "VALIDATION_REJECTED", decision_id, severity: "CRITICAL", payload: { route: "/authority", session_id, continuity_id, expected_continuity_id: currentContinuityIdentity.continuity_id, expected_identity_id: currentContinuityIdentity.identity_id, indicator: "stale_or_detached_continuity_identity" }, drift_class: "authority_drift" })
       }
+      const topologyEpochAdmission = await enforceTopologyEpochAdmission(env, b, "")
+      if (!topologyEpochAdmission.ok) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason: topologyEpochAdmission.reason }, { event_type: "VALIDATION_REJECTED", severity: "HIGH", payload: { route: "authority", indicator: topologyEpochAdmission.reason }, drift_class: "topology_drift" })
       const baseScope = canonicalRecord(b.scope || {})
       const rec: any = { authority_id: crypto.randomUUID(), decision_id, identity_id: String(session.identity_id || ""), session_id, continuity_id, owner: String(b.owner || "unknown"), intent: String(b.intent || "deploy_production"), scope: JSON.stringify(baseScope), constraints: JSON.stringify(b.constraints || {}), expiry: String(b.expiry || new Date(Date.now()+3600_000).toISOString()), status: "ACTIVE", created_at: new Date().toISOString() }
       const delegated = await buildDelegatedAuthorityForIssuance(env, b, rec)

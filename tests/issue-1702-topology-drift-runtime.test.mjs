@@ -68,10 +68,14 @@ test('issue #1702 topology epoch admission routes retain topology_drift emission
   }
 })
 
+// /authority now validates session/continuity lineage before topology admission (issue #1796).
+// Remaining routes still gate on topology epoch first.
+const topologyFirstRoutes = ['/compile', '/validate', '/execute']
+
 test('issue #1702 topology epoch admission failures record topology_drift at runtime', async () => {
   const worker = await loadWorker()
 
-  for (const route of topologyAdmissionRoutes) {
+  for (const route of topologyFirstRoutes) {
     const { env, statements } = createCapturingEnv()
     const response = await worker.fetch(post(route), env)
     const body = await response.json()
@@ -84,7 +88,16 @@ test('issue #1702 topology epoch admission failures record topology_drift at run
     assert.equal(driftRows[0].args[1], 'topology_drift', `${route} must emit topology_drift in drift_registry`)
 
     const driftPayload = JSON.parse(driftRows[0].args[5])
-    assert.equal(driftPayload.route, route === '/authority' ? 'authority' : route, `${route} drift payload must preserve route identity`)
+    assert.equal(driftPayload.route, route, `${route} drift payload must preserve route identity`)
     assert.equal(driftPayload.indicator, 'missing_topology_epoch', `${route} drift payload must preserve admission reason`)
   }
+})
+
+test('issue #1702 /authority rejects invalid session before topology epoch admission', async () => {
+  const worker = await loadWorker()
+  const { env } = createCapturingEnv()
+  const response = await worker.fetch(post('/authority'), env)
+  const body = await response.json()
+  assert.equal(body.status, 'NULL', '/authority must fail closed with no session')
+  assert.equal(body.reason, 'invalid_session', '/authority must surface lineage failure before topology admission')
 })
