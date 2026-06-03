@@ -30,6 +30,16 @@ test('issue #838: all mutation-capable runtime surfaces are declared and classif
   for (const route of ['/session','/continuity','/authority','/compile','/validate','/execute','/proof']) {
     assert.ok(byId.has(`route:${route}`), `${route} must be declared`)
   }
+  const gatewayCompile = byId.get('route:/gateway/tool/compile')
+  assert.ok(gatewayCompile, '/gateway/tool/compile must be declared separately')
+  assert.equal(gatewayCompile.surface_type, 'governed_gateway_compile_route')
+  assert.equal(gatewayCompile.mutation_capability, true)
+  assert.equal(gatewayCompile.execution_capability, false)
+  assert.equal(gatewayCompile.deployment_capability, false)
+  assert.equal(gatewayCompile.proof_generating, false)
+  assert.equal(gatewayCompile.creates_authority, false)
+  assert.equal(gatewayCompile.compile_only, true)
+  assert.deepEqual(gatewayCompile.issue_lineage, ['#1627', '#1773'])
 
   for (const surface of inventory.surfaces.filter((s) => s.mutation_capability || s.execution_capability || s.deployment_capability)) {
     const cls = classify(surface)
