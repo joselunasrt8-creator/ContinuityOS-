@@ -11,6 +11,18 @@ export type PredicateDefinition = {
   readonly predicate_hash: string
   readonly lineage_version: string
   readonly predicate_ids: readonly string[]
+  readonly side_effects_allowed?: unknown
+}
+
+export type PurePredicateDefinition = PredicateDefinition & {
+  readonly side_effects_allowed: false
+}
+
+export type PredicatePurityViolation = {
+  readonly result: "NULL"
+  readonly reason: "PREDICATE_PURITY_VIOLATION"
+  readonly creates_proof: false
+  readonly creates_execution_eligibility: false
 }
 
 export interface PredicateRegistryDB {
@@ -44,6 +56,47 @@ function parsePredicateIds(value: unknown): readonly string[] | null {
   return Object.freeze(predicateIds as string[])
 }
 
+function parseSideEffectsAllowed(value: unknown): unknown {
+  if (typeof value === "boolean") return value
+  if (typeof value !== "string") return value
+
+  const trimmed = value.trim()
+  if (trimmed !== "false" && trimmed !== "true") return value
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    return typeof parsed === "boolean" ? parsed : value
+  } catch {
+    return value
+  }
+}
+
+const PREDICATE_PURITY_NULL: PredicatePurityViolation = Object.freeze({
+  result: "NULL" as const,
+  reason: "PREDICATE_PURITY_VIOLATION" as const,
+  creates_proof: false as const,
+  creates_execution_eligibility: false as const,
+})
+
+// validatePredicateDefinitionPurity: validator pre-flight gate before predicate
+// implementation loading, predicate execution, proof creation, or execution
+// eligibility creation. A predicate may narrow validator policy, but may never
+// widen it. Validation predicates must prove purity with an explicit
+// side_effects_allowed === false metadata value before validation can continue.
+export function validatePredicateDefinitionPurity<T>(
+  predicate_definition: PredicateDefinition | null | undefined,
+  continueValidation: (predicateDefinition: PurePredicateDefinition) => T,
+): T | PredicatePurityViolation {
+  if (!predicate_definition || predicate_definition.side_effects_allowed !== false) {
+    return PREDICATE_PURITY_NULL
+  }
+
+  return continueValidation(Object.freeze({
+    ...predicate_definition,
+    side_effects_allowed: false as const,
+  }))
+}
+
 // resolvePredicateDefinition: deterministic Phase 3A predicate lookup.
 //
 // Rules:
@@ -53,7 +106,7 @@ function parsePredicateIds(value: unknown): readonly string[] | null {
 //   missing predicate_hash         → NULL
 //   missing lineage_version        → NULL
 //   multiple ACTIVE definitions    → NULL
-//   exactly 1 ACTIVE definition    → immutable PredicateDefinition
+//   exactly 1 ACTIVE definition    → immutable PredicateDefinition metadata
 //
 // Non-goals preserved here:
 //   no predicate execution or evaluation
@@ -61,6 +114,9 @@ function parsePredicateIds(value: unknown): readonly string[] | null {
 //   no proof generation
 //   no replay mutation
 //   no Ω validator execution or evaluation
+//
+// Purity is not inferred from resolution. Call validatePredicateDefinitionPurity
+// before loading or executing any predicate implementation.
 export async function resolvePredicateDefinition(
   predicate_set_id: string | null | undefined,
   db: PredicateRegistryDB,
@@ -70,7 +126,7 @@ export async function resolvePredicateDefinition(
 
   const queryResult = await db
     .prepare(
-      `SELECT predicate_set_id, predicate_hash, lineage_version, status, predicate_ids
+      `SELECT predicate_set_id, predicate_hash, lineage_version, status, predicate_ids, side_effects_allowed
        FROM predicate_registry
        WHERE predicate_set_id = ?1 AND status = 'ACTIVE'
        ORDER BY created_at ASC, predicate_hash ASC, lineage_version ASC`,
@@ -87,6 +143,7 @@ export async function resolvePredicateDefinition(
   const predicateHash = nonEmptyText(row.predicate_hash)
   const lineageVersion = nonEmptyText(row.lineage_version)
   const predicateIds = parsePredicateIds(row.predicate_ids)
+  const sideEffectsAllowed = parseSideEffectsAllowed(row.side_effects_allowed)
 
   if (status !== "ACTIVE") return null
   if (resolvedPredicateSetId !== requestedPredicateSetId) return null
@@ -97,5 +154,6 @@ export async function resolvePredicateDefinition(
     predicate_hash: predicateHash,
     lineage_version: lineageVersion,
     predicate_ids: predicateIds,
+    side_effects_allowed: sideEffectsAllowed,
   })
 }
