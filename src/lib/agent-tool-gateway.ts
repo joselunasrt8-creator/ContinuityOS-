@@ -12,6 +12,7 @@
 //   No ATAO → No AEO → NULL
 
 import { hashCanonical } from '../canonical.js'
+import type { PurePredicateDefinition } from './predicate-registry.js'
 
 // ── AEO Template Registry types ───────────────────────────────────────────────
 
@@ -519,6 +520,64 @@ export function checkOmegaValidatorBoundary(conditions: OmegaValidatorConditions
     return "VALID"
   }
   return "NULL"
+}
+
+// ── Issue #1789: Phase 3B Predicate Verification Contract ─────────────────────
+// Binds template identity to predicate identity without performing validation,
+// authority creation, execution authorization, proof generation, replay mutation,
+// or Ω Validator evaluation.
+//
+// Non-goals preserved here:
+//   no validator execution
+//   no predicate execution
+//   no proof generation
+//   no authority creation
+//   no execution eligibility
+//   no database persistence
+
+export type PredicateVerificationContract = {
+  readonly contract_id: string
+  readonly template_id: string
+  readonly schema_version: string
+  readonly predicate_set_id: string
+  readonly predicate_hash: string
+  readonly lineage_version: string
+}
+
+// createPredicateVerificationContract: deterministic binding of template identity
+// and predicate identity. Fails closed on missing inputs, field mismatches, or
+// purity violation.
+export function createPredicateVerificationContract(
+  binding: ValidatorBinding | null | undefined,
+  predicate: PurePredicateDefinition | null | undefined,
+): PredicateVerificationContract | null {
+  if (!binding || !predicate) return null
+  if (predicate.side_effects_allowed !== false) return null
+  if (!isNonBlankString(binding.template_id)) return null
+  if (!isNonBlankString(binding.schema_version)) return null
+  if (!isNonBlankString(binding.predicate_set_id)) return null
+  if (!isNonBlankString(binding.predicate_hash)) return null
+  if (!isNonBlankString(binding.lineage_version)) return null
+  if (binding.predicate_set_id !== predicate.predicate_set_id) return null
+  if (binding.predicate_hash !== predicate.predicate_hash) return null
+  if (binding.lineage_version !== predicate.lineage_version) return null
+
+  const contract_id = hashCanonical({
+    template_id: binding.template_id,
+    schema_version: binding.schema_version,
+    predicate_set_id: binding.predicate_set_id,
+    predicate_hash: binding.predicate_hash,
+    lineage_version: binding.lineage_version,
+  })
+
+  return Object.freeze({
+    contract_id,
+    template_id: binding.template_id,
+    schema_version: binding.schema_version,
+    predicate_set_id: binding.predicate_set_id,
+    predicate_hash: binding.predicate_hash,
+    lineage_version: binding.lineage_version,
+  })
 }
 
 // interceptToolCall — gateway entry point.
