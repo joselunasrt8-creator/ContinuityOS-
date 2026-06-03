@@ -942,6 +942,13 @@ const AGENT_TOOL_GATEWAY_PROPOSE_ROUTE = "/gateway/tool/propose" as const
 const AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE = "/gateway/authority/review" as const
 const AGENT_TOOL_GATEWAY_ATAO_ROUTE = "/gateway/authority/atao" as const
 const AGENT_TOOL_GATEWAY_COMPILE_ROUTE = "/gateway/tool/compile" as const
+const AGENT_TOOL_GOVERNED_SUPPORT_SURFACES = Object.freeze([
+  Object.freeze({ route: AGENT_TOOL_INVOCATION_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: true, replay_safe: true, replay_neutral: false, replay_characteristics: "proof_bound_single_use_invocation_nonce", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "append_only_observation_and_proposal_evidence", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: true, replay_characteristics: "proposal_lookup_only", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: true, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "append_only_review_lineage_may_form_atao", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: true, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "deterministic_compile_only_hash_reuse", topology_visibility_classification: "inventory_visible_governed_support_surface", compile_only: true }),
+] as const)
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
 const RECURSIVE_GOVERNANCE_SELF_INTEGRITY_ROUTE = "/governance/recursive/self-integrity" as const
@@ -7443,6 +7450,9 @@ function sortTopologyObjects(objects: Record<string, unknown>[]) {
 async function enumerateRuntimeTopologySnapshot(): Promise<RuntimeTopologySnapshot> {
   const routeNodes = [...CANONICAL_RUNTIME_ROUTES].sort().map((route) => runtimeTopologyNodeObject("canonical_routes", route, { route, canonical: true, observability_only: false, mutation_requires_authority: true }))
   const observabilityNodes = [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort().map((route) => runtimeTopologyNodeObject("observability_only_routes", route, { route, observability_only: true, replay_neutral: true, executable: false, deployment_capable: false, creates_authority: false }))
+  const supportRouteNodes = [...AGENT_TOOL_GOVERNED_SUPPORT_SURFACES]
+    .sort((a, b) => a.route.localeCompare(b.route))
+    .map((surface) => runtimeTopologyNodeObject("governed_support_routes", surface.route, { ...surface, canonical_execution_route: false, execution_surface_classification: "not_execution_capable_surface" }))
   const appendOnlyRegistries = [
     "authority_registry", "aeo_registry", "validation_registry", "execution_registry", "proof_registry", "invocation_registry", "preo_registry", "runtime_surface_containment_registry", "reconciliation_closure_registry", "recursive_governance_containment_registry", "runtime_sovereignty_registry", "root_authority_observability_registry", "runtime_topology_registry", "topology_reconciliation_registry"
   ].sort().map((registry) => runtimeTopologyNodeObject("append_only_registries", registry, { registry, append_only: true, update_allowed: false, delete_allowed: false }))
@@ -7457,11 +7467,11 @@ async function enumerateRuntimeTopologySnapshot(): Promise<RuntimeTopologySnapsh
     runtimeTopologyNodeObject("recursive_governance_containment", RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY, { registry: RECURSIVE_GOVERNANCE_CONTAINMENT_REGISTRY, contained: true }),
     runtimeTopologyNodeObject("sovereignty_containment", ROOT_AUTHORITY_OBSERVABILITY_REGISTRY, { registry: ROOT_AUTHORITY_OBSERVABILITY_REGISTRY, contained: true }),
   ]
-  const nodes = sortTopologyObjects([...routeNodes, ...observabilityNodes, ...appendOnlyRegistries, ...mutationNodes, ...governanceNodes, ...containmentNodes])
+  const nodes = sortTopologyObjects([...routeNodes, ...observabilityNodes, ...supportRouteNodes, ...appendOnlyRegistries, ...mutationNodes, ...governanceNodes, ...containmentNodes])
   const edges = sortTopologyObjects(nodes.map((node) => canonicalRecord({ object_type: "RuntimeTopologyEdge", from: node.section, to: node.identity, relation: "ENUMERATES_EXACT_OBJECT" })))
-  const runtimeMaterial = { canonical_routes: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_routes: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort() }
+  const runtimeMaterial = { canonical_routes: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_routes: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort(), governed_support_routes: AGENT_TOOL_GOVERNED_SUPPORT_SURFACES.map((surface) => surface.route).sort() }
   const semanticMaterial = { governance_artifacts: governanceNodes.map((node) => node.identity).sort(), registries: appendOnlyRegistries.map((node) => node.identity).sort() }
-  const boundaryMaterial = { execution_boundary: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_boundary: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort(), workflow_mutation_surfaces: GOVERNED_DEPLOY_WORKFLOW_SURFACES }
+  const boundaryMaterial = { execution_boundary: [...CANONICAL_RUNTIME_ROUTES].sort(), observability_boundary: [...NON_EXECUTABLE_OBSERVABILITY_ROUTES].sort(), governed_support_boundary: AGENT_TOOL_GOVERNED_SUPPORT_SURFACES.map((surface) => ({ route: surface.route, classification: surface.classification, execution_capability: surface.execution_capability, creates_authority: surface.creates_authority })).sort((a, b) => a.route.localeCompare(b.route)), workflow_mutation_surfaces: GOVERNED_DEPLOY_WORKFLOW_SURFACES }
   const lineageMaterial = { append_only_registries: appendOnlyRegistries.map((node) => node.identity).sort(), containment: containmentNodes.map((node) => node.identity).sort() }
   const topology_hash = await sha256Hex(canonicalize(runtimeMaterial))
   const topology_semantic_hash = await sha256Hex(canonicalize(semanticMaterial))
