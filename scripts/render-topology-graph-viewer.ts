@@ -26,6 +26,7 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dir, '..');
 
 const CANDIDATE_SOURCES = [
+  'graph/repo_graph.json',                  // primary: produced by npm run graph:extract
   'graph/runtime-topology.sample.json',
   'runtime-topology.json',
   'runtime/topology/runtime_graph.json',
