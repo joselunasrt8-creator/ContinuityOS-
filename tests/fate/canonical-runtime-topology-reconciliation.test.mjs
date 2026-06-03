@@ -151,27 +151,63 @@ test('no canonical execution route expansion occurs', () => {
   assert.doesNotMatch(source, /url\.pathname === "\/proof\/propagate" && request\.method === "POST"/)
 })
 
-test('gateway tool compile is declared separately from canonical execution routes', () => {
+test('agent tool gateway support routes are inventory-visible governed support surfaces', () => {
   const source = read('src/index.ts')
   const inventory = JSON.parse(read('runtime/unauthorized_mutation_surface_inventory.json'))
   const matrix = JSON.parse(read('runtime/MUTATION_SURFACE_EXHAUSTIVENESS.json'))
-  const route = inventory.surfaces.find((surface) => surface.surface_id === 'route:/gateway/tool/compile')
-  const matrixRoute = matrix.declared_surfaces.find((surface) => surface.surface_id === 'route:/gateway/tool/compile')
+  const scopedRoutes = [
+    '/agent/tool-call',
+    '/gateway/tool/intercept',
+    '/gateway/tool/propose',
+    '/gateway/authority/review',
+    '/gateway/tool/compile',
+  ]
+  const expectedMutationCapability = new Map([
+    ['/agent/tool-call', true],
+    ['/gateway/tool/intercept', true],
+    ['/gateway/tool/propose', false],
+    ['/gateway/authority/review', true],
+    ['/gateway/tool/compile', true],
+  ])
+  const expectedCreatesAtao = new Map([
+    ['/agent/tool-call', false],
+    ['/gateway/tool/intercept', false],
+    ['/gateway/tool/propose', false],
+    ['/gateway/authority/review', true],
+    ['/gateway/tool/compile', false],
+  ])
+  const expectedProofRequired = new Map([
+    ['/agent/tool-call', true],
+    ['/gateway/tool/intercept', false],
+    ['/gateway/tool/propose', false],
+    ['/gateway/authority/review', false],
+    ['/gateway/tool/compile', false],
+  ])
 
-  assert.match(source, /AGENT_TOOL_GATEWAY_COMPILE_ROUTE\s*=\s*"\/gateway\/tool\/compile"/)
-  assert.equal(canonicalPostRoutes.has('/gateway/tool/compile'), false)
-  assert.equal(route.surface_type, 'governed_gateway_compile_route')
-  assert.equal(route.compile_only, true)
-  assert.equal(route.mutation_capability, true)
-  assert.equal(route.execution_capability, false)
-  assert.equal(route.proof_generating, false)
-  assert.equal(route.deployment_capability, false)
-  assert.equal(route.creates_authority, false)
-  assert.deepEqual(route.issue_lineage, ['#1627', '#1773'])
-  assert.equal(route.closure_state, 'PARTIAL_CONTAINED')
-  assert.equal(route.containment_status, 'CONTAINED')
-  assert.equal(matrixRoute.canonical_execution_expansion, false)
-  assert.equal(matrixRoute.compile_only, true)
+  assert.match(source, /AGENT_TOOL_GOVERNED_SUPPORT_SURFACES/)
+  assert.match(source, /governed_support_routes/)
+  for (const routeName of scopedRoutes) {
+    assert.equal(canonicalPostRoutes.has(routeName), false, `${routeName} must not enter canonical execution routes`)
+    const route = inventory.surfaces.find((surface) => surface.surface_id === `route:${routeName}`)
+    const matrixRoute = matrix.declared_surfaces.find((surface) => surface.surface_id === `route:${routeName}`)
+    assert.ok(route, `${routeName} missing from unauthorized mutation surface inventory`)
+    assert.ok(matrixRoute, `${routeName} missing from mutation surface exhaustiveness matrix`)
+
+    for (const surface of [route, matrixRoute]) {
+      assert.equal(surface.classification, 'governed_support_surface')
+      assert.equal(surface.execution_surface_classification, 'not_execution_capable_surface')
+      assert.equal(surface.mutation_capability, expectedMutationCapability.get(routeName))
+      assert.equal(surface.execution_capability, false)
+      assert.equal(surface.deployment_capability, false)
+      assert.equal(surface.proof_generating, false)
+      assert.equal(surface.creates_authority, false)
+      assert.equal(surface.creates_atao, expectedCreatesAtao.get(routeName))
+      assert.equal(surface.proof_required, expectedProofRequired.get(routeName))
+      assert.equal(surface.replay_safe, true)
+      assert.equal(surface.topology_visibility_classification, 'inventory_visible_governed_support_surface')
+      assert.equal(surface.canonical_execution_expansion, false)
+    }
+  }
 })
 
 test('no deploy workflow bypass is introduced by topology evidence', () => {

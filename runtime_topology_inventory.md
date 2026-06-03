@@ -67,3 +67,22 @@ The sample includes per-surface closure status, production-relevance-aware summa
 - graph observation ≠ execution permission
 - visibility ≠ authority
 - no runtime mutation performed
+
+## Governed support surface reconciliation (#1606)
+
+The following Agent Gateway and Agent Tool routes are inventory-visible governed support surfaces. They are not canonical execution routes and do not expand the canonical `/session → /continuity → /authority → /compile → /validate → /execute → /proof` chain.
+
+| Route | Classification | Mutation capability | Execution capability | Deployment capability | Creates authority | Creates ATAO | Proof required | Replay characteristics | Topology visibility classification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `/agent/tool-call` | `governed_support_surface` | `true` | `false` | `false` | `false` | `false` | `true` | Proof-bound single-use invocation nonce; duplicate ATAO/decision/object/nonce lineage returns `NULL`. | `inventory_visible_governed_support_surface` |
+| `/gateway/tool/intercept` | `governed_support_surface` | `true` | `false` | `false` | `false` | `false` | `false` | Append-only observation/proposal evidence; no execution nonce is consumed and no execution replay eligibility is created. | `inventory_visible_governed_support_surface` |
+| `/gateway/tool/propose` | `governed_support_surface` | `false` | `false` | `false` | `false` | `false` | `false` | Proposal lookup only; no support lineage append, execution nonce consumption, or replay eligibility creation. | `inventory_visible_governed_support_surface` |
+| `/gateway/authority/review` | `governed_support_surface` | `true` | `false` | `false` | `false` | `true` | `false` | Append-only review lineage; approved reviews may form ATAO support objects but do not create authority or execution replay state. | `inventory_visible_governed_support_surface` |
+| `/gateway/tool/compile` | `governed_support_surface` | `true` | `false` | `false` | `false` | `false` | `false` | Deterministic compile-only hash reuse; existing AEO compile returns the existing canonical object without execution or proof creation. | `inventory_visible_governed_support_surface` |
+
+Reconciliation invariants:
+- `execution_capability=false` for every scoped support route.
+- `creates_authority=false` for every scoped support route.
+- `deployment_capability=false` for every scoped support route.
+- `canonical_execution_expansion=false` for every scoped support route.
+- Support route visibility is inventory evidence only; it is not authority, validation, proof, deployment, or execution permission.
