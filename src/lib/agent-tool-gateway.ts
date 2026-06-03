@@ -580,6 +580,76 @@ export function createPredicateVerificationContract(
   })
 }
 
+// ── Issue #1790: Phase 3C Ω Validator Input Envelope ─────────────────────────
+// Binds validator identity, predicate identity, and contract identity into a
+// deterministic envelope artifact. Transport / identity structure only.
+//
+// Non-goals preserved here:
+//   no validator execution
+//   no predicate execution
+//   no validation
+//   no authority creation
+//   no execution eligibility
+//   no proof generation
+//   no replay mutation
+//   no database persistence
+//
+// Topology:
+//   Predicate Verification Contract
+//   → Ω Validator Input Envelope
+//   → Future Ω Validator
+
+export type OmegaValidatorInputEnvelope = {
+  readonly envelope_id: string
+  readonly contract_id: string
+  readonly template_id: string
+  readonly predicate_set_id: string
+  readonly predicate_hash: string
+  readonly lineage_version: string
+}
+
+// createOmegaValidatorInputEnvelope: forms a deterministic envelope from a
+// PredicateVerificationContract. Verifies contract integrity by recomputing the
+// contract_id from its constituent fields before forming the envelope.
+// Fails closed on missing fields, blank fields, or contract hash mismatch.
+export function createOmegaValidatorInputEnvelope(
+  contract: PredicateVerificationContract | null | undefined,
+): OmegaValidatorInputEnvelope | null {
+  if (!contract) return null
+  if (!isNonBlankString(contract.contract_id)) return null
+  if (!isNonBlankString(contract.template_id)) return null
+  if (!isNonBlankString(contract.schema_version)) return null
+  if (!isNonBlankString(contract.predicate_set_id)) return null
+  if (!isNonBlankString(contract.predicate_hash)) return null
+  if (!isNonBlankString(contract.lineage_version)) return null
+
+  const recomputedContractId = hashCanonical({
+    template_id: contract.template_id,
+    schema_version: contract.schema_version,
+    predicate_set_id: contract.predicate_set_id,
+    predicate_hash: contract.predicate_hash,
+    lineage_version: contract.lineage_version,
+  })
+  if (recomputedContractId !== contract.contract_id) return null
+
+  const envelope_id = hashCanonical({
+    contract_id: contract.contract_id,
+    template_id: contract.template_id,
+    predicate_set_id: contract.predicate_set_id,
+    predicate_hash: contract.predicate_hash,
+    lineage_version: contract.lineage_version,
+  })
+
+  return Object.freeze({
+    envelope_id,
+    contract_id: contract.contract_id,
+    template_id: contract.template_id,
+    predicate_set_id: contract.predicate_set_id,
+    predicate_hash: contract.predicate_hash,
+    lineage_version: contract.lineage_version,
+  })
+}
+
 // interceptToolCall — gateway entry point.
 // Produces: Observation Artifact → CIP → GovernanceProposal
 // Does NOT produce: ATAO, AEO, authority, execution eligibility
