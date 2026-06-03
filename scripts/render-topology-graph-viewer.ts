@@ -20,8 +20,7 @@ import { join, dirname, resolve } from 'node:path';
 import {
   normalizeTopologyGraph,
   renderTopologyGraphHtml,
-  VIEWER_METADATA,
-} from '../src/visualizer/topology-graph-viewer.js';
+} from '../src/visualizer/topology-graph-viewer.ts';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dir, '..');
@@ -61,9 +60,8 @@ const html = renderTopologyGraphHtml(graph);
 
 writeFileSync(outputPath, html, 'utf8');
 
-console.log('[render-topology-graph-viewer]', VIEWER_METADATA.satisfies);
+console.log('[render-topology-graph-viewer] evidence_only=true read_only=true observational=true');
 console.log(`  source : ${sourcePath}`);
 console.log(`  nodes  : ${graph.nodes.length}`);
 console.log(`  edges  : ${graph.edges.length}`);
 console.log(`  output : ${outputPath}`);
-console.log(`  evidence_only=${VIEWER_METADATA.evidence_only}  read_only=${VIEWER_METADATA.read_only}  creates_authority=${VIEWER_METADATA.creates_authority}`);
