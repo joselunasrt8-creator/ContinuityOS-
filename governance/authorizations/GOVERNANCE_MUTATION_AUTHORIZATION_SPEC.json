@@ -27,9 +27,10 @@
   "expiry_enforcement": "GMA is rejected if expires_at is in the past at merge check time",
   "mutation_class_coverage": "GMA must declare all governance_mutation and workflow_mutation classes detected in the PR",
   "exempted_paths": [
-    "governance/authorizations/**"
+    "governance/authorizations/**",
+    "governance/merge-legitimacy/merge_proof_registry.jsonl"
   ],
-  "exemption_rationale": "GMA artifacts committed to governance/authorizations/ are authorization evidence artifacts, not governance primitives. They are self-referentially exempt to break the bootstrap circularity.",
+  "exemption_rationale": "Two classes of paths are exempt from governance_mutation classification: (1) GMA artifacts at governance/authorizations/ are authorization evidence, not governance primitives — self-referentially exempt to break bootstrap circularity. (2) merge_proof_registry.jsonl is an append-only proof evidence surface that records merge events after the fact; it does not define governance rules, authority, policy, or validation logic. Evidence persistence != governance self-mutation.",
   "failure_result": "NULL",
   "enforcement_rule": "governance_mutation or workflow_mutation detected AND no valid GMA at governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json -> MERGE_LEGITIMACY_NULL",
   "creation_workflow": ".github/workflows/governance-mutation-authorization.yml",
