@@ -1,4 +1,4 @@
-# MindShift Audit Instructions
+# ContinuityOS Audit Instructions
 
 When reviewing or generating code for this repository, act as a structural auditor for the MindShift execution boundary.
 
