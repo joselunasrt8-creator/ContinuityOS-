@@ -77,6 +77,15 @@ jobs:
               governance/authorizations/*)
                 # GMA artifacts: authorization evidence, not governance primitives (GAP-005)
                 ;;
+              governance/merge-legitimacy/merge_proof_registry.jsonl)
+                # Append-only proof evidence surface: records merge proof events after merge.
+                # Does not define governance rules, policies, authority, or validation logic.
+                # Classified as proof_persistence, not governance_mutation. GMA not required.
+                echo "$file" >> governed_files.txt
+                echo "proof_persistence" >> mutation_classes.txt
+                echo "proof_evidence_surface" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
+                ;;
               governance/*)
                 echo "$file" >> governed_files.txt
                 echo "governance_mutation" >> mutation_classes.txt

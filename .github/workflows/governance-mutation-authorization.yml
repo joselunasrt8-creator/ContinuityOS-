@@ -75,6 +75,59 @@ jobs:
           echo "GMA_REPLAY_ID=$GMA_REPLAY_ID" >> "$GITHUB_ENV"
           echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
 
+      - name: PREFLIGHT — Verify WORKER_URL resolves directly to runtime API (no redirect)
+        run: |
+          set -euo pipefail
+
+          # curl -L (redirect follow) is intentionally absent.
+          # Following redirects without validating the redirect host would send API_KEY
+          # to an unvalidated destination — a credential-exfiltration vector.
+          PREFLIGHT_OUT=$(curl -sS \
+            --max-time 10 \
+            --output preflight_body.txt \
+            --write-out "%{http_code}|%{content_type}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d '{"identity_id":"preflight"}' \
+            "$CLEAN_WORKER_URL/session" 2>/dev/null) || PREFLIGHT_OUT="000|unknown"
+
+          PREFLIGHT_HTTP_STATUS="${PREFLIGHT_OUT%%|*}"
+          PREFLIGHT_CONTENT_TYPE="${PREFLIGHT_OUT#*|}"
+
+          # Print path only — CLEAN_WORKER_URL is a secret, never echo the host
+          echo "preflight_endpoint_path=/session"
+          echo "preflight_http_status=$PREFLIGHT_HTTP_STATUS"
+          echo "preflight_content_type=${PREFLIGHT_CONTENT_TYPE:-none}"
+
+          if [[ "$PREFLIGHT_HTTP_STATUS" -lt 200 || "$PREFLIGHT_HTTP_STATUS" -ge 300 ]]; then
+            echo "NULL — PREFLIGHT FAIL: /session returned HTTP $PREFLIGHT_HTTP_STATUS (expected 2xx JSON)"
+            case "$PREFLIGHT_HTTP_STATUS" in
+              301|302|307|308)
+                echo "DIAGNOSIS: MINDSHIFT_WORKER_URL redirects instead of serving the API directly."
+                echo "ACTION: Update MINDSHIFT_WORKER_URL secret to the direct runtime API endpoint"
+                echo "  that returns {\"status\":\"SESSION_ACTIVE\",\"session_id\":\"...\"}."
+                echo "SECURITY: curl -L is absent by design — redirect follow without host"
+                echo "  validation would forward API_KEY to an unvalidated destination."
+                ;;
+              000)
+                echo "DIAGNOSIS: Connection failed (timeout, DNS failure, or unreachable host)."
+                ;;
+              *)
+                echo "DIAGNOSIS: Unexpected HTTP $PREFLIGHT_HTTP_STATUS from runtime API."
+                ;;
+            esac
+            exit 1
+          fi
+
+          if [[ "$PREFLIGHT_CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "NULL — PREFLIGHT FAIL: /session returned non-JSON content-type: $PREFLIGHT_CONTENT_TYPE"
+            echo "Expected application/json. Check MINDSHIFT_WORKER_URL points to correct endpoint."
+            exit 1
+          fi
+
+          echo "PREFLIGHT_OK — WORKER_URL resolves directly to runtime API with JSON response"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
