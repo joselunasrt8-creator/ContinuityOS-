@@ -1,5 +1,7 @@
 {
-  "version": "2.0",
+  "version": "2.1",
+  "canonical_source": true,
+  "canonical_source_note": "This file is the single canonical source of record for BYPASS_PATHS. All copies under governance/, governance/runtime/, governance/mindshift-validation-bundle/governance/, and runtime/surfaces/ are derived artifacts. Enforcement tooling must reference this file only.",
   "purpose": "Known and potential execution bypass paths — classified by governance state",
   "governance_class_taxonomy": [
     "GOVERNED",
@@ -16,10 +18,12 @@
       "bypass_id": "ungoverned_agent_tool_call",
       "surface_category": "agent",
       "risk": "AI/LLM agent tool call executes mutation (D1 write, deploy, schema change) outside canonical /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof lifecycle — no authority object, no proof, no replay protection",
-      "governance_class": "UNKNOWN",
+      "governance_class": "GOVERNED",
+      "governed_via": "Agent tool calls route through src/lib/agent-tool-gateway.ts: Observation -> CIP -> GovernanceProposal -> Authority Review -> ATAO -> AEO -> Omega Validator -> execution boundary -> proof. State-changing tool calls without a valid authority-bound AEO collapse to NULL. Enforcement: conductAuthorityReview() in src/lib/authority-review.ts; reviewer_id validated against permitted_reviewer_ids list derived from MERGE_ACTOR_REGISTRY.json.",
       "fail_closed_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
-      "required_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
+      "required_response": "NULL if no valid ATAO; GOVERNED if AEO + Omega Validator VALID",
       "topology_surface": "bypass:agent_tool_call",
+      "issue_reference": "#1833",
       "closure_condition": "All agent tool calls that perform state-changing operations must be bound to an active authority object and produce a proof record before mutation is applied"
     },
     {
@@ -167,10 +171,12 @@
       "bypass_id": "manual_workflow_dispatch",
       "surface_category": "ci_cd",
       "risk": "unauthorized execution via direct workflow_dispatch without governed authority context",
-      "governance_class": "UNKNOWN",
-      "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
-      "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
-      "topology_surface": "bypass:ci_cd_direct_dispatch"
+      "governance_class": "GOVERNED",
+      "governed_via": "governed-deploy.yml enforces hard-fail on missing required inputs (decision_id, validated_object_hash, invocation_nonce). Fabricated inputs are rejected at runtime replay and hash verification stages. This rejection is a declared governance behavior, not ad-hoc validation. Dispatch without valid AEO inputs collapses to NULL. Issue reference: #1839.",
+      "fail_closed_response": "NULL on missing or fabricated decision_id / validated_object_hash / invocation_nonce",
+      "required_response": "NULL if inputs absent or fabricated; GOVERNED path if all AEO inputs valid",
+      "topology_surface": "bypass:ci_cd_direct_dispatch",
+      "issue_reference": "#1839"
     },
     {
       "path": "raw_database_write",
@@ -303,22 +309,37 @@
       "fail_closed_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
       "required_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
       "topology_surface": "bypass:raw_d1_migration"
+    },
+    {
+      "path": "cloudflare_git_integration_auto_deploy",
+      "bypass_id": "cloudflare_git_integration_auto_deploy",
+      "surface_category": "deploy",
+      "risk": "Cloudflare Git Integration triggers auto-deploy on git push, bypassing /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof. PR #582 confirmed a live preview deploy from commit 77c2b95 outside the governed lifecycle.",
+      "governance_class": "BREAK_GLASS",
+      "governed_via": "Pending: disable at Cloudflare account level (external action required, not a code change). Until disabled: preview-only constraint active per wrangler.toml [env.preview]. Production mutation classified as disallowed. Closure requires account-level Git Integration disable + root_authority_inventory.json update + cloudflare-sovereignty.test.ts assertion update.",
+      "fail_closed_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "required_response": "ROOT_AUTHORITY_CONTAINMENT_REQUIRED -> NULL",
+      "topology_surface": "bypass:wrangler_direct_deploy",
+      "issue_reference": "#1832",
+      "closure_pending_external_action": "Disable Cloudflare Git Integration at account level; update runtime/sovereignty/root_authority_inventory.json governed_by_mindshift: true, status: CLOSED"
     }
   ],
   "topology_surfaces": [
     {
       "surface_id": "bypass:agent_tool_call",
-      "description": "Ungoverned AI/LLM agent tool call surface — mutation-capable calls outside canonical lifecycle",
-      "governance_class": "UNKNOWN",
+      "description": "AI/LLM agent tool call surface — mutation-capable calls governed via ATAO -> AEO -> Omega Validator canonical lifecycle in src/lib/agent-tool-gateway.ts",
+      "governance_class": "GOVERNED",
       "mutation_capable": true,
-      "surface_category": "agent"
+      "surface_category": "agent",
+      "issue_reference": "#1833"
     },
     {
       "surface_id": "bypass:ci_cd_direct_dispatch",
-      "description": "Direct CI/CD workflow dispatch without valid authority object or governed context",
-      "governance_class": "UNKNOWN",
+      "description": "CI/CD workflow dispatch — governed via governed-deploy.yml AEO input enforcement; dispatch without valid decision_id/validated_object_hash/invocation_nonce collapses to NULL",
+      "governance_class": "GOVERNED",
       "mutation_capable": true,
-      "surface_category": "ci_cd"
+      "surface_category": "ci_cd",
+      "issue_reference": "#1839"
     },
     {
       "surface_id": "bypass:wrangler_direct_deploy",

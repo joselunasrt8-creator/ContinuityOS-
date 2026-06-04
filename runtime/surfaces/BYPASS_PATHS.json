@@ -1,6 +1,10 @@
 {
   "object_type": "RuntimeSurfaceInventory",
   "version": "1.0.0",
+  "canonical_source": false,
+  "derived_from": "BYPASS_PATHS.json",
+  "generated_at": "2026-06-04T00:00:00.000Z",
+  "canonical_source_note": "DERIVED ARTIFACT. The canonical source is /BYPASS_PATHS.json (root). Enforcement tooling must not reference this file.",
   "generated_at": "2026-05-14T00:00:00.000Z",
   "invariant": "If no valid object exists -> nothing happens.",
   "evidence_only": true,

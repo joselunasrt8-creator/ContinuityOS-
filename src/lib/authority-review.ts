@@ -183,9 +183,15 @@ export function conductAuthorityReview(input: {
   readonly review_decision: string
   readonly review_rationale: string
   readonly timestamp: string
+  // When provided, reviewer_id must be present in this list or the review collapses to NULL.
+  // Load from MERGE_ACTOR_REGISTRY.json permitted_self_certifiers + authority_roles.sovereignty_review[].login at call site.
+  readonly permitted_reviewer_ids?: readonly string[]
 }): AuthorityReviewOutcome {
   if (!input.reviewer_id) {
     return Object.freeze({ status: "NULL" as const, reason: "missing_reviewer_id" })
+  }
+  if (input.permitted_reviewer_ids !== undefined && !input.permitted_reviewer_ids.includes(input.reviewer_id)) {
+    return Object.freeze({ status: "NULL" as const, reason: "unauthorized_reviewer_id" })
   }
   if (!input.review_rationale) {
     return Object.freeze({ status: "NULL" as const, reason: "missing_review_rationale" })

@@ -324,6 +324,30 @@ test('conductAuthorityReview: invalid review_decision → NULL', async () => {
   assert.equal(outcome.reason, 'invalid_review_decision')
 })
 
+// Issue #1833: reviewer_id must be validated against permitted_reviewer_ids when provided
+test('conductAuthorityReview: reviewer_id not in permitted_reviewer_ids → NULL (unauthorized_reviewer_id)', async () => {
+  const { conductAuthorityReview } = await import('../src/lib/authority-review.ts')
+  const proposal = { proposal_id: 'p', cip_id: 'c', observation_id: 'o', observation_hash: 'h', agent_id: 'a', session_id: 's', framework: 'langchain', tool_name: 't', tool_system: 'github', risk_class: 'P1', intent: 'i', scope: {}, constraints: {}, requires_authority_binding: false }
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'fabricated-reviewer', review_decision: 'APPROVED', review_rationale: 'r', timestamp: '2026-06-02T00:00:00.000Z', permitted_reviewer_ids: ['joselunasrt8-creator'] })
+  assert.equal(outcome.status, 'NULL')
+  assert.equal(outcome.reason, 'unauthorized_reviewer_id')
+})
+
+test('conductAuthorityReview: reviewer_id in permitted_reviewer_ids → proceeds normally', async () => {
+  const { conductAuthorityReview } = await import('../src/lib/authority-review.ts')
+  const proposal = { proposal_id: 'p-auth', cip_id: 'c', observation_id: 'o', observation_hash: 'h', agent_id: 'a', session_id: 's', framework: 'langchain', tool_name: 't', tool_system: 'github', risk_class: 'P1', intent: 'i', scope: {}, constraints: {}, requires_authority_binding: false }
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'joselunasrt8-creator', review_decision: 'APPROVED', review_rationale: 'authorized', timestamp: '2026-06-02T00:00:00.000Z', permitted_reviewer_ids: ['joselunasrt8-creator'] })
+  assert.equal(outcome.status, 'APPROVED')
+  assert.ok(outcome.atao)
+})
+
+test('conductAuthorityReview: permitted_reviewer_ids omitted → no registry check (backward compatible)', async () => {
+  const { conductAuthorityReview } = await import('../src/lib/authority-review.ts')
+  const proposal = { proposal_id: 'p-compat', cip_id: 'c', observation_id: 'o', observation_hash: 'h', agent_id: 'a', session_id: 's', framework: 'langchain', tool_name: 't', tool_system: 'github', risk_class: 'P1', intent: 'i', scope: {}, constraints: {}, requires_authority_binding: false }
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'any-reviewer', review_decision: 'APPROVED', review_rationale: 'ok', timestamp: '2026-06-02T00:00:00.000Z' })
+  assert.equal(outcome.status, 'APPROVED')
+})
+
 // formAgentToolATAO type-safety: produces canonical ATAO with correct shape
 test('formAgentToolATAO with APPROVED review produces canonical AgentToolATAO', async () => {
   const { formAuthorityReviewArtifact, formAgentToolATAO } = await import('../src/lib/authority-review.ts')

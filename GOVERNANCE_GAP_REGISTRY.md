@@ -68,10 +68,10 @@ The purpose of this registry is to:
 | risk_class | P0 |
 | bypass_condition | Infrastructure root credentials mutate runtime outside canonical legitimacy chain |
 | closure_condition | All production mutation authority traverses canonical governed execution lifecycle |
-| current_state | Runtime governance stronger than infrastructure sovereignty; PR #582 triggered a Cloudflare Git Integration deployment from commit 77c2b95 outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof. Classified as preview/non-production based on PR-linked Git Integration evidence; sovereignty gap tracked under #578, not #577 production deploy blocker unless production-capable. |
+| current_state | Runtime governance stronger than infrastructure sovereignty; PR #582 triggered a Cloudflare Git Integration deployment from commit 77c2b95 outside /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof. Classified as preview/non-production based on PR-linked Git Integration evidence. `cloudflare_git_integration_auto_deploy` entry added to canonical BYPASS_PATHS.json (v2.1) as BREAK_GLASS with explicit closure_pending_external_action. Remaining blocker: account-level Git Integration disable requires Cloudflare account access (external action, not a code change). On completion: update runtime/sovereignty/root_authority_inventory.json governed_by_mindshift: true, status: CLOSED + cloudflare-sovereignty.test.ts assertion. Issue: #1832. |
 | required_tests | deploy bypass detection, workflow provenance verification, authority equivalence verification |
 | required_proofs | deploy provenance evidence, immutable workflow lineage |
-| status | OPEN |
+| status | PARTIAL — bypass formally classified in BYPASS_PATHS.json; account-level Git Integration disable pending external Cloudflare account action |
 
 ---
 
@@ -116,12 +116,12 @@ The purpose of this registry is to:
 | risk_class | P0 |
 | bypass_condition | Governance primitives mutate without governed legitimacy validation |
 | closure_condition | Runtime governance changes require recursively governed legitimacy approval |
-| current_state | PARTIAL — GMA (Governance Mutation Authorization) enforcement active: governance_mutation and workflow_mutation class PRs require a valid GMA artifact with canonical lifecycle lineage (/session → /continuity → /authority → /compile). Enforcement in merge-governance-check.yml. Creation workflow: governance-mutation-authorization.yml. Spec: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json. Bootstrap exemption (GMA_BOOTSTRAP_EXEMPTION) applies only to the single PR introducing GAP-005 GMA infrastructure — self-limiting, non-reusable, auditable. Once merged, all subsequent governance mutations fully enforce GMA. Remaining gap: runtime proof persistence (/execute → /proof) for governance mutations not yet enforced. |
+| current_state | PARTIAL — GMA (Governance Mutation Authorization) enforcement active: governance_mutation and workflow_mutation class PRs require a valid GMA artifact with canonical lifecycle lineage (/session → /continuity → /authority → /compile). Enforcement in merge-governance-check.yml. Creation workflow: governance-mutation-authorization.yml. Spec: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json. Bootstrap exemption (GMA_BOOTSTRAP_EXEMPTION) applies only to the single PR introducing GAP-005 GMA infrastructure — self-limiting, non-reusable, auditable. Once merged, all subsequent governance mutations fully enforce GMA. Remaining gap: runtime proof persistence (/execute → /proof) for governance mutations not yet enforced. Depends on GAP-001 (#1835) recursive continuity lineage for reliable ancestry validation. |
 | issue_reference | #1831 |
 | required_tests | governance mutation validation, recursive approval lineage, policy drift invalidation |
 | required_proofs | governance lineage persistence, immutable governance mutation evidence |
-| remaining_closure | Wire /execute → /proof stage for governance mutations; add governance_mutation_proof to proof registry |
-| status | PARTIAL |
+| remaining_closure | (1) GAP-001 #1835 recursive continuity + durable nonce — precondition. (2) Wire /execute → /proof stage for governance mutations; add governance_mutation_proof to proof registry. |
+| status | PARTIAL — GAP-001 (#1835) is a declared precondition; once resolved, wire /execute → /proof for governance mutations |
 
 ---
 
@@ -135,11 +135,11 @@ The purpose of this registry is to:
 | risk_class | P3 |
 | bypass_condition | Production Cloudflare Worker deployment occurs outside canonical /session → /continuity → /authority → /compile → /validate → /execute → /proof chain. Vectors: Cloudflare Git Integration (auto-deploy on push), local wrangler deploy with valid API token, unauthorized workflow_dispatch with fabricated inputs, preview environment targeting production worker. |
 | closure_condition | All production-capable Cloudflare mutation paths either: (a) traverse the full canonical chain via governed-deploy.yml, or (b) are classified as root break-glass authority with observable audit trail. Cloudflare Git Integration must be disabled at account level. |
-| current_state | Governed deploy workflow (PATH-001) is active and enforces canonical chain. Git Integration requires account-level disable (OPEN). Local wrangler bypass is classified as root break-glass authority with audit observable. Preview environment isolated via wrangler.toml [env.preview]. Authority expiry in legitimacy artifact now derived from /authority response (was hardcoded 2999). Wrangler detection in governed-deploy.ts strengthened to cover shell-wrapped patterns. |
+| current_state | Governed deploy workflow (PATH-001) is active and enforces canonical chain. Git Integration requires account-level disable (OPEN). Local wrangler bypass is classified as root break-glass authority with audit observable. Preview environment isolated via wrangler.toml [env.preview]. Authority expiry in legitimacy artifact now derived from /authority response (was hardcoded 2999). Wrangler detection in governed-deploy.ts strengthened to cover shell-wrapped patterns. `cloudflare_git_integration_auto_deploy` formally classified in canonical BYPASS_PATHS.json (v2.1) as BREAK_GLASS with closure_pending_external_action. Manual workflow_dispatch formally classified as GOVERNED in BYPASS_PATHS.json (issue #1839). |
 | required_tests | production deploy outside governed workflow → NULL; unauthorized workflow dispatch → NULL; local bypass classified and observable; preview-only paths cannot mutate production; replayed deployment lineage rejected |
 | required_proofs | CLOUDFLARE_AUTHORITY_CLASSIFICATION.json, DEPLOYMENT_TOPOLOGY_MAP.json, PRODUCTION_MUTATION_CONTAINMENT.json, RESIDUAL_BYPASS_MATRIX.json |
 | fate_tests | tests/fate/issue-584-cloudflare-authority-bypass-containment.test.mjs |
-| status | PARTIAL — code containment active; Cloudflare Git Integration account-level disable pending |
+| status | PARTIAL — code containment active; manual dispatch classified as GOVERNED; Cloudflare Git Integration account-level disable pending external action (#1832) |
 
 ---
 

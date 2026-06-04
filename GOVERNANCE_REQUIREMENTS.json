@@ -124,8 +124,11 @@
     {
       "finding_id": "RIF-004",
       "severity": "low",
-      "status": "bounded_by_tests",
-      "finding": "Manual workflow dispatch remains available but is bounded by exact decision_id, validated_object_hash, invocation_nonce, worker API key, and runtime replay checks."
+      "status": "classified",
+      "finding": "Manual workflow_dispatch is formally classified as GOVERNED in BYPASS_PATHS.json (issue #1839). Rejection of dispatch without valid decision_id, validated_object_hash, and invocation_nonce is a declared governance behavior enforced by governed-deploy.yml — not ad-hoc input validation. Dispatch with fabricated inputs collapses to NULL via runtime replay and hash verification. Classification is explicit, owned, and auditable.",
+      "issue_reference": "#1839",
+      "governed_by": "governed-deploy.yml required inputs enforcement",
+      "bypass_paths_entry": "manual_workflow_dispatch"
     }
   ],
   "invariant_violations": [],
