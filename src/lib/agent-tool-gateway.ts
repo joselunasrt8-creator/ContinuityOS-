@@ -383,6 +383,7 @@ const GATEWAY_TOOL_RISK_TABLE: ReadonlyMap<string, { readonly system: GatewayToo
   ["list_issues",         { system: "github",     risk_class: "P0" }],
   ["list_pull_requests",  { system: "github",     risk_class: "P0" }],
   ["search_code",         { system: "github",     risk_class: "P0" }],
+  ["comment_issue",       { system: "github",     risk_class: "P2" }],
   ["http_get",            { system: "http_api",   risk_class: "P0" }],
   ["db_read",             { system: "database",   risk_class: "P0" }],
   ["http_post",           { system: "http_api",   risk_class: "P1" }],
