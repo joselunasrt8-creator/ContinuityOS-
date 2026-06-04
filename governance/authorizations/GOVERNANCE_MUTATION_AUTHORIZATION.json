@@ -1,0 +1,25 @@
+{
+  "gma_id": "GMA-gap-005-enforcement-56Hxx-1",
+  "decision_id": "96223f6a-6e53-4550-bb2f-cd23bc68ce70",
+  "continuity_id": "4b5a1a41-b356-4018-a161-3d784773ab59",
+  "session_id": "71f6a87a-ed39-4a44-850b-60ebabbb33af",
+  "validated_object_hash": "8e177cb2682758fcf6000ef360d53b288d86fe98538ccf812b70a5726ce3e8de",
+  "governed_files_hash": "1156e3c40db4843eafef1ee06d347eb891a95f628a8da8b83f0f4dd683d63db9",
+  "governed_files": [
+    ".github/workflows/governance-mutation-authorization.yml",
+    ".github/workflows/merge-governance-check.yml"
+  ],
+  "mutation_classes": [
+    "workflow_mutation"
+  ],
+  "gm_control_class": "GOVERNANCE_CONTAINED",
+  "intent": "Authorize two governance-contained workflow mutations: (1) merge-governance-check.yml — exempt governance/merge-legitimacy/merge_proof_registry.jsonl from governance_mutation classification; it is an append-only proof evidence surface, not a governance primitive. (2) governance-mutation-authorization.yml — add PREFLIGHT step to detect WORKER_URL redirects before the /session call, diagnosing the HTTP 302 failure without leaking secrets or following redirects to unvalidated hosts.",
+  "authority_lineage_bound": true,
+  "repo": "joselunasrt8-creator/mindshift-demo",
+  "branch": "claude/gap-005-gma-enforcement-56Hxx",
+  "head_sha": "a9abd1c3f000e1046a52af15aa9cb39b3e01a3f9",
+  "workflow_run_id": "gap-005-gma-enforcement-56Hxx",
+  "created_at": "2026-06-04T06:56:46Z",
+  "expires_at": "2027-06-04T06:56:46Z",
+  "status": "GMA_VALID"
+}
