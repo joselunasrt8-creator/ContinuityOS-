@@ -35,13 +35,13 @@ function failClosed(reason, errorCode) {
   process.exit(1);
 }
 
-async function fetchJson(url, body, timeoutOverride) {
+async function fetchJson(url, body, extraHeaders, timeoutOverride) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutOverride ?? timeoutMs);
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'mock-key' },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'mock-key', ...extraHeaders },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -65,9 +65,9 @@ async function run() {
 
   const base = `http://127.0.0.1:${port}`;
 
-  async function call(path, body) {
+  async function call(path, body, extraHeaders = {}) {
     try {
-      return await fetchJson(`${base}${path}`, body);
+      return await fetchJson(`${base}${path}`, body, extraHeaders);
     } catch (err) {
       server.close();
       failClosed(err.message ?? 'fetch_failed', 'ADAPTER_FETCH_ERROR');
@@ -101,11 +101,31 @@ async function run() {
     }
     const continuityId = continuity.json.continuity_id;
 
+    // /govern — must precede /authority to obtain governed_tool_envelope_id
+    const governNonce = `nonce-adapter-govern-${Date.now()}`;
+    const govern = await call('/govern', {
+      intent: 'deploy_production',
+      scope: { environment: 'production' },
+      target: { repo: 'joselunasrt8-creator/mindshift-demo', branch: 'main', workflow: 'governed-deploy.yml' },
+      finality: { proof_required: true },
+      policy_class: 'TOOL_RUNTIME_MUTATION',
+      policy_digest: 'a'.repeat(64),
+      topology_attestation_hash: 'b'.repeat(64),
+    }, { 'X-Nonce': governNonce });
+    if (govern.code < 200 || govern.code > 299 || govern.json.status !== 'VALID_CANDIDATE') {
+      server.close();
+      process.stdout.write(JSON.stringify({ validation_result: 'NULL', reason: govern.json.reason ?? 'govern_failed', error_code: 'NULL_GOVERN' }) + '\n');
+      return;
+    }
+    const envelopeId = govern.json.envelope_id;
+    const envelopeHash = govern.json.envelope_hash;
+
     // /authority
     const authority = await call('/authority', {
       session_id: sessionId,
       continuity_id: continuityId,
       decision_id: 'dec-cicd-mock-00000000',
+      governed_tool_envelope_id: envelopeId,
     });
     if (authority.code < 200 || authority.code > 299 || authority.json.status !== 'ACTIVE') {
       server.close();
@@ -113,8 +133,20 @@ async function run() {
       return;
     }
 
-    // /compile
-    const compile = await call('/compile', { decision_id: 'dec-cicd-mock-00000000' });
+    // /compile — includes full execution_snapshot fields required by the real API
+    const workflowHash = 'c'.repeat(64);
+    const repoTreeHash = 'd'.repeat(64);
+    const compile = await call('/compile', {
+      decision_id: 'dec-cicd-mock-00000000',
+      repository_tree_hash: repoTreeHash,
+      workflow_hash: workflowHash,
+      topology_hash: 'e'.repeat(64),
+      governance_hash: 'f'.repeat(64),
+      runtime_surface_hash: '0'.repeat(64),
+      schema_set_hash: '1'.repeat(64),
+      workflow_identity: '.github/workflows/governed-deploy.yml',
+      replay_epoch: 'mock-replay-epoch-1',
+    });
     if (compile.code < 200 || compile.code > 299 || compile.json.status !== 'COMPILED') {
       server.close();
       process.stdout.write(JSON.stringify({ validation_result: 'NULL', reason: compile.json.reason ?? 'compile_failed', error_code: 'NULL_COMPILE' }) + '\n');
@@ -139,6 +171,8 @@ async function run() {
       repo: 'joselunasrt8-creator/mindshift-demo',
       branch: 'main',
       workflow: 'governed-deploy.yml',
+      govern_envelope_id: envelopeId,
+      govern_envelope_hash: envelopeHash,
     });
     if (validate.code < 200 || validate.code > 299 || validate.json.status !== 'VALID') {
       server.close();
@@ -154,9 +188,23 @@ async function run() {
       validated_object_hash: validatedObjectHash,
       invocation_nonce: invocationNonce,
       environment: 'production',
-      repo: 'joselunasrt8-creator/mindshift-demo',
+      // provenance fields (workflow_sha must equal workflow_hash; source_tree_hash must equal repository_tree_hash)
+      repository: 'joselunasrt8-creator/mindshift-demo',
       branch: 'main',
-      workflow: 'governed-deploy.yml',
+      pull_request_id: 'none',
+      merge_commit_sha: 'mock-sha',
+      source_tree_hash: repoTreeHash,
+      workflow_run_id: 'mock-run-id',
+      workflow_sha: workflowHash,
+      // execution_snapshot fields
+      repository_tree_hash: repoTreeHash,
+      workflow_hash: workflowHash,
+      topology_hash: 'e'.repeat(64),
+      governance_hash: 'f'.repeat(64),
+      runtime_surface_hash: '0'.repeat(64),
+      schema_set_hash: '1'.repeat(64),
+      workflow_identity: '.github/workflows/governed-deploy.yml',
+      replay_epoch: 'mock-replay-epoch-1',
     });
     if (execute.code < 200 || execute.code > 299 || execute.json.status !== 'EXECUTED') {
       server.close();

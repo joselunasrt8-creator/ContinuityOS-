@@ -90,11 +90,27 @@ export function startMockServer(port = DEFAULT_PORT, scenarioNameOrConfig = null
     consumedNonces.add(`${MOCK_DECISION_ID}:${mockAeoHash}:nonce-fixture-replayed-00000004`);
   }
 
+  let governCounter = 0;
+
   const routes = {
     '/session': (_body) => {
       if (scenario.failAt === 'session') return [503, nullResponse('session_unavailable')];
       sessionCounter++;
       return [200, { status: 'SESSION_ACTIVE', session_id: `session-mock-${sessionCounter}` }];
+    },
+
+    '/govern': (_body) => {
+      if (scenario.failAt === 'govern') return [503, nullResponse('govern_unavailable')];
+      governCounter++;
+      const envelopeId = `envelope-mock-${governCounter}`;
+      const envelopeHash = sha256(`envelope-${governCounter}`).slice(0, 64);
+      return [200, {
+        status: 'VALID_CANDIDATE',
+        envelope_id: envelopeId,
+        envelope_hash: envelopeHash,
+        reason: 'valid_candidate',
+        nonce_domain: 'openclaw',
+      }];
     },
 
     '/continuity': (_body) => {

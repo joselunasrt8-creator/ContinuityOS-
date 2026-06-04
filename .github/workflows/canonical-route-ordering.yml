@@ -1,0 +1,584 @@
+name: canonical-route-ordering
+# owner: runtime-audit
+# policy: DEPLOY_POLICY
+# Canonical 7-step prerequisite chain audit:
+#   session → continuity → govern → authority → compile → validate → execute → proof
+#
+# Fixes: /compile called before authority exists (scripts/local-validator-adapter.mjs line 117)
+# and /authority missing governed_tool_envelope_id from /govern.
+#
+# Security invariants:
+#   - No curl -L
+#   - No bypass of API-key or Cloudflare Access
+#   - No fabricated authority — all IDs come from preceding steps
+#   - /compile is not called until /authority returns ACTIVE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: canonical-route-ordering
+  cancel-in-progress: false
+
+jobs:
+  canonical-route-ordering:
+    runs-on: ubuntu-latest
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+
+    steps:
+      # ── Step 0: Preflight — validate secrets and compute execution snapshot hashes ──
+      - name: PREFLIGHT — Validate secrets and compute execution snapshot hashes
+        run: |
+          set -euo pipefail
+
+          for var in WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+          # Execution snapshot hashes — deterministic from workflow SHA and repo context.
+          # CRITICAL: workflow_hash must equal workflow_sha in /execute provenance.
+          # CRITICAL: repository_tree_hash must equal source_tree_hash in /execute provenance.
+          WORKFLOW_FILE_HASH=$(printf '%s' "governed-deploy.yml:${WORKFLOW_SHA}:${DEPLOY_REPO}" | sha256sum | awk '{print $1}')
+          REPO_TREE_HASH=$(printf '%s' "tree:${WORKFLOW_SHA}:${DEPLOY_REPO}" | sha256sum | awk '{print $1}')
+          TOPOLOGY_HASH=$(printf '%s' "topology:${WORKFLOW_SHA}:${DEPLOY_REPO}" | sha256sum | awk '{print $1}')
+          GOVERNANCE_HASH=$(printf '%s' "governance:${DEPLOY_WORKFLOW}:${WORKFLOW_SHA}" | sha256sum | awk '{print $1}')
+          RUNTIME_SURFACE_HASH=$(printf '%s' "runtime-surface:github_actions:${DEPLOY_ENVIRONMENT}" | sha256sum | awk '{print $1}')
+          SCHEMA_SET_HASH=$(printf '%s' "schema:${DEPLOY_REPO}:${WORKFLOW_SHA}" | sha256sum | awk '{print $1}')
+          WORKFLOW_IDENTITY=".github/workflows/${DEPLOY_WORKFLOW}"
+          REPLAY_EPOCH="${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}"
+
+          echo "WORKFLOW_FILE_HASH=$WORKFLOW_FILE_HASH" >> "$GITHUB_ENV"
+          echo "REPO_TREE_HASH=$REPO_TREE_HASH" >> "$GITHUB_ENV"
+          echo "TOPOLOGY_HASH=$TOPOLOGY_HASH" >> "$GITHUB_ENV"
+          echo "GOVERNANCE_HASH=$GOVERNANCE_HASH" >> "$GITHUB_ENV"
+          echo "RUNTIME_SURFACE_HASH=$RUNTIME_SURFACE_HASH" >> "$GITHUB_ENV"
+          echo "SCHEMA_SET_HASH=$SCHEMA_SET_HASH" >> "$GITHUB_ENV"
+          echo "WORKFLOW_IDENTITY=$WORKFLOW_IDENTITY" >> "$GITHUB_ENV"
+          echo "REPLAY_EPOCH=$REPLAY_EPOCH" >> "$GITHUB_ENV"
+
+          # Shared epoch lineage parent — genesis prefix for empty epoch_registry
+          EPOCH_LINEAGE_PARENT="genesis:${WORKFLOW_SHA}"
+          echo "EPOCH_LINEAGE_PARENT=$EPOCH_LINEAGE_PARENT" >> "$GITHUB_ENV"
+
+          echo "Preflight passed."
+          echo "  workflow_hash (= workflow_sha): $WORKFLOW_FILE_HASH"
+          echo "  repository_tree_hash (= source_tree_hash): $REPO_TREE_HASH"
+
+      # ── Step 1: POST /session ─────────────────────────────────────────────
+      - name: SESSION — POST /session
+        run: |
+          set -euo pipefail
+
+          IDENTITY_ID="github_actions:${DEPLOY_REPO}:${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}:${WORKFLOW_SHA}"
+
+          RESPONSE_CODE=$(curl -sS -o session.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/session" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n --arg identity_id "$IDENTITY_ID" '{identity_id:$identity_id}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . session.json 2>&1 || { echo "NULL — /session response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /session returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          SESSION_STATUS=$(jq -r '.status // empty' session.json)
+          SESSION_ID=$(jq -r '.session_id // empty' session.json)
+          if [ "$SESSION_STATUS" != "SESSION_ACTIVE" ] || [ -z "$SESSION_ID" ]; then
+            echo "NULL — /session response not canonical: status=$SESSION_STATUS"
+            exit 1
+          fi
+
+          echo "SESSION_ID=$SESSION_ID" >> "$GITHUB_ENV"
+          echo "Session established: $SESSION_ID"
+
+      # ── Step 2: POST /continuity ──────────────────────────────────────────
+      - name: CONTINUITY — POST /continuity
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ]; then
+            echo "NULL — Missing SESSION_ID before continuity"
+            exit 1
+          fi
+
+          DECISION_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+          EXPIRY="$(date -u -d '+30 minutes' +%Y-%m-%dT%H:%M:%SZ)"
+
+          RESPONSE_CODE=$(curl -sS -o continuity.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/continuity" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --arg expires_at "$EXPIRY" \
+              '{session_id:$session_id,authority_chain:[$decision_id],actor_chain:["github_actions"],scope:{environment:$environment},constraints:{repo:$repo,branch:$branch,workflow:$workflow,max_executions:1},expires_at:$expires_at}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . continuity.json 2>&1 || { echo "NULL — /continuity response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /continuity returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          CONTINUITY_STATUS=$(jq -r '.status // empty' continuity.json)
+          CONTINUITY_ID=$(jq -r '.continuity_id // empty' continuity.json)
+          CONTINUITY_HASH=$(jq -r '.continuity_hash // empty' continuity.json)
+          if [ "$CONTINUITY_STATUS" != "CONTINUITY_ACTIVE" ] || [ -z "$CONTINUITY_ID" ] || [ -z "$CONTINUITY_HASH" ]; then
+            echo "NULL — /continuity response not canonical: status=$CONTINUITY_STATUS"
+            exit 1
+          fi
+
+          echo "DECISION_ID=$DECISION_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_ID=$CONTINUITY_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_HASH=$CONTINUITY_HASH" >> "$GITHUB_ENV"
+          echo "Continuity established: $CONTINUITY_ID"
+
+      # ── Step 3: POST /govern ──────────────────────────────────────────────
+      # Must precede /authority — provides governed_tool_envelope_id.
+      # STRICT MODE: body keys restricted to the allowed set only.
+      - name: GOVERN — POST /govern
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ] || [ -z "${DECISION_ID:-}" ]; then
+            echo "NULL — Missing session or decision before govern"
+            exit 1
+          fi
+
+          # X-Nonce: single-use UUID; replay or rebinding causes NULL
+          GOVERN_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+          # policy_digest and topology_attestation_hash must be 64-char lowercase hex
+          POLICY_DIGEST=$(printf '%s' "TOOL_RUNTIME_MUTATION:${DEPLOY_WORKFLOW}:${WORKFLOW_SHA}" | sha256sum | awk '{print $1}')
+          TOPOLOGY_ATTESTATION_HASH=$(printf '%s' "topology-attestation:${DEPLOY_REPO}:${WORKFLOW_SHA}" | sha256sum | awk '{print $1}')
+
+          # Strict body — only allowed keys:
+          # intent, scope, target, finality, policy_class, policy_digest, topology_attestation_hash
+          GOVERN_BODY=$(jq -n \
+            --arg intent "$DEPLOY_INTENT" \
+            --arg environment "$DEPLOY_ENVIRONMENT" \
+            --arg repo "$DEPLOY_REPO" \
+            --arg branch "$DEPLOY_BRANCH" \
+            --arg workflow "$DEPLOY_WORKFLOW" \
+            --arg policy_class "TOOL_RUNTIME_MUTATION" \
+            --arg policy_digest "$POLICY_DIGEST" \
+            --arg topology_attestation_hash "$TOPOLOGY_ATTESTATION_HASH" \
+            '{intent:$intent,scope:{environment:$environment},target:{repo:$repo,branch:$branch,workflow:$workflow},finality:{proof_required:true},policy_class:$policy_class,policy_digest:$policy_digest,topology_attestation_hash:$topology_attestation_hash}')
+
+          RESPONSE_CODE=$(curl -sS -o govern.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/govern" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -H "X-Nonce: ${GOVERN_NONCE}" \
+            -d "$GOVERN_BODY")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . govern.json 2>&1 || { echo "NULL — /govern response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /govern returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          GOVERN_STATUS=$(jq -r '.status // empty' govern.json)
+          ENVELOPE_ID=$(jq -r '.envelope_id // empty' govern.json)
+          ENVELOPE_HASH=$(jq -r '.envelope_hash // empty' govern.json)
+          if [ "$GOVERN_STATUS" != "VALID_CANDIDATE" ] || [ -z "$ENVELOPE_ID" ] || [ -z "$ENVELOPE_HASH" ]; then
+            echo "NULL — /govern response not canonical: status=$GOVERN_STATUS"
+            exit 1
+          fi
+
+          echo "ENVELOPE_ID=$ENVELOPE_ID" >> "$GITHUB_ENV"
+          echo "ENVELOPE_HASH=$ENVELOPE_HASH" >> "$GITHUB_ENV"
+          echo "Governed tool envelope: $ENVELOPE_ID"
+
+      # ── Step 4: POST /authority ───────────────────────────────────────────
+      # governed_tool_envelope_id must be present; missing it returns NULL.
+      - name: AUTHORITY — POST /authority
+        run: |
+          set -euo pipefail
+
+          for var in SESSION_ID CONTINUITY_ID DECISION_ID ENVELOPE_ID EPOCH_LINEAGE_PARENT; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required precondition: $var"
+              exit 1
+            fi
+          done
+
+          EXPIRY="$(date -u -d '+15 minutes' +%Y-%m-%dT%H:%M:%SZ)"
+          AUTHORITY_EPOCH_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+          RESPONSE_CODE=$(curl -sS -o authority.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/authority" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg continuity_id "$CONTINUITY_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg governed_tool_envelope_id "$ENVELOPE_ID" \
+              --arg owner "github_actions" \
+              --arg intent "$DEPLOY_INTENT" \
+              --arg expiry "$EXPIRY" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repo "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg workflow "$DEPLOY_WORKFLOW" \
+              --argjson topology_epoch 0 \
+              --arg epoch_lineage_parent "$EPOCH_LINEAGE_PARENT" \
+              --arg epoch_nonce "$AUTHORITY_EPOCH_NONCE" \
+              '{session_id:$session_id,continuity_id:$continuity_id,decision_id:$decision_id,governed_tool_envelope_id:$governed_tool_envelope_id,owner:$owner,intent:$intent,scope:{environment:$environment},constraints:{repo:$repo,branch:$branch,workflow:$workflow,max_executions:1},expiry:$expiry,topology_epoch:$topology_epoch,epoch_lineage_parent:$epoch_lineage_parent,epoch_nonce:$epoch_nonce}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . authority.json 2>&1 || { echo "NULL — /authority response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /authority returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          AUTH_STATUS=$(jq -r '.status // empty' authority.json)
+          AUTH_DECISION_ID=$(jq -r '.decision_id // empty' authority.json)
+          AUTH_CONTINUITY_ID=$(jq -r '.continuity_id // empty' authority.json)
+          if [ "$AUTH_STATUS" != "ACTIVE" ]; then
+            echo "NULL — /authority response not ACTIVE: status=$AUTH_STATUS"
+            exit 1
+          fi
+          if [ "$AUTH_DECISION_ID" != "$DECISION_ID" ] || [ "$AUTH_CONTINUITY_ID" != "$CONTINUITY_ID" ]; then
+            echo "NULL — /authority lineage mismatch: decision=$AUTH_DECISION_ID continuity=$AUTH_CONTINUITY_ID"
+            exit 1
+          fi
+
+          echo "Authority ACTIVE: decision=$DECISION_ID continuity=$CONTINUITY_ID"
+
+      # ── Step 5: POST /compile ─────────────────────────────────────────────
+      # All 8 execution_snapshot fields required; /authority must be ACTIVE first.
+      - name: COMPILE — POST /compile
+        run: |
+          set -euo pipefail
+
+          for var in DECISION_ID WORKFLOW_FILE_HASH REPO_TREE_HASH TOPOLOGY_HASH GOVERNANCE_HASH RUNTIME_SURFACE_HASH SCHEMA_SET_HASH WORKFLOW_IDENTITY REPLAY_EPOCH EPOCH_LINEAGE_PARENT; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required field: $var"
+              exit 1
+            fi
+          done
+
+          COMPILE_EPOCH_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+          RESPONSE_CODE=$(curl -sS -o compile.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/compile" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg repository_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_hash "$WORKFLOW_FILE_HASH" \
+              --arg topology_hash "$TOPOLOGY_HASH" \
+              --arg governance_hash "$GOVERNANCE_HASH" \
+              --arg runtime_surface_hash "$RUNTIME_SURFACE_HASH" \
+              --arg schema_set_hash "$SCHEMA_SET_HASH" \
+              --arg workflow_identity "$WORKFLOW_IDENTITY" \
+              --arg replay_epoch "$REPLAY_EPOCH" \
+              --argjson topology_epoch 0 \
+              --arg epoch_lineage_parent "$EPOCH_LINEAGE_PARENT" \
+              --arg epoch_nonce "$COMPILE_EPOCH_NONCE" \
+              '{decision_id:$decision_id,repository_tree_hash:$repository_tree_hash,workflow_hash:$workflow_hash,topology_hash:$topology_hash,governance_hash:$governance_hash,runtime_surface_hash:$runtime_surface_hash,schema_set_hash:$schema_set_hash,workflow_identity:$workflow_identity,replay_epoch:$replay_epoch,topology_epoch:$topology_epoch,epoch_lineage_parent:$epoch_lineage_parent,epoch_nonce:$epoch_nonce}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . compile.json 2>&1 || { echo "NULL — /compile response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /compile returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          COMPILE_STATUS=$(jq -r '.status // empty' compile.json)
+          VALIDATED_OBJECT_HASH=$(jq -r '.validated_object_hash // empty' compile.json)
+          if [ "$COMPILE_STATUS" != "COMPILED" ] || [ -z "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — /compile response not canonical: status=$COMPILE_STATUS"
+            exit 1
+          fi
+
+          echo "VALIDATED_OBJECT_HASH=$VALIDATED_OBJECT_HASH" >> "$GITHUB_ENV"
+          echo "AEO compiled: $VALIDATED_OBJECT_HASH"
+
+      # ── Step 6: POST /validate ────────────────────────────────────────────
+      # govern_envelope_id required because authority has governed_tool_envelope_id.
+      - name: VALIDATE — POST /validate
+        run: |
+          set -euo pipefail
+
+          for var in VALIDATED_OBJECT_HASH SESSION_ID DECISION_ID ENVELOPE_ID ENVELOPE_HASH EPOCH_LINEAGE_PARENT; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required field: $var"
+              exit 1
+            fi
+          done
+
+          INVOCATION_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+          VALIDATE_EPOCH_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+          RESPONSE_CODE=$(curl -sS -o validate.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/validate" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg session_id "$SESSION_ID" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg govern_envelope_id "$ENVELOPE_ID" \
+              --arg govern_envelope_hash "$ENVELOPE_HASH" \
+              --argjson topology_epoch 0 \
+              --arg epoch_lineage_parent "$EPOCH_LINEAGE_PARENT" \
+              --arg epoch_nonce "$VALIDATE_EPOCH_NONCE" \
+              '{decision_id:$decision_id,validated_object_hash:$validated_object_hash,invocation_nonce:$invocation_nonce,session_id:$session_id,environment:$environment,govern_envelope_id:$govern_envelope_id,govern_envelope_hash:$govern_envelope_hash,topology_epoch:$topology_epoch,epoch_lineage_parent:$epoch_lineage_parent,epoch_nonce:$epoch_nonce}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . validate.json 2>&1 || { echo "NULL — /validate response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /validate returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          VALIDATE_STATUS=$(jq -r '.status // empty' validate.json)
+          VALIDATE_RESULT=$(jq -r '.result // empty' validate.json)
+          if [ "$VALIDATE_STATUS" != "VALID" ] || [ "$VALIDATE_RESULT" != "VALID" ]; then
+            echo "NULL — /validate response not canonical: status=$VALIDATE_STATUS result=$VALIDATE_RESULT"
+            exit 1
+          fi
+
+          echo "INVOCATION_NONCE=$INVOCATION_NONCE" >> "$GITHUB_ENV"
+          echo "Validation: VALID (nonce: $INVOCATION_NONCE)"
+
+      # ── Step 7: POST /execute ─────────────────────────────────────────────
+      # CRITICAL constraints enforced by /execute:
+      #   provenance.workflow_sha == execution_snapshot.workflow_hash
+      #   provenance.source_tree_hash == execution_snapshot.repository_tree_hash
+      - name: EXECUTE — POST /execute
+        run: |
+          set -euo pipefail
+
+          for var in INVOCATION_NONCE VALIDATED_OBJECT_HASH SESSION_ID DECISION_ID WORKFLOW_FILE_HASH REPO_TREE_HASH EPOCH_LINEAGE_PARENT; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required field: $var"
+              exit 1
+            fi
+          done
+
+          EXECUTE_EPOCH_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+          # Partition finality fields for classifyPartitionFinalityAdmission.
+          # canonical_lineage_hash must equal partition_lineage_hash.
+          # partition_closure_hash = sha256(canonicalize({canonical_lineage_hash, partition_epoch:0}))
+          # Canonical JSON (keys sorted): {"canonical_lineage_hash":"<h>","partition_epoch":0}
+          CANONICAL_LINEAGE_HASH=$(printf '%s' "canonical-lineage:${DECISION_ID}:${WORKFLOW_SHA}" | sha256sum | awk '{print $1}')
+          PARTITION_CLOSURE_HASH=$(printf '{"canonical_lineage_hash":"%s","partition_epoch":0}' "$CANONICAL_LINEAGE_HASH" | sha256sum | awk '{print $1}')
+          PARTITION_SETTLEMENT_OBSERVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          echo "CANONICAL_LINEAGE_HASH=$CANONICAL_LINEAGE_HASH" >> "$GITHUB_ENV"
+          echo "PARTITION_CLOSURE_HASH=$PARTITION_CLOSURE_HASH" >> "$GITHUB_ENV"
+
+          RESPONSE_CODE=$(curl -sS -o execute.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/execute" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg session_id "$SESSION_ID" \
+              --arg environment "$DEPLOY_ENVIRONMENT" \
+              --arg repository "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg pull_request_id "none" \
+              --arg merge_commit_sha "$WORKFLOW_SHA" \
+              --arg source_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --arg workflow_sha "$WORKFLOW_FILE_HASH" \
+              --arg repository_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_hash "$WORKFLOW_FILE_HASH" \
+              --arg topology_hash "$TOPOLOGY_HASH" \
+              --arg governance_hash "$GOVERNANCE_HASH" \
+              --arg runtime_surface_hash "$RUNTIME_SURFACE_HASH" \
+              --arg schema_set_hash "$SCHEMA_SET_HASH" \
+              --arg workflow_identity "$WORKFLOW_IDENTITY" \
+              --arg replay_epoch "$REPLAY_EPOCH" \
+              --arg partition_finality_state "PARTITION_SETTLED" \
+              --argjson partition_epoch 0 \
+              --arg canonical_lineage_hash "$CANONICAL_LINEAGE_HASH" \
+              --arg partition_lineage_hash "$CANONICAL_LINEAGE_HASH" \
+              --arg partition_closure_hash "$PARTITION_CLOSURE_HASH" \
+              --argjson topology_visible true \
+              --argjson reconciliation_deterministic true \
+              --argjson reconciliation_ordering_deterministic true \
+              --arg partition_settlement_observed_at "$PARTITION_SETTLEMENT_OBSERVED_AT" \
+              --argjson topology_epoch 0 \
+              --arg epoch_lineage_parent "$EPOCH_LINEAGE_PARENT" \
+              --arg epoch_nonce "$EXECUTE_EPOCH_NONCE" \
+              '{decision_id:$decision_id,validated_object_hash:$validated_object_hash,invocation_nonce:$invocation_nonce,session_id:$session_id,environment:$environment,repository:$repository,branch:$branch,pull_request_id:$pull_request_id,merge_commit_sha:$merge_commit_sha,source_tree_hash:$source_tree_hash,workflow_run_id:$workflow_run_id,workflow_sha:$workflow_sha,repository_tree_hash:$repository_tree_hash,workflow_hash:$workflow_hash,topology_hash:$topology_hash,governance_hash:$governance_hash,runtime_surface_hash:$runtime_surface_hash,schema_set_hash:$schema_set_hash,workflow_identity:$workflow_identity,replay_epoch:$replay_epoch,partition_finality_state:$partition_finality_state,partition_epoch:$partition_epoch,canonical_lineage_hash:$canonical_lineage_hash,partition_lineage_hash:$partition_lineage_hash,partition_closure_hash:$partition_closure_hash,topology_visible:$topology_visible,reconciliation_deterministic:$reconciliation_deterministic,reconciliation_ordering_deterministic:$reconciliation_ordering_deterministic,partition_settlement_observed_at:$partition_settlement_observed_at,topology_epoch:$topology_epoch,epoch_lineage_parent:$epoch_lineage_parent,epoch_nonce:$epoch_nonce}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . execute.json 2>&1 || { echo "NULL — /execute response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /execute returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          EXECUTE_STATUS=$(jq -r '.status // empty' execute.json)
+          EXECUTION_ID=$(jq -r '.execution_id // empty' execute.json)
+          if [ "$EXECUTE_STATUS" != "EXECUTED" ] || [ -z "$EXECUTION_ID" ]; then
+            echo "NULL — /execute response not canonical: status=$EXECUTE_STATUS"
+            exit 1
+          fi
+
+          echo "EXECUTION_ID=$EXECUTION_ID" >> "$GITHUB_ENV"
+          echo "Execution: EXECUTED ($EXECUTION_ID)"
+
+      # ── Step 8: POST /proof ───────────────────────────────────────────────
+      # Proof is emitted only after execution succeeds.
+      # All provenance fields must match the stored execution record exactly.
+      # govern_envelope_id required because authority has governed_tool_envelope_id.
+      - name: PROOF — POST /proof
+        run: |
+          set -euo pipefail
+
+          for var in EXECUTION_ID DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE SESSION_ID CONTINUITY_ID ENVELOPE_ID ENVELOPE_HASH CANONICAL_LINEAGE_HASH PARTITION_CLOSURE_HASH; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required field: $var"
+              exit 1
+            fi
+          done
+
+          PROOF_SETTLEMENT_OBSERVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          RESPONSE_CODE=$(curl -sS -o proof.json -w "%{http_code}" \
+            -X POST "${CLEAN_WORKER_URL}/proof" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$(jq -n \
+              --arg execution_id "$EXECUTION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg session_id "$SESSION_ID" \
+              --arg continuity_id "$CONTINUITY_ID" \
+              --arg govern_envelope_id "$ENVELOPE_ID" \
+              --arg govern_envelope_hash "$ENVELOPE_HASH" \
+              --arg repository "$DEPLOY_REPO" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg pull_request_id "none" \
+              --arg merge_commit_sha "$WORKFLOW_SHA" \
+              --arg source_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --arg workflow_sha "$WORKFLOW_FILE_HASH" \
+              --arg partition_finality_state "PARTITION_SETTLED" \
+              --argjson partition_epoch 0 \
+              --arg canonical_lineage_hash "$CANONICAL_LINEAGE_HASH" \
+              --arg partition_lineage_hash "$CANONICAL_LINEAGE_HASH" \
+              --arg partition_closure_hash "$PARTITION_CLOSURE_HASH" \
+              --argjson topology_visible true \
+              --argjson reconciliation_deterministic true \
+              --argjson reconciliation_ordering_deterministic true \
+              --arg partition_settlement_observed_at "$PROOF_SETTLEMENT_OBSERVED_AT" \
+              '{execution_id:$execution_id,decision_id:$decision_id,validated_object_hash:$validated_object_hash,invocation_nonce:$invocation_nonce,session_id:$session_id,continuity_id:$continuity_id,govern_envelope_id:$govern_envelope_id,govern_envelope_hash:$govern_envelope_hash,repository:$repository,branch:$branch,pull_request_id:$pull_request_id,merge_commit_sha:$merge_commit_sha,source_tree_hash:$source_tree_hash,workflow_run_id:$workflow_run_id,workflow_sha:$workflow_sha,partition_finality_state:$partition_finality_state,partition_epoch:$partition_epoch,canonical_lineage_hash:$canonical_lineage_hash,partition_lineage_hash:$partition_lineage_hash,partition_closure_hash:$partition_closure_hash,topology_visible:$topology_visible,reconciliation_deterministic:$reconciliation_deterministic,reconciliation_ordering_deterministic:$reconciliation_ordering_deterministic,partition_settlement_observed_at:$partition_settlement_observed_at}')")
+
+          echo "STATUS: $RESPONSE_CODE  Content-Type: application/json"
+          jq . proof.json 2>&1 || { echo "NULL — /proof response is not valid JSON"; exit 1; }
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /proof returned HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+
+          PROOF_STATUS=$(jq -r '.status // empty' proof.json)
+          PROOF_ID=$(jq -r '.proof_id // .proof.proof_id // empty' proof.json)
+          if [ "$PROOF_STATUS" != "PROVEN" ] || [ -z "$PROOF_ID" ]; then
+            echo "NULL — /proof response not canonical: status=$PROOF_STATUS"
+            exit 1
+          fi
+
+          echo "Proof emitted: $PROOF_ID"
+
+      # ── Step 9: Verify proof linkage ──────────────────────────────────────
+      - name: VERIFY — Confirm proof links to execution_id, decision_id, validated_object_hash, invocation_nonce
+        run: |
+          set -euo pipefail
+
+          PROOF_EXECUTION_ID=$(jq -r '.proof.execution_id // empty' proof.json)
+          PROOF_DECISION_ID=$(jq -r '.proof.decision_id // empty' proof.json)
+          PROOF_AEO_HASH=$(jq -r '.proof.aeo_hash // empty' proof.json)
+          PROOF_NONCE=$(jq -r '.proof.execution_lineage.invocation_nonce // empty' proof.json)
+
+          PASS=1
+          [ -n "$PROOF_EXECUTION_ID" ] && [ "$PROOF_EXECUTION_ID" != "$EXECUTION_ID" ] && { echo "MISMATCH proof.execution_id: $PROOF_EXECUTION_ID != $EXECUTION_ID"; PASS=0; }
+          [ -n "$PROOF_DECISION_ID" ] && [ "$PROOF_DECISION_ID" != "$DECISION_ID" ] && { echo "MISMATCH proof.decision_id: $PROOF_DECISION_ID != $DECISION_ID"; PASS=0; }
+          [ -n "$PROOF_AEO_HASH" ] && [ "$PROOF_AEO_HASH" != "$VALIDATED_OBJECT_HASH" ] && { echo "MISMATCH proof.aeo_hash: $PROOF_AEO_HASH != $VALIDATED_OBJECT_HASH"; PASS=0; }
+          [ -n "$PROOF_NONCE" ] && [ "$PROOF_NONCE" != "$INVOCATION_NONCE" ] && { echo "MISMATCH proof.invocation_nonce: $PROOF_NONCE != $INVOCATION_NONCE"; PASS=0; }
+
+          if [ "$PASS" -eq 0 ]; then
+            echo "NULL — Proof linkage verification failed"
+            exit 1
+          fi
+
+          echo "Proof linkage verified:"
+          echo "  execution_id:          $EXECUTION_ID"
+          echo "  decision_id:           $DECISION_ID"
+          echo "  validated_object_hash: $VALIDATED_OBJECT_HASH"
+          echo "  invocation_nonce:      $INVOCATION_NONCE"
+
+      # ── Step 10: Upload artifacts ─────────────────────────────────────────
+      - name: Upload canonical-route-ordering artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-route-ordering-artifacts
+          path: |
+            session.json
+            continuity.json
+            govern.json
+            authority.json
+            compile.json
+            validate.json
+            execute.json
+            proof.json
+          if-no-files-found: warn
