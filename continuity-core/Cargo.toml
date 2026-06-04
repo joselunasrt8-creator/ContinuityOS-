@@ -1,0 +1,8 @@
+[package]
+name = "continuity-core"
+version = "0.1.0"
+edition = "2021"
+description = "Correctness-critical ContinuityOS primitives with deterministic validation and no runtime mutation surfaces."
+license = "MIT"
+
+[dependencies]
