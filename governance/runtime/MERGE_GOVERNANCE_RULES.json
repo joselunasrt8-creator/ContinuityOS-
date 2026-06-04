@@ -5,6 +5,7 @@
   "rules": [
     "No PREO -> no governed merge",
     "Governance/runtime mutation -> requires SCO",
+    "Governance primitive mutation (governance_mutation or workflow_mutation class) -> requires GMA with valid canonical lifecycle lineage -> else MERGE_LEGITIMACY_NULL (GAP-005)",
     "PREO must bind exact PR head_sha",
     "SCO must bind exact governed files",
     "Merge proof must persist merge_commit_sha",
@@ -261,6 +262,52 @@
     ],
     "governed_mutation_without_sco_result": "NULL",
     "sco_scope_mismatch_result": "NULL"
+  },
+  "gma_enforcement": {
+    "gap_reference": "GAP-005",
+    "issue_reference": "#1831",
+    "required_when_mutation_classes_include": [
+      "governance_mutation",
+      "workflow_mutation"
+    ],
+    "gma_artifact_path": "governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json",
+    "gma_spec_path": "governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json",
+    "gma_creation_workflow": ".github/workflows/governance-mutation-authorization.yml",
+    "gma_validation_fields": [
+      "gma_id",
+      "decision_id",
+      "continuity_id",
+      "session_id",
+      "validated_object_hash",
+      "governed_files_hash",
+      "mutation_classes",
+      "gm_control_class",
+      "authority_lineage_bound",
+      "expires_at",
+      "status"
+    ],
+    "governed_files_hash_algorithm": "sha256 of sorted 'path:sha256(content)' entries joined by newline",
+    "exempted_paths": [
+      "governance/authorizations/**"
+    ],
+    "exemption_rationale": "GMA artifacts are authorization evidence, not governance primitives",
+    "missing_gma_result": "NULL",
+    "expired_gma_result": "NULL",
+    "hash_mismatch_result": "NULL",
+    "missing_mutation_class_result": "NULL",
+    "fail_closed": true,
+    "recursive_governance_binding": "GMA requires canonical lifecycle lineage via /session -> /continuity -> /authority -> /compile before merge is permitted",
+    "enforcement_step": "merge-governance-check workflow step: 'Validate governance mutation authorization (GAP-005)'",
+    "bootstrap_exemption": {
+      "classification": "GMA_BOOTSTRAP_EXEMPTION",
+      "condition": "governance-mutation-authorization.yml absent from base branch at exact base SHA",
+      "applies_to": "single bootstrap PR introducing GAP-005 GMA infrastructure",
+      "self_limiting": true,
+      "rationale": "SELF_BLOCKING_GMA_BOOTSTRAP: the workflow required to create a GMA cannot be dispatched before it exists on main. Enforcement deferred only for the PR that introduces the workflow. After merge, all subsequent governance mutations require a valid GMA.",
+      "non_reusable": true,
+      "auditable": true,
+      "issue_reference": "#1831"
+    }
   },
   "merge_method_policy": {
     "merge_queue": {

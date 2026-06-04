@@ -1,0 +1,412 @@
+name: governance-mutation-authorization
+# owner: #1831
+# policy: GAP-005 — Governance Self-Mutation Containment
+# policy-path: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json
+# gap-reference: GAP-005
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base branch to diff governed files against (default: main)'
+        required: false
+        default: 'main'
+      intent:
+        description: 'Brief description of the governance mutation being authorized'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  create-governance-mutation-authorization:
+    runs-on: ubuntu-latest
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      BASE_REF: ${{ inputs.base_ref || 'main' }}
+      MUTATION_INTENT: ${{ inputs.intent }}
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: HARD FAIL — Guard against non-dispatch invocation and missing secrets
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit workflow_dispatch invocation allowed"
+            exit 1
+          fi
+
+          for var in WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required secret: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/governance-mutation-authorization.yml@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through governance-mutation-authorization.yml"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${MUTATION_INTENT:-}" ]; then
+            echo "NULL — intent input is required"
+            exit 1
+          fi
+
+          GMA_REPLAY_ID="$(printf '%s' "${GITHUB_REPOSITORY}|governance-mutation-authorization.yml|${WORKFLOW_RUN_ID}|${WORKFLOW_RUN_ATTEMPT}|${WORKFLOW_SHA}|${WORKFLOW_REF}" | sha256sum | awk '{print $1}')"
+          echo "GMA_REPLAY_ID=$GMA_REPLAY_ID" >> "$GITHUB_ENV"
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute governed files hash
+        run: |
+          set -euo pipefail
+
+          git fetch origin "$BASE_REF" --depth=1
+
+          git diff --name-only "origin/$BASE_REF" HEAD > gma_changed_files.txt || true
+
+          : > gma_governed_files.txt
+          : > gma_mutation_classes.txt
+
+          while IFS= read -r file; do
+            case "$file" in
+              governance/authorizations/*)
+                # GMA artifacts are exempt — not governance primitives
+                ;;
+              governance/*)
+                echo "$file" >> gma_governed_files.txt
+                echo "governance_mutation" >> gma_mutation_classes.txt
+                ;;
+              .github/workflows/*)
+                echo "$file" >> gma_governed_files.txt
+                echo "workflow_mutation" >> gma_mutation_classes.txt
+                ;;
+              src/*)
+                echo "$file" >> gma_governed_files.txt
+                echo "runtime_mutation" >> gma_mutation_classes.txt
+                ;;
+              schema.sql)
+                echo "$file" >> gma_governed_files.txt
+                echo "schema_mutation" >> gma_mutation_classes.txt
+                ;;
+              migrations/*)
+                echo "$file" >> gma_governed_files.txt
+                echo "migration_mutation" >> gma_mutation_classes.txt
+                ;;
+              wrangler.toml)
+                echo "$file" >> gma_governed_files.txt
+                echo "deployment_config_mutation" >> gma_mutation_classes.txt
+                ;;
+            esac
+          done < gma_changed_files.txt
+
+          sort -u gma_governed_files.txt -o gma_governed_files.txt
+          sort -u gma_mutation_classes.txt -o gma_mutation_classes.txt
+
+          HAS_GOVERNANCE_MUTATION=$(grep -qE '^(governance_mutation|workflow_mutation)$' gma_mutation_classes.txt && echo "true" || echo "false")
+          if [ "$HAS_GOVERNANCE_MUTATION" = "false" ]; then
+            echo "NULL — No governance_mutation or workflow_mutation detected in changed files."
+            echo "This workflow is only required for PRs mutating governance primitives."
+            exit 1
+          fi
+
+          # Compute governed_files_hash: sha256 of sorted "path:sha256(content)" pairs joined by newline
+          GOVERNED_FILES_HASH=$(python3 -c "
+          import hashlib, sys
+
+          governed_files = sorted(open('gma_governed_files.txt').read().splitlines())
+          governed_files = [f for f in governed_files if f]
+
+          parts = []
+          for f in governed_files:
+              try:
+                  with open(f, 'rb') as fh:
+                      content = fh.read()
+                  h = hashlib.sha256(content).hexdigest()
+                  parts.append(f'{f}:{h}')
+              except FileNotFoundError:
+                  # File deleted in this PR — record as deleted
+                  parts.append(f'{f}:DELETED')
+
+          combined = '\n'.join(parts)
+          print(hashlib.sha256(combined.encode()).hexdigest())
+          ")
+
+          echo "GOVERNED_FILES_HASH=$GOVERNED_FILES_HASH" >> "$GITHUB_ENV"
+          echo "governed_files_hash=$GOVERNED_FILES_HASH"
+          echo "governed_files=$(cat gma_governed_files.txt | tr '\n' ' ')"
+          echo "mutation_classes=$(cat gma_mutation_classes.txt | tr '\n' ' ')"
+
+      - name: SESSION — Create governance mutation session
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o gma_session.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/session" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg identity_id "github_actions:${GITHUB_REPOSITORY}:${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}:${WORKFLOW_SHA}:${GMA_REPLAY_ID}" \
+              '{identity_id:$identity_id}')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Session endpoint error"
+            cat gma_session.json
+            exit 1
+          fi
+
+          SESSION_STATUS=$(jq -r '.status // empty' gma_session.json)
+          SESSION_ID=$(jq -r '.session_id // empty' gma_session.json)
+          if [ "$SESSION_STATUS" != "SESSION_ACTIVE" ] || [ -z "$SESSION_ID" ]; then
+            echo "NULL — Session response is non-canonical"
+            cat gma_session.json
+            exit 1
+          fi
+
+          echo "SESSION_ID=$SESSION_ID" >> "$GITHUB_ENV"
+
+      - name: CONTINUITY — Create governance mutation continuity
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ]; then
+            echo "NULL — Missing active session_id before continuity"
+            exit 1
+          fi
+
+          DECISION_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+          EXPIRY="$(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)"
+
+          RESPONSE_CODE=$(curl -sS -o gma_continuity.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/continuity" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "$WORKFLOW_REF_NAME" \
+              --arg governed_files_hash "$GOVERNED_FILES_HASH" \
+              --arg expires_at "$EXPIRY" \
+              '{
+                session_id:$session_id,
+                authority_chain:[$decision_id],
+                actor_chain:["github_actions"],
+                scope:{intent:"governance_mutation_authorization"},
+                constraints:{
+                  repo:$repo,
+                  branch:$branch,
+                  governed_files_hash:$governed_files_hash,
+                  max_executions:1
+                },
+                expires_at:$expires_at
+              }')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Continuity endpoint error"
+            cat gma_continuity.json
+            exit 1
+          fi
+
+          CONTINUITY_STATUS=$(jq -r '.status // empty' gma_continuity.json)
+          CONTINUITY_ID=$(jq -r '.continuity_id // empty' gma_continuity.json)
+          CONTINUITY_HASH=$(jq -r '.continuity_hash // empty' gma_continuity.json)
+          if [ "$CONTINUITY_STATUS" != "CONTINUITY_ACTIVE" ] || [ -z "$CONTINUITY_ID" ] || [ -z "$CONTINUITY_HASH" ]; then
+            echo "NULL — Continuity response is non-canonical"
+            cat gma_continuity.json
+            exit 1
+          fi
+
+          echo "DECISION_ID=$DECISION_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_ID=$CONTINUITY_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_HASH=$CONTINUITY_HASH" >> "$GITHUB_ENV"
+
+      - name: AUTHORITY — Create governance mutation authority
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SESSION_ID:-}" ] || [ -z "${DECISION_ID:-}" ] || [ -z "${CONTINUITY_ID:-}" ]; then
+            echo "NULL — Missing required identifiers before authority"
+            exit 1
+          fi
+
+          EXPIRY="$(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)"
+
+          RESPONSE_CODE=$(curl -sS -o gma_authority.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/authority" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg continuity_id "$CONTINUITY_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg owner "github_actions" \
+              --arg intent "governance_mutation_authorization" \
+              --arg expiry "$EXPIRY" \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "$WORKFLOW_REF_NAME" \
+              --arg governed_files_hash "$GOVERNED_FILES_HASH" \
+              '{
+                session_id:$session_id,
+                continuity_id:$continuity_id,
+                decision_id:$decision_id,
+                owner:$owner,
+                intent:$intent,
+                scope:{intent:"governance_mutation_authorization"},
+                constraints:{
+                  repo:$repo,
+                  branch:$branch,
+                  governed_files_hash:$governed_files_hash,
+                  max_executions:1
+                },
+                expiry:$expiry
+              }')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Authority endpoint error"
+            cat gma_authority.json
+            exit 1
+          fi
+
+          AUTHORITY_DECISION_ID=$(jq -r '.decision_id // empty' gma_authority.json)
+          AUTHORITY_CONTINUITY_ID=$(jq -r '.continuity_id // empty' gma_authority.json)
+          if [ -z "$AUTHORITY_DECISION_ID" ] || [ "$AUTHORITY_DECISION_ID" != "$DECISION_ID" ]; then
+            echo "NULL — Missing or mismatched decision_id from authority"
+            cat gma_authority.json
+            exit 1
+          fi
+          if [ -z "$AUTHORITY_CONTINUITY_ID" ] || [ "$AUTHORITY_CONTINUITY_ID" != "$CONTINUITY_ID" ]; then
+            echo "NULL — Missing or mismatched continuity_id from authority"
+            cat gma_authority.json
+            exit 1
+          fi
+
+      - name: COMPILE — Resolve validated object hash for GMA
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o gma_compile.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/compile" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — Compile endpoint error"
+            cat gma_compile.json
+            exit 1
+          fi
+
+          VALIDATED_OBJECT_HASH=$(jq -r '.validated_object_hash // empty' gma_compile.json)
+          if [ -z "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — Missing validated_object_hash from compile"
+            cat gma_compile.json
+            exit 1
+          fi
+
+          echo "VALIDATED_OBJECT_HASH=$VALIDATED_OBJECT_HASH" >> "$GITHUB_ENV"
+
+      - name: Generate GMA artifact
+        run: |
+          set -euo pipefail
+
+          GMA_ID="GMA-${WORKFLOW_RUN_ID}-${WORKFLOW_RUN_ATTEMPT}"
+          EXPIRY="$(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          MUTATION_CLASSES=$(jq -R . gma_mutation_classes.txt | jq -s .)
+          GOVERNED_FILES=$(jq -R . gma_governed_files.txt | jq -s .)
+
+          jq -n \
+            --arg gma_id "$GMA_ID" \
+            --arg decision_id "$DECISION_ID" \
+            --arg continuity_id "$CONTINUITY_ID" \
+            --arg session_id "$SESSION_ID" \
+            --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+            --arg governed_files_hash "$GOVERNED_FILES_HASH" \
+            --argjson mutation_classes "$MUTATION_CLASSES" \
+            --argjson governed_files "$GOVERNED_FILES" \
+            --arg gm_control_class "GOVERNANCE_CONTAINED" \
+            --arg intent "$MUTATION_INTENT" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$WORKFLOW_REF_NAME" \
+            --arg head_sha "$WORKFLOW_SHA" \
+            --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+            --arg created_at "$CREATED_AT" \
+            --arg expires_at "$EXPIRY" \
+            '{
+              gma_id: $gma_id,
+              decision_id: $decision_id,
+              continuity_id: $continuity_id,
+              session_id: $session_id,
+              validated_object_hash: $validated_object_hash,
+              governed_files_hash: $governed_files_hash,
+              governed_files: $governed_files,
+              mutation_classes: $mutation_classes,
+              gm_control_class: $gm_control_class,
+              intent: $intent,
+              authority_lineage_bound: true,
+              repo: $repo,
+              branch: $branch,
+              head_sha: $head_sha,
+              workflow_run_id: $workflow_run_id,
+              created_at: $created_at,
+              expires_at: $expires_at,
+              status: "GMA_VALID"
+            }' > GOVERNANCE_MUTATION_AUTHORIZATION.json
+
+      - name: Upload GMA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GOVERNANCE_MUTATION_AUTHORIZATION
+          path: GOVERNANCE_MUTATION_AUTHORIZATION.json
+
+      - name: Print GMA commit instructions
+        run: |
+          set -euo pipefail
+
+          {
+            printf '%s\n\n' '### Governance Mutation Authorization (GMA) Created'
+            printf '%s\n\n' 'Download the artifact and commit it to your branch:'
+            printf '%s\n' '```bash'
+            printf '%s\n' '# 1. Download the GOVERNANCE_MUTATION_AUTHORIZATION artifact from this workflow run'
+            printf '%s\n' '# 2. Place it at:'
+            printf '%s\n' '#    governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json'
+            printf '%s\n' '# 3. Commit and push:'
+            printf '%s\n' 'mkdir -p governance/authorizations'
+            printf '%s\n' 'mv GOVERNANCE_MUTATION_AUTHORIZATION.json governance/authorizations/'
+            printf '%s\n' 'git add governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json'
+            printf '%s\n' 'git commit -m "chore: add GMA for governance mutation authorization"'
+            printf '%s\n' 'git push'
+            printf '%s\n\n' '```'
+            printf '%s\n\n' '**GMA artifact:**'
+            printf '%s\n' '```json'
+            cat GOVERNANCE_MUTATION_AUTHORIZATION.json
+            printf '%s\n' '```'
+            printf '\n%s\n' "governed_files_hash: $GOVERNED_FILES_HASH"
+            printf '%s\n' "gma_id: GMA-${WORKFLOW_RUN_ID}-${WORKFLOW_RUN_ATTEMPT}"
+            printf '%s\n' "expires_at: $(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_STEP_SUMMARY"
