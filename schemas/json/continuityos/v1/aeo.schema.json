@@ -18,7 +18,17 @@
       "minLength": 1
     },
     "scope": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo"
+      ],
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "validation": {
       "type": "object",
@@ -40,13 +50,16 @@
           "minLength": 1
         },
         "require_active_authority": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "require_exact_object_hash": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "require_session_continuity": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         }
       }
     },
@@ -78,14 +91,16 @@
       ],
       "properties": {
         "proof_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "proof_type": {
           "type": "string",
           "minLength": 1
         },
         "registry_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         }
       }
     }

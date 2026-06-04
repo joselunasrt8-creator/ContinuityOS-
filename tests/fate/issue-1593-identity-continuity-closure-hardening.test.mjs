@@ -533,6 +533,29 @@ test('AC5: expiry enforcement is fail-closed (revoked or expired → same invali
 
 // ── AC6 & AC7: FATE coverage and fail-closed behavior ────────────────────────
 
+
+test('fail-closed: malformed session expiry rejects at admission', () => {
+  const result = verifyContinuityLineage({
+    session: makeSession({ expires_at: 'not-a-date' }),
+    continuity: makeNode(),
+    continuityById: new Map(),
+    computeLineageHash: lineageHash,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.reason, 'expired_session_lineage')
+})
+
+test('fail-closed: malformed continuity expiry rejects at admission', () => {
+  const result = verifyContinuityLineage({
+    session: makeSession(),
+    continuity: makeNode({ expires_at: 'not-a-date' }),
+    continuityById: new Map(),
+    computeLineageHash: lineageHash,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.reason, 'expired_continuity_lineage')
+})
+
 test('fail-closed: null session rejects at admission', () => {
   const result = verifyContinuityLineage({
     session: null,

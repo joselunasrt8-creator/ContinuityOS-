@@ -99,3 +99,21 @@ test('historical append-only lineage does not fail closed by default depth budge
   assert.equal(result.drift_classification, 'NONE')
   assert.ok(result.canonical_traversal_hash)
 })
+
+test('illegal canonical parent edge returns NULL / ILLEGAL_PARENT_EDGE', () => {
+  const illegal = baseNodes.map((node) => node.registry === 'proof_registry'
+    ? { ...node, parent_registry: 'session_registry', parent_id: 'sess-1' }
+    : node)
+  const result = computeTraversalHash(request(illegal))
+  assert.equal(result.traversal_status, 'NULL')
+  assert.equal(result.drift_classification, 'ILLEGAL_PARENT_EDGE')
+})
+
+test('missing non-root parent edge returns NULL / ILLEGAL_PARENT_EDGE', () => {
+  const missingParentEdge = baseNodes.map((node) => node.registry === 'authority_registry'
+    ? { ...node, parent_registry: null, parent_id: null }
+    : node)
+  const result = computeTraversalHash(request(missingParentEdge))
+  assert.equal(result.traversal_status, 'NULL')
+  assert.equal(result.drift_classification, 'ILLEGAL_PARENT_EDGE')
+})

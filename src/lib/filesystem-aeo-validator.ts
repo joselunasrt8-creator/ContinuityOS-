@@ -1,6 +1,5 @@
 import type { FilesystemAEO } from './filesystem-aeo.js'
-import { FILESYSTEM_AEO_REQUIRED_KEYS } from './filesystem-aeo.js'
-import { canonicalize, sha256Hex } from '../canonical.js'
+import { FILESYSTEM_AEO_REQUIRED_KEYS, materializeFilesystemAEO } from './filesystem-aeo.js'
 
 export type ObservationError =
   | "NOT_FOUND"
@@ -201,10 +200,20 @@ export async function validateFilesystemAEO(
     }
   }
 
-  const aeo = input as FilesystemAEO
+  const materialized = materializeFilesystemAEO(input)
+  if (!materialized.ok) {
+    return nullResult({
+      denial_reason: materialized.failure === "authority_binding_missing" ? "AUTHORITY_INVALID" : "INVALID_AEO_SHAPE",
+      failure_class: "INVALID_AEO_SHAPE",
+      mutation_performed: false,
+      retry_same_aeo_allowed: false,
+    })
+  }
+
+  const aeo = materialized.aeo
 
   // Step 2: Canonicalization + AEO hash binding
-  const aeo_hash = "sha256:" + sha256Hex(canonicalize(aeo))
+  const aeo_hash = materialized.aeo_hash
   if (aeoHashOverride !== undefined && aeoHashOverride !== aeo_hash) {
     return nullResult({
       denial_reason: "AEO_HASH_MISMATCH",
@@ -460,7 +469,23 @@ export async function validateFilesystemAEO(
   }
 
   const aeoStateObs = await context.replayRegistry.readAeoState(aeo_hash)
-  if (aeoStateObs.ok && aeoStateObs.value !== "UNUSED") {
+  if (!aeoStateObs.ok) {
+    return nullResult({
+      denial_reason: "REPLAY_NOT_DETERMINABLE",
+      failure_class: "AEO_REPLAY_STATE_UNKNOWN",
+      mutation_performed: false,
+      retry_same_aeo_allowed: false,
+      decision_id,
+      aeo_hash,
+      adapter_observation: {
+        adapter: "replayRegistry",
+        observation_error: aeoStateObs.observation_error,
+        safe_to_disclose: aeoStateObs.safe_to_disclose,
+      },
+    })
+  }
+
+  if (aeoStateObs.value !== "UNUSED") {
     return nullResult({
       denial_reason: "REPLAY_NOT_ALLOWED",
       failure_class: "AEO_ALREADY_CONSUMED",

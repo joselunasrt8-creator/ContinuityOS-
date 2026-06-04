@@ -81,6 +81,17 @@ function lineageClosureOk(entries: readonly CrossRegistryEntry[]): boolean {
   return true
 }
 
+function hasRequiredEvidence(entry: CrossRegistryEntry): boolean {
+  return Boolean(
+    String(entry.object_id || '') &&
+    String(entry.lineage_hash || '') &&
+    String(entry.replay_hash || '') &&
+    String(entry.revocation_hash || '') &&
+    String(entry.topology_hash || '') &&
+    String(entry.observed_at || '')
+  )
+}
+
 export function reconcileCrossRegistryLegitimacy(
   input: CrossRegistryReconciliationInput,
 ): CrossRegistryReconciliationResult {
@@ -113,11 +124,14 @@ export function reconcileCrossRegistryLegitimacy(
 
   for (const view of orderedViews) {
     const registryId = String(view.registry_id || '')
+    const entries: readonly CrossRegistryEntry[] = view.entries || []
     registryHashes[registryId] = buildRegistryHash(view)
     if (!registryId || registryIds.has(registryId)) insufficient.add('non_deterministic_registry_identity')
     registryIds.add(registryId)
     if (!view.visibility_complete) insufficient.add('partial_visibility')
-    if (!lineageClosureOk(view.entries || [])) drift.add('stale_lineage')
+    if (entries.length === 0) insufficient.add('empty_registry_evidence')
+    if (entries.some((entry) => !hasRequiredEvidence(entry))) insufficient.add('malformed_registry_evidence')
+    if (!lineageClosureOk(entries)) drift.add('stale_lineage')
   }
 
   if (orderedViews.length < 2) insufficient.add('single_registry_observation')

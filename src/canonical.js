@@ -2,18 +2,44 @@ function isCanonicalObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-export function normalize(value) {
-  if (value === undefined) return null
+function isPlainCanonicalObject(value) {
+  if (!isCanonicalObject(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function unsupportedCanonicalValue(message) {
+  throw new TypeError(`Unsupported canonical value: ${message}`)
+}
+
+export function normalize(value, seen = new WeakSet()) {
+  if (value === undefined) unsupportedCanonicalValue("undefined")
   if (value === null || typeof value === "string" || typeof value === "boolean") return value
-  if (typeof value === "number") return Number.isFinite(value) ? value : null
-  if (Array.isArray(value)) return value.map((item) => normalize(item))
-  if (isCanonicalObject(value)) {
-    return Object.freeze(Object.keys(value).sort().reduce((normalized, key) => {
-      normalized[key] = normalize(value[key])
-      return normalized
-    }, {}))
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) unsupportedCanonicalValue("non-finite number")
+    return Object.is(value, -0) ? 0 : value
   }
-  return null
+  if (typeof value === "bigint" || typeof value === "symbol" || typeof value === "function") {
+    unsupportedCanonicalValue(typeof value)
+  }
+  if (Array.isArray(value)) {
+    if (seen.has(value)) unsupportedCanonicalValue("cycle")
+    seen.add(value)
+    const normalized = value.map((item) => normalize(item, seen))
+    seen.delete(value)
+    return Object.freeze(normalized)
+  }
+  if (isPlainCanonicalObject(value)) {
+    if (seen.has(value)) unsupportedCanonicalValue("cycle")
+    seen.add(value)
+    const normalized = Object.keys(value).sort().reduce((accumulator, key) => {
+      accumulator[key] = normalize(value[key], seen)
+      return accumulator
+    }, {})
+    seen.delete(value)
+    return Object.freeze(normalized)
+  }
+  unsupportedCanonicalValue(Object.prototype.toString.call(value))
 }
 
 export function canonicalize(value) {
@@ -34,7 +60,8 @@ function utf8Bytes(value) {
 export function sha256Hex(input) {
   const bytes = utf8Bytes(input)
   const bitLength = bytes.length * 8
-  const paddedLength = (((bytes.length + 9 + 63) >> 6) << 6)
+  if (!Number.isSafeInteger(bitLength)) throw new RangeError("Input too large for deterministic SHA-256 length encoding")
+  const paddedLength = Math.ceil((bytes.length + 9) / 64) * 64
   const padded = new Uint8Array(paddedLength)
   padded.set(bytes)
   padded[bytes.length] = 0x80

@@ -7,6 +7,7 @@ export type TraversalDriftClassification =
   | 'LOOP_DETECTED'
   | 'DEPTH_EXCEEDED'
   | 'LINEAGE_DRIFT'
+  | 'ILLEGAL_PARENT_EDGE'
 
 export type RegistryName =
   | 'session_registry'
@@ -28,6 +29,17 @@ const CANONICAL_REGISTRY_ORDER: RegistryName[] = [
   'proof_registry',
   'preo_registry'
 ]
+
+const CANONICAL_PARENT_REGISTRY: Readonly<Record<RegistryName, RegistryName | null>> = Object.freeze({
+  session_registry: null,
+  continuity_registry: 'session_registry',
+  authority_registry: 'continuity_registry',
+  aeo_registry: 'authority_registry',
+  validation_registry: 'aeo_registry',
+  execution_registry: 'validation_registry',
+  proof_registry: 'execution_registry',
+  preo_registry: 'proof_registry'
+})
 
 export interface TraversalRegistryNode {
   registry: RegistryName
@@ -87,10 +99,14 @@ export function computeTraversalHash(request: TraversalHashRequest): TraversalHa
       if (visited.has(key)) return fail(request, 'LOOP_DETECTED')
       visited.add(key)
 
-      if (node.parent_registry && node.parent_id) {
-        const parentKey = `${node.parent_registry}:${node.parent_id}`
-        if (parentKey === key) return fail(request, 'LOOP_DETECTED')
-        const parent = byKey.get(parentKey)
+      const expectedParentRegistry = CANONICAL_PARENT_REGISTRY[node.registry]
+      const declaredParentKey = node.parent_registry && node.parent_id ? `${node.parent_registry}:${node.parent_id}` : ''
+      if (declaredParentKey === key) return fail(request, 'LOOP_DETECTED')
+      if (expectedParentRegistry === null) {
+        if (node.parent_registry || node.parent_id) return fail(request, 'ILLEGAL_PARENT_EDGE')
+      } else {
+        if (node.parent_registry !== expectedParentRegistry || !node.parent_id) return fail(request, 'ILLEGAL_PARENT_EDGE')
+        const parent = byKey.get(declaredParentKey)
         if (!parent || parent.lineage_root !== request.lineage_root) return fail(request, 'ORPHANED')
       }
       canonicalNodes.push(node)

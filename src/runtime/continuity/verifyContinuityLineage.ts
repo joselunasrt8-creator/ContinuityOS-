@@ -5,7 +5,15 @@ export type ContinuityFailureReason = "missing_session_lineage" | "missing_conti
 export type ContinuityLineageVerifierInput = { now?: Date; maxDepth?: number; session: SessionNode | null; continuity: ContinuityNode | null; continuityById: Map<string, ContinuityNode | ContinuityNode[]>; expectedLineageHash?: string; computeLineageHash: (lineage: ContinuityNode[]) => string }
 export type ContinuityLineageVerification = { ok: true; lineage: ContinuityNode[]; lineage_hash: string } | { ok: false; reason: ContinuityFailureReason }
 
-const isExpired = (iso: string | null | undefined, nowMs: number) => Boolean(iso && Number.isFinite(Date.parse(iso)) && Date.parse(iso) <= nowMs)
+const parseOptionalTimestamp = (iso: string | null | undefined): number | null | false => {
+  if (!iso) return null
+  const parsed = Date.parse(iso)
+  return Number.isFinite(parsed) ? parsed : false
+}
+const isInvalidOrExpired = (iso: string | null | undefined, nowMs: number) => {
+  const parsed = parseOptionalTimestamp(iso)
+  return parsed === false || (typeof parsed === "number" && parsed <= nowMs)
+}
 const resolveDeterministicNode = (map: Map<string, ContinuityNode | ContinuityNode[]>, continuityId: string) => {
   const value = map.get(continuityId)
   if (!value) return { node: null as ContinuityNode | null, ambiguous: false }
@@ -18,7 +26,7 @@ export function verifyContinuityLineage(input: ContinuityLineageVerifierInput): 
   const maxDepth = Number.isFinite(input.maxDepth) && Number(input.maxDepth) > 0 ? Math.floor(Number(input.maxDepth)) : 32
   if (!input.session) return { ok: false, reason: "missing_session_lineage" }
   if ((input.session.revoked_at || "") || (input.session.continuity_status || "ACTIVE") !== "ACTIVE") return { ok: false, reason: "revoked_session_lineage" }
-  if (isExpired(input.session.expires_at, nowMs)) return { ok: false, reason: "expired_session_lineage" }
+  if (isInvalidOrExpired(input.session.expires_at, nowMs)) return { ok: false, reason: "expired_session_lineage" }
   if (!input.continuity) return { ok: false, reason: "missing_continuity_lineage" }
 
   const lineage: ContinuityNode[] = []
@@ -33,7 +41,7 @@ export function verifyContinuityLineage(input: ContinuityLineageVerifierInput): 
     const continuityIdentity = String(current.identity_id || "").trim()
     if ((sessionIdentity || continuityIdentity) && sessionIdentity !== continuityIdentity) return { ok: false, reason: "continuity_identity_mismatch" }
     if ((current.revoked_at || "") || current.status !== "ACTIVE") return { ok: false, reason: "revoked_continuity_lineage" }
-    if (isExpired(current.expires_at, nowMs)) return { ok: false, reason: "expired_continuity_lineage" }
+    if (isInvalidOrExpired(current.expires_at, nowMs)) return { ok: false, reason: "expired_continuity_lineage" }
     lineage.push(current)
     if (lineage.length > maxDepth) return { ok: false, reason: "continuity_depth_exceeded" }
     const parentId = String(current.parent_continuity_id || "").trim()

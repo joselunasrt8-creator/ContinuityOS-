@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { canonicalize, hashCanonical, normalize, sha256Hex } from '../../src/canonical.js'
 import { canonicalize as conformanceCanonicalize, hashCanonicalObject } from '../../runtime/legitimacy/validators/schema-validator.js'
 import { canonicalize as reconciliationCanonicalize, hashCanonical as reconciliationHashCanonical, reconcileTopology } from '../../runtime/reconciliation/topology-reconciliation-engine.js'
@@ -9,27 +10,41 @@ import { fingerprintObject } from '../../src/lib/legitimacy-governance.js'
 
 const fixture = Object.freeze({
   b: 2,
-  a: { d: undefined, c: Number.NaN },
-  e: [Number.POSITIVE_INFINITY, undefined, { z: 1, y: 2 }],
+  a: { d: null, c: 1.5 },
+  e: [true, null, { z: 1, y: 2 }],
 })
-const canonicalFixture = '{"a":{"c":null,"d":null},"b":2,"e":[null,null,{"y":2,"z":1}]}'
-const canonicalFixtureHash = '6964f0df4bd17e27b6f824e8841436e4ea3aa78da7ddf299f97112686113c714'
+const canonicalFixture = '{"a":{"c":1.5,"d":null},"b":2,"e":[true,null,{"y":2,"z":1}]}'
+const canonicalFixtureHash = createHash('sha256').update(canonicalFixture, 'utf8').digest('hex')
 
 test('canonical serialization deterministically orders keys recursively', () => {
   assert.equal(canonicalize({ b: 1, a: { d: 4, c: 3 } }), '{"a":{"c":3,"d":4},"b":1}')
   assert.equal(canonicalize({ a: { c: 3, d: 4 }, b: 1 }), canonicalize({ b: 1, a: { d: 4, c: 3 } }))
 })
 
-test('canonical serialization normalizes floating point sentinels and undefined to null', () => {
-  assert.equal(canonicalize({ finite: 1.25, inf: Infinity, neg_inf: -Infinity, nan: NaN, missing: undefined }), '{"finite":1.25,"inf":null,"missing":null,"nan":null,"neg_inf":null}')
-  assert.deepEqual(normalize([undefined, NaN, Infinity, -Infinity]), [null, null, null, null])
+test('canonical serialization rejects unsupported values instead of collapsing them to null', () => {
+  assert.throws(() => canonicalize({ missing: undefined }), /Unsupported canonical value: undefined/)
+  assert.throws(() => canonicalize({ nan: NaN }), /Unsupported canonical value: non-finite number/)
+  assert.throws(() => canonicalize({ inf: Infinity }), /Unsupported canonical value: non-finite number/)
+  assert.throws(() => normalize([undefined]), /Unsupported canonical value: undefined/)
+})
+
+test('canonical serialization rejects circular objects deterministically', () => {
+  const cycle = { a: 1 }
+  cycle.self = cycle
+  assert.throws(() => canonicalize(cycle), /Unsupported canonical value: cycle/)
 })
 
 test('canonical hash remains stable for logically equivalent objects', () => {
   assert.equal(canonicalize(fixture), canonicalFixture)
   assert.equal(sha256Hex(canonicalFixture), canonicalFixtureHash)
   assert.equal(hashCanonical(fixture), canonicalFixtureHash)
-  assert.equal(hashCanonical({ e: [Infinity, undefined, { y: 2, z: 1 }], a: { c: NaN, d: undefined }, b: 2 }), canonicalFixtureHash)
+  assert.equal(hashCanonical({ e: [true, null, { y: 2, z: 1 }], a: { c: 1.5, d: null }, b: 2 }), canonicalFixtureHash)
+})
+
+test('sha256Hex matches platform SHA-256 vectors at block boundaries', () => {
+  for (const input of ['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(57), 'a'.repeat(63), 'a'.repeat(64), 'a'.repeat(65), 'continuity-π']) {
+    assert.equal(sha256Hex(input), createHash('sha256').update(input, 'utf8').digest('hex'))
+  }
 })
 
 test('runtime, reconciliation, and conformance layers share canonical serialization', () => {

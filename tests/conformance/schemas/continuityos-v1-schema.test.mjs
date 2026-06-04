@@ -148,3 +148,22 @@ test('legacy and v1 AEO schemas both reject same extra-field fixture', async () 
   assert.equal(legacy(invalid), false);
   assert.equal(v1(invalid), false);
 });
+
+test('continuityos v1 AEO rejects disabled legitimacy requirements', async () => {
+  const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
+  const validate = createValidator(schema);
+  assert.equal(validate({
+    ...validAeo,
+    validation: { ...validAeo.validation, require_exact_object_hash: false }
+  }), false);
+  assert.equal(validate({
+    ...validAeo,
+    finality: { ...validAeo.finality, proof_required: false }
+  }), false);
+});
+
+test('continuityos v1 AEO rejects extra scope fields', async () => {
+  const schema = await loadSchema('schemas/json/continuityos/v1/aeo.schema.json');
+  const validate = createValidator(schema);
+  assert.equal(validate({ ...validAeo, scope: { repo: 'mindshift-demo', hidden: true } }), false);
+});

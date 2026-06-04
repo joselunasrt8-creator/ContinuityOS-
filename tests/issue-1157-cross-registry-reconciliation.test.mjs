@@ -107,3 +107,25 @@ test('Issue #1157: fail-closed NULL and canonical hashing usage', () => {
   assert.equal(result.lineage_hash, expectedLineage)
   assert.equal(result.creates_authority, false)
 })
+
+test('Issue #1157: empty equivalent registries remain insufficient evidence', () => {
+  const result = reconcileCrossRegistryLegitimacy({
+    reconciliation_id: 'r-empty-evidence',
+    evidence_only: true,
+    views: [view('a', { entries: [] }), view('b', { entries: [] })],
+  })
+  assert.equal(result.classification, 'INSUFFICIENT_EVIDENCE')
+  assert.equal(result.equivalent, false)
+  assert.ok(result.drift_classes.includes('empty_registry_evidence'))
+})
+
+test('Issue #1157: malformed empty evidence fields remain insufficient evidence', () => {
+  const result = reconcileCrossRegistryLegitimacy({
+    reconciliation_id: 'r-malformed-evidence',
+    evidence_only: true,
+    views: [view('a', { entries: [entry({ object_id: '' })] }), view('b', { entries: [entry({ object_id: '' })] })],
+  })
+  assert.equal(result.classification, 'INSUFFICIENT_EVIDENCE')
+  assert.equal(result.equivalent, false)
+  assert.ok(result.drift_classes.includes('malformed_registry_evidence'))
+})

@@ -109,6 +109,15 @@ test('issue #1709 missing required field returns missing_required_field failure'
   assert.equal(result.failure, 'missing_required_field')
 })
 
+test('issue #1709 nested extra validation field fails exact-object materialization', () => {
+  const input = makeValidInput()
+  input.validation.hidden_authority = 'must-not-be-dropped'
+  const result = materializeFilesystemAEO(input)
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.equal(result.failure, 'authority_binding_missing')
+})
+
 test('issue #1709 missing decision_id in validation returns authority_binding_missing', () => {
   const input = makeValidInput()
   delete input.validation.decision_id
@@ -488,6 +497,30 @@ test('issue #1708 REPLAY_STATE_UNKNOWN returns NULL: REPLAY_NOT_DETERMINABLE', a
   const result = await validateFilesystemAEO(makeValidInput(), ctx)
   assert.equal(result.result, 'NULL')
   assert.equal(result.denial_result.failure_class, 'REPLAY_STATE_UNKNOWN')
+  assert.equal(result.denial_result.mutation_performed, false)
+})
+
+test('issue #1708 unobservable AEO replay state fails closed before pre-state read', async () => {
+  const ctx = makeContext({
+    replayRegistry: {
+      readNonceState: async () => ({ ok: true, value: 'UNUSED' }),
+      readAeoState: async () => ({
+        ok: false,
+        observation_error: 'REPLAY_STATE_UNKNOWN',
+        topology_visible: false,
+        safe_to_disclose: true,
+      }),
+    },
+    filesystem: {
+      normalizePath: (path) => ({ ok: true, value: path }),
+      readHash: async () => { throw new Error('readHash must not be called when AEO replay state is unobservable') },
+      readMetadata: async () => ({ ok: true, value: { exists: true, is_symlink: false } }),
+    },
+  })
+  const result = await validateFilesystemAEO(makeValidInput(), ctx)
+  assert.equal(result.result, 'NULL')
+  assert.equal(result.denial_result.failure_class, 'AEO_REPLAY_STATE_UNKNOWN')
+  assert.equal(result.denial_result.denial_reason, 'REPLAY_NOT_DETERMINABLE')
   assert.equal(result.denial_result.mutation_performed, false)
 })
 

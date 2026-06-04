@@ -72,15 +72,21 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === "string")
 }
 
+function hasExactKeys(v: Record<string, unknown>, expectedKeys: readonly string[]): boolean {
+  const keys = Object.keys(v).sort()
+  if (keys.length !== expectedKeys.length) return false
+  return expectedKeys.every((key, index) => keys[index] === key)
+}
+
 function validateIntent(v: unknown): FilesystemAEOIntent | null {
-  if (!isPlainObject(v)) return null
+  if (!isPlainObject(v) || !hasExactKeys(v, ["action", "purpose"])) return null
   if (!isNonEmptyString(v.action)) return null
   if (!isNonEmptyString(v.purpose)) return null
   return { action: v.action, purpose: v.purpose }
 }
 
 function validateScope(v: unknown): FilesystemAEOScope | null {
-  if (!isPlainObject(v)) return null
+  if (!isPlainObject(v) || !hasExactKeys(v, ["allowed_operations", "allowed_paths", "denied_operations", "denied_paths", "max_diff_lines", "max_files", "repo", "root"])) return null
   if (!isNonEmptyString(v.repo)) return null
   if (!isNonEmptyString(v.root)) return null
   if (!isStringArray(v.allowed_paths)) return null
@@ -102,7 +108,7 @@ function validateScope(v: unknown): FilesystemAEOScope | null {
 }
 
 function validateValidation(v: unknown): FilesystemAEOValidation | null {
-  if (!isPlainObject(v)) return null
+  if (!isPlainObject(v) || !hasExactKeys(v, ["aeo_hash_required", "authority_lineage_hash", "canonicalization", "decision_id", "policy_hash", "policy_id", "pre_write_hash", "proposed_diff_hash", "replay_nonce", "requires_path_policy_match", "requires_pre_write_hash_match", "requires_scope_match", "requires_unused_nonce"])) return null
   if (!isNonEmptyString(v.decision_id)) return null
   if (!isNonEmptyString(v.authority_lineage_hash)) return null
   if (!isNonEmptyString(v.policy_id)) return null
@@ -134,7 +140,7 @@ function validateValidation(v: unknown): FilesystemAEOValidation | null {
 }
 
 function validateTarget(v: unknown): FilesystemAEOTarget | null {
-  if (!isPlainObject(v)) return null
+  if (!isPlainObject(v) || !hasExactKeys(v, ["normalized_path_required", "operation", "path", "symlink_following_allowed", "system"])) return null
   if (v.system !== "filesystem") return null
   if (!isNonEmptyString(v.operation)) return null
   if (!isNonEmptyString(v.path)) return null
@@ -150,7 +156,7 @@ function validateTarget(v: unknown): FilesystemAEOTarget | null {
 }
 
 function validateFinality(v: unknown): FilesystemAEOFinality | null {
-  if (!isPlainObject(v)) return null
+  if (!isPlainObject(v) || !hasExactKeys(v, ["expected_result", "proof_fields", "proof_required", "proof_type", "reconciliation_required", "registry_required", "replay_state_after_success"])) return null
   if (typeof v.proof_required !== "boolean" || !v.proof_required) return null
   if (!isNonEmptyString(v.proof_type)) return null
   if (!isNonEmptyString(v.expected_result)) return null
