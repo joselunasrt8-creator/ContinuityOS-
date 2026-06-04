@@ -1,0 +1,43 @@
+{
+  "artifact": "governance_mutation_authorization_spec",
+  "version": "1.0",
+  "gap_reference": "GAP-005",
+  "issue_reference": "#1831",
+  "purpose": "Defines the required structure and validation rules for a Governance Mutation Authorization (GMA). A GMA must be present, valid, and hash-matched for any PR that mutates governance primitives (governance_mutation or workflow_mutation classes).",
+  "canonical_invariant": "If no valid object exists -> nothing happens.",
+  "closure_condition": "Runtime governance changes require recursively governed legitimacy approval via the canonical /session -> /continuity -> /authority -> /compile lifecycle.",
+  "required_fields": [
+    "gma_id",
+    "decision_id",
+    "continuity_id",
+    "session_id",
+    "validated_object_hash",
+    "governed_files_hash",
+    "mutation_classes",
+    "gm_control_class",
+    "authority_lineage_bound",
+    "created_at",
+    "expires_at",
+    "status"
+  ],
+  "valid_status": "GMA_VALID",
+  "governed_files_hash_algorithm": "sha256",
+  "governed_files_hash_input": "sorted list of 'path:sha256(file_content)' entries joined by newline, then sha256 of the result",
+  "governed_files_hash_scope": "all governed files changed in the PR (governance/**, .github/workflows/**, src/**, schema.sql, migrations/**, wrangler.toml) — excludes governance/authorizations/**",
+  "expiry_enforcement": "GMA is rejected if expires_at is in the past at merge check time",
+  "mutation_class_coverage": "GMA must declare all governance_mutation and workflow_mutation classes detected in the PR",
+  "exempted_paths": [
+    "governance/authorizations/**"
+  ],
+  "exemption_rationale": "GMA artifacts committed to governance/authorizations/ are authorization evidence artifacts, not governance primitives. They are self-referentially exempt to break the bootstrap circularity.",
+  "failure_result": "NULL",
+  "enforcement_rule": "governance_mutation or workflow_mutation detected AND no valid GMA at governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json -> MERGE_LEGITIMACY_NULL",
+  "creation_workflow": ".github/workflows/governance-mutation-authorization.yml",
+  "evidence_flags": {
+    "evidence_only": false,
+    "creates_authority": false,
+    "creates_execution_eligibility": false,
+    "requires_canonical_lifecycle_lineage": true,
+    "fail_closed": true
+  }
+}
