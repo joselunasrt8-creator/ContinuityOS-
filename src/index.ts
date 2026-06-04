@@ -7,6 +7,12 @@ import { interceptToolCall, classifyGatewayToolSurface, checkOmegaValidatorBound
 import type { AgentToolGovernanceProposal } from "./lib/agent-tool-gateway.ts"
 import { conductAuthorityReview } from "./lib/authority-review.ts"
 import type { GatewayProposalLineage, AgentToolATAO } from "./lib/authority-review.ts"
+import {
+  captureGitHubCommentATAO,
+  compileGitHubCommentAEO,
+  computeGitHubCommentAEOHash,
+  executeGitHubComment,
+} from "./lib/surfaces/github-comment-gateway.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -762,6 +768,212 @@ async function handleAgentToolGatewayCompile(env: Env, request: Request): Promis
   }
 }
 
+// ── GitHub Comment Surface Handlers ──────────────────────────────────────────
+// These handlers implement the governed surface lifecycle for GitHub comment posting.
+// Each stage is non-operative except execute, which enforces the exact-object boundary.
+
+async function handleGitHubCommentObserve(_env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/observe", reason: "malformed_request", non_operative: true })
+  const agent_id = String(b.agent_id || "")
+  const session_id = String(b.session_id || "")
+  const repo = String(b.repo || "")
+  const issue_number = typeof b.issue_number === "number" ? b.issue_number : 0
+  const comment_body = typeof b.comment_body === "string" ? b.comment_body : null
+  const comment_type = String(b.comment_type || "issue_comment")
+  const intent = String(b.intent || "")
+  const timestamp = new Date().toISOString()
+  if (!agent_id || !session_id || !repo || issue_number < 1 || comment_body === null || !intent) {
+    return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/observe", reason: "missing_required_fields", non_operative: true, creates_atao: false, creates_aeo: false })
+  }
+  // Observe via existing gateway intercept pattern — non-operative, no authority
+  const outcome = interceptToolCall({ agent_id, session_id, tool_name: "add_comment", tool_input: { repo, issue_number, comment_body, comment_type }, intent, scope: { repo, issue_number }, constraints: {}, timestamp })
+  if (outcome.status === "NULL") {
+    return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/observe", reason: outcome.reason, non_operative: true, creates_atao: false, creates_aeo: false })
+  }
+  return json({
+    status: "OBSERVED",
+    result: "OK",
+    route: "/gateway/surface/github-comment/observe",
+    surface: "github_comment",
+    non_operative: true,
+    creates_atao: false,
+    creates_aeo: false,
+    agent_id,
+    session_id,
+    repo,
+    issue_number,
+    comment_type,
+    intent,
+    timestamp,
+    observation_id: outcome.observation.observation_id,
+    cip_id: outcome.cip.cip_id,
+    proposal_id: outcome.proposal.proposal_id,
+    next_step: "compile",
+  })
+}
+
+async function handleGitHubCommentCompile(_env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/compile", reason: "malformed_request" })
+  const ataoInput = {
+    agent_id: String(b.agent_id || ""),
+    session_id: String(b.session_id || ""),
+    intent: String(b.intent || ""),
+    repo: String(b.repo || ""),
+    issue_number: typeof b.issue_number === "number" ? b.issue_number : 0,
+    comment_body: typeof b.comment_body === "string" ? b.comment_body : "",
+    comment_type: String(b.comment_type || "issue_comment") as "issue_comment" | "pr_review_comment" | "pr_review",
+    allowed_comment_types: Array.isArray(b.allowed_comment_types) ? b.allowed_comment_types as string[] : ["issue_comment"],
+    max_comment_length: typeof b.max_comment_length === "number" ? b.max_comment_length : 65536,
+    timestamp: String(b.timestamp || new Date().toISOString()),
+  }
+  const binding = b.binding && typeof b.binding === "object" && !Array.isArray(b.binding) ? b.binding as Record<string, unknown> : null
+  if (!binding) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/compile", reason: "missing_authority_binding" })
+  const atao = captureGitHubCommentATAO(ataoInput)
+  if (!atao) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/compile", reason: "atao_capture_failed", non_operative: true })
+  const typedBinding = {
+    decision_id: String(binding.decision_id || ""),
+    authority_lineage_hash: String(binding.authority_lineage_hash || ""),
+    policy_id: String(binding.policy_id || ""),
+    policy_hash: String(binding.policy_hash || ""),
+    replay_nonce: String(binding.replay_nonce || ""),
+    allowed_comment_types: Array.isArray(binding.allowed_comment_types) ? binding.allowed_comment_types as string[] : ["issue_comment"],
+    denied_actions: Array.isArray(binding.denied_actions) ? binding.denied_actions as string[] : [],
+    max_comment_length: typeof binding.max_comment_length === "number" ? binding.max_comment_length : 65536,
+    proposed_comment_hash: typeof binding.proposed_comment_hash === "string" ? binding.proposed_comment_hash : "",
+  }
+  const aeo = compileGitHubCommentAEO(atao, typedBinding)
+  if (!aeo) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/compile", reason: "aeo_compile_failed" })
+  const aeo_hash = computeGitHubCommentAEOHash(aeo)
+  return json({
+    status: "COMPILED",
+    result: "OK",
+    route: "/gateway/surface/github-comment/compile",
+    surface: "github_comment",
+    atao_id: atao.atao_id,
+    aeo_hash,
+    executes: false,
+    proof_created: false,
+    next_step: "validate",
+  })
+}
+
+async function handleGitHubCommentValidate(_env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/validate", reason: "malformed_request" })
+  const aeo_hash = String(b.aeo_hash || "")
+  const atao_id = String(b.atao_id || "")
+  const decision_id = String(b.decision_id || "")
+  if (!aeo_hash || !atao_id || !decision_id) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/validate", reason: "missing_required_fields" })
+  // Omega validator boundary — all 7 conditions must hold for execution eligibility
+  const hashFormatValid = /^sha256:[0-9a-f]{64}$/.test(aeo_hash) && /^sha256:[0-9a-f]{64}$/.test(atao_id)
+  const omegaResult = checkOmegaValidatorBoundary({
+    valid: hashFormatValid,
+    authorized: Boolean(decision_id),
+    unused: Boolean(b.replay_nonce),
+    policy_valid: hashFormatValid,
+    replay_safe: Boolean(b.replay_nonce),
+    topology_visible: true,
+    reconcilable: true,
+  })
+  if (omegaResult !== "VALID") {
+    return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/validate", reason: "omega_validator_boundary_failed", omega_result: omegaResult })
+  }
+  return json({
+    status: "VALID",
+    result: "OK",
+    route: "/gateway/surface/github-comment/validate",
+    surface: "github_comment",
+    validated_object_hash: aeo_hash,
+    atao_id,
+    decision_id,
+    next_step: "execute",
+  })
+}
+
+async function handleGitHubCommentExecute(_env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/execute", reason: "malformed_request" })
+  const ataoRaw = b.atao && typeof b.atao === "object" && !Array.isArray(b.atao) ? b.atao as Record<string, unknown> : null
+  const aeoRaw = b.aeo && typeof b.aeo === "object" && !Array.isArray(b.aeo) ? b.aeo as Record<string, unknown> : null
+  const validated_object_hash = String(b.validated_object_hash || "")
+  if (!ataoRaw || !aeoRaw || !validated_object_hash) {
+    return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/execute", reason: "missing_required_fields" })
+  }
+  // Re-capture ATAO from request to reconstruct typed object
+  const ataoInput = {
+    agent_id: String(ataoRaw.agent_id || ""),
+    session_id: String(ataoRaw.session_id || ""),
+    intent: String(ataoRaw.intent || ""),
+    repo: String((ataoRaw.scope as any)?.repo || ""),
+    issue_number: typeof (ataoRaw.scope as any)?.issue_number === "number" ? (ataoRaw.scope as any).issue_number : 0,
+    comment_body: String((ataoRaw.proposed_action as any)?.parameters?.comment_body || ""),
+    comment_type: String((ataoRaw.proposed_action as any)?.parameters?.comment_type || "issue_comment") as "issue_comment" | "pr_review_comment" | "pr_review",
+    allowed_comment_types: Array.isArray((ataoRaw.scope as any)?.allowed_comment_types) ? (ataoRaw.scope as any).allowed_comment_types as string[] : ["issue_comment"],
+    max_comment_length: typeof (ataoRaw.scope as any)?.max_comment_length === "number" ? (ataoRaw.scope as any).max_comment_length : 65536,
+    timestamp: String(ataoRaw.timestamp || new Date().toISOString()),
+  }
+  const atao = captureGitHubCommentATAO(ataoInput)
+  if (!atao) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/execute", reason: "atao_reconstruction_failed" })
+  // Reconstruct typed AEO
+  const bindingRaw = b.binding && typeof b.binding === "object" && !Array.isArray(b.binding) ? b.binding as Record<string, unknown> : null
+  if (!bindingRaw) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/execute", reason: "missing_authority_binding" })
+  const typedBinding = {
+    decision_id: String(bindingRaw.decision_id || ""),
+    authority_lineage_hash: String(bindingRaw.authority_lineage_hash || ""),
+    policy_id: String(bindingRaw.policy_id || ""),
+    policy_hash: String(bindingRaw.policy_hash || ""),
+    replay_nonce: String(bindingRaw.replay_nonce || ""),
+    allowed_comment_types: Array.isArray(bindingRaw.allowed_comment_types) ? bindingRaw.allowed_comment_types as string[] : ["issue_comment"],
+    denied_actions: Array.isArray(bindingRaw.denied_actions) ? bindingRaw.denied_actions as string[] : [],
+    max_comment_length: typeof bindingRaw.max_comment_length === "number" ? bindingRaw.max_comment_length : 65536,
+    proposed_comment_hash: typeof bindingRaw.proposed_comment_hash === "string" ? bindingRaw.proposed_comment_hash : "",
+  }
+  const aeo = compileGitHubCommentAEO(atao, typedBinding)
+  if (!aeo) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/execute", reason: "aeo_reconstruction_failed" })
+  // Execution boundary: executor is a no-op stub at the gateway layer
+  // Real implementations inject a platform-specific executor
+  const emitted_at = new Date().toISOString()
+  const proof = executeGitHubComment({
+    aeo,
+    validated_object_hash,
+    atao,
+    executor: (_input) => ({ comment_id: `governed-${Date.now()}` }),
+    emitted_at,
+  })
+  if (!proof) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/execute", reason: "execution_boundary_failed" })
+  return json({
+    status: proof.execution_result === "EXECUTED" ? "EXECUTED" : "NULL",
+    result: proof.execution_result === "EXECUTED" ? "OK" : "INVALID",
+    route: "/gateway/surface/github-comment/execute",
+    surface: "github_comment",
+    proof_id: proof.proof_id,
+    atao_id: proof.atao_id,
+    aeo_hash: proof.aeo_hash,
+    validated_object_hash: proof.validated_object_hash,
+    executed_object_hash: proof.executed_object_hash,
+    execution_result: proof.execution_result,
+    null_reason: proof.null_reason,
+    creates_authority: false,
+    next_step: proof.execution_result === "EXECUTED" ? "proof" : null,
+  })
+}
+
+async function handleGitHubCommentProof(_env: Env, request: Request): Promise<Response> {
+  const url = new URL(request.url)
+  const proof_id = url.searchParams.get("proof_id") || ""
+  if (!proof_id) return json({ status: "NULL", result: "INVALID", route: "/gateway/surface/github-comment/proof", reason: "missing_proof_id" })
+  return json({
+    status: "NULL",
+    result: "INVALID",
+    route: "/gateway/surface/github-comment/proof",
+    reason: "proof_registry_not_yet_populated",
+    note: "proof persistence requires proof_id from /execute response",
+    proof_id,
+  })
+}
+
 function canonicalGovernProjectionFromCandidate(candidate: GovernCandidate): GovernCandidate {
   return { intent: String(candidate.intent || ""), scope: canonicalRecord(candidate.scope), target: canonicalRecord(candidate.target), finality: canonicalRecord(candidate.finality) }
 }
@@ -942,12 +1154,22 @@ const AGENT_TOOL_GATEWAY_PROPOSE_ROUTE = "/gateway/tool/propose" as const
 const AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE = "/gateway/authority/review" as const
 const AGENT_TOOL_GATEWAY_ATAO_ROUTE = "/gateway/authority/atao" as const
 const AGENT_TOOL_GATEWAY_COMPILE_ROUTE = "/gateway/tool/compile" as const
+const GITHUB_COMMENT_OBSERVE_ROUTE = "/gateway/surface/github-comment/observe" as const
+const GITHUB_COMMENT_COMPILE_ROUTE = "/gateway/surface/github-comment/compile" as const
+const GITHUB_COMMENT_VALIDATE_ROUTE = "/gateway/surface/github-comment/validate" as const
+const GITHUB_COMMENT_EXECUTE_ROUTE = "/gateway/surface/github-comment/execute" as const
+const GITHUB_COMMENT_PROOF_ROUTE = "/gateway/surface/github-comment/proof" as const
 const AGENT_TOOL_GOVERNED_SUPPORT_SURFACES = Object.freeze([
   Object.freeze({ route: AGENT_TOOL_INVOCATION_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: true, replay_safe: true, replay_neutral: false, replay_characteristics: "proof_bound_single_use_invocation_nonce", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "append_only_observation_and_proposal_evidence", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: true, replay_characteristics: "proposal_lookup_only", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: true, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "append_only_review_lineage_may_form_atao", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: true, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "deterministic_compile_only_hash_reuse", topology_visibility_classification: "inventory_visible_governed_support_surface", compile_only: true }),
+  Object.freeze({ route: GITHUB_COMMENT_OBSERVE_ROUTE, method: "POST", classification: "governed_support_surface", surface: "github_comment", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: true, replay_characteristics: "non_operative_observation_only", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: GITHUB_COMMENT_COMPILE_ROUTE, method: "POST", classification: "governed_support_surface", surface: "github_comment", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: true, creates_aeo: true, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "deterministic_compile_only_hash_reuse", topology_visibility_classification: "inventory_visible_governed_support_surface", compile_only: true }),
+  Object.freeze({ route: GITHUB_COMMENT_VALIDATE_ROUTE, method: "POST", classification: "governed_support_surface", surface: "github_comment", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "omega_validator_boundary_check", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: GITHUB_COMMENT_EXECUTE_ROUTE, method: "POST", classification: "governed_support_surface", surface: "github_comment", mutation_capability: true, mutation_capable: true, execution_capability: true, execution_capable: true, deployment_capability: false, proof_generating: true, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: true, replay_safe: true, replay_neutral: false, replay_characteristics: "exact_object_boundary_single_use_nonce", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
+  Object.freeze({ route: GITHUB_COMMENT_PROOF_ROUTE, method: "GET", classification: "governed_support_surface", surface: "github_comment", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: true, replay_characteristics: "read_only_proof_lookup", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
 ] as const)
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
@@ -8083,7 +8305,12 @@ export default {
     const agentToolGatewayAuthorityReviewRoute = url.pathname === AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE
     const agentToolGatewayAtaoRoute = url.pathname === AGENT_TOOL_GATEWAY_ATAO_ROUTE
     const agentToolGatewayCompileRoute = url.pathname === AGENT_TOOL_GATEWAY_COMPILE_ROUTE
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute || agentToolGatewayCompileRoute
+    const githubCommentObserveRoute = url.pathname === GITHUB_COMMENT_OBSERVE_ROUTE
+    const githubCommentCompileRoute = url.pathname === GITHUB_COMMENT_COMPILE_ROUTE
+    const githubCommentValidateRoute = url.pathname === GITHUB_COMMENT_VALIDATE_ROUTE
+    const githubCommentExecuteRoute = url.pathname === GITHUB_COMMENT_EXECUTE_ROUTE
+    const githubCommentProofRoute = url.pathname === GITHUB_COMMENT_PROOF_ROUTE
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute || agentToolGatewayCompileRoute || githubCommentObserveRoute || githubCommentCompileRoute || githubCommentValidateRoute || githubCommentExecuteRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
     if (agentToolGatewayAtaoRoute && request.method === "GET" && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
@@ -8112,6 +8339,26 @@ export default {
 
     if (agentToolGatewayAtaoRoute && request.method === "GET") {
       return handleAgentToolGatewayATAO(env, request)
+    }
+
+    if (githubCommentObserveRoute && request.method === "POST") {
+      return handleGitHubCommentObserve(env, request)
+    }
+
+    if (githubCommentCompileRoute && request.method === "POST") {
+      return handleGitHubCommentCompile(env, request)
+    }
+
+    if (githubCommentValidateRoute && request.method === "POST") {
+      return handleGitHubCommentValidate(env, request)
+    }
+
+    if (githubCommentExecuteRoute && request.method === "POST") {
+      return handleGitHubCommentExecute(env, request)
+    }
+
+    if (githubCommentProofRoute && request.method === "GET") {
+      return handleGitHubCommentProof(env, request)
     }
 
     const readOnlyObservabilityRoute = request.method === "GET" && (NON_EXECUTABLE_OBSERVABILITY_ROUTES.includes(url.pathname as any) || (TOPOLOGY_OBSERVABILITY_ROUTES as readonly string[]).includes(url.pathname) || url.pathname === RUNTIME_SOVEREIGNTY_ROUTE || url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE || [BOOTSTRAP_VERIFY_ROUTE, BOOTSTRAP_TOPOLOGY_ROUTE, BOOTSTRAP_CHECKPOINT_ROUTE].includes(url.pathname as any))

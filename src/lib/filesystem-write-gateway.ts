@@ -330,3 +330,25 @@ export function executeFilesystemWrite(
 
   return Object.freeze({ proof_id, ...proofBody })
 }
+
+// ── Surface adapter ───────────────────────────────────────────────────────────
+// Wraps the three gateway functions in the GovernedActionSurface interface.
+// This is what gets registered in surface-registry.ts.
+
+import type { GovernedActionSurface, GovernedSurfaceType } from './governed-action-template.js'
+import { createGovernedAction } from './governed-action-template.js'
+
+export const FilesystemWriteSurface = createGovernedAction<
+  FilesystemWriteATAO,
+  FilesystemWriteATAOInput,
+  FilesystemWriteATAOBinding,
+  FilesystemAEO,
+  FilesystemWriteExecuteInput,
+  FilesystemWriteExecutionProof
+>({
+  surfaceType: "filesystem" as GovernedSurfaceType,
+  captureATAO: captureFilesystemWriteATAO,
+  compileAEO: compileFilesystemWriteAEO,
+  computeAEOHash: computeFilesystemAEOHash,
+  execute: executeFilesystemWrite,
+})
