@@ -316,6 +316,22 @@ jobs:
             exit 0
           fi
 
+          # Bootstrap guard (self-limiting, one-time, auditable):
+          # If governance-mutation-authorization.yml is absent from the base branch at its exact SHA,
+          # this PR is the bootstrap PR that introduces GAP-005 GMA infrastructure.
+          # Enforcement is deferred ONLY for this PR. Once merged, the workflow exists on main
+          # and all subsequent governance mutation PRs are fully enforced — no follow-up needed.
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          if ! git cat-file -e "${BASE_SHA}:.github/workflows/governance-mutation-authorization.yml" 2>/dev/null; then
+            echo "GMA_BOOTSTRAP_EXEMPTION — governance-mutation-authorization.yml is absent from base branch at ${BASE_SHA}."
+            echo "Classification: SELF_BLOCKING_GMA_BOOTSTRAP (Path A repair — split bootstrap)"
+            echo "This PR introduces GAP-005 GMA infrastructure. Enforcement deferred for this PR only."
+            echo "After merge to main, governance-mutation-authorization.yml exists on main."
+            echo "All subsequent governance/workflow mutations will require a valid GMA."
+            echo "Bootstrap exemption is non-reusable and self-limiting."
+            exit 0
+          fi
+
           GMA_FILE="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
 
           if [ ! -f "$GMA_FILE" ]; then

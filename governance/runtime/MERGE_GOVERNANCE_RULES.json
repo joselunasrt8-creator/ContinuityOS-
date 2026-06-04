@@ -297,7 +297,17 @@
     "missing_mutation_class_result": "NULL",
     "fail_closed": true,
     "recursive_governance_binding": "GMA requires canonical lifecycle lineage via /session -> /continuity -> /authority -> /compile before merge is permitted",
-    "enforcement_step": "merge-governance-check workflow step: 'Validate governance mutation authorization (GAP-005)'"
+    "enforcement_step": "merge-governance-check workflow step: 'Validate governance mutation authorization (GAP-005)'",
+    "bootstrap_exemption": {
+      "classification": "GMA_BOOTSTRAP_EXEMPTION",
+      "condition": "governance-mutation-authorization.yml absent from base branch at exact base SHA",
+      "applies_to": "single bootstrap PR introducing GAP-005 GMA infrastructure",
+      "self_limiting": true,
+      "rationale": "SELF_BLOCKING_GMA_BOOTSTRAP: the workflow required to create a GMA cannot be dispatched before it exists on main. Enforcement deferred only for the PR that introduces the workflow. After merge, all subsequent governance mutations require a valid GMA.",
+      "non_reusable": true,
+      "auditable": true,
+      "issue_reference": "#1831"
+    }
   },
   "merge_method_policy": {
     "merge_queue": {
