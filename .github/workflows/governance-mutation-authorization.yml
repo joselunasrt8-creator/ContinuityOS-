@@ -149,6 +149,11 @@ jobs:
               governance/authorizations/*)
                 # GMA artifacts are exempt — not governance primitives
                 ;;
+              GOVERNANCE_GAP_REGISTRY.md|GOVERNANCE_REQUIREMENTS.json|BYPASS_PATHS.json|AGENT_BYPASS_INVENTORY.json|ARTIFACT_INVENTORY.md)
+                # Root-level governance registry files (GAP-005 #1831)
+                echo "$file" >> gma_governed_files.txt
+                echo "governance_registry_mutation" >> gma_mutation_classes.txt
+                ;;
               governance/*)
                 echo "$file" >> gma_governed_files.txt
                 echo "governance_mutation" >> gma_mutation_classes.txt
@@ -179,9 +184,9 @@ jobs:
           sort -u gma_governed_files.txt -o gma_governed_files.txt
           sort -u gma_mutation_classes.txt -o gma_mutation_classes.txt
 
-          HAS_GOVERNANCE_MUTATION=$(grep -qE '^(governance_mutation|workflow_mutation)$' gma_mutation_classes.txt && echo "true" || echo "false")
+          HAS_GOVERNANCE_MUTATION=$(grep -qE '^(governance_mutation|workflow_mutation|governance_registry_mutation)$' gma_mutation_classes.txt && echo "true" || echo "false")
           if [ "$HAS_GOVERNANCE_MUTATION" = "false" ]; then
-            echo "NULL — No governance_mutation or workflow_mutation detected in changed files."
+            echo "NULL — No governance_mutation, workflow_mutation, or governance_registry_mutation detected in changed files."
             echo "This workflow is only required for PRs mutating governance primitives."
             exit 1
           fi

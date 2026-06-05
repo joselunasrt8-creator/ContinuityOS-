@@ -77,6 +77,13 @@ jobs:
               governance/authorizations/*)
                 # GMA artifacts: authorization evidence, not governance primitives (GAP-005)
                 ;;
+              GOVERNANCE_GAP_REGISTRY.md|GOVERNANCE_REQUIREMENTS.json|BYPASS_PATHS.json|AGENT_BYPASS_INVENTORY.json|ARTIFACT_INVENTORY.md)
+                # Root-level governance registry files (GAP-005 #1831)
+                echo "$file" >> governed_files.txt
+                echo "governance_registry_mutation" >> mutation_classes.txt
+                echo "governance_registry" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
+                ;;
               governance/merge-legitimacy/merge_proof_registry.jsonl)
                 # Append-only proof evidence surface: records merge proof events after merge.
                 # Does not define governance rules, policies, authority, or validation logic.
@@ -402,8 +409,9 @@ jobs:
           // Mutation class coverage
           const gmaMutationClasses = new Set(gma.mutation_classes);
           const detectedClasses = readFileSync('mutation_classes.txt', 'utf8').split('\n').filter(Boolean);
+          const enforcedClasses = new Set(['governance_mutation', 'workflow_mutation', 'governance_registry_mutation']);
           for (const cls of detectedClasses) {
-            if (cls === 'governance_mutation' || cls === 'workflow_mutation') {
+            if (enforcedClasses.has(cls)) {
               assert.ok(gmaMutationClasses.has(cls), `GMA does not cover detected mutation class: ${cls}`);
             }
           }
