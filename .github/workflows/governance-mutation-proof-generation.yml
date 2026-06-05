@@ -1,0 +1,587 @@
+name: governance-mutation-proof-generation
+# owner: #1831
+# policy: GAP-005 — Governance Self-Mutation Containment
+# policy-path: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json
+# gap-reference: GAP-005
+#
+# Completes the remaining lifecycle stages for a governance mutation that has an
+# existing GMA (Governance Mutation Authorization):
+#
+#   GMA covers:  /session → /continuity → /authority → /compile
+#   This covers: /validate → /execute → /proof
+#
+# Output: GOVERNANCE_MUTATION_PROOF.json artifact to commit at
+#   governance/authorizations/GOVERNANCE_MUTATION_PROOF.json
+#
+# Precondition: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json
+#   must exist on the branch and contain a valid, unexpired GMA.
+#
+# Trigger: workflow_dispatch only. Non-dispatch invocation → HARD FAIL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base branch (default: main)'
+        required: false
+        default: 'main'
+      intent:
+        description: 'Brief description of the governance mutation (must match GMA intent)'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  generate-governance-mutation-proof:
+    runs-on: ubuntu-latest
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      BASE_REF: ${{ inputs.base_ref || 'main' }}
+      MUTATION_INTENT: ${{ inputs.intent }}
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+      GMA_WORKFLOW: governance-mutation-proof-generation.yml
+
+    steps:
+      - name: HARD FAIL — Guard against non-dispatch invocation and missing secrets
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit workflow_dispatch invocation allowed"
+            exit 1
+          fi
+
+          for var in WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required secret: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/governance-mutation-proof-generation.yml@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through governance-mutation-proof-generation.yml"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${MUTATION_INTENT:-}" ]; then
+            echo "NULL — intent input is required"
+            exit 1
+          fi
+
+          GMP_REPLAY_ID="$(printf '%s' "${GITHUB_REPOSITORY}|governance-mutation-proof-generation.yml|${WORKFLOW_RUN_ID}|${WORKFLOW_RUN_ATTEMPT}|${WORKFLOW_SHA}|${WORKFLOW_REF}" | sha256sum | awk '{print $1}')"
+          echo "GMP_REPLAY_ID=$GMP_REPLAY_ID" >> "$GITHUB_ENV"
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate GMA artifact
+        run: |
+          set -euo pipefail
+
+          GMA_FILE="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+          if [ ! -f "$GMA_FILE" ]; then
+            echo "NULL — GMA artifact not found at $GMA_FILE"
+            echo "Run governance-mutation-authorization.yml first and commit the GMA artifact."
+            exit 1
+          fi
+
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+
+          const gma = JSON.parse(readFileSync('governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json', 'utf8'));
+
+          const required = ['gma_id', 'decision_id', 'continuity_id', 'session_id',
+            'validated_object_hash', 'governed_files_hash', 'mutation_classes',
+            'gm_control_class', 'authority_lineage_bound', 'expires_at', 'status'];
+          for (const f of required) {
+            assert.ok(gma[f] !== undefined && gma[f] !== null && gma[f] !== '',
+              `GMA missing required field: ${f}`);
+          }
+          assert.equal(gma.status, 'GMA_VALID', 'GMA status must be GMA_VALID');
+          assert.ok(new Date(gma.expires_at) > new Date(), `GMA expired at ${gma.expires_at}`);
+          assert.equal(gma.authority_lineage_bound, true, 'GMA must declare authority_lineage_bound: true');
+
+          console.log(`GMA_ID=${gma.gma_id}`);
+          console.log(`DECISION_ID=${gma.decision_id}`);
+          console.log(`CONTINUITY_ID=${gma.continuity_id}`);
+          console.log(`SESSION_ID=${gma.session_id}`);
+          console.log(`VALIDATED_OBJECT_HASH=${gma.validated_object_hash}`);
+          console.log(`GOVERNED_FILES_HASH=${gma.governed_files_hash}`);
+          NODE
+
+          GMA_ID=$(jq -r '.gma_id' "$GMA_FILE")
+          DECISION_ID=$(jq -r '.decision_id' "$GMA_FILE")
+          CONTINUITY_ID=$(jq -r '.continuity_id' "$GMA_FILE")
+          SESSION_ID=$(jq -r '.session_id' "$GMA_FILE")
+          VALIDATED_OBJECT_HASH=$(jq -r '.validated_object_hash' "$GMA_FILE")
+          GOVERNED_FILES_HASH=$(jq -r '.governed_files_hash' "$GMA_FILE")
+
+          echo "GMA_ID=$GMA_ID" >> "$GITHUB_ENV"
+          echo "DECISION_ID=$DECISION_ID" >> "$GITHUB_ENV"
+          echo "CONTINUITY_ID=$CONTINUITY_ID" >> "$GITHUB_ENV"
+          echo "SESSION_ID=$SESSION_ID" >> "$GITHUB_ENV"
+          echo "VALIDATED_OBJECT_HASH=$VALIDATED_OBJECT_HASH" >> "$GITHUB_ENV"
+          echo "GOVERNED_FILES_HASH=$GOVERNED_FILES_HASH" >> "$GITHUB_ENV"
+
+      - name: Compute execution snapshot hashes
+        run: |
+          set -euo pipefail
+
+          # repository_tree_hash: canonical tree hash of current HEAD
+          REPO_TREE_HASH="$(git rev-parse HEAD^{tree})"
+
+          # workflow_hash: SHA256 of this workflow file (the executing surface)
+          WORKFLOW_HASH="$(sha256sum .github/workflows/governance-mutation-proof-generation.yml | awk '{print $1}')"
+
+          # governance_hash: SHA256 of all governance artifacts (sorted, deterministic)
+          GOVERNANCE_HASH="$(find governance/ -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}')"
+
+          # topology_hash: SHA256 of runtime topology files
+          TOPOLOGY_HASH="$(find runtime/topology/ -type f 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}')"
+          if [ -z "$TOPOLOGY_HASH" ]; then
+            TOPOLOGY_HASH="$(printf '%s' 'no_topology_files' | sha256sum | awk '{print $1}')"
+          fi
+
+          # runtime_surface_hash: SHA256 of runtime surfaces
+          RUNTIME_SURFACE_HASH="$(find runtime/surfaces/ -type f 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}')"
+          if [ -z "$RUNTIME_SURFACE_HASH" ]; then
+            RUNTIME_SURFACE_HASH="$(printf '%s' 'no_runtime_surface_files' | sha256sum | awk '{print $1}')"
+          fi
+
+          # schema_set_hash: SHA256 of all schemas
+          SCHEMA_SET_HASH="$(find schemas/ -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}')"
+
+          # replay_epoch: year-based epoch for replay resistance
+          REPLAY_EPOCH="$(date -u +%Y)"
+
+          echo "REPO_TREE_HASH=$REPO_TREE_HASH" >> "$GITHUB_ENV"
+          echo "WORKFLOW_HASH=$WORKFLOW_HASH" >> "$GITHUB_ENV"
+          echo "GOVERNANCE_HASH=$GOVERNANCE_HASH" >> "$GITHUB_ENV"
+          echo "TOPOLOGY_HASH=$TOPOLOGY_HASH" >> "$GITHUB_ENV"
+          echo "RUNTIME_SURFACE_HASH=$RUNTIME_SURFACE_HASH" >> "$GITHUB_ENV"
+          echo "SCHEMA_SET_HASH=$SCHEMA_SET_HASH" >> "$GITHUB_ENV"
+          echo "REPLAY_EPOCH=$REPLAY_EPOCH" >> "$GITHUB_ENV"
+
+          echo "execution_snapshot:"
+          echo "  repository_tree_hash=$REPO_TREE_HASH"
+          echo "  workflow_hash=$WORKFLOW_HASH"
+          echo "  governance_hash=$GOVERNANCE_HASH"
+          echo "  topology_hash=$TOPOLOGY_HASH"
+          echo "  runtime_surface_hash=$RUNTIME_SURFACE_HASH"
+          echo "  schema_set_hash=$SCHEMA_SET_HASH"
+          echo "  workflow_identity=governance-mutation-proof-generation.yml"
+          echo "  replay_epoch=$REPLAY_EPOCH"
+
+      - name: Generate invocation nonce
+        run: |
+          set -euo pipefail
+          INVOCATION_NONCE="$(uuidgen | tr '[:upper:]' '[:lower:]')-gmp-${WORKFLOW_RUN_ID}-${WORKFLOW_RUN_ATTEMPT}"
+          echo "INVOCATION_NONCE=$INVOCATION_NONCE" >> "$GITHUB_ENV"
+          echo "invocation_nonce=$INVOCATION_NONCE"
+
+      - name: VALIDATE — Call /validate with GMA lineage
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o gmp_validate.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/validate" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg environment "governance_mutation" \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "$WORKFLOW_REF_NAME" \
+              --arg workflow "governance-mutation-proof-generation.yml" \
+              --arg repository_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_hash "$WORKFLOW_HASH" \
+              --arg governance_hash "$GOVERNANCE_HASH" \
+              --arg topology_hash "$TOPOLOGY_HASH" \
+              --arg runtime_surface_hash "$RUNTIME_SURFACE_HASH" \
+              --arg schema_set_hash "$SCHEMA_SET_HASH" \
+              --arg workflow_identity "governance-mutation-proof-generation.yml" \
+              --arg replay_epoch "$REPLAY_EPOCH" \
+              '{
+                session_id: $session_id,
+                decision_id: $decision_id,
+                validated_object_hash: $validated_object_hash,
+                invocation_nonce: $invocation_nonce,
+                environment: $environment,
+                repo: $repo,
+                branch: $branch,
+                workflow: $workflow,
+                repository_tree_hash: $repository_tree_hash,
+                workflow_hash: $workflow_hash,
+                governance_hash: $governance_hash,
+                topology_hash: $topology_hash,
+                runtime_surface_hash: $runtime_surface_hash,
+                schema_set_hash: $schema_set_hash,
+                workflow_identity: $workflow_identity,
+                replay_epoch: $replay_epoch
+              }')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /validate endpoint error (HTTP $RESPONSE_CODE)"
+            cat gmp_validate.json
+            exit 1
+          fi
+
+          VALIDATE_STATUS=$(jq -r '.status // empty' gmp_validate.json)
+          VALIDATE_RESULT=$(jq -r '.result // empty' gmp_validate.json)
+          RETURNED_HASH=$(jq -r '.validated_object_hash // empty' gmp_validate.json)
+          RETURNED_NONCE=$(jq -r '.invocation_nonce // empty' gmp_validate.json)
+
+          if [ "$VALIDATE_STATUS" != "VALID" ] || [ "$VALIDATE_RESULT" != "VALID" ]; then
+            echo "NULL — /validate returned non-canonical status: $VALIDATE_STATUS/$VALIDATE_RESULT"
+            cat gmp_validate.json
+            exit 1
+          fi
+
+          if [ "$RETURNED_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — /validate returned hash mismatch"
+            echo "expected: $VALIDATED_OBJECT_HASH"
+            echo "returned: $RETURNED_HASH"
+            exit 1
+          fi
+
+          if [ "$RETURNED_NONCE" != "$INVOCATION_NONCE" ]; then
+            echo "NULL — /validate nonce not accepted/reserved"
+            exit 1
+          fi
+
+          # Extract validation_receipt_id if present (implementation-specific)
+          VALIDATION_ID=$(jq -r '.validation_id // .validated_object_hash // empty' gmp_validate.json)
+          echo "VALIDATION_ID=$VALIDATION_ID" >> "$GITHUB_ENV"
+          echo "validate_status=$VALIDATE_STATUS result=$VALIDATE_RESULT hash_ok=true nonce_reserved=true"
+
+      - name: Upload validate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMP-validate-${{ env.GMP_REPLAY_ID }}
+          path: gmp_validate.json
+
+      - name: EXECUTE — Call /execute with validated lineage
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o gmp_execute.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/execute" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg intent "governance_mutation_authorization" \
+              --arg environment "governance_mutation" \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "$WORKFLOW_REF_NAME" \
+              --arg workflow "governance-mutation-proof-generation.yml" \
+              --arg merge_commit_sha "$WORKFLOW_SHA" \
+              --arg source_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+              --arg workflow_sha "$WORKFLOW_SHA" \
+              --arg repository_tree_hash "$REPO_TREE_HASH" \
+              --arg workflow_hash "$WORKFLOW_HASH" \
+              --arg governance_hash "$GOVERNANCE_HASH" \
+              --arg topology_hash "$TOPOLOGY_HASH" \
+              --arg runtime_surface_hash "$RUNTIME_SURFACE_HASH" \
+              --arg schema_set_hash "$SCHEMA_SET_HASH" \
+              --arg workflow_identity "governance-mutation-proof-generation.yml" \
+              --arg replay_epoch "$REPLAY_EPOCH" \
+              '{
+                session_id: $session_id,
+                decision_id: $decision_id,
+                validated_object_hash: $validated_object_hash,
+                invocation_nonce: $invocation_nonce,
+                intent: $intent,
+                environment: $environment,
+                repo: $repo,
+                branch: $branch,
+                workflow: $workflow,
+                merge_commit_sha: $merge_commit_sha,
+                source_tree_hash: $source_tree_hash,
+                workflow_run_id: $workflow_run_id,
+                workflow_sha: $workflow_sha,
+                repository_tree_hash: $repository_tree_hash,
+                workflow_hash: $workflow_hash,
+                governance_hash: $governance_hash,
+                topology_hash: $topology_hash,
+                runtime_surface_hash: $runtime_surface_hash,
+                schema_set_hash: $schema_set_hash,
+                workflow_identity: $workflow_identity,
+                replay_epoch: $replay_epoch
+              }')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /execute endpoint error (HTTP $RESPONSE_CODE)"
+            cat gmp_execute.json
+            exit 1
+          fi
+
+          EXEC_STATUS=$(jq -r '.status // empty' gmp_execute.json)
+          EXECUTION_ID=$(jq -r '.execution_id // empty' gmp_execute.json)
+
+          if [ "$EXEC_STATUS" != "EXECUTED" ] || [ -z "$EXECUTION_ID" ]; then
+            echo "NULL — /execute returned non-canonical status: $EXEC_STATUS"
+            cat gmp_execute.json
+            exit 1
+          fi
+
+          echo "EXECUTION_ID=$EXECUTION_ID" >> "$GITHUB_ENV"
+          echo "execute_status=$EXEC_STATUS execution_id=$EXECUTION_ID"
+
+      - name: Upload execute artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMP-execute-${{ env.GMP_REPLAY_ID }}
+          path: gmp_execute.json
+
+      - name: Verify replay protection
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o gmp_replay.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/execute" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg intent "governance_mutation_authorization" \
+              --arg environment "governance_mutation" \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "$WORKFLOW_REF_NAME" \
+              --arg workflow "governance-mutation-proof-generation.yml" \
+              '{
+                session_id: $session_id,
+                decision_id: $decision_id,
+                validated_object_hash: $validated_object_hash,
+                invocation_nonce: $invocation_nonce,
+                intent: $intent,
+                environment: $environment,
+                repo: $repo,
+                branch: $branch,
+                workflow: $workflow
+              }')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 499 ]; then
+            echo "NULL — Replay protection endpoint error"
+            cat gmp_replay.json
+            exit 1
+          fi
+
+          REPLAY_STATUS=$(jq -r '.status // empty' gmp_replay.json)
+          REPLAY_REASON=$(jq -r '.reason // empty' gmp_replay.json)
+
+          if [ "$REPLAY_STATUS" != "NULL" ]; then
+            echo "NULL — Replay protection did not reject duplicate execution"
+            cat gmp_replay.json
+            exit 1
+          fi
+
+          case "$REPLAY_REASON" in
+            replay_detected|authority_not_reserved|proof_replay|nonce_not_reserved) ;;
+            *)
+              echo "NULL — Replay protection failed with unexpected reason: $REPLAY_REASON"
+              cat gmp_replay.json
+              exit 1
+              ;;
+          esac
+
+          echo "replay_protection=CONFIRMED reason=$REPLAY_REASON"
+
+      - name: PROOF — Call /proof to persist execution lineage
+        run: |
+          set -euo pipefail
+
+          RESPONSE_CODE=$(curl -sS -o gmp_proof.json -w "%{http_code}" \
+            -X POST "$CLEAN_WORKER_URL/proof" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: $API_KEY" \
+            -d "$(jq -n \
+              --arg session_id "$SESSION_ID" \
+              --arg continuity_id "$CONTINUITY_ID" \
+              --arg execution_id "$EXECUTION_ID" \
+              --arg decision_id "$DECISION_ID" \
+              --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+              --arg invocation_nonce "$INVOCATION_NONCE" \
+              --arg surface "governance_mutation" \
+              --arg run_id "$WORKFLOW_RUN_ID" \
+              --arg commit_sha "$WORKFLOW_SHA" \
+              --arg workflow "governance-mutation-proof-generation.yml" \
+              --arg environment "governance_mutation" \
+              --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "$WORKFLOW_REF_NAME" \
+              '{
+                session_id: $session_id,
+                continuity_id: $continuity_id,
+                execution_id: $execution_id,
+                decision_id: $decision_id,
+                validated_object_hash: $validated_object_hash,
+                invocation_nonce: $invocation_nonce,
+                surface: $surface,
+                run_id: $run_id,
+                commit_sha: $commit_sha,
+                workflow: $workflow,
+                environment: $environment,
+                repo: $repo,
+                branch: $branch
+              }')")
+
+          if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
+            echo "NULL — /proof endpoint error (HTTP $RESPONSE_CODE)"
+            cat gmp_proof.json
+            exit 1
+          fi
+
+          PROOF_STATUS=$(jq -r '.status // empty' gmp_proof.json)
+          PROOF_ID=$(jq -r '.proof.proof_id // .proof_id // empty' gmp_proof.json)
+
+          if [ "$PROOF_STATUS" != "PROVEN" ] || [ -z "$PROOF_ID" ]; then
+            echo "NULL — /proof returned non-canonical status: $PROOF_STATUS"
+            cat gmp_proof.json
+            exit 1
+          fi
+
+          PROOF_AEO_HASH=$(jq -r '.proof.aeo_hash // .aeo_hash // empty' gmp_proof.json)
+          if [ -n "$PROOF_AEO_HASH" ] && [ "$PROOF_AEO_HASH" != "$VALIDATED_OBJECT_HASH" ]; then
+            echo "NULL — /proof aeo_hash mismatch: lineage violation"
+            exit 1
+          fi
+
+          echo "PROOF_ID=$PROOF_ID" >> "$GITHUB_ENV"
+          echo "proof_status=$PROOF_STATUS proof_id=$PROOF_ID"
+
+      - name: Upload proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMP-proof-${{ env.GMP_REPLAY_ID }}
+          path: gmp_proof.json
+
+      - name: Generate GMP artifact
+        run: |
+          set -euo pipefail
+
+          GMP_ID="GMP-${WORKFLOW_RUN_ID}-${WORKFLOW_RUN_ATTEMPT}"
+          EXPIRY="$(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # validation_receipt_id: use validation_id if returned, else derive from validate response hash
+          VALIDATION_RECEIPT_ID="${VALIDATION_ID:-${VALIDATED_OBJECT_HASH}}"
+
+          jq -n \
+            --arg gmp_id "$GMP_ID" \
+            --arg gma_id "$GMA_ID" \
+            --arg gap_reference "GAP-005" \
+            --arg issue_reference "#1831" \
+            --arg session_id "$SESSION_ID" \
+            --arg continuity_id "$CONTINUITY_ID" \
+            --arg decision_id "$DECISION_ID" \
+            --arg validated_object_hash "$VALIDATED_OBJECT_HASH" \
+            --arg validation_receipt_id "$VALIDATION_RECEIPT_ID" \
+            --arg execution_id "$EXECUTION_ID" \
+            --arg proof_id "$PROOF_ID" \
+            --arg governed_files_hash "$GOVERNED_FILES_HASH" \
+            --arg intent "$MUTATION_INTENT" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$WORKFLOW_REF_NAME" \
+            --arg head_sha "$WORKFLOW_SHA" \
+            --arg workflow_run_id "$WORKFLOW_RUN_ID" \
+            --arg replay_id "$GMP_REPLAY_ID" \
+            --arg created_at "$CREATED_AT" \
+            --arg expires_at "$EXPIRY" \
+            '{
+              gmp_id: $gmp_id,
+              gma_id: $gma_id,
+              gap_reference: $gap_reference,
+              issue_reference: $issue_reference,
+              session_id: $session_id,
+              continuity_id: $continuity_id,
+              decision_id: $decision_id,
+              validated_object_hash: $validated_object_hash,
+              validation_receipt_id: $validation_receipt_id,
+              execution_id: $execution_id,
+              proof_id: $proof_id,
+              governed_files_hash: $governed_files_hash,
+              lifecycle_stages: ["session","continuity","authority","compile","validate","execute","proof"],
+              intent: $intent,
+              repo: $repo,
+              branch: $branch,
+              head_sha: $head_sha,
+              workflow_run_id: $workflow_run_id,
+              replay_id: $replay_id,
+              created_at: $created_at,
+              expires_at: $expires_at,
+              status: "GMP_VALID"
+            }' > GOVERNANCE_MUTATION_PROOF.json
+
+          echo "GMP artifact generated:"
+          cat GOVERNANCE_MUTATION_PROOF.json
+
+      - name: Upload GMP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GOVERNANCE_MUTATION_PROOF
+          path: GOVERNANCE_MUTATION_PROOF.json
+
+      - name: Print GMP commit instructions
+        run: |
+          set -euo pipefail
+
+          {
+            printf '%s\n\n' '### Governance Mutation Proof (GMP) Created'
+            printf '%s\n\n' 'Download the artifact and commit it to your branch **alongside the GMA**:'
+            printf '%s\n' '```bash'
+            printf '%s\n' '# 1. Download the GOVERNANCE_MUTATION_PROOF artifact from this workflow run'
+            printf '%s\n' '# 2. Place it at:'
+            printf '%s\n' '#    governance/authorizations/GOVERNANCE_MUTATION_PROOF.json'
+            printf '%s\n' '# 3. Commit and push:'
+            printf '%s\n' 'mv GOVERNANCE_MUTATION_PROOF.json governance/authorizations/'
+            printf '%s\n' 'git add governance/authorizations/GOVERNANCE_MUTATION_PROOF.json'
+            printf '%s\n' 'git commit -m "chore: add GMP for governance mutation proof"'
+            printf '%s\n' 'git push'
+            printf '%s\n\n' '```'
+            printf '%s\n\n' '**Full lifecycle completed:**'
+            printf '%s\n' '```'
+            printf '%s\n' '/session → /continuity → /authority → /compile  (GMA)'
+            printf '%s\n' '/validate → /execute → /proof                   (GMP)'
+            printf '%s\n\n' '```'
+            printf '%s\n\n' '**GMP artifact:**'
+            printf '%s\n' '```json'
+            cat GOVERNANCE_MUTATION_PROOF.json
+            printf '%s\n' '```'
+            printf '\n%s\n' "gmp_id: GMP-${WORKFLOW_RUN_ID}-${WORKFLOW_RUN_ATTEMPT}"
+            printf '%s\n' "gma_id: $GMA_ID"
+            printf '%s\n' "proof_id: $PROOF_ID"
+            printf '%s\n' "execution_id: $EXECUTION_ID"
+            printf '%s\n' "expires_at: $(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_STEP_SUMMARY"
