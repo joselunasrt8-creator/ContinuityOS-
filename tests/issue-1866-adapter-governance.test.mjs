@@ -11,10 +11,17 @@
 //   TC-08  creates_authority is structurally false in all outcomes
 //   TC-09  Cloudflare adapter: routing, execution, and null paths
 //   TC-10  D1 storage adapter: routing, execution, and null paths
+//   TC-11  computeAdapterAEOHash is deterministic
+//   TC-12  exact AEO shape guard: extra/missing fields → AEO_SHAPE_INVALID
+//          adapters do not re-validate AEO field semantics (adapter ≠ validator)
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { computeAdapterAEOHash, executeWithAdapter } from '../src/lib/adapter-contract.ts'
+import {
+  computeAdapterAEOHash,
+  executeWithAdapter,
+  ADAPTER_AEO_REQUIRED_KEYS,
+} from '../src/lib/adapter-contract.ts'
 import {
   executeCloudflareAdapter,
   CloudflareAdapter,
@@ -496,4 +503,74 @@ test('TC-11b computeAdapterAEOHash differs for different AEOs', () => {
   const aeo1 = makeCloudflareAEO()
   const aeo2 = makeCloudflareAEO({ path: '/scripts/different' })
   assert.notEqual(computeAdapterAEOHash(aeo1), computeAdapterAEOHash(aeo2))
+})
+
+// ── TC-12: exact AEO shape guard ───────────────────────────────────────────────
+
+test('TC-12a ADAPTER_AEO_REQUIRED_KEYS contains exactly the 5 canonical top-level fields', () => {
+  const sorted = [...ADAPTER_AEO_REQUIRED_KEYS].sort()
+  assert.deepEqual(sorted, ['finality', 'intent', 'scope', 'target', 'validation'])
+})
+
+test('TC-12b AEO with extra top-level field returns AEO_SHAPE_INVALID', () => {
+  const aeo = { ...makeCloudflareAEO(), extra_injected_field: 'injected' }
+  // Compute hash over the malformed object (simulates a tampered pre-computed hash)
+  const hash = computeAdapterAEOHash(aeo)
+  const out = executeWithAdapter(aeo, hash, { adapter_surface: 'cf', execute: () => GOOD_CF_EVIDENCE }, EMITTED_AT)
+  assert.equal(out.ok, false)
+  assert.equal(out.null_result.null_reason, 'AEO_SHAPE_INVALID')
+})
+
+test('TC-12c AEO missing a top-level field returns AEO_SHAPE_INVALID', () => {
+  const { finality: _dropped, ...incomplete } = makeCloudflareAEO()
+  const hash = computeAdapterAEOHash(incomplete)
+  const out = executeWithAdapter(incomplete, hash, { adapter_surface: 'cf', execute: () => GOOD_CF_EVIDENCE }, EMITTED_AT)
+  assert.equal(out.ok, false)
+  assert.equal(out.null_result.null_reason, 'AEO_SHAPE_INVALID')
+})
+
+test('TC-12d executor is not called when AEO shape is invalid', () => {
+  const aeo = { ...makeCloudflareAEO(), extra_injected_field: 'injected' }
+  const hash = computeAdapterAEOHash(aeo)
+  let executorCalled = false
+  const adapter = { adapter_surface: 'cf', execute: () => { executorCalled = true; return GOOD_CF_EVIDENCE } }
+  executeWithAdapter(aeo, hash, adapter, EMITTED_AT)
+  assert.equal(executorCalled, false, 'executor must not be called on AEO_SHAPE_INVALID')
+})
+
+test('TC-12e valid 5-field AEO passes shape guard', () => {
+  const aeo = makeCloudflareAEO()
+  // Confirm exactly 5 keys
+  assert.equal(Object.keys(aeo).length, 5)
+  const hash = computeAdapterAEOHash(aeo)
+  const out = executeWithAdapter(aeo, hash, { adapter_surface: 'cloudflare_worker', execute: () => GOOD_CF_EVIDENCE }, EMITTED_AT)
+  assert.equal(out.ok, true)  // shape guard does not block valid AEOs
+})
+
+test('TC-12f adapter does not re-validate AEO field semantics (adapter ≠ validator)', () => {
+  // The adapter accepts any AEO with correct shape and matching hash.
+  // It does NOT check intent.action, scope contents, authority status, replay state,
+  // or policy fields — that is the upstream Ω validator's job.
+  // This test proves the boundary: a semantically unusual but structurally valid AEO
+  // passes the adapter layer without triggering re-validation.
+  const aeo = Object.freeze({
+    intent: Object.freeze({ action: 'unusual_action', purpose: 'test' }),
+    scope: Object.freeze({ some_key: 'some_value' }),
+    validation: Object.freeze({
+      decision_id: 'AUTH-unusual',
+      authority_lineage_hash: 'sha256:unusual',
+      policy_id: 'unusual-policy',
+      policy_hash: 'sha256:unusual-policy',
+      replay_nonce: 'unusual-nonce',
+      aeo_hash_required: false,   // unusual but structurally valid
+      requires_unused_nonce: false,
+    }),
+    target: Object.freeze({ system: 'cloudflare_worker', worker_url: 'https://example.com', method: 'POST', path: '/test', request_body_hash: 'sha256:x' }),
+    finality: Object.freeze({ proof_required: true, proof_type: 'test_proof', replay_state_after_success: 'CONSUMED' }),
+  })
+  const hash = computeAdapterAEOHash(aeo)
+  const out = executeWithAdapter(aeo, hash, { adapter_surface: 'cloudflare_worker', execute: () => GOOD_CF_EVIDENCE }, EMITTED_AT)
+  // Passes through — adapter does not validate field semantics
+  assert.equal(out.ok, true)
+  assert.equal(out.receipt.execution_result, 'EXECUTED')
 })

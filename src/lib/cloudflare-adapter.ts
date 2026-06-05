@@ -50,11 +50,13 @@ export type CloudflareAEOTarget = {
 
 // ── Cloudflare Execution Evidence ─────────────────────────────────────────────
 // Must be derived from the actual HTTP response — never from AEO fields.
-// execution_id must be the CF-Ray header assigned by Cloudflare's edge.
-// A missing CF-Ray header means the request did not reach Cloudflare — executor returns null.
+// execution_id is expected to be the CF-Ray header from the response. This is an
+// executor obligation: the adapter contract rejects blank execution_id but cannot
+// independently prove the value is system-assigned rather than fabricated.
+// The concrete executor implementation is responsible for enforcing CF-Ray origin.
 
 export type CloudflareExecutionEvidence = {
-  readonly execution_id: string     // CF-Ray header from response (system-assigned)
+  readonly execution_id: string     // expected: CF-Ray header (executor obligation, not contract guarantee)
   readonly executed_at: string      // ISO timestamp of when the response was received
   readonly adapter_surface: "cloudflare_worker"
   readonly adapter_specific: {
@@ -66,11 +68,10 @@ export type CloudflareExecutionEvidence = {
 
 // ── Cloudflare Worker Executor ─────────────────────────────────────────────────
 // Receives ONLY what AEO.target specifies — no additional context injection.
-// Returns evidence derived from actual execution, or null on any failure:
-//   - network error
-//   - HTTP status ≥ 400
-//   - missing CF-Ray header
-//   - any other executor-level failure
+// Executor obligation: return evidence only after actual HTTP execution; null on any failure.
+// The contract layer rejects blank evidence fields but does not independently verify origin.
+// Concrete implementations should set execution_id from the CF-Ray response header and
+// return null if that header is absent (indicating the request did not reach Cloudflare).
 
 export type CloudflareWorkerExecutor = (target: {
   readonly worker_url: string

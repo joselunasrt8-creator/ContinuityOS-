@@ -98,6 +98,7 @@ export type AdapterNullReason =
   | "NULL_VALIDATED_HASH"             // validated_object_hash was null, undefined, or blank
   | "NULL_EXECUTOR"                   // executor argument was null or not an AdapterContract
   | "NULL_EMITTED_AT"                 // emitted_at was null, undefined, or blank
+  | "AEO_SHAPE_INVALID"               // AEO has extra or missing top-level fields (not exactly 5)
   | "OBJECT_HASH_MISMATCH"            // recomputed AEO hash ≠ validated_object_hash
   | "EXECUTOR_RETURNED_NULL"          // executor.execute() returned null or undefined
   | "EVIDENCE_MISSING_EXECUTION_ID"   // evidence.execution_id was blank or missing
@@ -147,6 +148,24 @@ export interface AdapterContract {
   ): AdapterExecutionEvidence | null
 }
 
+// ── AEO Shape Guard ────────────────────────────────────────────────────────────
+// Exact top-level field check — AEOs must have exactly these 5 keys, no more.
+// TypeScript types do not protect runtime inputs; this guard does.
+// Note: content validation is the Ω validator's job upstream. This boundary only
+// ensures the adapter cannot accept an object that was never run through canonical
+// AEO compilation (e.g., an object with injected extra fields that would hash
+// differently from any legitimately compiled AEO).
+
+export const ADAPTER_AEO_REQUIRED_KEYS = [
+  "finality", "intent", "scope", "target", "validation",
+] as const
+
+function hasExactAEOShape(aeo: AdapterTargetedAEO): boolean {
+  const keys = Object.keys(aeo).sort()
+  if (keys.length !== ADAPTER_AEO_REQUIRED_KEYS.length) return false
+  return keys.every((key, i) => key === ADAPTER_AEO_REQUIRED_KEYS[i])
+}
+
 // ── Hash Utility ───────────────────────────────────────────────────────────────
 // Used externally to compute the validated_object_hash before calling executeWithAdapter.
 
@@ -159,15 +178,20 @@ export function computeAdapterAEOHash(aeo: AdapterTargetedAEO): string {
 //
 // Enforcement sequence:
 //   1. Null-check all inputs — any null → NULL result with specific reason
-//   2. Recompute AEO hash at execution boundary
-//   3. Hash mismatch → NULL (OBJECT_HASH_MISMATCH) — executor never called
-//   4. Call adapter.execute() with exact AEO — no field injection or reinterpretation
-//   5. Null evidence → NULL (EXECUTOR_RETURNED_NULL)
-//   6. Incomplete evidence fields → NULL with specific reason
-//   7. Evidence surface mismatch → NULL (EVIDENCE_SURFACE_MISMATCH)
-//   8. All checks pass → emit immutable proof receipt
+//   2. Exact AEO shape guard — extra or missing top-level fields → AEO_SHAPE_INVALID
+//      (TypeScript types do not protect runtime inputs; this guard does)
+//   3. Recompute AEO hash at execution boundary
+//   4. Hash mismatch → NULL (OBJECT_HASH_MISMATCH) — executor never called
+//   5. Call adapter.execute() with exact AEO — no field injection or reinterpretation
+//   6. Null evidence → NULL (EXECUTOR_RETURNED_NULL)
+//   7. Incomplete evidence fields → NULL with specific reason
+//   8. Evidence surface mismatch → NULL (EVIDENCE_SURFACE_MISMATCH)
+//   9. All checks pass → emit immutable proof receipt
 //
 // The proof receipt is constructed here, not in the adapter, to prevent fabrication.
+// Note: semantic AEO content validation is the upstream Ω validator's responsibility.
+// This boundary guards shape and hash integrity only — it does not re-validate
+// authority, policy, replay state, or field semantics.
 
 export function executeWithAdapter(
   aeo: AdapterTargetedAEO | null | undefined,
@@ -188,6 +212,11 @@ export function executeWithAdapter(
   if (!isNonBlankString(validated_object_hash)) return nullResult("NULL_VALIDATED_HASH")
   if (!executor || typeof executor.execute !== "function") return nullResult("NULL_EXECUTOR")
   if (!isNonBlankString(emitted_at)) return nullResult("NULL_EMITTED_AT")
+
+  // Exact shape guard: reject AEOs with extra or missing top-level fields.
+  // This is a defense-in-depth check — the Ω validator upstream already enforces
+  // canonical shape, but TypeScript types do not protect against runtime injection.
+  if (!hasExactAEOShape(aeo)) return nullResult("AEO_SHAPE_INVALID")
 
   // Recompute AEO hash at execution boundary.
   // Any mutation between Ω validation and this boundary produces a different hash → NULL.
