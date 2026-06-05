@@ -1,0 +1,87 @@
+name: governance-mutation-containment
+# owner: #1831
+# policy: GAP-005 — Governance Self-Mutation Containment
+# policy-path: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json
+# gap-reference: GAP-005
+#
+# Enforces that any mutation to a governance primitive (validator files, schema files,
+# policy files, workflow YAML files, governance registry files) carries evidence of the
+# full canonical governed lifecycle:
+#   /session → /continuity → /authority → /compile → /validate → /execute → /proof
+#
+# Fail-closed: governance mutation without valid GMA + GMP → GOVERNANCE_MUTATION_CONTAINMENT_NULL
+
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  governance-mutation-containment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Reject merge queue attempts
+        if: github.event_name == 'merge_group'
+        run: |
+          echo "NULL — merge_group event detected."
+          echo "Merge queue is DISABLED_FOR_GOVERNED_BRANCHES."
+          echo "Result: GOVERNANCE_MUTATION_CONTAINMENT_NULL"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        run: |
+          set -euo pipefail
+          git diff --name-only \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            > changed_files.txt
+          echo "changed_files_count=$(wc -l < changed_files.txt | tr -d ' ')"
+
+      - name: Run governance mutation containment check
+        run: |
+          set -euo pipefail
+          node scripts/governance-mutation-containment-check.mjs
+
+      - name: Emit containment result summary
+        if: always()
+        run: |
+          {
+            echo "### Governance Mutation Containment Check (GAP-005)"
+            echo ""
+            echo "gap_reference: GAP-005"
+            echo "issue_reference: #1831"
+            echo ""
+            echo "#### Changed files"
+            echo '```'
+            cat changed_files.txt || echo "(none)"
+            echo '```'
+            echo ""
+            echo "#### GMA artifact"
+            if [ -f governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json ]; then
+              echo '```json'
+              cat governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json
+              echo '```'
+            else
+              echo "absent"
+            fi
+            echo ""
+            echo "#### GMP artifact"
+            if [ -f governance/authorizations/GOVERNANCE_MUTATION_PROOF.json ]; then
+              echo '```json'
+              cat governance/authorizations/GOVERNANCE_MUTATION_PROOF.json
+              echo '```'
+            else
+              echo "absent"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
