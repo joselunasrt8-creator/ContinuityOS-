@@ -16,7 +16,8 @@
       "merge-governance-check",
       "generate-preo-candidate",
       "generate-sco-candidate",
-      "constitutional-integrity"
+      "constitutional-integrity",
+      "governance-mutation-containment"
     ],
     "require_branch_up_to_date_before_merge": true,
     "restrict_direct_push_to_main": true,
@@ -42,7 +43,8 @@
     "branch synchronized with main",
     "PREO_VALID remains canonical merge gate",
     "admin or branch protection bypass is root authority evidence only",
-    "merge queue, squash merge, and rebase merge require current head_sha-bound checks"
+    "merge queue, squash merge, and rebase merge require current head_sha-bound checks",
+    "governance-mutation-containment passing (GAP-005: GMA+GMP required for governance primitive mutations)"
   ],
   "forbidden_paths": [
     "direct push to main",
@@ -118,6 +120,16 @@
       "emitted_check_run_name": "constitutional-integrity",
       "required_check": "constitutional-integrity",
       "trigger": "pull_request"
+    },
+    {
+      "workflow_file": ".github/workflows/governance-mutation-containment.yml",
+      "workflow_name": "governance-mutation-containment",
+      "job_name": "governance-mutation-containment",
+      "emitted_check_run_name": "governance-mutation-containment",
+      "required_check": "governance-mutation-containment",
+      "trigger": "pull_request",
+      "gap_reference": "GAP-005",
+      "issue_reference": "#1831"
     }
   ],
   "non_required_checks": [

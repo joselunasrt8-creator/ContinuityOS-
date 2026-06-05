@@ -25,11 +25,23 @@ export const REQUIRED_GMP_FIELDS = [
 ];
 
 // Governance primitive path classification.
-// These match the target surfaces listed in #1831:
-//   validator files, schema files, policy files, workflow YAML files, governance registry files
+// Covers: validator files, schema files, policy files, workflow YAML files,
+//         governance registry files (including root-level registries).
 const GOVERNANCE_PRIMITIVE_RULES = [
   {
-    // policy files, governance registry files
+    // Root-level governance registry files
+    match: (f) => [
+      'GOVERNANCE_GAP_REGISTRY.md',
+      'GOVERNANCE_REQUIREMENTS.json',
+      'BYPASS_PATHS.json',
+      'AGENT_BYPASS_INVENTORY.json',
+      'ARTIFACT_INVENTORY.md',
+    ].includes(f),
+    exempt: () => false,
+    class: 'governance_registry_mutation',
+  },
+  {
+    // policy files, governance registry files under governance/
     match: (f) => f.startsWith('governance/'),
     exempt: (f) =>
       f.startsWith('governance/authorizations/') ||
@@ -49,7 +61,7 @@ const GOVERNANCE_PRIMITIVE_RULES = [
     class: 'schema_mutation',
   },
   {
-    // validator files — match any file whose name contains "validator"
+    // validator files — any file whose name contains "validator"
     match: (f) => {
       if (!f.startsWith('src/') && !f.startsWith('scripts/')) return false;
       const filename = f.slice(f.lastIndexOf('/') + 1);
@@ -83,6 +95,32 @@ export function classifyChangedFiles(changedFiles) {
 }
 
 /**
+ * Compute the canonical governed_files_hash for a set of governed file paths.
+ *
+ * Algorithm (matches governance-mutation-authorization.yml and merge-governance-check.yml):
+ *   sorted(governed).map(path => `${path}:${sha256hex(readFile(path))}`).join('\n')
+ *   → sha256hex of that joined string
+ *
+ * @param {string[]} governed - Sorted or unsorted list of governed file paths
+ * @param {(path: string) => Buffer|string} readFile - File reader (throws on missing → treated as DELETED)
+ * @returns {string} hex sha256 hash
+ */
+export function computeGovernedFilesHash(governed, readFile) {
+  const sorted = [...governed].sort();
+  const parts = sorted.map((f) => {
+    let content;
+    try {
+      content = readFile(f);
+    } catch {
+      content = Buffer.from('DELETED');
+    }
+    const hash = createHash('sha256').update(content).digest('hex');
+    return `${f}:${hash}`;
+  });
+  return createHash('sha256').update(parts.join('\n')).digest('hex');
+}
+
+/**
  * Validate a Governance Mutation Proof artifact.
  * Returns { valid: true } or { valid: false, reason: string }.
  *
@@ -102,8 +140,12 @@ export function validateGovernanceMutationProof(gmp, gma) {
     return { valid: false, reason: `GMP status must be GMP_VALID, got: ${gmp.status}` };
   }
 
-  // Expiry
-  if (new Date(gmp.expires_at) <= new Date()) {
+  // Expiry — reject invalid date strings explicitly (invalid date → NaN → bypass attempt)
+  const expiry = new Date(gmp.expires_at);
+  if (isNaN(expiry.getTime())) {
+    return { valid: false, reason: `GMP expires_at is not a valid date: ${gmp.expires_at}` };
+  }
+  if (expiry <= new Date()) {
     return { valid: false, reason: `GMP expired at ${gmp.expires_at}` };
   }
 
@@ -128,6 +170,14 @@ export function validateGovernanceMutationProof(gmp, gma) {
     };
   }
 
+  // Binding: validated_object_hash must be identical in GMP and GMA
+  if (gmp.validated_object_hash !== gma.validated_object_hash) {
+    return {
+      valid: false,
+      reason: `GMP validated_object_hash (${gmp.validated_object_hash}) does not match GMA validated_object_hash (${gma.validated_object_hash})`,
+    };
+  }
+
   // Binding: session/continuity/decision lineage must match GMA
   if (gmp.session_id !== gma.session_id) {
     return { valid: false, reason: `GMP session_id does not match GMA session_id` };
@@ -143,15 +193,17 @@ export function validateGovernanceMutationProof(gmp, gma) {
 }
 
 /**
- * Main containment check. Pure function — no side effects, deterministic.
+ * Main containment check. Deterministic — fails closed on any missing evidence.
  *
  * @param {object} opts
  * @param {string[]} opts.changedFiles - List of changed file paths
  * @param {object|null} opts.gma - Parsed GMA artifact (or null if absent)
  * @param {object|null} opts.gmp - Parsed GMP artifact (or null if absent)
- * @returns {{ result: 'CONTAINED'|'NULL', reason?: string, governed?: string[], mutationClasses?: string[] }}
+ * @param {((path: string) => Buffer|string)|null} opts.readFile - File reader for hash verification.
+ *   When governed files are detected, readFile is required. If absent → NULL.
+ * @returns {{ result: 'CONTAINED'|'NULL', reason: string, governed?: string[], mutationClasses?: string[] }}
  */
-export function runContainmentCheck({ changedFiles, gma, gmp }) {
+export function runContainmentCheck({ changedFiles, gma, gmp, readFile = null }) {
   const { governed, mutationClasses } = classifyChangedFiles(changedFiles);
 
   if (governed.length === 0) {
@@ -163,6 +215,27 @@ export function runContainmentCheck({ changedFiles, gma, gmp }) {
     return {
       result: 'NULL',
       reason: 'governance_mutation_without_gma',
+      governed,
+      mutationClasses: [...mutationClasses],
+    };
+  }
+
+  // Verify governed_files_hash: GMA must have been created for exactly these files.
+  // This prevents an old matching GMA+GMP pair from covering a different mutation set.
+  if (!readFile) {
+    return {
+      result: 'NULL',
+      reason: 'hash_verification_impossible',
+      governed,
+      mutationClasses: [...mutationClasses],
+    };
+  }
+
+  const computedHash = computeGovernedFilesHash(governed, readFile);
+  if (computedHash !== gma.governed_files_hash) {
+    return {
+      result: 'NULL',
+      reason: `gma_governed_files_hash_mismatch: computed ${computedHash}, gma has ${gma.governed_files_hash}`,
       governed,
       mutationClasses: [...mutationClasses],
     };
@@ -217,17 +290,17 @@ function cliMain() {
   try {
     gma = JSON.parse(readFileSync(gmaPath, 'utf8'));
   } catch {
-    // GMA absent — containment check will fail if governance primitives changed
+    // GMA absent — check will fail closed if governance primitives changed
   }
 
   let gmp = null;
   try {
     gmp = JSON.parse(readFileSync(gmpPath, 'utf8'));
   } catch {
-    // GMP absent — containment check will fail if governance primitives changed
+    // GMP absent — check will fail closed if governance primitives changed
   }
 
-  const check = runContainmentCheck({ changedFiles, gma, gmp });
+  const check = runContainmentCheck({ changedFiles, gma, gmp, readFile: readFileSync });
 
   if (check.result === 'CONTAINED') {
     console.log(`GOVERNANCE_MUTATION_CONTAINMENT: CONTAINED`);
