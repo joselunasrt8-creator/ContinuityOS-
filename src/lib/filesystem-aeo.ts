@@ -2,6 +2,10 @@ import { canonicalize, sha256Hex } from '../canonical.js'
 
 export const FILESYSTEM_AEO_REQUIRED_KEYS = ["finality", "intent", "scope", "target", "validation"] as const
 
+// Canonical sentinel for create operations — absence of pre-existing file state.
+// Use instead of blank string to pass validation and distinguish create from modify.
+export const PRE_WRITE_HASH_ABSENT = 'sha256:ABSENT'
+
 export type FilesystemAEOIntent = {
   readonly action: string
   readonly purpose: string
@@ -32,6 +36,7 @@ export type FilesystemAEOValidation = {
   readonly requires_scope_match: boolean
   readonly requires_path_policy_match: boolean
   readonly requires_pre_write_hash_match: boolean
+  readonly content_hash: string
 }
 
 export type FilesystemAEOTarget = {
@@ -116,6 +121,7 @@ function validateValidation(v: unknown): FilesystemAEOValidation | null {
   if (typeof v.requires_scope_match !== "boolean") return null
   if (typeof v.requires_path_policy_match !== "boolean") return null
   if (typeof v.requires_pre_write_hash_match !== "boolean") return null
+  if (!isNonEmptyString(v.content_hash)) return null
   return {
     decision_id: v.decision_id,
     authority_lineage_hash: v.authority_lineage_hash,
@@ -130,6 +136,7 @@ function validateValidation(v: unknown): FilesystemAEOValidation | null {
     requires_scope_match: v.requires_scope_match,
     requires_path_policy_match: v.requires_path_policy_match,
     requires_pre_write_hash_match: v.requires_pre_write_hash_match,
+    content_hash: v.content_hash,
   }
 }
 
@@ -248,6 +255,7 @@ export const CANONICAL_FILESYSTEM_AEO_FIXTURE: FilesystemAEO = Object.freeze({
     requires_scope_match: true,
     requires_path_policy_match: true,
     requires_pre_write_hash_match: true,
+    content_hash: 'sha256:fixture-content-hash',
   }),
   target: Object.freeze({
     system: "filesystem" as const,

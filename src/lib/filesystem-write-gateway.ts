@@ -11,6 +11,7 @@
 // Core invariants:
 //   If no valid object exists → nothing happens
 //   validated_object_hash == executed_object_hash
+//   validated_content_hash == executed_content_hash
 //
 // Scoped to: filesystem write (single mutation-capable action)
 // Non-goals: multi-tool orchestration, multi-agent routing, authority creation,
@@ -18,7 +19,9 @@
 
 import { canonicalize, sha256Hex } from '../canonical.js'
 import type { FilesystemAEO } from './filesystem-aeo.js'
-import { computeFilesystemAEOHash } from './filesystem-aeo.js'
+import { computeFilesystemAEOHash, PRE_WRITE_HASH_ABSENT } from './filesystem-aeo.js'
+
+export { PRE_WRITE_HASH_ABSENT }
 
 function isNonBlankString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0
@@ -27,6 +30,7 @@ function isNonBlankString(v: unknown): v is string {
 // ── ATAO: Agent Tool Action Object ────────────────────────────────────────────
 // Captures the proposed filesystem write before any legitimacy exists.
 // Non-operative: creates no authority, no execution eligibility.
+// Does not create authority or execution eligibility.
 
 export type FilesystemWriteATAO = {
   readonly atao_id: string
@@ -113,7 +117,8 @@ export function captureFilesystemWriteATAO(
 // ── AEO Compilation: ATAO + Authority Binding → AEO Candidate ─────────────────
 // Authority binding carries governance constraints from the authority layer.
 // The compiled AEO is the exact candidate submitted to the Ω validator.
-// Compilation does not validate, execute, or authorize anything.
+// Does not validate, execute, or produce proof.
+// Compilation does not validate, execute, or produce proof.
 
 export type FilesystemWriteATAOBinding = {
   readonly decision_id: string
@@ -133,6 +138,9 @@ export type FilesystemWriteATAOBinding = {
 
 // compileFilesystemWriteAEO: compiles an ATAO + authority binding into a FilesystemAEO.
 // The compiled AEO carries the exact fields required by the Ω validator.
+// content_hash binds the write payload to the validated object — it is impossible
+// to validate one AEO and execute different ATAO content.
+// Blank pre_write_hash is normalized to PRE_WRITE_HASH_ABSENT for create semantics.
 // Fails closed on null/missing inputs, blank required binding fields,
 // or empty allowed_paths / allowed_operations arrays.
 // Does not validate, execute, or produce proof.
@@ -156,8 +164,13 @@ export function compileFilesystemWriteAEO(
   if (typeof binding.max_files !== 'number' || binding.max_files < 1) return null
   if (typeof binding.max_diff_lines !== 'number' || binding.max_diff_lines < 1) return null
 
-  // Derive operation from pre_write_hash: empty = create, non-empty = modify
-  const operation = isNonBlankString(binding.pre_write_hash) ? 'modify' : 'create'
+  // Bind write content to the validated object — verifiable at execution boundary.
+  const contentHash = 'sha256:' + sha256Hex(atao.proposed_action.parameters.content)
+
+  // Explicit create pre-state: blank pre_write_hash → PRE_WRITE_HASH_ABSENT sentinel.
+  // Avoids blank-string semantics that conflict with validator pre-write checks.
+  const preWriteHash = isNonBlankString(binding.pre_write_hash) ? binding.pre_write_hash : PRE_WRITE_HASH_ABSENT
+  const operation = preWriteHash === PRE_WRITE_HASH_ABSENT ? 'create' : 'modify'
 
   return Object.freeze({
     intent: Object.freeze({
@@ -180,7 +193,7 @@ export function compileFilesystemWriteAEO(
       policy_id: binding.policy_id,
       policy_hash: binding.policy_hash,
       canonicalization: "json-canonical-v1",
-      pre_write_hash: binding.pre_write_hash,
+      pre_write_hash: preWriteHash,
       proposed_diff_hash: binding.proposed_diff_hash,
       aeo_hash_required: true,
       replay_nonce: binding.replay_nonce,
@@ -188,6 +201,7 @@ export function compileFilesystemWriteAEO(
       requires_scope_match: true,
       requires_path_policy_match: true,
       requires_pre_write_hash_match: true,
+      content_hash: contentHash,
     }),
     target: Object.freeze({
       system: "filesystem" as const,
@@ -203,6 +217,7 @@ export function compileFilesystemWriteAEO(
       proof_fields: Object.freeze([
         "decision_id",
         "aeo_hash",
+        "atao_id",
         "target_path",
         "operation",
         "pre_write_hash",
@@ -221,23 +236,31 @@ export function compileFilesystemWriteAEO(
 // ── Execution Boundary ─────────────────────────────────────────────────────────
 // executeFilesystemWrite: exact-object boundary gate.
 //
-// Invariant enforced here:
+// Invariants enforced here:
 //   validated_object_hash == executed_object_hash
+//   validated_content_hash == executed_content_hash
 //
 // Steps:
-//   1. Fail closed on null/blank inputs (no ATAO, no AEO, no hash, no executor)
-//   2. Recompute AEO hash immediately before execution
-//   3. Compare recomputed hash to validated_object_hash
-//   4. Mismatch → NULL proof (OBJECT_HASH_MISMATCH), executor never called
-//   5. Match    → executor called with exact validated path and content
-//   6. Emit immutable proof linking ATAO, AEO hash, validated hash, executed hash,
-//      target surface, and execution result
+//   1. Fail closed on null/blank inputs (no ATAO, no AEO, no evidence, no executor)
+//   2. Validate evidence: result must be VALID with matching aeo_hash
+//   3. Recompute AEO hash immediately before execution
+//   4. Compare recomputed hash to validated_object_hash
+//   5. Mismatch → NULL proof (OBJECT_HASH_MISMATCH), executor never called
+//   6. Verify content binding: sha256(atao.content) must match aeo.validation.content_hash
+//   7. Mismatch → NULL proof (CONTENT_HASH_MISMATCH), executor never called
+//   8. Execute exactly the validated object; on throw → NULL proof (EXECUTOR_FAILURE)
+//   9. Emit immutable proof with all AEO-declared fields and gateway invariant fields
 //
 // Non-goals:
 //   no authority creation
 //   no replay state mutation
 //   no proof persistence
 //   no runtime route
+
+export type FilesystemWriteValidationEvidence = {
+  readonly result: "VALID"
+  readonly aeo_hash: string
+}
 
 export type FilesystemWriteExecutor = (input: {
   readonly path: string
@@ -246,22 +269,28 @@ export type FilesystemWriteExecutor = (input: {
 
 export type FilesystemWriteExecutionProof = {
   readonly proof_id: string
+  readonly execution_id: string
   readonly atao_id: string
   readonly aeo_hash: string
-  readonly validated_object_hash: string
-  readonly executed_object_hash: string
+  readonly decision_id: string
   readonly target_surface: "filesystem"
   readonly target_path: string
-  readonly target_action: string
+  readonly operation: string
+  readonly pre_write_hash: string
+  readonly post_write_hash: string | null
+  readonly diff_hash: string
+  readonly validated_object_hash: string
+  readonly executed_object_hash: string
   readonly execution_result: "EXECUTED" | "NULL"
   readonly null_reason: string | null
+  readonly mutation_performed: boolean
+  readonly timestamp: string
   readonly creates_authority: false
-  readonly emitted_at: string
 }
 
 export type FilesystemWriteExecuteInput = {
   readonly aeo: FilesystemAEO | null | undefined
-  readonly validated_object_hash: string
+  readonly validation_evidence: FilesystemWriteValidationEvidence | null | undefined
   readonly atao: FilesystemWriteATAO | null | undefined
   readonly executor: FilesystemWriteExecutor
   readonly emitted_at: string
@@ -270,60 +299,106 @@ export type FilesystemWriteExecuteInput = {
 export function executeFilesystemWrite(
   input: FilesystemWriteExecuteInput | null | undefined,
 ): FilesystemWriteExecutionProof | null {
+  // Guard checks — return null (no proof) for missing or structurally invalid inputs
   if (!input) return null
   if (!input.aeo) return null
   if (!input.atao) return null
-  if (!isNonBlankString(input.validated_object_hash)) return null
+  if (!input.validation_evidence) return null
+  if (input.validation_evidence.result !== 'VALID') return null
+  if (!isNonBlankString(input.validation_evidence.aeo_hash)) return null
   if (!isNonBlankString(input.emitted_at)) return null
   if (typeof input.executor !== 'function') return null
 
   const aeo = input.aeo
   const atao = input.atao
+  const validatedObjectHash = input.validation_evidence.aeo_hash
 
-  const targetPath = typeof (aeo.target as Record<string, unknown>).path === 'string'
-    ? (aeo.target as Record<string, unknown>).path as string
-    : ''
-  const targetAction = typeof (aeo.target as Record<string, unknown>).operation === 'string'
-    ? (aeo.target as Record<string, unknown>).operation as string
-    : ''
+  // Extract AEO fields used in proof regardless of execution outcome
+  const target = aeo.target as Record<string, unknown>
+  const validation = aeo.validation as Record<string, unknown>
+  const targetPath = typeof target.path === 'string' ? target.path : ''
+  const targetOperation = typeof target.operation === 'string' ? target.operation : ''
+  const decisionId = typeof validation.decision_id === 'string' ? validation.decision_id : ''
+  const preWriteHash = typeof validation.pre_write_hash === 'string' ? validation.pre_write_hash : ''
+  const diffHash = typeof validation.proposed_diff_hash === 'string' ? validation.proposed_diff_hash : ''
+  const aeoContentHash = typeof validation.content_hash === 'string' ? validation.content_hash : ''
 
-  // Recompute AEO hash immediately before execution.
-  // Any mutation since validation will produce a different hash → NULL.
+  // Step 1: Recompute AEO hash immediately before execution.
+  // Any mutation since validation produces a different hash → NULL proof, executor never called.
   const recomputedAEOHash = computeFilesystemAEOHash(aeo)
-  const hashMatch = recomputedAEOHash === input.validated_object_hash
+  const hashMatch = recomputedAEOHash === validatedObjectHash
 
   let executionResult: "EXECUTED" | "NULL"
   let nullReason: string | null
   let executedObjectHash: string
+  let postWriteHash: string | null
+  let mutationPerformed: boolean
 
   if (!hashMatch) {
     // Object mutated between validation and execution boundary — block unconditionally
     executionResult = "NULL"
     nullReason = "OBJECT_HASH_MISMATCH"
     executedObjectHash = recomputedAEOHash
+    postWriteHash = null
+    mutationPerformed = false
   } else {
-    // Execute exactly the object that passed validation — path and content from validated ATAO
-    input.executor({
-      path: targetPath,
-      content: atao.proposed_action.parameters.content,
-    })
-    executionResult = "EXECUTED"
-    nullReason = null
-    executedObjectHash = recomputedAEOHash  // equals validated_object_hash — invariant holds
+    // Step 2: Verify content binding.
+    // The ATAO content being executed must match what was bound in the validated AEO.
+    // Prevents substituting a different ATAO's content after validation.
+    const ataoContentHash = 'sha256:' + sha256Hex(atao.proposed_action.parameters.content)
+    if (ataoContentHash !== aeoContentHash) {
+      executionResult = "NULL"
+      nullReason = "CONTENT_HASH_MISMATCH"
+      executedObjectHash = recomputedAEOHash
+      postWriteHash = null
+      mutationPerformed = false
+    } else {
+      // Step 3: Execute exactly the validated object — path and content from validated ATAO.
+      // On executor failure, emit NULL proof with EXECUTOR_FAILURE — never propagate throws.
+      try {
+        input.executor({
+          path: targetPath,
+          content: atao.proposed_action.parameters.content,
+        })
+        executionResult = "EXECUTED"
+        nullReason = null
+        executedObjectHash = recomputedAEOHash  // invariant: validated_object_hash == executed_object_hash
+        postWriteHash = 'sha256:' + sha256Hex(atao.proposed_action.parameters.content)
+        mutationPerformed = true
+      } catch {
+        executionResult = "NULL"
+        nullReason = "EXECUTOR_FAILURE"
+        executedObjectHash = recomputedAEOHash
+        postWriteHash = null
+        mutationPerformed = false
+      }
+    }
   }
 
+  const executionId = 'sha256:' + sha256Hex(canonicalize({
+    aeo_hash: recomputedAEOHash,
+    atao_id: atao.atao_id,
+    timestamp: input.emitted_at,
+  }))
+
   const proofBody = {
+    execution_id: executionId,
     atao_id: atao.atao_id,
     aeo_hash: recomputedAEOHash,
-    validated_object_hash: input.validated_object_hash,
-    executed_object_hash: executedObjectHash,
+    decision_id: decisionId,
     target_surface: "filesystem" as const,
     target_path: targetPath,
-    target_action: targetAction,
+    operation: targetOperation,
+    pre_write_hash: preWriteHash,
+    post_write_hash: postWriteHash,
+    diff_hash: diffHash,
+    validated_object_hash: validatedObjectHash,
+    executed_object_hash: executedObjectHash,
     execution_result: executionResult,
     null_reason: nullReason,
+    mutation_performed: mutationPerformed,
+    timestamp: input.emitted_at,
     creates_authority: false as const,
-    emitted_at: input.emitted_at,
   }
 
   const proof_id = "sha256:" + sha256Hex(canonicalize(proofBody))
