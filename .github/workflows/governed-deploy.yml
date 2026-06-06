@@ -32,6 +32,8 @@ jobs:
     env:
       WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
       API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       DECISION_ID: ${{ github.event.inputs.decision_id }}
       VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
       INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
@@ -57,7 +59,7 @@ jobs:
             exit 1
           fi
 
-          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE WORKER_URL API_KEY; do
+          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE WORKER_URL API_KEY CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
             if [ -z "${!var:-}" ]; then
               echo "NULL — Missing required variable: $var"
               exit 1
@@ -105,6 +107,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/session" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n --arg identity_id "github_actions:${GITHUB_REPOSITORY}:${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}:${WORKFLOW_SHA}:${REPLAY_ID}" '{identity_id: $identity_id}')")
 
           echo "SESSION_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
@@ -144,6 +148,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/continuity" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg decision_id "$DECISION_ID" \
@@ -197,6 +203,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/authority" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg continuity_id "$CONTINUITY_ID" \
@@ -261,6 +269,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/compile" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
 
           echo "COMPILE_RESPONSE_CODE=$RESPONSE_CODE" >> "$GITHUB_ENV"
@@ -310,6 +320,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/validate" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg decision_id "$DECISION_ID" \
@@ -384,6 +396,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/execute" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg decision_id "$DECISION_ID" \
@@ -433,6 +447,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/execute" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg decision_id "$DECISION_ID" \
@@ -490,6 +506,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/proof" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg continuity_id "$CONTINUITY_ID" \
