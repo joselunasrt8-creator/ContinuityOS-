@@ -57,11 +57,10 @@
       "type": "string",
       "enum": [
         "ACTIVE",
-        "VALIDATED",
         "RESERVED",
+        "EXECUTED",
         "CONSUMED",
-        "REVOKED",
-        "EXPIRED"
+        "REVOKED"
       ]
     },
     "signature": {

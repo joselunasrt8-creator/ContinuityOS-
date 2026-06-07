@@ -1,7 +1,8 @@
 {
   "object_type": "AuthorityConsumptionModel",
   "states": [
-    "ISSUED",
+    "ACTIVE",
+    "RESERVED",
     "EXECUTED",
     "CONSUMED",
     "REVOKED",
