@@ -2211,8 +2211,11 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_quarantine_registry_boundary_hash ON legitimacy_quarantine_registry(boundary_hash)`,
       `CREATE INDEX IF NOT EXISTS idx_legitimacy_quarantine_registry_classification ON legitimacy_quarantine_registry(classification)`
     ]
-    for (const s of stmts) await env.DB.prepare(s).run()
+    const createTableStmts = stmts.filter((s) => /^CREATE TABLE/i.test(s))
+    const postTableStmts = stmts.filter((s) => !/^CREATE TABLE/i.test(s))
+    for (const s of createTableStmts) await env.DB.prepare(s).run()
     await ensureRequiredSchemaColumns(env)
+    for (const s of postTableStmts) await env.DB.prepare(s).run()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_SCHEMA_INITIALIZED")
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_MIGRATIONS_VALIDATED")
     if (options.stabilizeProofRegistry === false) return
