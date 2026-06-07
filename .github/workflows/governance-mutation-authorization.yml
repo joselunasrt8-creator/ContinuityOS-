@@ -26,6 +26,8 @@ jobs:
     env:
       WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
       API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       BASE_REF: ${{ inputs.base_ref || 'main' }}
       MUTATION_INTENT: ${{ inputs.intent }}
       CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
@@ -45,7 +47,7 @@ jobs:
             exit 1
           fi
 
-          for var in WORKER_URL API_KEY; do
+          for var in WORKER_URL API_KEY CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
             if [ -z "${!var:-}" ]; then
               echo "NULL — Missing required secret: $var"
               exit 1
@@ -89,6 +91,8 @@ jobs:
             -X POST \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d '{"identity_id":"preflight"}' \
             "$CLEAN_WORKER_URL/session" 2>/dev/null) || PREFLIGHT_OUT="000|unknown"
 
@@ -221,6 +225,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/session" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg identity_id "github_actions:${GITHUB_REPOSITORY}:${WORKFLOW_RUN_ID}:${WORKFLOW_RUN_ATTEMPT}:${WORKFLOW_SHA}:${GMA_REPLAY_ID}" \
               '{identity_id:$identity_id}')")
@@ -257,6 +263,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/continuity" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg decision_id "$DECISION_ID" \
@@ -312,6 +320,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/authority" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n \
               --arg session_id "$SESSION_ID" \
               --arg continuity_id "$CONTINUITY_ID" \
@@ -365,6 +375,8 @@ jobs:
             -X POST "$CLEAN_WORKER_URL/compile" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: $API_KEY" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -d "$(jq -n --arg decision_id "$DECISION_ID" '{decision_id:$decision_id}')")
 
           if [ "$RESPONSE_CODE" -lt 200 ] || [ "$RESPONSE_CODE" -gt 299 ]; then
