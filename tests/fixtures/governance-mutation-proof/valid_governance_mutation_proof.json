@@ -1,0 +1,34 @@
+{
+  "_non_operative": true,
+  "_purpose": "GAP-005 closure fixture: example of a VALID governance mutation proof artifact, lineage-bound to session -> continuity -> decision -> authority -> GMA -> compiled -> executed.",
+  "gap_reference": "GAP-005",
+  "issue_reference": "#1831",
+  "inputs": {
+    "session_id": "sess-gap005-fixture-001",
+    "continuity_id": "cont-gap005-fixture-001",
+    "decision_id": "dec-gap005-fixture-001",
+    "authority_id": "auth-gap005-fixture-001",
+    "gma_id": "GMA-gap-005-enforcement-fixture-001",
+    "gma_status": "GMA_VALID",
+    "gma_decision_id": "dec-gap005-fixture-001",
+    "gma_continuity_id": "cont-gap005-fixture-001",
+    "gma_session_id": "sess-gap005-fixture-001",
+    "compiled_object_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "executed_object_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "expected_proof": {
+    "object_type": "GovernanceMutationProof",
+    "proof_id": "GMP-07fac199d1529a592fbac8bcd2395b83",
+    "lineage_hash": "07fac199d1529a592fbac8bcd2395b83a50bcb2074cef09a193ebaaec8b2edee",
+    "session_id": "sess-gap005-fixture-001",
+    "continuity_id": "cont-gap005-fixture-001",
+    "decision_id": "dec-gap005-fixture-001",
+    "authority_id": "auth-gap005-fixture-001",
+    "gma_id": "GMA-gap-005-enforcement-fixture-001",
+    "compiled_object_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "executed_object_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "creates_authority": false,
+    "replay_safe": true,
+    "fail_closed": true
+  }
+}

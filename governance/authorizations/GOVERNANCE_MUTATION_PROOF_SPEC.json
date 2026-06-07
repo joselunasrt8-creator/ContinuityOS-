@@ -1,0 +1,97 @@
+{
+  "artifact": "governance_mutation_proof_spec",
+  "version": "1.0",
+  "gap_reference": "GAP-005",
+  "issue_reference": "#1831",
+  "purpose": "Defines the required structure and fail-closed validation rules for a GovernanceMutationProof — the artifact that binds /execute -> /proof for governance mutations, closing the gap between Governance Mutation Authorization (GMA) and runtime proof persistence.",
+  "canonical_invariant": "If no valid object exists -> nothing happens.",
+  "closure_condition": "Specified -> Authorized -> Compiled -> Executed -> Proven is enforced end-to-end for governance mutations. A governance mutation that completes execution must produce a lineage-bound proof or collapse to NULL.",
+  "object_type": "GovernanceMutationProof",
+  "emission_surface": "POST /proof — additive, optional. Engages only when the request body includes a governance_mutation_authorization object carrying GMA lineage fields (gma_id, status, decision_id, continuity_id, session_id). Non-governance-mutation /proof calls are unaffected.",
+  "emission_timing": "Occurs only after the underlying execution proof has passed every existing /proof eligibility check (execution lineage, session/continuity/authority binding, freshness, hash equality, attestation, replay ambiguity) and the proof_registry row plus authority consumption have been committed.",
+  "required_fields": [
+    "object_type",
+    "proof_id",
+    "lineage_hash",
+    "session_id",
+    "continuity_id",
+    "decision_id",
+    "authority_id",
+    "gma_id",
+    "compiled_object_hash",
+    "executed_object_hash",
+    "creates_authority",
+    "replay_safe",
+    "fail_closed"
+  ],
+  "lineage_binding": {
+    "session_id": "must equal the executing session_id bound to the underlying execution and authority",
+    "continuity_id": "must equal execution.continuity_id (the continuity lineage the execution was bound to)",
+    "decision_id": "must equal the executing decision_id and the GMA's declared decision_id",
+    "authority_id": "must equal authority_registry.authority_id consumed by the underlying proof",
+    "gma_id": "identifier of the Governance Mutation Authorization that authorized this mutation",
+    "compiled_object_hash": "validated_object_hash of the COMPILED canonical AEO (the compiled object hash)",
+    "executed_object_hash": "validated_object_hash recorded on the EXECUTED execution_registry row (the executed object hash)"
+  },
+  "lineage_hash_algorithm": "sha256",
+  "lineage_hash_input": "canonicalize({ object_type: 'GovernanceMutationProofLineage', session_id, continuity_id, decision_id, authority_id, gma_id, compiled_object_hash, executed_object_hash }), then sha256 of the canonical JSON",
+  "proof_id_derivation": "GMP-<lineage_hash[0:32]> — deterministic; identical lineage always yields the identical proof_id, which is the basis for replay detection",
+  "object_invariants": {
+    "creates_authority": false,
+    "replay_safe": true,
+    "fail_closed": true
+  },
+  "fail_closed_rules": [
+    {
+      "order": 1,
+      "rejection_reason": "missing_proof_inputs",
+      "condition": "any required lineage or hash field is absent or empty",
+      "result": "NULL"
+    },
+    {
+      "order": 2,
+      "rejection_reason": "compiled_executed_hash_mismatch",
+      "condition": "compiled_object_hash != executed_object_hash — the compiled object and the executed object diverged",
+      "result": "NULL"
+    },
+    {
+      "order": 3,
+      "rejection_reason": "authorization_not_valid",
+      "condition": "the supplied GMA status != GMA_VALID",
+      "result": "NULL"
+    },
+    {
+      "order": 4,
+      "rejection_reason": "authorization_lineage_mismatch",
+      "condition": "the GMA's declared decision_id, continuity_id, or session_id does not match the executing lineage",
+      "result": "NULL"
+    },
+    {
+      "order": 5,
+      "rejection_reason": "proof_replay",
+      "condition": "the deterministic lineage_hash / proof_id has already been persisted to governance_mutation_proof_registry",
+      "result": "NULL"
+    }
+  ],
+  "persistence": {
+    "table": "governance_mutation_proof_registry",
+    "primary_key": "proof_id",
+    "uniqueness": ["lineage_hash", "execution_proof_id"],
+    "binding_triggers": [
+      "trg_governance_mutation_proof_requires_hash_match — aborts insert when compiled_object_hash != executed_object_hash",
+      "trg_governance_mutation_proof_requires_valid_proof — aborts insert unless a matching EXECUTED-lineage row exists in proof_registry for execution_proof_id/decision_id/executed_object_hash"
+    ]
+  },
+  "evidence_flags": {
+    "evidence_only": true,
+    "creates_authority": false,
+    "creates_execution_eligibility": false,
+    "replay_safe": true,
+    "fail_closed": true
+  },
+  "implementation_path": "src/lib/governance-mutation-proof.ts (pure, fail-closed builder); wired additively into the POST /proof handler in src/index.ts after authority consumption succeeds",
+  "test_paths": [
+    "tests/governance-mutation-proof-binding.test.mjs",
+    "tests/governance-mutation-proof-runtime-wiring.test.mjs"
+  ]
+}

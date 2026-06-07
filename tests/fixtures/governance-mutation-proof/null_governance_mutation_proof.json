@@ -1,0 +1,27 @@
+{
+  "_non_operative": true,
+  "_purpose": "GAP-005 closure fixture: example of a NULL governance mutation proof — GMA lineage does not bind to the executing decision, so the canonical invariant 'If no valid object exists -> nothing happens' yields NULL.",
+  "gap_reference": "GAP-005",
+  "issue_reference": "#1831",
+  "inputs": {
+    "session_id": "sess-gap005-fixture-002",
+    "continuity_id": "cont-gap005-fixture-002",
+    "decision_id": "dec-gap005-fixture-002",
+    "authority_id": "auth-gap005-fixture-002",
+    "gma_id": "GMA-gap-005-enforcement-fixture-002",
+    "gma_status": "GMA_VALID",
+    "gma_decision_id": "dec-UNRELATED-mismatch",
+    "gma_continuity_id": "cont-gap005-fixture-002",
+    "gma_session_id": "sess-gap005-fixture-002",
+    "compiled_object_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "executed_object_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "expected_status": "NULL",
+  "expected_reason": "authorization_lineage_mismatch",
+  "forbidden_outcomes": [
+    "GOVERNANCE_MUTATION_PROOF_VALID",
+    "proof_artifact_emitted",
+    "authority_created",
+    "execution_eligibility_created"
+  ]
+}

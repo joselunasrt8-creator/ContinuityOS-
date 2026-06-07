@@ -297,6 +297,18 @@
       "rationale": "append-only proof quarantine evidence; evidence_only enforced by schema CHECK"
     },
     {
+      "surface_id": "db_write:governance_mutation_proof_registry",
+      "table": "governance_mutation_proof_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/proof",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "GAP-005 closure: persists the GovernanceMutationProof artifact lineage-bound to session/continuity/decision/authority/GMA/compiled/executed hashes; only writes after the underlying proof_registry row and authority consumption succeed; lineage_hash and execution_proof_id uniqueness plus binding triggers (trg_governance_mutation_proof_requires_hash_match, trg_governance_mutation_proof_requires_valid_proof) make it replay-safe and proof-bound; evidence_only — creates no authority"
+    },
+    {
       "surface_id": "db_write:proof_propagation_outbox",
       "table": "proof_propagation_outbox",
       "operation": "INSERT",

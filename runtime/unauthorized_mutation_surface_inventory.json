@@ -903,6 +903,28 @@
       "non_authoritative": true
     },
     {
+      "surface_id": "db_write:governance_mutation_proof_registry",
+      "surface_type": "database_write_surface",
+      "source_file": "src/index.ts",
+      "entrypoint": "governance_mutation_proof_registry",
+      "mutation_capability": true,
+      "execution_capability": false,
+      "deployment_capability": false,
+      "authority_required": "canonical_runtime_route",
+      "aeo_required": false,
+      "validation_required": true,
+      "proof_required": true,
+      "replay_semantics": "replay_safe_lineage_hash_unique",
+      "drift_observable": true,
+      "proof_bound": true,
+      "governance_addressable": true,
+      "canonical_boundary_status": "PROOF_EVIDENCE_LINEAGE_BOUND",
+      "bypass_risk": "raw_database_write",
+      "containment_status": "EVIDENCE_ONLY_PROOF_LINEAGE_BOUND",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
       "surface_id": "db_write:proof_registry",
       "surface_type": "database_write_surface",
       "source_file": "src/index.ts",
