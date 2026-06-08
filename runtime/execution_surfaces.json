@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "RUNTIME_PROJECTION_LEGACY",
+    "canonical_source": "runtime/surfaces/EXECUTION_SURFACES.json",
+    "derived_from": "runtime/surfaces/EXECUTION_SURFACES.json",
+    "annotation_date": "2026-06-08",
+    "note": "Legacy runtime projection. Superseded by runtime/surfaces/ copy. No confirmed consumer. See INVENTORY_SOURCE_MAP.md Family 1."
+  },
   "artifact": "EXECUTION_SURFACES",
   "status": "NON_OPERATIVE",
   "surfaces": [

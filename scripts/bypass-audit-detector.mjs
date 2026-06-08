@@ -19,7 +19,7 @@ import { createHash } from 'node:crypto';
 
 const ROOT = resolve(new URL('.', import.meta.url).pathname, '..');
 const REGISTRY_PATH = resolve(ROOT, 'runtime/deploy_audit_registry.json');
-const BYPASS_PATHS_FILE = resolve(ROOT, 'runtime/bypass_paths.json');
+const BYPASS_PATHS_FILE = resolve(ROOT, 'BYPASS_PATHS.json');
 const WORKFLOWS_DIR = resolve(ROOT, '.github/workflows');
 const PACKAGE_JSON = resolve(ROOT, 'package.json');
 
@@ -127,8 +127,8 @@ for (const file of yamlFiles) {
   }
 }
 
-// ── Check 3: cross-reference with runtime/bypass_paths.json ──────────────────
-// Entries in bypass_paths.json are pre-classified topology-visible paths.
+// ── Check 3: cross-reference with BYPASS_PATHS.json (canonical source) ───────
+// Entries in BYPASS_PATHS.json are pre-classified topology-visible paths.
 // Those without a code-enforceable flag are platform/account-level controls
 // (Cloudflare token scope, GitHub branch protection) — documented as OPEN but
 // not code-blockable. Emit audit events but do not set hasOpenBypass.

@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "GENERATED_BUNDLE_COPY",
+    "canonical_source": "governance/runtime/EXECUTION_SURFACES.json",
+    "derived_from": "governance/runtime/EXECUTION_SURFACES.json",
+    "annotation_date": "2026-06-08",
+    "note": "Generated bundle copy from scripts/regenerate-governance-artifacts.mjs. Do not edit directly. See INVENTORY_SOURCE_MAP.md Family 1."
+  },
   "canonical_executable_routes": [
     "/session",
     "/continuity",

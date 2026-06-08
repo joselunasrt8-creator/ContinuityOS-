@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "GOVERNANCE_PROJECTION_LEGACY",
+    "canonical_source": "governance/runtime/EXECUTION_SURFACES.json",
+    "derived_from": "governance/runtime/EXECUTION_SURFACES.json",
+    "annotation_date": "2026-06-08",
+    "note": "Legacy governance projection. Superseded by governance/runtime/ copy. No confirmed consumer. See INVENTORY_SOURCE_MAP.md Family 1."
+  },
   "artifact": "EXECUTION_SURFACES",
   "status": "NON_OPERATIVE",
   "issue": 436,

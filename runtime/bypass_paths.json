@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "RUNTIME_PROJECTION_LEGACY",
+    "canonical_source": "BYPASS_PATHS.json",
+    "derived_from": "BYPASS_PATHS.json",
+    "annotation_date": "2026-06-08",
+    "note": "Legacy runtime projection. No confirmed consumer. Superseded by root BYPASS_PATHS.json. See INVENTORY_SOURCE_MAP.md Family 2."
+  },
   "artifact": "BYPASS_PATHS",
   "status": "NON_OPERATIVE",
   "known_bypass_classes": [

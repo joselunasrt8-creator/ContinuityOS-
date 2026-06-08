@@ -100,10 +100,15 @@ The purpose of this registry is to:
 | risk_class | P1 |
 | bypass_condition | Mutation-capable execution surface exists outside canonical inventory |
 | closure_condition | Every mutation-capable surface is declared, classified, authority-bound, replay-safe, and proof-bound |
-| current_state | Surface inventory exists but requires continuous reconciliation |
-| required_tests | surface reconciliation, bypass drift detection, unauthorized route detection |
+| current_state | Canonical sources declared in INVENTORY_SOURCE_MAP.md (issue #1837). EXECUTION_SURFACES canonical: `runtime/surfaces/EXECUTION_SURFACES.json` (merge-governance-check.yml consumer) and `governance/runtime/EXECUTION_SURFACES.json` (src/index.ts consumer). BYPASS_PATHS canonical: `BYPASS_PATHS.json` (root). Non-canonical copies annotated with `_source_metadata`. Split-source convergence (Slice 2) remains open — two diverged EXECUTION_SURFACES files serve two consumers. Enforcement tooling path compliance verified by `scripts/canonical-source-check.mjs`. |
+| canonical_execution_surfaces_enforcement | runtime/surfaces/EXECUTION_SURFACES.json |
+| canonical_execution_surfaces_governance | governance/runtime/EXECUTION_SURFACES.json |
+| canonical_bypass_paths | BYPASS_PATHS.json |
+| canonical_schemas | runtime/legitimacy/schemas/ |
+| source_map | INVENTORY_SOURCE_MAP.md |
+| required_tests | surface reconciliation, bypass drift detection, unauthorized route detection, canonical-source-check |
 | required_proofs | canonical surface map, drift telemetry |
-| status | OPEN |
+| status | PARTIAL — canonical sources declared, non-canonical copies annotated, enforcement path lint active; split-source convergence (Slice 2) deferred |
 
 ---
 

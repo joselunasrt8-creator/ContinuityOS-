@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "GOVERNANCE_PROJECTION",
+    "canonical_source": "BYPASS_PATHS.json",
+    "derived_from": "BYPASS_PATHS.json",
+    "annotation_date": "2026-06-08",
+    "note": "v1.0 governance projection of root canonical. Sparse schema (path + risk only). No confirmed enforcement consumer. See INVENTORY_SOURCE_MAP.md Family 2."
+  },
   "version": "1.0",
   "purpose": "Known and potential execution bypass paths",
   "bypass_paths": [

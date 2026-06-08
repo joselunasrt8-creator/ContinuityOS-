@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "ROOT_ACCUMULATION",
+    "canonical_source": "runtime/surfaces/EXECUTION_SURFACES.json",
+    "derived_from": null,
+    "annotation_date": "2026-06-08",
+    "note": "Non-canonical accumulation copy. No confirmed enforcement consumer. See INVENTORY_SOURCE_MAP.md Family 1."
+  },
   "version": "1.0",
   "purpose": "Inventory all state-changing execution surfaces",
   "canonical_runtime_route": [

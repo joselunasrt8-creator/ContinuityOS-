@@ -1,4 +1,11 @@
 {
+  "_source_metadata": {
+    "classification": "GENERATED_BUNDLE_COPY",
+    "canonical_source": "BYPASS_PATHS.json",
+    "derived_from": "BYPASS_PATHS.json",
+    "annotation_date": "2026-06-08",
+    "note": "Generated bundle copy. Matches governance/runtime/BYPASS_PATHS.json. Do not edit directly. See INVENTORY_SOURCE_MAP.md Family 2."
+  },
   "bypass_paths": [
     {
       "path": "direct_wrangler_deploy",
