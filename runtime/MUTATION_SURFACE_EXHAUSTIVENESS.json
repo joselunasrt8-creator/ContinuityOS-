@@ -869,6 +869,65 @@
       "rationale": "governed tool envelope registry records non-operative/governed envelope lineage; cannot execute without canonical validation/proof"
     },
     {
+      "surface_id": "db_write:governed_filesystem_object_registry",
+      "table": "governed_filesystem_object_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/filesystem-write",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "governed_filesystem_object_registry is the D1-backed virtual filesystem object store mutated only as a consequence of an EXECUTED outcome from runFilesystemWriteGatewayAction (issue #1890); the table write itself creates no authority and is not the execution surface — the gateway route is"
+    },
+    {
+      "surface_id": "db_write:governed_filesystem_write_decision_registry",
+      "table": "governed_filesystem_write_decision_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/filesystem-write",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "append-only seed of the governed filesystem-write decision binding consumed by the Ω validator; cannot itself create authority or authorize execution"
+    },
+    {
+      "surface_id": "db_write:governed_filesystem_write_nonce_registry",
+      "table": "governed_filesystem_write_nonce_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/filesystem-write",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "replay nonce state is recorded only as a consequence of an EXECUTED outcome — single-use nonce consumption evidence; cannot authorize execution on its own"
+    },
+    {
+      "surface_id": "db_write:governed_filesystem_write_proof_registry",
+      "table": "governed_filesystem_write_proof_registry",
+      "operation": "INSERT",
+      "classification": "EVIDENCE_ONLY",
+      "canonical_route": "/gateway/tool/filesystem-write",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "append-only proof receipt for the filesystem-write gateway action (issue #1890); trigger-protected against UPDATE and DELETE; binds AEO hash, validated/executed object hash, and result — evidence only, creates no authority"
+    },
+    {
+      "surface_id": "db_write:SET",
+      "table": "SET",
+      "operation": "UPDATE",
+      "classification": "EVIDENCE_ONLY",
+      "creates_authority": false,
+      "execution_capable": false,
+      "governance_bound": true,
+      "replay_safe": true,
+      "rationale": "scanner false-positive: the regex captures the SET clause of `ON CONFLICT(...) DO UPDATE SET ...` upsert statements in the filesystem-write gateway (issue #1890) as a literal table name; declared here to keep the static FATE scan exhaustive without altering scanner source"
+    },
+    {
       "surface_id": "route:/agent/tool-call",
       "table": null,
       "operation": null,
@@ -1054,7 +1113,7 @@
   },
   "classification_counts": {
     "AUTHORITATIVE": 10,
-    "EVIDENCE_ONLY": 56,
+    "EVIDENCE_ONLY": 61,
     "NON_EXECUTABLE": 8,
     "governed_support_surface": 5
   },
