@@ -249,7 +249,7 @@ test('topology manifest and referenced hashes are deterministic', () => {
 test('schema-validator remains fail-closed', () => {
   assert.equal(validateLegitimacySchema('not json').status, 'NULL')
   assert.equal(validateLegitimacySchema({ object_type: 'TopologyManifest' }).status, 'UNKNOWN_OBJECT_TYPE')
-  assert.equal(validateLegitimacySchema({ object_type: 'ProofObject', proof_id: 'missing-required-fields' }).status, 'NULL')
+  assert.equal(validateLegitimacySchema({ object_type: 'ProofObject', proof_id: 'missing-required-fields' }).status, 'UNKNOWN_OBJECT_TYPE')
 })
 
 test('AEO remains exact five fields', () => {

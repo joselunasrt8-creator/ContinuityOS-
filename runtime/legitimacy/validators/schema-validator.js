@@ -17,7 +17,6 @@ const SCHEMA_FILES = Object.freeze({
   ATAO: 'ATAO.schema.json',
   PREO: 'PREO.schema.json',
   SCO: 'SCO.schema.json',
-  ProofObject: 'PROOF_OBJECT.schema.json',
   ContinuityObject: 'CONTINUITY_OBJECT.schema.json',
   FederationEnvelope: 'FEDERATION_ENVELOPE.schema.json',
 })

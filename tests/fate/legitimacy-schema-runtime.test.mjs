@@ -211,15 +211,13 @@ test('ContinuityObject broken chain does not imply authority', () => {
   assert.equal(Object.hasOwn(result.canonicalized_object, 'grants_authority'), false)
 })
 
-test('ProofObject binds validated_object_hash and execution_hash', () => {
+test('ProofObject schema is retired — validator returns UNKNOWN_OBJECT_TYPE', () => {
+  // PROOF_OBJECT.schema.json is DEAD_CONTRACT (issue #1884): schema described an object model
+  // the runtime never built. Removed from SCHEMA_FILES; no production call site ever used it.
   const result = validateLegitimacySchema(proofObject())
-  assert.equal(result.status, 'VALID_SCHEMA')
-  assert.equal(result.canonicalized_object.validated_object_hash, hashA)
-  assert.equal(result.canonicalized_object.execution_hash, hashB)
-
-  const missingExecutionHash = proofObject()
-  delete missingExecutionHash.execution_hash
-  assert.equal(validateLegitimacySchema(missingExecutionHash).status, 'NULL')
+  assert.equal(result.status, 'UNKNOWN_OBJECT_TYPE')
+  assert.equal(result.object_hash, null)
+  assert.equal(result.canonicalized_object, null)
 })
 
 test('schema-valid object does not imply execution legitimacy', () => {
