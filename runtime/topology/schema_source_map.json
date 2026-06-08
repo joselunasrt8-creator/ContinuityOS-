@@ -27,8 +27,8 @@
     {
       "source_id": "canonical_runtime_proof_object",
       "path": "runtime/legitimacy/schemas/PROOF_OBJECT.schema.json",
-      "schema_role": "canonical_runtime_legitimacy_schema",
-      "authoritative_for_runtime_validator": true,
+      "schema_role": "dead_contract_retired",
+      "authoritative_for_runtime_validator": false,
       "required_hash_fields": [
         "validated_object_hash",
         "execution_hash"
@@ -62,5 +62,5 @@
       "authoritative_for_runtime_validator": true
     }
   ],
-  "schema_source_map_hash": "0fe964c67eaf7d364a6c222514374e69612542e22004129a18ef533ab3719e14"
+  "schema_source_map_hash": "1c79f002ab3e61ee9b1bd2eaba6bc156f243ca96dc391cdc0ca4c07c261a13ae"
 }
