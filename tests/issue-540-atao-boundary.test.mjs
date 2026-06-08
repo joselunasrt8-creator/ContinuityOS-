@@ -18,6 +18,10 @@ function post(path, body) {
   })
 }
 
+// Topology epoch fields required by /validate to pass enforceTopologyEpochAdmission
+// epoch=0 with no prior epoch_registry rows is accepted as the genesis epoch
+const EPOCH_FIXTURE = { topology_epoch: 0, epoch_lineage_parent: 'genesis-parent', topology_visibility_state: 'VISIBLE' }
+
 function buildContinuityRecord() {
   const canonical = { continuity_id: 'continuity-1', identity_id: 'identity-1', session_id: 'session-1', parent_continuity_id: null, authority_chain: ['decision-1'], actor_chain: ['human'], scope: {}, constraints: {}, revocation: { status: 'ACTIVE', revoked_at: null }, issued_at: '2026-01-01T00:00:00.000Z', expires_at: '2999-01-01T00:00:00.000Z' }
   const continuity_hash = createHash('sha256').update(JSON.stringify(canonical)).digest('hex')
@@ -63,14 +67,14 @@ function buildEnv(overrides = {}) {
 test('Issue #540: expired authority returns NULL', async () => {
   const worker = await loadWorker()
   const env = buildEnv({ authority: { authority_id: 'auth-1', decision_id: 'decision-1', status: 'ACTIVE', session_id: 'session-1', continuity_id: 'continuity-1', identity_id: 'identity-1', constraints: JSON.stringify({ repo: 'owner/repo', branch: 'main', workflow: 'governed-deploy.yml' }), scope: JSON.stringify({ repo: 'owner/repo', branch: 'main' }), expiry: '2000-01-01T00:00:00.000Z' } })
-  const res = await worker.fetch(post('/validate', { decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
+  const res = await worker.fetch(post('/validate', { ...EPOCH_FIXTURE, epoch_nonce: 'epoch-nonce-540-expired', decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
   assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'authority_expired' })
 })
 
 test('Issue #540: revoked authority returns NULL', async () => {
   const worker = await loadWorker()
   const env = buildEnv({ authority: { authority_id: 'auth-1', decision_id: 'decision-1', status: 'REVOKED', session_id: 'session-1', continuity_id: 'continuity-1', identity_id: 'identity-1', constraints: JSON.stringify({ repo: 'owner/repo', branch: 'main', workflow: 'governed-deploy.yml' }), scope: JSON.stringify({ repo: 'owner/repo', branch: 'main' }), expiry: '2999-01-01T00:00:00.000Z' } })
-  const res = await worker.fetch(post('/validate', { decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
+  const res = await worker.fetch(post('/validate', { ...EPOCH_FIXTURE, epoch_nonce: 'epoch-nonce-540-revoked', decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
   assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'authority_revoked' })
 })
 
@@ -78,7 +82,7 @@ test('Issue #540: ATAO mutation after validation returns NULL', async () => {
   const worker = await loadWorker()
   const widened = JSON.stringify({ intent: 'deploy_production', scope: { repo: 'owner/repo', branch: 'main', admin: true }, validation: { workflow: 'governed-deploy.yml' }, target: { repo: 'owner/repo', branch: 'main', workflow: 'governed-deploy.yml' }, finality: { proof_required: true } })
   const env = buildEnv({ canonicalAeo: widened })
-  const res = await worker.fetch(post('/validate', { decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
+  const res = await worker.fetch(post('/validate', { ...EPOCH_FIXTURE, epoch_nonce: 'epoch-nonce-540-mutation', decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
   assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'invalid_continuity' })
 })
 
@@ -86,6 +90,6 @@ test('Issue #540: deterministic ATAO canonicalization required', async () => {
   const worker = await loadWorker()
   const noProof = JSON.stringify({ intent: 'deploy_production', scope: { repo: 'owner/repo', branch: 'main' }, validation: { workflow: 'governed-deploy.yml' }, target: { repo: 'owner/repo', branch: 'main', workflow: 'governed-deploy.yml' }, finality: { proof_required: false } })
   const env = buildEnv({ canonicalAeo: noProof })
-  const res = await worker.fetch(post('/validate', { decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
+  const res = await worker.fetch(post('/validate', { ...EPOCH_FIXTURE, epoch_nonce: 'epoch-nonce-540-canonical', decision_id: 'decision-1', validated_object_hash: env.validatedHash, invocation_nonce: 'n1', session_id: 'session-1' }), env)
   assert.deepEqual(await res.json(), { status: 'NULL', result: 'INVALID', reason: 'invalid_continuity' })
 })
