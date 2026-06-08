@@ -30,6 +30,13 @@ test('authority-review lib: AgentToolATAO carries review_id as required authorit
 })
 
 // Authority Review Artifact exports
+// Reviewer identity binding (issue #1833) — reviewer_id must be validated against an authorized registry
+test('authority-review lib binds reviewer_id to MERGE_ACTOR_REGISTRY-synced authorized reviewer registry', () => {
+  assert.match(authorityReviewLib, /MERGE_ACTOR_REGISTRY/)
+  assert.match(authorityReviewLib, /export function isAuthorizedAgentToolReviewer/)
+  assert.match(authorityReviewLib, /unauthorized_reviewer_id/)
+})
+
 test('authority-review lib exports conductAuthorityReview as the authority review entry point', () => {
   assert.match(authorityReviewLib, /export function conductAuthorityReview/)
 })
@@ -170,7 +177,7 @@ test('CORE: Proposal → APPROVED authority review → ATAO formed', async () =>
     proposal_id: 'proposal:cip:obs:agent-1:2026-06-02T00:00:00.000Z:abc123',
     observation_id: 'obs:gateway:create_issue:agent-1:2026-06-02T00:00:00.000Z',
     observation_hash: 'abc123',
-    reviewer_id: 'authority-reviewer-1',
+    reviewer_id: 'joselunasrt8-creator',
     review_decision: 'APPROVED',
     review_rationale: 'issue creation is policy-compliant',
   }), makeEnv())
@@ -191,7 +198,7 @@ test('CORE: Proposal → REJECTED authority review → no ATAO', async () => {
     proposal_id: 'proposal:cip:obs:agent-1:2026-06-02T00:00:00.000Z:abc123',
     observation_id: 'obs:gateway:create_issue:agent-1:2026-06-02T00:00:00.000Z',
     observation_hash: 'abc123',
-    reviewer_id: 'authority-reviewer-1',
+    reviewer_id: 'joselunasrt8-creator',
     review_decision: 'REJECTED',
     review_rationale: 'not authorized in this session',
   }), makeEnv())
@@ -232,6 +239,23 @@ test('authority review missing reviewer_id → NULL', async () => {
   assert.equal(data.reason, 'missing_reviewer_id')
 })
 
+// Fabricated reviewer_id (not in MERGE_ACTOR_REGISTRY authorized reviewers) → NULL, fail-closed rejection
+test('authority review with fabricated reviewer_id not in registry → rejected (NULL, no ATAO)', async () => {
+  const worker = await getWorker()
+  const res = await worker.fetch(post('/gateway/authority/review', {
+    proposal_id: 'proposal:cip:obs:agent-1:2026-06-02T00:00:00.000Z:abc123',
+    observation_id: 'obs:gateway:create_issue:agent-1:2026-06-02T00:00:00.000Z',
+    observation_hash: 'abc123',
+    reviewer_id: 'totally-fabricated-reviewer-not-in-registry',
+    review_decision: 'APPROVED',
+    review_rationale: 'self-asserted approval',
+  }), makeEnv())
+  const data = await res.json()
+  assert.equal(data.status, 'NULL')
+  assert.equal(data.reason, 'unauthorized_reviewer_id')
+  assert.equal(data.atao_id, undefined, 'no ATAO must be formed for an unauthorized reviewer')
+})
+
 // Invalid decision → NULL
 test('authority review with invalid review_decision → NULL', async () => {
   const worker = await getWorker()
@@ -269,7 +293,7 @@ test('conductAuthorityReview: APPROVED → review (creates_atao=true) + ATAO (at
     tool_name: 'create_issue', tool_system: 'github', risk_class: 'P2',
     intent: 'create an issue', scope: { repo: 'r/r' }, constraints: {}, requires_authority_binding: true,
   }
-  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'reviewer-1', review_decision: 'APPROVED', review_rationale: 'approved', timestamp: '2026-06-02T00:00:00.000Z' })
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'joselunasrt8-creator', review_decision: 'APPROVED', review_rationale: 'approved', timestamp: '2026-06-02T00:00:00.000Z' })
   assert.equal(outcome.status, 'APPROVED')
   assert.equal(outcome.review.creates_atao, true)
   assert.ok(outcome.atao)
@@ -286,7 +310,7 @@ test('conductAuthorityReview: REJECTED → review (creates_atao=false) + atao=nu
     tool_name: 'terminal_command', tool_system: 'shell', risk_class: 'P3',
     intent: 'run command', scope: {}, constraints: {}, requires_authority_binding: true,
   }
-  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'reviewer-1', review_decision: 'REJECTED', review_rationale: 'shell not authorized', timestamp: '2026-06-02T00:00:00.000Z' })
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'joselunasrt8-creator', review_decision: 'REJECTED', review_rationale: 'shell not authorized', timestamp: '2026-06-02T00:00:00.000Z' })
   assert.equal(outcome.status, 'REJECTED')
   assert.equal(outcome.atao, null)
   assert.equal(outcome.review.creates_atao, false)
@@ -300,7 +324,7 @@ test('conductAuthorityReview: ATAO carries review_id, proposal_id, observation_i
     tool_name: 'push_files', tool_system: 'github', risk_class: 'P2',
     intent: 'push', scope: {}, constraints: {}, requires_authority_binding: true,
   }
-  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'reviewer-1', review_decision: 'APPROVED', review_rationale: 'ok', timestamp: '2026-06-02T00:00:00.000Z' })
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'joselunasrt8-creator', review_decision: 'APPROVED', review_rationale: 'ok', timestamp: '2026-06-02T00:00:00.000Z' })
   assert.equal(outcome.status, 'APPROVED')
   assert.equal(outcome.atao.review_id, outcome.review.review_id)
   assert.equal(outcome.atao.proposal_id, 'p-4')
@@ -314,6 +338,16 @@ test('conductAuthorityReview: missing reviewer_id → NULL', async () => {
   const outcome = conductAuthorityReview({ proposal, reviewer_id: '', review_decision: 'APPROVED', review_rationale: 'r', timestamp: '2026-06-02T00:00:00.000Z' })
   assert.equal(outcome.status, 'NULL')
   assert.equal(outcome.reason, 'missing_reviewer_id')
+})
+
+test('conductAuthorityReview: fabricated reviewer_id (not in MERGE_ACTOR_REGISTRY authorized reviewers) → NULL, fail-closed', async () => {
+  const { conductAuthorityReview, isAuthorizedAgentToolReviewer } = await import('../src/lib/authority-review.ts')
+  const proposal = { proposal_id: 'p', cip_id: 'c', observation_id: 'o', observation_hash: 'h', agent_id: 'a', session_id: 's', framework: 'langchain', tool_name: 't', tool_system: 'github', risk_class: 'P1', intent: 'i', scope: {}, constraints: {}, requires_authority_binding: false }
+  assert.equal(isAuthorizedAgentToolReviewer('totally-fabricated-reviewer-not-in-registry'), false)
+  assert.equal(isAuthorizedAgentToolReviewer('joselunasrt8-creator'), true)
+  const outcome = conductAuthorityReview({ proposal, reviewer_id: 'totally-fabricated-reviewer-not-in-registry', review_decision: 'APPROVED', review_rationale: 'self-asserted', timestamp: '2026-06-02T00:00:00.000Z' })
+  assert.equal(outcome.status, 'NULL')
+  assert.equal(outcome.reason, 'unauthorized_reviewer_id')
 })
 
 test('conductAuthorityReview: invalid review_decision → NULL', async () => {

@@ -21,6 +21,16 @@
     }
   ],
   "permitted_bot_actors": [],
+  "authorized_agent_tool_reviewers": {
+    "description": "Identities permitted to act as reviewer_id in conductAuthorityReview() (src/lib/authority-review.ts), the Agent Tool Gateway authority review surface (issue #1627 / #1833). reviewer_id is an identity claim carried in the request body — without binding to this registry, any caller that knows the field name could pass the authority review gate. Unrecognized reviewer_id values produce AUTHORITY_REVIEW_NULL: no review-decision artifact of consequence and no AgentToolATAO is formed.",
+    "permitted_reviewers": [
+      "joselunasrt8-creator"
+    ],
+    "default_unclassified_result": "AUTHORITY_REVIEW_NULL",
+    "sync_target": "src/lib/authority-review.ts AUTHORIZED_AGENT_TOOL_REVIEWERS",
+    "issue_reference": "#1833",
+    "closes_gaps": ["GAP-1833-reviewer-identity"]
+  },
   "authority_roles": {
     "sovereignty_review": [],
     "sovereignty_review_entry_schema": {

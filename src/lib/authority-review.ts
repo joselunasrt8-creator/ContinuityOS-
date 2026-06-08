@@ -112,6 +112,21 @@ export type AuthorityReviewOutcome =
 
 export type AuthorityReviewDecision = "APPROVED" | "REJECTED"
 
+// Authorized Agent Tool Reviewer Registry (issue #1833) — must remain in sync
+// with governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json
+// authorized_agent_tool_reviewers.permitted_reviewers.
+// reviewer_id is an identity claim, not a permission grant: any caller that
+// knows the field name can supply an arbitrary string. Binding reviewer_id to
+// this registry closes that silent authority-escalation path. Unrecognized
+// reviewer_id values are rejected fail-closed — no review artifact, no ATAO.
+const AUTHORIZED_AGENT_TOOL_REVIEWERS: ReadonlySet<string> = new Set([
+  "joselunasrt8-creator",
+])
+
+export function isAuthorizedAgentToolReviewer(reviewer_id: string): boolean {
+  return AUTHORIZED_AGENT_TOOL_REVIEWERS.has(reviewer_id)
+}
+
 export function formAuthorityReviewArtifact(input: {
   readonly proposal: GatewayProposalLineage
   readonly reviewer_id: string
@@ -195,6 +210,9 @@ export function conductAuthorityReview(input: {
   }
   if (!input.proposal.proposal_id || !input.proposal.observation_id || !input.proposal.observation_hash) {
     return Object.freeze({ status: "NULL" as const, reason: "invalid_proposal_lineage" })
+  }
+  if (!isAuthorizedAgentToolReviewer(input.reviewer_id)) {
+    return Object.freeze({ status: "NULL" as const, reason: "unauthorized_reviewer_id" })
   }
 
   const review = formAuthorityReviewArtifact({

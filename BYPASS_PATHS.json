@@ -16,11 +16,26 @@
       "bypass_id": "ungoverned_agent_tool_call",
       "surface_category": "agent",
       "risk": "AI/LLM agent tool call executes mutation (D1 write, deploy, schema change) outside canonical /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof lifecycle — no authority object, no proof, no replay protection",
-      "governance_class": "UNKNOWN",
+      "governance_class": "GOVERNED",
       "fail_closed_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
       "required_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
       "topology_surface": "bypass:agent_tool_call",
-      "closure_condition": "All agent tool calls that perform state-changing operations must be bound to an active authority object and produce a proof record before mutation is applied"
+      "closure_condition": "All agent tool calls that perform state-changing operations must be bound to an active authority object and produce a proof record before mutation is applied",
+      "closure_evidence": {
+        "issue_reference": "#1833",
+        "lifecycle": "GovernanceProposal (PENDING_AUTHORITY_REVIEW) -> conductAuthorityReview() -> AuthorityReviewArtifact (APPROVED|REJECTED) -> AgentToolATAO (FORMED, only on APPROVED)",
+        "binding_artifacts": [
+          "src/lib/agent-tool-gateway.ts — Observation -> CIP -> GovernanceProposal",
+          "src/lib/authority-review.ts — Authority Review -> AgentToolATAO (review_id required lineage on every ATAO; type-enforced to require an APPROVED review)",
+          "governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json authorized_agent_tool_reviewers — reviewer_id bound to authorized reviewer registry; unrecognized reviewer_id produces unauthorized_reviewer_id -> NULL (no review artifact, no ATAO)"
+        ],
+        "fail_closed_paths": [
+          "no proposal lineage -> NULL (proposal_not_found / invalid_proposal_lineage)",
+          "missing or unauthorized reviewer_id -> NULL (missing_reviewer_id / unauthorized_reviewer_id)",
+          "REJECTED review -> creates_atao=false, atao=null"
+        ],
+        "note": "An agent tool call that bypasses this lifecycle entirely (calls a tool system directly without an approved AgentToolATAO) is not GOVERNED by this binding — it remains an undeclared/unbound mutation and resolves to AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL per fail_closed_response."
+      }
     },
     {
       "path": "local_script_execution",
@@ -308,8 +323,8 @@
   "topology_surfaces": [
     {
       "surface_id": "bypass:agent_tool_call",
-      "description": "Ungoverned AI/LLM agent tool call surface — mutation-capable calls outside canonical lifecycle",
-      "governance_class": "UNKNOWN",
+      "description": "AI/LLM agent tool call surface — mutation-capable calls bound to canonical lifecycle (GovernanceProposal -> conductAuthorityReview -> AgentToolATAO) per issue #1833; calls that bypass this lifecycle remain AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
+      "governance_class": "GOVERNED",
       "mutation_capable": true,
       "surface_category": "agent"
     },
