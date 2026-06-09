@@ -163,54 +163,12 @@ test('Replay fixtures', async (t) => {
 
 // ─── 8. Reconciliation ───────────────────────────────────────────────────────
 
-test('Reconciliation: null evidence returns NULL', () => {
-  assert.equal(classifyReconciliation(null), 'NULL')
-})
-
-test('Reconciliation: missing hash returns PARTIAL', () => {
-  assert.equal(classifyReconciliation({
-    expected_hash: null,
-    observed_hash: null,
-    lineage_complete: true,
-    proof_present: true,
-    observations_complete: true,
-    ambiguity_detected: false,
-  }), 'PARTIAL')
-})
-
-test('Reconciliation: ambiguity_detected returns AMBIGUOUS even with matching hashes', () => {
-  const hash = '43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777'
-  assert.equal(classifyReconciliation({
-    expected_hash: hash,
-    observed_hash: hash,
-    lineage_complete: true,
-    proof_present: true,
-    observations_complete: true,
-    ambiguity_detected: true,
-  }), 'AMBIGUOUS')
-})
-
-test('Reconciliation: matching hashes with complete evidence returns RECONCILED', () => {
-  const hash = '43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777'
-  assert.equal(classifyReconciliation({
-    expected_hash: hash,
-    observed_hash: hash,
-    lineage_complete: true,
-    proof_present: true,
-    observations_complete: true,
-    ambiguity_detected: false,
-  }), 'RECONCILED')
-})
-
-test('Reconciliation: mismatched hashes returns DIVERGENT', () => {
-  const hash1 = '43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777'
-  const hash2 = '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a'
-  assert.equal(classifyReconciliation({
-    expected_hash: hash1,
-    observed_hash: hash2,
-    lineage_complete: true,
-    proof_present: true,
-    observations_complete: true,
-    ambiguity_detected: false,
-  }), 'DIVERGENT')
+test('Reconciliation fixtures', async (t) => {
+  const { cases } = loadFixture('reconciliation-fixtures.json')
+  for (const c of cases) {
+    await t.test(c.id, () => {
+      const result = classifyReconciliation(c.evidence)
+      assert.equal(result, c.expected_state, `reconciliation mismatch for ${c.id}`)
+    })
+  }
 })
