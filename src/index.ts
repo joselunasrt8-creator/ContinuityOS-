@@ -7,6 +7,7 @@ import { interceptToolCall, classifyGatewayToolSurface, checkOmegaValidatorBound
 import type { AgentToolGovernanceProposal } from "./lib/agent-tool-gateway.ts"
 import { conductAuthorityReview } from "./lib/authority-review.ts"
 import type { GatewayProposalLineage, AgentToolATAO } from "./lib/authority-review.ts"
+import mergeActorRegistry from "../governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json" with { type: "json" }
 import { runFilesystemWriteGatewayAction } from "./lib/filesystem-write-runtime-gateway.ts"
 import type { FilesystemValidatorContext } from "./lib/filesystem-aeo-validator.ts"
 import type { FilesystemWriteExecutor } from "./lib/filesystem-write-gateway.ts"
@@ -548,7 +549,8 @@ async function handleAgentToolGatewayAuthorityReview(env: Env, request: Request)
     requires_authority_binding: Boolean(proposal.requires_authority_binding),
   }
   const timestamp = new Date().toISOString()
-  const outcome = conductAuthorityReview({ proposal: proposalLineage, reviewer_id, review_decision, review_rationale, timestamp })
+  const permitted_reviewer_ids = (mergeActorRegistry as any)?.authority_review_permitted_reviewers?.allowlist ?? []
+  const outcome = conductAuthorityReview({ proposal: proposalLineage, reviewer_id, review_decision, review_rationale, timestamp, permitted_reviewer_ids })
   if (outcome.status === "NULL") {
     return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, reason: outcome.reason })
   }

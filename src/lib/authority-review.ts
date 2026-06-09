@@ -177,15 +177,25 @@ export function formAgentToolATAO(
 // conductAuthorityReview — the top-level entry point for the authority review surface.
 // Validates inputs, forms review artifact, and conditionally forms ATAO.
 // This is the only function on this path that produces an AgentToolATAO.
+//
+// permitted_reviewer_ids: when non-empty, reviewer_id must be in the list (sourced from
+// MERGE_ACTOR_REGISTRY.json authority_review_permitted_reviewers.allowlist at the call site).
+// When empty or omitted, any non-empty reviewer_id is accepted (open enrollment).
 export function conductAuthorityReview(input: {
   readonly proposal: GatewayProposalLineage
   readonly reviewer_id: string
   readonly review_decision: string
   readonly review_rationale: string
   readonly timestamp: string
+  readonly permitted_reviewer_ids?: readonly string[]
 }): AuthorityReviewOutcome {
   if (!input.reviewer_id) {
     return Object.freeze({ status: "NULL" as const, reason: "missing_reviewer_id" })
+  }
+  if (input.permitted_reviewer_ids && input.permitted_reviewer_ids.length > 0) {
+    if (!input.permitted_reviewer_ids.includes(input.reviewer_id)) {
+      return Object.freeze({ status: "NULL" as const, reason: "unauthorized_reviewer_id" })
+    }
   }
   if (!input.review_rationale) {
     return Object.freeze({ status: "NULL" as const, reason: "missing_review_rationale" })

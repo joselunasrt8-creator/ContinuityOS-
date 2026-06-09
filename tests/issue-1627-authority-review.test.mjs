@@ -345,3 +345,64 @@ test('formAgentToolATAO with APPROVED review produces canonical AgentToolATAO', 
   assert.equal(atao.review_id, review.review_id)
   assert.equal(atao.framework, 'langchain')
 })
+
+// ── Reviewer identity validation against MERGE_ACTOR_REGISTRY ────────────────
+
+test('conductAuthorityReview: reviewer_id not in permitted list → NULL with unauthorized_reviewer_id (#1833)', async () => {
+  const { conductAuthorityReview } = await import('../src/lib/authority-review.ts')
+  const proposal = {
+    proposal_id: 'p-reg-1', cip_id: 'cip-reg-1', observation_id: 'obs-reg-1', observation_hash: 'hash-reg-1',
+    agent_id: 'agent-1', session_id: 'session-1', framework: 'langchain',
+    tool_name: 'create_issue', tool_system: 'github', risk_class: 'P2',
+    intent: 'create an issue', scope: { repo: 'r/r' }, constraints: {}, requires_authority_binding: true,
+  }
+  const outcome = conductAuthorityReview({
+    proposal,
+    reviewer_id: 'fabricated-attacker',
+    review_decision: 'APPROVED',
+    review_rationale: 'approved',
+    timestamp: '2026-06-02T00:00:00.000Z',
+    permitted_reviewer_ids: ['joselunasrt8-creator'],
+  })
+  assert.equal(outcome.status, 'NULL')
+  assert.equal(outcome.reason, 'unauthorized_reviewer_id')
+})
+
+test('conductAuthorityReview: registered reviewer_id passes strict allowlist check (#1833)', async () => {
+  const { conductAuthorityReview } = await import('../src/lib/authority-review.ts')
+  const proposal = {
+    proposal_id: 'p-reg-2', cip_id: 'cip-reg-2', observation_id: 'obs-reg-2', observation_hash: 'hash-reg-2',
+    agent_id: 'agent-1', session_id: 'session-1', framework: 'langchain',
+    tool_name: 'create_issue', tool_system: 'github', risk_class: 'P2',
+    intent: 'create an issue', scope: { repo: 'r/r' }, constraints: {}, requires_authority_binding: true,
+  }
+  const outcome = conductAuthorityReview({
+    proposal,
+    reviewer_id: 'joselunasrt8-creator',
+    review_decision: 'APPROVED',
+    review_rationale: 'approved',
+    timestamp: '2026-06-02T00:00:00.000Z',
+    permitted_reviewer_ids: ['joselunasrt8-creator'],
+  })
+  assert.equal(outcome.status, 'APPROVED')
+  assert.ok(outcome.atao)
+})
+
+test('conductAuthorityReview: empty permitted list → open enrollment, any non-empty ID accepted (#1833)', async () => {
+  const { conductAuthorityReview } = await import('../src/lib/authority-review.ts')
+  const proposal = {
+    proposal_id: 'p-reg-3', cip_id: 'cip-reg-3', observation_id: 'obs-reg-3', observation_hash: 'hash-reg-3',
+    agent_id: 'agent-1', session_id: 'session-1', framework: 'langchain',
+    tool_name: 'create_issue', tool_system: 'github', risk_class: 'P2',
+    intent: 'create an issue', scope: { repo: 'r/r' }, constraints: {}, requires_authority_binding: true,
+  }
+  const outcome = conductAuthorityReview({
+    proposal,
+    reviewer_id: 'any-reviewer',
+    review_decision: 'APPROVED',
+    review_rationale: 'approved',
+    timestamp: '2026-06-02T00:00:00.000Z',
+    permitted_reviewer_ids: [],
+  })
+  assert.equal(outcome.status, 'APPROVED')
+})
