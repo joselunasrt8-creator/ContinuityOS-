@@ -1,8 +1,10 @@
 // Issue #1890: Enforce first runtime Agent Tool Gateway action — filesystem write.
+// Updated for Execution Adapter Boundary: tests now use FilesystemWriter (not
+// FilesystemWriteExecutor) and AdapterProofReceipt (not FilesystemWriteExecutionProof).
 //
 // Scope: runFilesystemWriteGatewayAction — the composed, mandatory chain that wires
 //   captureFilesystemWriteATAO → compileFilesystemWriteAEO → validateFilesystemAEO
-//   → executeFilesystemWrite into a single path with no bypass branch.
+//   → executeFilesystemAdapter into a single path with no bypass branch.
 //
 // Required evidence (issue acceptance criteria):
 //   - a filesystem-write request cannot execute unless an ATAO is captured
@@ -10,9 +12,9 @@
 //   - the exact AEO is validated before the adapter is invoked
 //   - the adapter is invoked only after VALID
 //   - validated_object_hash == executed_object_hash on the EXECUTED path
-//   - invalid / bypass / denied requests return NULL and never reach the executor
-//   - successful execution emits proof containing the AEO hash, target path,
-//     action, and result
+//   - invalid / bypass / denied requests return NULL and never reach the writer
+//   - successful execution emits AdapterProofReceipt containing the hash, surface,
+//     decision_id, and replay_nonce
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -116,11 +118,21 @@ function makeValidatorContext(overrides = {}) {
   return { ...base, ...overrides }
 }
 
-function makeExecutor() {
+// FilesystemWriter: synchronous capture closure matching the execution adapter contract.
+function makeWriter() {
   let callCount = 0
   let lastInput = null
+  const fn = (input) => {
+    callCount++
+    lastInput = input
+    return {
+      execution_id: `fs-write:sha256:fixture-${callCount}`,
+      executed_at: EMITTED_AT,
+      bytes_written: input.content.length,
+    }
+  }
   return {
-    fn: (input) => { callCount++; lastInput = input; return { bytes_written: input.content.length } },
+    fn,
     get callCount() { return callCount },
     get lastInput() { return lastInput },
   }
@@ -135,51 +147,51 @@ test('source declares runFilesystemWriteGatewayAction as the mandatory chain', (
   assert.match(gatewaySource, /captureFilesystemWriteATAO/)
   assert.match(gatewaySource, /compileFilesystemWriteAEO/)
   assert.match(gatewaySource, /validateFilesystemAEO/)
-  assert.match(gatewaySource, /executeFilesystemWrite/)
+  assert.match(gatewaySource, /executeFilesystemAdapter/)
   assert.match(gatewaySource, /the ONLY function in this codebase that can\s*\n\/\/ produce an EXECUTED filesystem-write proof/)
 })
 
-// ── Fail-closed at every stage, executor never reached early ─────────────────
+// ── Fail-closed at every stage, writer never reached early ───────────────────
 
-test('TC-RUN-01 null/undefined gateway input returns NULL at capture, executor never called', async () => {
-  const executor = makeExecutor()
-  const context = { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT }
+test('TC-RUN-01 null/undefined gateway input returns NULL at capture, writer never called', async () => {
+  const writer = makeWriter()
+  const context = { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT }
   for (const bad of [null, undefined]) {
     const outcome = await runFilesystemWriteGatewayAction(bad, context)
     assert.equal(outcome.result, 'NULL')
     assert.equal(outcome.stage, 'capture')
   }
-  assert.equal(executor.callCount, 0)
+  assert.equal(writer.callCount, 0)
 })
 
 test('TC-RUN-02 a request that cannot form an ATAO is blocked at capture — no AEO, no validation, no execution', async () => {
-  const executor = makeExecutor()
+  const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput({ path: '' }), binding: makeBinding() },   // blank path → captureFilesystemWriteATAO returns null
-    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
   assert.equal(outcome.reason, 'ATAO_CAPTURE_FAILED')
-  assert.equal(outcome.proof, null)
-  assert.equal(executor.callCount, 0, 'executor must not be called when ATAO capture fails')
+  assert.equal(outcome.receipt, null)
+  assert.equal(writer.callCount, 0, 'writer must not be called when ATAO capture fails')
 })
 
-test('TC-RUN-03 a captured ATAO with no usable authority binding is blocked at compile — never reaches the validator or the executor', async () => {
-  const executor = makeExecutor()
+test('TC-RUN-03 a captured ATAO with no usable authority binding is blocked at compile — never reaches the validator or the writer', async () => {
+  const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding({ allowed_paths: [] }) },  // compileFilesystemWriteAEO fails closed
-    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'compile')
   assert.equal(outcome.reason, 'AEO_COMPILE_FAILED')
-  assert.equal(outcome.proof, null)
-  assert.equal(executor.callCount, 0, 'executor must not be called when AEO compilation fails')
+  assert.equal(outcome.receipt, null)
+  assert.equal(writer.callCount, 0, 'writer must not be called when AEO compilation fails')
 })
 
 test('TC-RUN-04 a compiled AEO that the Ω validator denies is blocked at validate — adapter is never invoked on a non-VALID object', async () => {
-  const executor = makeExecutor()
+  const writer = makeWriter()
   const deniedContext = makeValidatorContext({
     policyRegistry: {
       readPolicy: async () => ({ ok: true, value: makePolicy({ allowed_paths: ['docs/**'] }) }), // src/example.ts not allowed
@@ -188,19 +200,19 @@ test('TC-RUN-04 a compiled AEO that the Ω validator denies is blocked at valida
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: deniedContext, executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: deniedContext, writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.reason, 'PATH_OR_OPERATION_NOT_ALLOWED')
   assert.notEqual(outcome.validator_denial, null)
   assert.equal(outcome.validator_denial.failure_class, 'PATH_NOT_ALLOWED')
-  assert.equal(outcome.proof, null)
-  assert.equal(executor.callCount, 0, 'executor must not be called when the Ω validator returns NULL')
+  assert.equal(outcome.receipt, null)
+  assert.equal(writer.callCount, 0, 'writer must not be called when the Ω validator returns NULL')
 })
 
 test('TC-RUN-05 replay-consumed nonce is denied at validate — replay cannot reach the adapter', async () => {
-  const executor = makeExecutor()
+  const writer = makeWriter()
   const replayedContext = makeValidatorContext({
     replayRegistry: {
       readNonceState: async () => ({ ok: true, value: 'CONSUMED' }),
@@ -209,89 +221,88 @@ test('TC-RUN-05 replay-consumed nonce is denied at validate — replay cannot re
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: replayedContext, executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: replayedContext, writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.validator_denial.failure_class, 'REPLAY_NONCE_CONSUMED_OR_RESERVED')
-  assert.equal(executor.callCount, 0, 'a replayed nonce must never reach the adapter')
+  assert.equal(writer.callCount, 0, 'a replayed nonce must never reach the adapter')
 })
 
 // ── The mandatory chain succeeds end-to-end exactly once VALID is reached ────
 
-test('TC-RUN-06 VALID end-to-end: ATAO captured → AEO compiled → validated → adapter invoked → proof emitted', async () => {
-  const executor = makeExecutor()
+test('TC-RUN-06 VALID end-to-end: ATAO captured → AEO compiled → validated → adapter invoked → receipt emitted', async () => {
+  const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
   )
 
   assert.equal(outcome.result, 'EXECUTED')
-  assert.notEqual(outcome.proof, null)
+  assert.notEqual(outcome.receipt, null)
 
-  const proof = outcome.proof
-  assert.equal(proof.execution_result, 'EXECUTED')
-  assert.equal(proof.null_reason, null)
+  const receipt = outcome.receipt
+  assert.equal(receipt.execution_result, 'EXECUTED')
 
   // Core invariant carried through the composed chain
-  assert.equal(proof.validated_object_hash, proof.executed_object_hash,
+  assert.equal(receipt.validated_object_hash, receipt.executed_object_hash,
     'validated_object_hash must equal executed_object_hash through the runtime gateway')
 
-  // Proof contains AEO hash, target path, action, and result (closure condition)
-  assert.match(proof.aeo_hash, /^sha256:[0-9a-f]{64}$/)
-  assert.equal(proof.target_path, 'src/example.ts')
-  assert.equal(proof.target_action, 'modify')
-  assert.equal(proof.target_surface, 'filesystem')
-  assert.strictEqual(proof.creates_authority, false)
+  // Receipt contains adapter surface, decision, nonce, and hash (closure condition)
+  assert.match(receipt.validated_object_hash, /^sha256:[0-9a-f]{64}$/)
+  assert.match(receipt.receipt_id, /^sha256:[0-9a-f]{64}$/)
+  assert.equal(receipt.adapter_surface, 'filesystem')
+  assert.equal(receipt.decision_id, 'AUTH-fixture-001')
+  assert.equal(receipt.replay_nonce, 'fixture-nonce-001')
+  assert.strictEqual(receipt.creates_authority, false)
 
-  // Adapter invoked exactly once, with exactly the validated content
-  assert.equal(executor.callCount, 1)
-  assert.equal(executor.lastInput.path, 'src/example.ts')
-  assert.equal(executor.lastInput.content, 'export const x = 1\n')
+  // Writer invoked exactly once, with exactly the validated path and content
+  assert.equal(writer.callCount, 1)
+  assert.equal(writer.lastInput.path, 'src/example.ts')
+  assert.equal(writer.lastInput.content, 'export const x = 1\n')
 })
 
 test('TC-RUN-07 the validated_object_hash handed to the adapter boundary is the hash the Ω validator produced — not a fabricated or pre-computed one', async () => {
-  const executor = makeExecutor()
+  const writer = makeWriter()
   const atao_input = makeATAOInput({ path: 'src/auth.ts', content: 'export function log() {}\n' })
   const binding = makeBinding()
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'EXECUTED')
 
   // Independently recompile the same ATAO+binding to recompute the AEO hash exactly
-  // as compileFilesystemWriteAEO + the Ω validator would — and confirm the proof's
-  // aeo_hash matches it (i.e. the gateway did not substitute a different object).
+  // as compileFilesystemWriteAEO + the Ω validator would — and confirm the receipt's
+  // validated_object_hash matches it (i.e. the gateway did not substitute a different object).
   const { captureFilesystemWriteATAO, compileFilesystemWriteAEO } = await import('../src/lib/filesystem-write-gateway.ts')
   const independentAtao = captureFilesystemWriteATAO(atao_input)
   const independentAeo = compileFilesystemWriteAEO(independentAtao, binding)
   const independentHash = computeFilesystemAEOHash(independentAeo)
 
-  assert.equal(outcome.proof.aeo_hash, independentHash)
-  assert.equal(outcome.proof.validated_object_hash, independentHash)
-  assert.equal(outcome.proof.executed_object_hash, independentHash)
+  assert.equal(outcome.receipt.validated_object_hash, independentHash)
+  assert.equal(outcome.receipt.executed_object_hash, independentHash)
 })
 
 // ── Direct / bypass paths cannot reach EXECUTED ───────────────────────────────
 
 test('TC-BYPASS-01 supplying a binding/context without a capturable ATAO can never produce EXECUTED, regardless of how "valid" the rest looks', async () => {
-  const executor = makeExecutor()
+  const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: null, binding: makeBinding() },  // no proposed action — nothing to govern
-    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
-  assert.equal(executor.callCount, 0)
+  assert.equal(writer.callCount, 0)
 })
 
 test('TC-BYPASS-02 a denied-path attempt cannot be smuggled through by skipping straight to a "valid-looking" validator result', async () => {
   // Even if every other input is well-formed, a path inside a denied glob must be
   // rejected by the Ω validator — and the composed gateway must surface that NULL
   // without ever invoking the adapter.
-  const executor = makeExecutor()
+  const writer = makeWriter()
   // src/secrets/** sits inside the allowed src/** tree but is independently denied
   // by the bound policy — the policy lives in the registry the Ω validator reads,
   // not in the AEO the gateway compiles. The only way to reject it is to actually
@@ -305,32 +316,32 @@ test('TC-BYPASS-02 a denied-path attempt cannot be smuggled through by skipping 
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput({ path: 'src/secrets/key.ts' }), binding: makeBinding() },
-    { validator_context: overlappingPolicyContext, executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: overlappingPolicyContext, writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.validator_denial.failure_class, 'PATH_DENIED')
-  assert.equal(executor.callCount, 0, 'a denied path must never reach the filesystem-write adapter')
+  assert.equal(writer.callCount, 0, 'a denied path must never reach the filesystem-write adapter')
 })
 
-test('TC-BYPASS-03 missing executor cannot be papered over by an otherwise-valid chain', async () => {
+test('TC-BYPASS-03 missing writer cannot be papered over by an otherwise-valid chain', async () => {
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: makeValidatorContext(), executor: null, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: null, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'execute')
-  assert.equal(outcome.reason, 'NULL_EXECUTOR')
+  assert.equal(outcome.reason, 'NULL_WRITER')
 })
 
 test('TC-BYPASS-04 missing validator context fails closed before any chain stage runs', async () => {
-  const executor = makeExecutor()
+  const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: null, executor: executor.fn, emitted_at: EMITTED_AT },
+    { validator_context: null, writer: writer.fn, emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.reason, 'NULL_VALIDATOR_CONTEXT')
-  assert.equal(executor.callCount, 0)
+  assert.equal(writer.callCount, 0)
 })
