@@ -2,14 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+const indexSource = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+const observabilityAdapterSource = readFileSync(new URL('../src/lib/runtime-observability-adapter.ts', import.meta.url), 'utf8')
+const source = `${indexSource}
+${observabilityAdapterSource}`
 
 test('issue-903: telemetry remains non-authoritative and derived from runtime outcomes', () => {
   assert.match(source, /function installBaseTelemetryTypeFromRejection/)
-  assert.match(source, /await emitInstallBaseTelemetryEvidence\(env, \{\s*event_type: installBaseType/)
+  assert.match(source, /await emitInstallBaseTelemetryEvidenceBestEffort\(env, \{\s*event_type: installBaseType/)
   assert.match(source, /result: "NULL"/)
-  assert.match(source, /await emitInstallBaseTelemetryEvidence\(env, \{ event_type: "proof_generated"/)
-  assert.match(source, /await emitInstallBaseTelemetryEvidence\(env, \{ event_type: "governed_execution_completed"/)
+  assert.match(source, /await emitInstallBaseTelemetryEvidenceBestEffort\(env, \{ event_type: "proof_generated"/)
+  assert.match(source, /await emitInstallBaseTelemetryEvidenceBestEffort\(env, \{ event_type: "governed_execution_completed"/)
 })
 
 test('issue-903: proof_generated_total derives from proof_generated telemetry records', () => {
