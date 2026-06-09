@@ -163,6 +163,33 @@ test('issue #1928 intent.value equals FilesystemAEO.intent.purpose', () => {
   assert.equal(result.canonical_aeo.intent.value, aeo.intent.purpose)
 })
 
+test('issue #1928 validation.proposed_diff_hash equals FilesystemAEO.validation.proposed_diff_hash (content identity binding)', () => {
+  const aeo = makeFilesystemAEO()
+  const result = compileCanonicalAEOFromFilesystem(aeo)
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(
+    result.canonical_aeo.validation.proposed_diff_hash,
+    aeo.validation.proposed_diff_hash,
+    'canonical projection must bind content identity via proposed_diff_hash',
+  )
+})
+
+test('issue #1928 changing proposed_diff_hash changes canonical_aeo_hash (content binding is in hash pre-image)', () => {
+  const aeo = makeFilesystemAEO()
+  const modified = { ...aeo, validation: { ...aeo.validation, proposed_diff_hash: 'sha256:different-diff-hash' } }
+  const base = compileCanonicalAEOFromFilesystem(aeo)
+  const changed = compileCanonicalAEOFromFilesystem(modified)
+  assert.equal(base.ok, true)
+  assert.equal(changed.ok, true)
+  if (!base.ok || !changed.ok) return
+  assert.notEqual(
+    base.canonical_aeo_hash,
+    changed.canonical_aeo_hash,
+    'different proposed_diff_hash must produce different canonical_aeo_hash',
+  )
+})
+
 test('issue #1928 compile does not mutate the source FilesystemAEO', () => {
   const aeo = makeFilesystemAEO()
   const before = JSON.stringify(aeo)

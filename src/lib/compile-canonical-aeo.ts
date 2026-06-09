@@ -43,7 +43,8 @@ export type CanonicalAEOTarget = {
 export type CanonicalAEOValidation = {
   readonly authority_id: string
   readonly decision_id: string
-  readonly object_hash: string  // 64-char hex, no "sha256:" prefix (validateAeo checks length === 64)
+  readonly object_hash: string          // 64-char hex, no "sha256:" prefix (validateAeo checks length === 64)
+  readonly proposed_diff_hash: string   // content identity binding — canonical hash covers the diff/content hash
   readonly replay_nonce: string
 }
 
@@ -125,6 +126,7 @@ export function compileCanonicalAEOFromFilesystem(
       authority_id: canonical_authority_id,
       decision_id: aeo.validation.decision_id,
       object_hash: null,
+      proposed_diff_hash: aeo.validation.proposed_diff_hash,
       replay_nonce: aeo.validation.replay_nonce,
     },
   }
@@ -134,6 +136,7 @@ export function compileCanonicalAEOFromFilesystem(
     authority_id: canonical_authority_id,
     decision_id: aeo.validation.decision_id,
     object_hash,
+    proposed_diff_hash: aeo.validation.proposed_diff_hash,
     replay_nonce: aeo.validation.replay_nonce,
   })
 
