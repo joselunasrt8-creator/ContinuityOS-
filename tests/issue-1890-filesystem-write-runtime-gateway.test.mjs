@@ -26,7 +26,6 @@ const gatewaySource = readFileSync(
 )
 
 const { runFilesystemWriteGatewayAction } = await import('../src/lib/filesystem-write-runtime-gateway.ts')
-const { computeFilesystemAEOHash } = await import('../src/lib/filesystem-aeo.ts')
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -140,6 +139,16 @@ function makeWriter() {
 
 const EMITTED_AT = '2026-06-08T00:00:01.000Z'
 
+// Permissive replay registry mock — used in tests that focus on stages other
+// than replay. Introduced when #1931 (ReplayRegistryPort) added a required
+// port to FilesystemWriteKernelContext.
+function makePermissiveReplayRegistry() {
+  return {
+    async isNonceUnused() { return true },
+    async markNonceConsumed(nonce, did) { return { status: 'APPENDED', id: nonce, hash: did } },
+  }
+}
+
 // ── Source structure: the composition is the gate ────────────────────────────
 
 test('source declares runFilesystemWriteGatewayAction as the mandatory chain', () => {
@@ -168,7 +177,7 @@ test('TC-RUN-02 a request that cannot form an ATAO is blocked at capture — no 
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput({ path: '' }), binding: makeBinding() },   // blank path → captureFilesystemWriteATAO returns null
-    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
@@ -181,7 +190,7 @@ test('TC-RUN-03 a captured ATAO with no usable authority binding is blocked at c
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding({ allowed_paths: [] }) },  // compileFilesystemWriteAEO fails closed
-    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'compile')
@@ -200,7 +209,7 @@ test('TC-RUN-04 a compiled AEO that the Ω validator denies is blocked at valida
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: deniedContext, writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: deniedContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
@@ -211,7 +220,10 @@ test('TC-RUN-04 a compiled AEO that the Ω validator denies is blocked at valida
   assert.equal(writer.callCount, 0, 'writer must not be called when the Ω validator returns NULL')
 })
 
-test('TC-RUN-05 replay-consumed nonce is denied at validate — replay cannot reach the adapter', async () => {
+test('TC-RUN-05 replay-consumed nonce is denied at validate by the Ω validator — replay cannot reach the adapter', async () => {
+  // TC-RUN-05 tests the Ω validator's replay check (Stage 6).
+  // The ReplayRegistryPort (Stage 5) allows the nonce so the test reaches Stage 6,
+  // where validateFilesystemAEO sees CONSUMED in the validator's replay registry and blocks.
   const writer = makeWriter()
   const replayedContext = makeValidatorContext({
     replayRegistry: {
@@ -221,7 +233,7 @@ test('TC-RUN-05 replay-consumed nonce is denied at validate — replay cannot re
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: replayedContext, writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: replayedContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
@@ -235,7 +247,7 @@ test('TC-RUN-06 VALID end-to-end: ATAO captured → AEO compiled → validated �
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
 
   assert.equal(outcome.result, 'EXECUTED')
@@ -262,24 +274,29 @@ test('TC-RUN-06 VALID end-to-end: ATAO captured → AEO compiled → validated �
   assert.equal(writer.lastInput.content, 'export const x = 1\n')
 })
 
-test('TC-RUN-07 the validated_object_hash handed to the adapter boundary is the hash the Ω validator produced — not a fabricated or pre-computed one', async () => {
+test('TC-RUN-07 the validated_object_hash handed to the adapter boundary is the canonical AEO hash produced by the gateway — not a fabricated or pre-computed one', async () => {
+  // Since #1928, validated_object_hash is the canonical_aeo_hash (sha256 of CanonicalAEO),
+  // not the FilesystemAEO hash. This test independently derives that hash and confirms
+  // the receipt carries the same value — i.e. the gateway did not substitute a different object.
   const writer = makeWriter()
   const atao_input = makeATAOInput({ path: 'src/auth.ts', content: 'export function log() {}\n' })
   const binding = makeBinding()
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'EXECUTED')
 
-  // Independently recompile the same ATAO+binding to recompute the AEO hash exactly
-  // as compileFilesystemWriteAEO + the Ω validator would — and confirm the receipt's
-  // validated_object_hash matches it (i.e. the gateway did not substitute a different object).
+  // Independently recompile the same ATAO+binding through the canonical projection
+  // to recompute canonical_aeo_hash — the same hash the gateway passes to executeWithAdapter.
   const { captureFilesystemWriteATAO, compileFilesystemWriteAEO } = await import('../src/lib/filesystem-write-gateway.ts')
+  const { compileCanonicalAEOFromFilesystem } = await import('../src/lib/compile-canonical-aeo.ts')
   const independentAtao = captureFilesystemWriteATAO(atao_input)
   const independentAeo = compileFilesystemWriteAEO(independentAtao, binding)
-  const independentHash = computeFilesystemAEOHash(independentAeo)
+  const canonicalResult = compileCanonicalAEOFromFilesystem(independentAeo)
+  assert.ok(canonicalResult.ok, 'independent canonical compilation must succeed')
+  const independentHash = canonicalResult.canonical_aeo_hash
 
   assert.equal(outcome.receipt.validated_object_hash, independentHash)
   assert.equal(outcome.receipt.executed_object_hash, independentHash)
@@ -291,7 +308,7 @@ test('TC-BYPASS-01 supplying a binding/context without a capturable ATAO can nev
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: null, binding: makeBinding() },  // no proposed action — nothing to govern
-    { validator_context: makeValidatorContext(), writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
@@ -316,7 +333,7 @@ test('TC-BYPASS-02 a denied-path attempt cannot be smuggled through by skipping 
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput({ path: 'src/secrets/key.ts' }), binding: makeBinding() },
-    { validator_context: overlappingPolicyContext, writer: writer.fn, emitted_at: EMITTED_AT },
+    { validator_context: overlappingPolicyContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
