@@ -143,6 +143,22 @@ The purpose of this registry is to:
 
 ---
 
+# Canonical Source Registry — Governance Artifact Paths
+
+Declared per #1837. Enforcement tooling must reference canonical paths only.
+
+| Artifact | Canonical Path | Derivative Copies |
+|---|---|---|
+| EXECUTION_SURFACES | `EXECUTION_SURFACES.json` (root) | `governance/runtime/EXECUTION_SURFACES.json`, `runtime/surfaces/EXECUTION_SURFACES.json`, `governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json` |
+| BYPASS_PATHS | `BYPASS_PATHS.json` (root) | `governance/runtime/BYPASS_PATHS.json`, `runtime/surfaces/BYPASS_PATHS.json`, `governance/mindshift-validation-bundle/governance/BYPASS_PATHS.json` |
+| Schemas | `schemas/` (root) | `runtime/legitimacy/schemas/`, namespace directories |
+
+All derivative copies carry `derived_from`, `canonical_source`, and `generated_at` metadata fields.
+
+CI enforcement: `.github/workflows/merge-governance-check.yml` updated to reference `EXECUTION_SURFACES.json` (canonical).
+
+---
+
 # Canonical Closure Condition
 
 The governance gap registry reaches closure only when:

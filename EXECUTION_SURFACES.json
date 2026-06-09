@@ -1,5 +1,8 @@
 {
   "version": "1.0",
+  "canonical_source": true,
+  "canonical_source_path": "EXECUTION_SURFACES.json",
+  "source_of_truth_note": "This is the canonical source. All copies in governance/, runtime/, and runtime/surfaces/ are derivatives. Enforcement tooling must reference this path.",
   "purpose": "Inventory all state-changing execution surfaces",
   "canonical_runtime_route": [
     "/session",

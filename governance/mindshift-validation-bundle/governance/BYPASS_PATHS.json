@@ -1,4 +1,8 @@
 {
+  "derived_from": "BYPASS_PATHS.json",
+  "canonical_source": "BYPASS_PATHS.json",
+  "generated_at": "2026-06-09T00:00:00.000Z",
+  "note": "Derivative copy in validation bundle. Canonical source is root-level BYPASS_PATHS.json.",
   "bypass_paths": [
     {
       "path": "direct_wrangler_deploy",

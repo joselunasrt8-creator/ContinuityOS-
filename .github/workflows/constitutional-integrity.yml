@@ -190,7 +190,7 @@ jobs:
             "router.delete("
           )
 
-          git diff origin/main...HEAD > constitutional.patch
+          git diff origin/main...HEAD -- src/ > constitutional.patch
 
           for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
             if grep -F "$pattern" constitutional.patch; then

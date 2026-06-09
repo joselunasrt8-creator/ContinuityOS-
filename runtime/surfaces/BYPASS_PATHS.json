@@ -1,7 +1,10 @@
 {
   "object_type": "RuntimeSurfaceInventory",
   "version": "1.0.0",
+  "derived_from": "BYPASS_PATHS.json",
+  "canonical_source": "BYPASS_PATHS.json",
   "generated_at": "2026-05-14T00:00:00.000Z",
+  "note": "Derivative runtime view. Canonical source is root-level BYPASS_PATHS.json. This file is evidence-only and must not be used as the authority for enforcement.",
   "invariant": "If no valid object exists -> nothing happens.",
   "evidence_only": true,
   "executable": false,

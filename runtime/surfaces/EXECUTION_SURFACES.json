@@ -1,7 +1,10 @@
 {
   "object_type": "RuntimeSurfaceInventory",
   "version": "1.0.0",
+  "derived_from": "EXECUTION_SURFACES.json",
+  "canonical_source": "EXECUTION_SURFACES.json",
   "generated_at": "2026-05-14T00:00:00.000Z",
+  "note": "Derivative runtime view. Canonical source is root-level EXECUTION_SURFACES.json. This file is evidence-only and must not be used as the authority for enforcement.",
   "invariant": "If no valid object exists -> nothing happens.",
   "evidence_only": true,
   "executable": false,

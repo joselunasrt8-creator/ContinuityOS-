@@ -36,3 +36,26 @@ test('canonical route mutation still fails closed', () => {
 test('canonical lifecycle remains exactly ordered', () => {
   assert.deepEqual(canonicalRouteDeclarationStatus(source), { declaration_count: 1, status: 'CANONICAL_RUNTIME_ROUTES_UNCHANGED' })
 })
+
+// ── Constitutional Guard Invariants — #1846 regression tests ──────────────────
+
+test('route expansion detection uses framework-pattern scoped grep, not generic route string grep (#1846)', () => {
+  // The forbidden patterns in "Detect executable route expansion" must be framework-style
+  // route registration patterns, not generic route path strings.
+  assert.match(workflow, /FORBIDDEN_PATTERNS/)
+  assert.match(workflow, /app\.post\(/)
+  assert.match(workflow, /router\.post\(/)
+  // Must NOT use raw grep for canonical route path strings in the diff
+  assert.doesNotMatch(workflow, /grep.*constitutional\.patch.*\/session/)
+  assert.doesNotMatch(workflow, /grep.*constitutional\.patch.*\/continuity/)
+  assert.doesNotMatch(workflow, /grep.*constitutional\.patch.*\/authority/)
+})
+
+test('direct pathname dispatch pattern does not match forbidden route expansion patterns (#1846)', () => {
+  // The codebase uses direct pathname matching, not express/router-style registration.
+  // This verifies no false positive: codebase additions would not trigger the expansion check.
+  const FORBIDDEN_PATTERNS = ['app.post(', 'router.post(', 'app.put(', 'router.put(', 'app.delete(', 'router.delete(']
+  for (const pattern of FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(source, new RegExp(pattern.replace('(', '\\(')))
+  }
+})
