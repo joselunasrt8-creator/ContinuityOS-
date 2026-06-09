@@ -1,0 +1,52 @@
+{
+  "id": "lineage-fixture",
+  "description": "Lineage classification cases — valid node, orphan node, and unknown node",
+  "cases": [
+    {
+      "id": "lineage-valid",
+      "description": "Node with an existing parent — must classify VALID",
+      "graph": [
+        {"id": "root", "kind": "authority", "parent_ids": []},
+        {"id": "child", "kind": "proof", "parent_ids": ["root"]}
+      ],
+      "classify_id": "child",
+      "expected_state": "VALID"
+    },
+    {
+      "id": "lineage-root-valid",
+      "description": "Root node with no parents — must classify VALID",
+      "graph": [
+        {"id": "root", "kind": "authority", "parent_ids": []}
+      ],
+      "classify_id": "root",
+      "expected_state": "VALID"
+    },
+    {
+      "id": "lineage-orphan",
+      "description": "Node whose parent does not exist in the graph — must classify NULL (orphan → NULL via classify_as_validation)",
+      "graph": [
+        {"id": "child", "kind": "execution", "parent_ids": ["missing-parent"]}
+      ],
+      "classify_id": "child",
+      "expected_state": "NULL"
+    },
+    {
+      "id": "lineage-unknown",
+      "description": "Node ID not present in the graph — must classify NULL",
+      "graph": [],
+      "classify_id": "nonexistent",
+      "expected_state": "NULL"
+    },
+    {
+      "id": "lineage-deep-chain",
+      "description": "Three-level chain — leaf node with full ancestry present must classify VALID",
+      "graph": [
+        {"id": "root", "kind": "authority", "parent_ids": []},
+        {"id": "middle", "kind": "proof", "parent_ids": ["root"]},
+        {"id": "leaf", "kind": "execution", "parent_ids": ["middle"]}
+      ],
+      "classify_id": "leaf",
+      "expected_state": "VALID"
+    }
+  ]
+}

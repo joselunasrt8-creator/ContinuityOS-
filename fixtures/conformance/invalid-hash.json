@@ -1,0 +1,21 @@
+{
+  "id": "invalid-hash",
+  "description": "AEO with object_hash that does not match the actual canonical hash — must classify NULL",
+  "null_reason": "hash_mismatch",
+  "aeo": {
+    "finality": {"authority_id": "authority-1", "mode": "deterministic"},
+    "intent": {"authority_id": "authority-1", "id": "intent-1", "nonce": "nonce-1"},
+    "scope": {"authority_id": "authority-1", "bounds": ["system:alpha", "action:write"]},
+    "target": {"action": "action:write", "authority_id": "authority-1", "system": "system:alpha"},
+    "validation": {
+      "authority_id": "authority-1",
+      "lineage_id": "lineage-1",
+      "object_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "context": {
+    "expected_authority": "authority-1",
+    "maximum_scope": ["system:alpha", "action:write", "action:read"]
+  },
+  "expected_decision": "NULL"
+}
