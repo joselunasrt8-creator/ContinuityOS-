@@ -1,0 +1,39 @@
+{
+  "id": "invalid-replay",
+  "description": "Replay registry classification cases — nonce reuse must produce NULL",
+  "cases": [
+    {
+      "id": "replay-first-use",
+      "description": "First use of a nonce — must return UNUSED and admit the entry",
+      "nonce": "nonce-abc",
+      "object_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+      "lineage_binding": "lineage-1",
+      "prior_admits": [],
+      "expected_admit_state": "UNUSED"
+    },
+    {
+      "id": "replay-nonce-reuse",
+      "description": "Second admit with the same nonce and hash — must return NULL",
+      "nonce": "nonce-abc",
+      "object_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+      "lineage_binding": "lineage-1",
+      "prior_admits": [
+        {
+          "nonce": "nonce-abc",
+          "object_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+          "lineage_binding": "lineage-1"
+        }
+      ],
+      "expected_admit_state": "NULL"
+    },
+    {
+      "id": "replay-missing-lineage",
+      "description": "Classify without lineage binding — must return NULL",
+      "nonce": "nonce-abc",
+      "object_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+      "lineage_binding": null,
+      "prior_admits": [],
+      "expected_classify_state": "NULL"
+    }
+  ]
+}
