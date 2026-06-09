@@ -47,7 +47,7 @@ function between(start, end) {
   return source.slice(startIndex, endIndex)
 }
 
-const reconciliationSource = between('type ReconciliationRegistry', 'async function quarantineHistoricalProofDuplicates')
+const reconciliationSource = between('type ReconciliationRegistry', 'function continuousFateFlags')
 
 test('scheduler windows remain deterministic, bounded, read-only, and replay neutral', () => {
   assert.match(source, /const RECONCILIATION_SCHEDULER_BATCH_LIMIT = 25/)

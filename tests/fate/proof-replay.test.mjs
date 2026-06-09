@@ -2,7 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+const indexSource = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+const d1StorageAdapterSource = readFileSync(new URL('../../src/lib/d1-storage-adapter.ts', import.meta.url), 'utf8')
+const source = `${indexSource}\n${d1StorageAdapterSource}`
 
 test('reordered proof_registry replay uses deterministic canonical proof resolver', () => {
   assert.match(source, /function resolveCanonicalProofEvidence\(proofs: any\[\], execution: any\): CanonicalProofResolution \{[\s\S]*const candidates = sortProofLineageRows\(Array\.isArray\(proofs\) \? proofs : \[\]\)/)

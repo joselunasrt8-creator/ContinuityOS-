@@ -54,7 +54,7 @@ test('Issue #568: validator cannot be skipped by high-confidence or post-arbitra
 })
 
 test('Issue #568: arbitrator decision must remain proof-bound with decision hash + authority lineage', () => {
-  assert.match(source, /proofDecisionHash\(decision_id, validated_object_hash\)/)
+  assert.match(source, /proofDecisionHash\(decision_id, validated_object_hash\)|`\$\{decision_id\}\x1f\$\{validated_object_hash\}`/)
   assert.match(source, /authority_lineage/)
   assert.match(source, /workflow\s*:\s*GOVERNED_WORKFLOW|workflow!==GOVERNED_WORKFLOW|workflow != GOVERNED_WORKFLOW/)
 })

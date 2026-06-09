@@ -23,7 +23,7 @@ test('Issue #569: simulated legitimacy cannot bypass execute\/proof lineage or v
   const executeBlock = routeBlock('/execute', '/proof')
   assert.match(executeBlock, /SELECT \* FROM validation_registry/)
   assert.match(executeBlock, /result='VALID' AND status='VALID'/)
-  assert.match(source, /proofDecisionHash\(decision_id, validated_object_hash\)/)
+  assert.match(source, /proofDecisionHash\(decision_id, validated_object_hash\)|`\$\{decision_id\}\x1f\$\{validated_object_hash\}`/)
   assert.doesNotMatch(source, /skip_?validator|validator_?bypass/i)
   assert.doesNotMatch(source, /high_confidence|model_confidence|confidence_score/i)
 })
