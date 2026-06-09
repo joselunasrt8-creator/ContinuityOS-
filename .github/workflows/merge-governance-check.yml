@@ -510,7 +510,7 @@ jobs:
 
           const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
           const runtimeGraph = readJson('runtime/topology/runtime_graph.json');
-          const executionSurfaces = readJson('EXECUTION_SURFACES.json'); // canonical source (#1837)
+          const executionSurfaces = readJson('runtime/surfaces/EXECUTION_SURFACES.json');
           const observabilitySurfaces = readJson('runtime/surfaces/OBSERVABILITY_SURFACES.json');
           const schemaSourceMap = readJson('runtime/topology/schema_source_map.json');
           const mergeGovernance = readJson('governance/runtime/MERGE_GOVERNANCE_RULES.json');
