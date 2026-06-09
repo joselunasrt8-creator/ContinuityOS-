@@ -60,5 +60,11 @@
     "Unclassified actors produce MERGE_LEGITIMACY_NULL",
     "Empty permitted_bot_actors means no bots are permitted merge actors"
   ],
-  "closes_gaps": ["GAP-004", "MB-009"]
+  "closes_gaps": ["GAP-004", "MB-009"],
+  "authority_review_permitted_reviewers": {
+    "note": "Authorized reviewer_id values for conductAuthorityReview(). Empty allowlist means open enrollment (any non-bot, non-empty ID accepted). Non-empty enables strict allowlist enforcement — reviewer_id not in allowlist returns NULL with reason unauthorized_reviewer_id.",
+    "allowlist": [],
+    "enforcement": "strict_when_non_empty",
+    "issue_reference": "#1833"
+  }
 }

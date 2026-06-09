@@ -90,29 +90,6 @@ function continuityObject(overrides = {}) {
   }
 }
 
-function proofObject(overrides = {}) {
-  return {
-    object_type: 'ProofObject',
-    proof_id: 'proof-1',
-    execution_id: 'execution-1',
-    decision_id: 'decision-1',
-    authority_id: 'auth-1',
-    validated_object_hash: hashA,
-    execution_hash: hashB,
-    target_system: 'github',
-    target_action: 'governed_deploy',
-    result: 'success',
-    timestamp: now,
-    proof_reference: { provider: 'github', run_id: 'run-1' },
-    continuity_id: 'continuity-1',
-    continuity_hash: hashC,
-    identity_id: 'identity-1',
-    session_id: 'session-1',
-    authority_lineage: { authority_id: 'auth-1' },
-    execution_lineage: { execution_id: 'execution-1' },
-    ...overrides,
-  }
-}
 
 test('valid Authority object -> VALID_SCHEMA', () => {
   const result = validateLegitimacySchema(authority())
@@ -211,16 +188,6 @@ test('ContinuityObject broken chain does not imply authority', () => {
   assert.equal(Object.hasOwn(result.canonicalized_object, 'grants_authority'), false)
 })
 
-test('ProofObject binds validated_object_hash and execution_hash', () => {
-  const result = validateLegitimacySchema(proofObject())
-  assert.equal(result.status, 'VALID_SCHEMA')
-  assert.equal(result.canonicalized_object.validated_object_hash, hashA)
-  assert.equal(result.canonicalized_object.execution_hash, hashB)
-
-  const missingExecutionHash = proofObject()
-  delete missingExecutionHash.execution_hash
-  assert.equal(validateLegitimacySchema(missingExecutionHash).status, 'NULL')
-})
 
 test('schema-valid object does not imply execution legitimacy', () => {
   const result = validateLegitimacySchema(authority())

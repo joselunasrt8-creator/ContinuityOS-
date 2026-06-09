@@ -1,5 +1,8 @@
 {
   "version": "2.0",
+  "canonical_source": true,
+  "canonical_source_path": "BYPASS_PATHS.json",
+  "source_of_truth_note": "This is the canonical source. All copies in governance/, runtime/, and runtime/surfaces/ are derivatives. Enforcement tooling must reference this path.",
   "purpose": "Known and potential execution bypass paths — classified by governance state",
   "governance_class_taxonomy": [
     "GOVERNED",
@@ -16,11 +19,23 @@
       "bypass_id": "ungoverned_agent_tool_call",
       "surface_category": "agent",
       "risk": "AI/LLM agent tool call executes mutation (D1 write, deploy, schema change) outside canonical /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof lifecycle — no authority object, no proof, no replay protection",
-      "governance_class": "UNKNOWN",
+      "governance_class": "PARTIAL",
       "fail_closed_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
       "required_response": "AGENT_TOOL_MUTATION_UNCLASSIFIED -> NULL",
       "topology_surface": "bypass:agent_tool_call",
-      "closure_condition": "All agent tool calls that perform state-changing operations must be bound to an active authority object and produce a proof record before mutation is applied"
+      "partial_controls_present": [
+        "filesystem-write mutations governed via POST /gateway/tool/filesystem-write (ATAO → AEO → validation → execution → proof chain enforced, PR #1891)",
+        "reviewer_id validated against MERGE_ACTOR_REGISTRY.json authority_review_permitted_reviewers"
+      ],
+      "remaining_unclassified_surfaces": [
+        "shell command execution",
+        "GitHub API mutations",
+        "HTTP/network mutations",
+        "deploy actions",
+        "browser/cron/process control"
+      ],
+      "closure_condition": "All agent tool calls that perform state-changing operations must be bound to an active authority object and produce a proof record before mutation is applied",
+      "closure_reference": "#1833, #1890, #1891"
     },
     {
       "path": "local_script_execution",

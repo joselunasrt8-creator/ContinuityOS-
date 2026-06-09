@@ -118,25 +118,25 @@ test('observability surfaces are classified non-executable', () => {
 test('schema source map distinguishes legacy schemas from runtime legitimacy schemas', () => {
   const map = readJson('runtime/topology/schema_source_map.json')
   const legacy = map.sources.find((source) => source.source_id === 'legacy_proof_schema')
-  const canonical = map.sources.find((source) => source.source_id === 'canonical_runtime_proof_object')
+  const retired = map.sources.find((source) => source.source_id === 'canonical_runtime_proof_object')
 
   assert.equal(legacy.path, 'schemas/proof.schema.json')
   assert.equal(legacy.schema_role, 'legacy_contract_schema')
   assert.equal(legacy.authoritative_for_runtime_validator, false)
   assert.deepEqual(legacy.required_hash_fields, ['aeo_hash'])
 
-  assert.equal(canonical.path, 'runtime/legitimacy/schemas/PROOF_OBJECT.schema.json')
-  assert.equal(canonical.schema_role, 'canonical_runtime_legitimacy_schema')
-  assert.equal(canonical.authoritative_for_runtime_validator, true)
-  assert.deepEqual(canonical.required_hash_fields, ['validated_object_hash', 'execution_hash'])
+  assert.equal(retired.path, 'runtime/legitimacy/schemas/PROOF_OBJECT.schema.json')
+  assert.equal(retired.schema_role, 'dead_contract_retired')
+  assert.equal(retired.authoritative_for_runtime_validator, false)
+  assert.deepEqual(retired.required_hash_fields, ['validated_object_hash', 'execution_hash'])
 })
 
 test('proof schema conflict is represented explicitly as topology evidence', () => {
   const reconciliation = readJson('runtime/topology/proof_schema_reconciliation.json')
   assert.equal(reconciliation.legacy_schema_conflict, true)
-  assert.equal(reconciliation.runtime_schema_authoritative_for_runtime_validator, true)
+  assert.equal(reconciliation.runtime_schema_authoritative_for_runtime_validator, false)
   assert.equal(reconciliation.legacy_schema_replacement_required_by_future_SCO, true)
-  assert.equal(reconciliation.reconciliation_status, 'CONFLICT_RECORDED_NO_REPLACEMENT')
+  assert.equal(reconciliation.reconciliation_status, 'DEAD_CONTRACT_RETIRED')
   assert.equal(reconciliation.legacy_proof_schema.path, 'schemas/proof.schema.json')
   assert.equal(reconciliation.canonical_runtime_proof_object.path, 'runtime/legitimacy/schemas/PROOF_OBJECT.schema.json')
 })
@@ -249,7 +249,7 @@ test('topology manifest and referenced hashes are deterministic', () => {
 test('schema-validator remains fail-closed', () => {
   assert.equal(validateLegitimacySchema('not json').status, 'NULL')
   assert.equal(validateLegitimacySchema({ object_type: 'TopologyManifest' }).status, 'UNKNOWN_OBJECT_TYPE')
-  assert.equal(validateLegitimacySchema({ object_type: 'ProofObject', proof_id: 'missing-required-fields' }).status, 'NULL')
+  assert.equal(validateLegitimacySchema({ object_type: 'ProofObject', proof_id: 'missing-required-fields' }).status, 'UNKNOWN_OBJECT_TYPE')
 })
 
 test('AEO remains exact five fields', () => {

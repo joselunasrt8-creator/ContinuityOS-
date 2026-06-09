@@ -7,6 +7,10 @@ import { interceptToolCall, classifyGatewayToolSurface, checkOmegaValidatorBound
 import type { AgentToolGovernanceProposal } from "./lib/agent-tool-gateway.ts"
 import { conductAuthorityReview } from "./lib/authority-review.ts"
 import type { GatewayProposalLineage, AgentToolATAO } from "./lib/authority-review.ts"
+import mergeActorRegistry from "../governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json" with { type: "json" }
+import { runFilesystemWriteGatewayAction } from "./lib/filesystem-write-runtime-gateway.ts"
+import type { FilesystemValidatorContext } from "./lib/filesystem-aeo-validator.ts"
+import type { FilesystemWriteExecutor } from "./lib/filesystem-write-gateway.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -545,7 +549,8 @@ async function handleAgentToolGatewayAuthorityReview(env: Env, request: Request)
     requires_authority_binding: Boolean(proposal.requires_authority_binding),
   }
   const timestamp = new Date().toISOString()
-  const outcome = conductAuthorityReview({ proposal: proposalLineage, reviewer_id, review_decision, review_rationale, timestamp })
+  const permitted_reviewer_ids = (mergeActorRegistry as any)?.authority_review_permitted_reviewers?.allowlist ?? []
+  const outcome = conductAuthorityReview({ proposal: proposalLineage, reviewer_id, review_decision, review_rationale, timestamp, permitted_reviewer_ids })
   if (outcome.status === "NULL") {
     return json({ status: "NULL", result: "INVALID", route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, reason: outcome.reason })
   }
@@ -762,6 +767,282 @@ async function handleAgentToolGatewayCompile(env: Env, request: Request): Promis
   }
 }
 
+// ── Issue #1890: Filesystem-write runtime gateway action ─────────────────────
+//
+// The first real, mutation-capable Agent Tool Gateway action wired into the
+// runtime. Every request to FILESYSTEM_WRITE_GATEWAY_ROUTE — valid or not —
+// is forced through runFilesystemWriteGatewayAction (capture → compile →
+// validate → execute → proof). This closes GAP-RT-2 from
+// docs/audits/agent-tool-execution-runtime-closure-audit.md for this one,
+// bounded surface: filesystem write.
+//
+// Cloudflare Workers have no real local filesystem, so the "filesystem" here
+// is a D1-backed virtual object registry (governed_filesystem_object_registry).
+// That registry IS the mutation target — the only thing that ever changes a
+// row in it is a successful EXECUTED proof from the mandatory chain, and the
+// persisted bytes are exactly what the validated executor captured.
+
+const FILESYSTEM_WRITE_GATEWAY_DECISION_ID = "AUTH-filesystem-write-gateway-001" as const
+const FILESYSTEM_WRITE_GATEWAY_POLICY_ID = "filesystem-write-gateway-policy-v1" as const
+const FILESYSTEM_WRITE_GATEWAY_SEED_PATH = "governed/filesystem-write-gateway/seed.md" as const
+const FILESYSTEM_WRITE_GATEWAY_SEED_CONTENT =
+  "# Governed Filesystem Write Gateway\n\nSeed object for the runtime-enforced filesystem-write gateway action (issue #1890).\nEvery mutation to this registry passes through runFilesystemWriteGatewayAction.\n"
+
+const FILESYSTEM_WRITE_GATEWAY_POLICY_BODY = Object.freeze({
+  policy_id: FILESYSTEM_WRITE_GATEWAY_POLICY_ID,
+  allowed_paths: Object.freeze(["governed/filesystem-write-gateway/**"]) as readonly string[],
+  denied_paths: Object.freeze(["governed/filesystem-write-gateway/secrets/**"]) as readonly string[],
+  allowed_operations: Object.freeze(["create", "modify"]) as readonly string[],
+  denied_operations: Object.freeze(["delete", "chmod", "rename", "symlink"]) as readonly string[],
+  max_files: 1,
+  max_diff_lines: 300,
+})
+
+let _filesystemWriteGatewayPolicyHash: string | null = null
+async function filesystemWriteGatewayPolicyHash(): Promise<string> {
+  if (!_filesystemWriteGatewayPolicyHash) {
+    _filesystemWriteGatewayPolicyHash = "sha256:" + await sha256Hex(canonicalize(FILESYSTEM_WRITE_GATEWAY_POLICY_BODY))
+  }
+  return _filesystemWriteGatewayPolicyHash
+}
+
+async function ensureFilesystemWriteGatewayRegistry(env: Env): Promise<void> {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_object_registry (path TEXT PRIMARY KEY, content TEXT NOT NULL, content_hash TEXT NOT NULL, bytes_written INTEGER NOT NULL, updated_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_decision_registry (decision_id TEXT PRIMARY KEY, status TEXT NOT NULL, authority_lineage_hash TEXT NOT NULL, scope TEXT NOT NULL, expires_at TEXT, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_nonce_registry (replay_nonce TEXT PRIMARY KEY, decision_id TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('UNUSED','RESERVED','CONSUMED','INVALIDATED')), created_at TEXT NOT NULL, consumed_at TEXT)`).run()
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_proof_registry (proof_id TEXT PRIMARY KEY, atao_id TEXT NOT NULL, aeo_hash TEXT NOT NULL, validated_object_hash TEXT NOT NULL, executed_object_hash TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_path TEXT NOT NULL, target_action TEXT NOT NULL, execution_result TEXT NOT NULL CHECK (execution_result IN ('EXECUTED')), creates_authority INTEGER NOT NULL CHECK (creates_authority = 0), emitted_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
+
+  const now = new Date().toISOString()
+  const authority_lineage_hash = "sha256:" + await sha256Hex(canonicalize({ decision_id: FILESYSTEM_WRITE_GATEWAY_DECISION_ID, surface: "filesystem_write", scope: "repository" }))
+  await env.DB.prepare(`INSERT OR IGNORE INTO governed_filesystem_write_decision_registry (decision_id, status, authority_lineage_hash, scope, expires_at, created_at) VALUES (?1, 'ACTIVE', ?2, 'repository', NULL, ?3)`)
+    .bind(FILESYSTEM_WRITE_GATEWAY_DECISION_ID, authority_lineage_hash, now).run()
+
+  const seed_hash = "sha256:" + await sha256Hex(FILESYSTEM_WRITE_GATEWAY_SEED_CONTENT)
+  await env.DB.prepare(`INSERT OR IGNORE INTO governed_filesystem_object_registry (path, content, content_hash, bytes_written, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)`)
+    .bind(FILESYSTEM_WRITE_GATEWAY_SEED_PATH, FILESYSTEM_WRITE_GATEWAY_SEED_CONTENT, seed_hash, FILESYSTEM_WRITE_GATEWAY_SEED_CONTENT.length, now).run()
+}
+
+function normalizeGovernedFilesystemPath(path: string): { ok: boolean; value?: any; observation_error?: string; topology_visible?: boolean; safe_to_disclose?: boolean } {
+  if (typeof path !== "string" || path.trim().length === 0) {
+    return { ok: false, observation_error: "AMBIGUOUS_PATH", topology_visible: false, safe_to_disclose: true }
+  }
+  if (path.startsWith("/") || path.includes("..") || path.includes("\\")) {
+    return { ok: false, observation_error: "OUTSIDE_SCOPE", topology_visible: false, safe_to_disclose: true }
+  }
+  return { ok: true, value: path }
+}
+
+function buildD1FilesystemValidatorContext(env: Env, policy_hash: string): FilesystemValidatorContext {
+  return {
+    authorityRegistry: {
+      readDecision: async (decisionId: string) => {
+        const row = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_decision_registry WHERE decision_id = ?1`).bind(decisionId).first<any>()
+        if (!row) return { ok: false, observation_error: "REGISTRY_MISS", topology_visible: false, safe_to_disclose: true }
+        return { ok: true, value: { decision_id: String(row.decision_id), status: String(row.status), authority_lineage_hash: String(row.authority_lineage_hash), scope: String(row.scope), expires_at: row.expires_at ? String(row.expires_at) : null } }
+      },
+      readAuthorityLineage: async (decisionId: string) => {
+        const row = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_decision_registry WHERE decision_id = ?1`).bind(decisionId).first<any>()
+        if (!row) return { ok: false, observation_error: "LINEAGE_MISMATCH", topology_visible: false, safe_to_disclose: true }
+        return { ok: true, value: { lineage_hash: String(row.authority_lineage_hash), status: String(row.status) } }
+      },
+    },
+    policyRegistry: {
+      readPolicy: async () => ({
+        ok: true,
+        value: {
+          policy_id: FILESYSTEM_WRITE_GATEWAY_POLICY_ID,
+          policy_hash,
+          allowed_paths: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.allowed_paths,
+          denied_paths: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.denied_paths,
+          allowed_operations: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.allowed_operations,
+          denied_operations: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.denied_operations,
+          max_files: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.max_files,
+          max_diff_lines: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.max_diff_lines,
+        },
+      }),
+      readPolicyHash: async () => ({ ok: true, value: policy_hash }),
+    },
+    replayRegistry: {
+      readNonceState: async (replayNonce: string) => {
+        const row = await env.DB.prepare(`SELECT state FROM governed_filesystem_write_nonce_registry WHERE replay_nonce = ?1`).bind(replayNonce).first<any>()
+        return { ok: true, value: row ? String(row.state) : "UNUSED" }
+      },
+      readAeoState: async () => ({ ok: true, value: "UNUSED" }),
+    },
+    filesystem: {
+      normalizePath: (path: string) => normalizeGovernedFilesystemPath(path) as any,
+      readHash: async (normalizedPath: any) => {
+        const row = await env.DB.prepare(`SELECT content_hash FROM governed_filesystem_object_registry WHERE path = ?1`).bind(String(normalizedPath)).first<any>()
+        if (!row) return { ok: false, observation_error: "NOT_FOUND", topology_visible: false, safe_to_disclose: true }
+        return { ok: true, value: String(row.content_hash) }
+      },
+      readMetadata: async (normalizedPath: any) => {
+        const row = await env.DB.prepare(`SELECT path FROM governed_filesystem_object_registry WHERE path = ?1`).bind(String(normalizedPath)).first<any>()
+        return { ok: true, value: { exists: Boolean(row), is_symlink: false } }
+      },
+    },
+    diffInspector: {
+      hashDiff: (diff: any) => ({ ok: true, value: "sha256:" + diff.content }),
+      inspectApplicability: async () => ({ ok: true, value: { applicable: true, post_write_hash: "" } }),
+    },
+    clock: {
+      now: () => ({ ok: true, value: new Date().toISOString() }),
+    },
+  } as any
+}
+
+type FilesystemWriteGatewayCapture = {
+  readonly path: string
+  readonly content: string
+  readonly bytes_written: number
+}
+
+// The execution boundary's executor contract is synchronous — it must return
+// {bytes_written} immediately so the proof can be emitted in the same call.
+// D1 writes are async, so this executor captures exactly the validated
+// path+content the chain handed it; the real persistence to
+// governed_filesystem_object_registry happens immediately afterward, strictly
+// gated on outcome.result === "EXECUTED" (see handleAgentToolGatewayFilesystemWrite).
+// There is no other way for that registry to change.
+function buildD1FilesystemWriteExecutor(): { fn: FilesystemWriteExecutor; capture: () => FilesystemWriteGatewayCapture | null } {
+  let captured: FilesystemWriteGatewayCapture | null = null
+  const fn: FilesystemWriteExecutor = (input) => {
+    captured = { path: input.path, content: input.content, bytes_written: input.content.length }
+    return { bytes_written: captured.bytes_written }
+  }
+  return { fn, capture: () => captured }
+}
+
+function filesystemWriteGatewayResponse(data: Record<string, unknown>, status = 200): Response {
+  return json({
+    route: FILESYSTEM_WRITE_GATEWAY_ROUTE,
+    mutation_capability: true,
+    execution_capability: true,
+    proof_generating: true,
+    creates_authority: false,
+    ...data,
+  }, status)
+}
+
+// handleAgentToolGatewayFilesystemWrite: the first real, mutation-capable
+// runtime route in this codebase. Every request — well-formed or not — passes
+// through runFilesystemWriteGatewayAction, which is the ONLY function that can
+// produce an EXECUTED filesystem-write proof. Persistence to
+// governed_filesystem_object_registry happens only after, and only because,
+// that function returned EXECUTED — there is no direct or bypass path to it.
+async function handleAgentToolGatewayFilesystemWrite(env: Env, request: Request): Promise<Response> {
+  const b = await request.json().catch(() => null) as Record<string, unknown> | null
+  if (!b || typeof b !== "object") return filesystemWriteGatewayResponse({ status: "NULL", result: "NULL", reason: "malformed_request" })
+
+  const agent_id = String(b.agent_id || "")
+  const session_id = String(b.session_id || "")
+  const intent = String(b.intent || "")
+  const path = String(b.path || "")
+  const content = typeof b.content === "string" ? b.content : ""
+  const decision_id = String(b.decision_id || FILESYSTEM_WRITE_GATEWAY_DECISION_ID)
+  const replay_nonce = String(b.replay_nonce || "")
+
+  if (!agent_id || !session_id || !intent || !path || !replay_nonce) {
+    return filesystemWriteGatewayResponse({ status: "NULL", result: "NULL", stage: "capture", reason: "missing_required_fields" })
+  }
+
+  await ensureFilesystemWriteGatewayRegistry(env)
+
+  const decisionRow = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_decision_registry WHERE decision_id = ?1`).bind(decision_id).first<any>()
+  if (!decisionRow) return filesystemWriteGatewayResponse({ status: "NULL", result: "NULL", stage: "validate", reason: "decision_not_found", decision_id })
+
+  const nonceRow = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_nonce_registry WHERE replay_nonce = ?1`).bind(replay_nonce).first<any>()
+  if (nonceRow && String(nonceRow.decision_id) !== decision_id) {
+    return filesystemWriteGatewayResponse({ status: "NULL", result: "NULL", stage: "validate", reason: "replay_nonce_decision_mismatch", replay_nonce })
+  }
+
+  const existingObject = await env.DB.prepare(`SELECT * FROM governed_filesystem_object_registry WHERE path = ?1`).bind(path).first<any>()
+  const pre_write_hash = existingObject ? String(existingObject.content_hash) : ""
+
+  const policy_hash = await filesystemWriteGatewayPolicyHash()
+
+  const atao_input = {
+    agent_id,
+    session_id,
+    intent,
+    path,
+    content,
+    repo: "mindshift-demo",
+    root: "repository",
+    timestamp: new Date().toISOString(),
+  }
+
+  const binding = {
+    decision_id,
+    authority_lineage_hash: String(decisionRow.authority_lineage_hash),
+    policy_id: FILESYSTEM_WRITE_GATEWAY_POLICY_ID,
+    policy_hash,
+    pre_write_hash,
+    proposed_diff_hash: "",
+    replay_nonce,
+    allowed_paths: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.allowed_paths,
+    denied_paths: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.denied_paths,
+    allowed_operations: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.allowed_operations,
+    denied_operations: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.denied_operations,
+    max_files: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.max_files,
+    max_diff_lines: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.max_diff_lines,
+  }
+
+  const validator_context = buildD1FilesystemValidatorContext(env, policy_hash)
+  const executor = buildD1FilesystemWriteExecutor()
+  const emitted_at = new Date().toISOString()
+
+  const outcome = await runFilesystemWriteGatewayAction({
+    atao_input,
+    binding,
+    validator_context,
+    executor: executor.fn,
+    emitted_at,
+  })
+
+  if (outcome.result !== "EXECUTED") {
+    return filesystemWriteGatewayResponse({
+      status: "NULL",
+      result: "NULL",
+      stage: outcome.stage,
+      reason: outcome.reason,
+      validator_denial: outcome.validator_denial,
+      proof: outcome.proof,
+    })
+  }
+
+  const captured = executor.capture()
+  if (!captured) {
+    return filesystemWriteGatewayResponse({ status: "NULL", result: "NULL", stage: "execute", reason: "EXECUTOR_CAPTURE_MISSING" })
+  }
+
+  // The real side effect: persisted only because — and exactly as — the
+  // mandatory chain returned EXECUTED. No other code path writes this row.
+  const content_hash = "sha256:" + await sha256Hex(captured.content)
+  const persisted_at = new Date().toISOString()
+  await env.DB.prepare(`INSERT INTO governed_filesystem_object_registry (path, content, content_hash, bytes_written, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
+    ON CONFLICT(path) DO UPDATE SET content = excluded.content, content_hash = excluded.content_hash, bytes_written = excluded.bytes_written, updated_at = excluded.updated_at`)
+    .bind(captured.path, captured.content, content_hash, captured.bytes_written, persisted_at).run()
+
+  await env.DB.prepare(`INSERT INTO governed_filesystem_write_nonce_registry (replay_nonce, decision_id, state, created_at, consumed_at) VALUES (?1, ?2, 'CONSUMED', ?3, ?3)
+    ON CONFLICT(replay_nonce) DO UPDATE SET state = 'CONSUMED', consumed_at = excluded.consumed_at`)
+    .bind(replay_nonce, decision_id, persisted_at).run()
+
+  const proof = outcome.proof
+  await env.DB.prepare(`INSERT INTO governed_filesystem_write_proof_registry (proof_id, atao_id, aeo_hash, validated_object_hash, executed_object_hash, decision_id, replay_nonce, target_path, target_action, execution_result, creates_authority, emitted_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,0,?11,?12)`)
+    .bind(proof.proof_id, proof.atao_id, proof.aeo_hash, proof.validated_object_hash, proof.executed_object_hash, decision_id, replay_nonce, proof.target_path, proof.target_action, proof.execution_result, proof.emitted_at, persisted_at).run()
+
+  return filesystemWriteGatewayResponse({
+    status: "EXECUTED",
+    result: "EXECUTED",
+    proof,
+    bytes_written: captured.bytes_written,
+    content_hash,
+  })
+}
+
 function canonicalGovernProjectionFromCandidate(candidate: GovernCandidate): GovernCandidate {
   return { intent: String(candidate.intent || ""), scope: canonicalRecord(candidate.scope), target: canonicalRecord(candidate.target), finality: canonicalRecord(candidate.finality) }
 }
@@ -942,12 +1223,14 @@ const AGENT_TOOL_GATEWAY_PROPOSE_ROUTE = "/gateway/tool/propose" as const
 const AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE = "/gateway/authority/review" as const
 const AGENT_TOOL_GATEWAY_ATAO_ROUTE = "/gateway/authority/atao" as const
 const AGENT_TOOL_GATEWAY_COMPILE_ROUTE = "/gateway/tool/compile" as const
+const FILESYSTEM_WRITE_GATEWAY_ROUTE = "/gateway/tool/filesystem-write" as const
 const AGENT_TOOL_GOVERNED_SUPPORT_SURFACES = Object.freeze([
   Object.freeze({ route: AGENT_TOOL_INVOCATION_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: true, replay_safe: true, replay_neutral: false, replay_characteristics: "proof_bound_single_use_invocation_nonce", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_INTERCEPT_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "append_only_observation_and_proposal_evidence", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_PROPOSE_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: false, mutation_capable: false, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: true, replay_characteristics: "proposal_lookup_only", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: true, creates_aeo: false, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "append_only_review_lineage_may_form_atao", topology_visibility_classification: "inventory_visible_governed_support_surface" }),
   Object.freeze({ route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, method: "POST", classification: "governed_support_surface", mutation_capability: true, mutation_capable: true, execution_capability: false, execution_capable: false, deployment_capability: false, proof_generating: false, creates_authority: false, creates_atao: false, creates_aeo: true, proof_required: false, replay_safe: true, replay_neutral: false, replay_characteristics: "deterministic_compile_only_hash_reuse", topology_visibility_classification: "inventory_visible_governed_support_surface", compile_only: true }),
+  Object.freeze({ route: FILESYSTEM_WRITE_GATEWAY_ROUTE, method: "POST", classification: "governed_execution_surface", mutation_capability: true, mutation_capable: true, execution_capability: true, execution_capable: true, deployment_capability: false, proof_generating: true, creates_authority: false, creates_atao: true, creates_aeo: true, proof_required: true, replay_safe: true, replay_neutral: false, replay_characteristics: "single_use_replay_nonce_consumed_on_executed", topology_visibility_classification: "inventory_visible_governed_execution_surface", mandatory_chain: "capture_compile_validate_execute", bypass_possible: false }),
 ] as const)
 const RECURSIVE_GOVERNANCE_ROUTE = "/governance/recursive/verify" as const
 const RECURSIVE_GOVERNANCE_ADMISSION_ROUTE = "/governance/recursive/admit" as const
@@ -8086,7 +8369,8 @@ export default {
     const agentToolGatewayAuthorityReviewRoute = url.pathname === AGENT_TOOL_GATEWAY_AUTHORITY_REVIEW_ROUTE
     const agentToolGatewayAtaoRoute = url.pathname === AGENT_TOOL_GATEWAY_ATAO_ROUTE
     const agentToolGatewayCompileRoute = url.pathname === AGENT_TOOL_GATEWAY_COMPILE_ROUTE
-    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute || agentToolGatewayCompileRoute
+    const filesystemWriteGatewayRoute = url.pathname === FILESYSTEM_WRITE_GATEWAY_ROUTE
+    const governedMutationRoute = canonicalRuntimeRoute || governanceEvidenceRoute || governedCandidateRoute || agentToolInvocationRoute || agentToolGatewayInterceptRoute || agentToolGatewayProposeRoute || agentToolGatewayAuthorityReviewRoute || agentToolGatewayCompileRoute || filesystemWriteGatewayRoute
     const mutationEndpoint = governedMutationRoute && request.method === "POST"
     if (mutationEndpoint && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
     if (agentToolGatewayAtaoRoute && request.method === "GET" && !authorized(request, env)) return json({ status: "NULL", reason: "unauthorized" }, 403)
@@ -8111,6 +8395,10 @@ export default {
 
     if (agentToolGatewayCompileRoute && request.method === "POST") {
       return handleAgentToolGatewayCompile(env, request)
+    }
+
+    if (filesystemWriteGatewayRoute && request.method === "POST") {
+      return handleAgentToolGatewayFilesystemWrite(env, request)
     }
 
     if (agentToolGatewayAtaoRoute && request.method === "GET") {

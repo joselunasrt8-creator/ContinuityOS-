@@ -1,5 +1,9 @@
 {
   "version": "1.0",
+  "derived_from": "EXECUTION_SURFACES.json",
+  "canonical_source": "EXECUTION_SURFACES.json",
+  "generated_at": "2026-06-09T00:00:00.000Z",
+  "note": "Derivative copy. Canonical source is root-level EXECUTION_SURFACES.json. Enforcement tooling must not reference this path.",
   "purpose": "Inventory all state-changing execution surfaces",
   "surfaces": [
     {

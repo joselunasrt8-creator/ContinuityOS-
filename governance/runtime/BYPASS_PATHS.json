@@ -1,5 +1,9 @@
 {
   "version": "1.0",
+  "derived_from": "BYPASS_PATHS.json",
+  "canonical_source": "BYPASS_PATHS.json",
+  "generated_at": "2026-06-09T00:00:00.000Z",
+  "note": "Derivative copy. Canonical source is root-level BYPASS_PATHS.json. Enforcement tooling must not reference this path.",
   "purpose": "Known and potential execution bypass paths",
   "bypass_paths": [
     {

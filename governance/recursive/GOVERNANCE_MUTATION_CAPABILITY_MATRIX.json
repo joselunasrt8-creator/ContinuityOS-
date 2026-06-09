@@ -13,8 +13,12 @@
     "FEDERATION_SEMANTICS_DRIFT",
     "OBSERVABILITY_TO_AUTHORITY_ESCALATION",
     "ROOT_GOVERNANCE_BYPASS_RISK",
-    "RECURSIVE_CONTAINMENT_REQUIRED"
+    "RECURSIVE_CONTAINMENT_REQUIRED",
+    "MANUAL_GMA_CONTAINMENT"
   ],
+  "class_notes": {
+    "MANUAL_GMA_CONTAINMENT": "GMA produced by manual hash computation when governance-mutation-authorization.yml workflow is BLOCKED. governed_files_hash binding is repo-verifiable. Canonical runtime lifecycle execution is NOT proven. Use only when PREFLIGHT failure prevents canonical issuance. Must declare canonical_lifecycle_executed: false and preflight_failure reason."
+  },
   "authorizes_execution": false,
   "authorizes_proof": false,
   "authorizes_deployment": false,
