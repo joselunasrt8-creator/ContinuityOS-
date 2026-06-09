@@ -14,7 +14,7 @@ import { canonicalize, sha256Hex } from '../canonical.js'
 import { runFilesystemWriteGatewayAction } from './filesystem-write-runtime-gateway.js'
 import type { FilesystemValidatorContext } from './filesystem-aeo-validator.js'
 import type { FilesystemWriter } from './filesystem-execution-adapter.js'
-import type { ReplayRegistryPort, AppendResult } from './storage-adapter.js'
+import type { ReplayRegistryPort, LineageRegistryPort, FilesystemExecutionLineageNode, AppendResult } from './storage-adapter.js'
 
 type FilesystemWriteAdapterEnv = { DB: D1Database }
 
@@ -54,6 +54,13 @@ async function ensureFilesystemWriteGatewayRegistry(env: FilesystemWriteAdapterE
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_proof_registry (receipt_id TEXT PRIMARY KEY, atao_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, executed_object_hash TEXT NOT NULL, execution_evidence_hash TEXT NOT NULL, adapter_surface TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_path TEXT NOT NULL, execution_result TEXT NOT NULL CHECK (execution_result IN ('EXECUTED')), creates_authority INTEGER NOT NULL CHECK (creates_authority = 0), emitted_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
+
+  // Lineage registry: append-only traceability record for each EXECUTED filesystem write.
+  // node_id = "lineage:" + receipt_id (deterministic, one record per proof receipt).
+  // No lineage record exists for NULL or EXECUTED_UNCOMMITTED outcomes.
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_lineage_registry (node_id TEXT PRIMARY KEY, parent_id TEXT, canonical_aeo_hash TEXT NOT NULL, receipt_id TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_system TEXT NOT NULL, target_action TEXT NOT NULL, target_path TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('EXECUTED','EXECUTED_UNCOMMITTED')), created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_lineage_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_lineage_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_lineage_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_lineage_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_lineage_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_lineage_registry is append-only'); END`).run()
 
   const now = new Date().toISOString()
   const authority_lineage_hash = "sha256:" + sha256Hex(canonicalize({ decision_id: FILESYSTEM_WRITE_GATEWAY_DECISION_ID, surface: "filesystem_write", scope: "repository" }))
@@ -98,6 +105,32 @@ function buildD1ReplayRegistryPort(db: D1Database): ReplayRegistryPort {
       return changes > 0
         ? { status: 'APPENDED', id: replay_nonce, hash: decision_id }
         : { status: 'ALREADY_EXISTS', id: replay_nonce, hash: decision_id }
+    },
+  }
+}
+
+function buildD1LineageRegistryPort(db: D1Database): LineageRegistryPort {
+  return {
+    async appendLineageNode(node: FilesystemExecutionLineageNode) {
+      const now = new Date().toISOString()
+      const result = await db
+        .prepare(
+          `INSERT INTO governed_filesystem_write_lineage_registry
+             (node_id, parent_id, canonical_aeo_hash, receipt_id, decision_id, replay_nonce,
+              target_system, target_action, target_path, status, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+           ON CONFLICT(node_id) DO NOTHING`,
+        )
+        .bind(
+          node.node_id, node.parent_id ?? null, node.canonical_aeo_hash,
+          node.receipt_id, node.decision_id, node.replay_nonce,
+          node.target_system, node.target_action, node.target_path,
+          node.status, now,
+        )
+        .run()
+      const changes = result.meta?.changes ?? 0
+      if (changes > 0) return { status: 'APPENDED', id: node.node_id, hash: node.canonical_aeo_hash }
+      return { status: 'ALREADY_EXISTS', id: node.node_id, hash: node.canonical_aeo_hash }
     },
   }
 }
@@ -272,6 +305,7 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
   }
 
   const replayRegistryPort = buildD1ReplayRegistryPort(env.DB)
+  const lineageRegistryPort = buildD1LineageRegistryPort(env.DB)
   const validator_context = buildD1FilesystemValidatorContext(env, policy_hash, replayRegistryPort)
   const writerHandle = buildD1FilesystemWriter(() => new Date().toISOString())
   const emitted_at = new Date().toISOString()
@@ -311,6 +345,28 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
   await env.DB.prepare(`INSERT INTO governed_filesystem_write_proof_registry (receipt_id, atao_id, validated_object_hash, executed_object_hash, execution_evidence_hash, adapter_surface, decision_id, replay_nonce, target_path, execution_result, creates_authority, emitted_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,0,?11,?12)`)
     .bind(receipt.receipt_id, outcome.atao_id, receipt.validated_object_hash, receipt.executed_object_hash, receipt.execution_evidence_hash, receipt.adapter_surface, receipt.decision_id, receipt.replay_nonce, captured.path, receipt.execution_result, receipt.emitted_at, persisted_at).run()
 
+  // Lineage append: route-level, after proof persistence.
+  // Ordering: executeWithAdapter → markNonceConsumed → appendProofReceipt → appendLineageNode.
+  // EXECUTED only — EXECUTED_UNCOMMITTED does not claim lineage convergence.
+  // Lineage failure does not change execution result; lineage_append_status is separate evidence.
+  let lineage_append_status: string | null = null
+  if (outcome.result === 'EXECUTED') {
+    const lineageNode: FilesystemExecutionLineageNode = {
+      node_id: 'lineage:' + receipt.receipt_id,
+      parent_id: null,
+      canonical_aeo_hash: receipt.validated_object_hash,
+      receipt_id: receipt.receipt_id,
+      decision_id: receipt.decision_id,
+      replay_nonce: receipt.replay_nonce,
+      target_system: 'filesystem',
+      target_action: 'write_file',
+      target_path: captured.path,
+      status: 'EXECUTED',
+    }
+    const lineageResult = await lineageRegistryPort.appendLineageNode(lineageNode)
+    lineage_append_status = lineageResult.status
+  }
+
   return filesystemWriteResponse({
     status: outcome.result,
     result: outcome.result,
@@ -318,5 +374,6 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
     target_path: captured.path,
     bytes_written: captured.bytes_written,
     content_hash,
+    ...(lineage_append_status !== null ? { lineage_append_status } : {}),
   })
 }

@@ -1,6 +1,7 @@
 // Issue #1890: Enforce first runtime Agent Tool Gateway action — filesystem write.
 // Issue #1928: Insert canonical validateAeo gateway stage (Approach B).
 // Issue #1931: Replay Registry Boundary — route replay eligibility through ReplayRegistryPort.
+// Issue #1934: Lineage Registry Boundary — lineage persistence is route-level, after proof.
 //
 // runFilesystemWriteGatewayAction is the ONLY function in this codebase that can
 // produce an EXECUTED filesystem-write proof. It does so by calling each stage in
@@ -16,6 +17,11 @@
 //   → executeFilesystemAdapter(canonicalAEO, canonical_aeo_hash)
 //                                            (exact-object boundary → EXECUTED | NULL)
 //   → ReplayRegistryPort.markNonceConsumed   (REJECTED → EXECUTED_UNCOMMITTED)
+//
+// After the gateway returns EXECUTED, the route adapter orchestrates:
+//   → persist filesystem object
+//   → appendProofReceipt  (existing proof path)
+//   → LineageRegistryPort.appendLineageNode  (EXECUTED path only; after proof)
 //
 // canonical_aeo_hash is the sha256 of the CanonicalAEO (with validation.object_hash set).
 // It is passed as validated_object_hash to executeWithAdapter, which recomputes the hash
@@ -60,6 +66,7 @@ export type FilesystemWriteIntentInput = {
 // read-only interfaces; writer wraps the write side-effect behind a synchronous
 // contract; replay_registry wraps nonce persistence behind ReplayRegistryPort;
 // emitted_at is a plain ISO string.
+// Lineage persistence is route-level (after proof), not gateway-level.
 export type FilesystemWriteKernelContext = {
   readonly validator_context: FilesystemValidatorContext
   readonly writer: FilesystemWriter
