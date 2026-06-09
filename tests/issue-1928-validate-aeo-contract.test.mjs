@@ -343,6 +343,10 @@ function makeGatewayContext(writerFn) {
       },
     },
     writer: writerFn ?? (() => ({ execution_id: 'fs-write:test-001', executed_at: new Date().toISOString(), bytes_written: 19 })),
+    replay_registry: {
+      isNonceUnused: async () => true,
+      markNonceConsumed: async (nonce, decision_id) => ({ status: 'APPENDED', id: nonce, hash: decision_id }),
+    },
     emitted_at: '2026-06-09T00:00:00.000Z',
   }
 }

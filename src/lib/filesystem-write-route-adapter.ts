@@ -14,6 +14,7 @@ import { canonicalize, sha256Hex } from '../canonical.js'
 import { runFilesystemWriteGatewayAction } from './filesystem-write-runtime-gateway.js'
 import type { FilesystemValidatorContext } from './filesystem-aeo-validator.js'
 import type { FilesystemWriter } from './filesystem-execution-adapter.js'
+import type { ReplayRegistryPort, AppendResult } from './storage-adapter.js'
 
 type FilesystemWriteAdapterEnv = { DB: D1Database }
 
@@ -74,7 +75,38 @@ function normalizeGovernedFilesystemPath(path: string): { ok: boolean; value?: a
   return { ok: true, value: path }
 }
 
-function buildD1FilesystemValidatorContext(env: FilesystemWriteAdapterEnv, policy_hash: string): FilesystemValidatorContext {
+function buildD1ReplayRegistryPort(db: D1Database): ReplayRegistryPort {
+  return {
+    async isNonceUnused(replay_nonce: string): Promise<boolean> {
+      const row = await db
+        .prepare(`SELECT state FROM governed_filesystem_write_nonce_registry WHERE replay_nonce = ?1`)
+        .bind(replay_nonce)
+        .first<any>()
+      return !row || String(row.state) === 'UNUSED'
+    },
+    async markNonceConsumed(replay_nonce: string, decision_id: string): Promise<AppendResult> {
+      const now = new Date().toISOString()
+      const result = await db
+        .prepare(
+          `INSERT INTO governed_filesystem_write_nonce_registry (replay_nonce, decision_id, state, created_at, consumed_at)
+           VALUES (?1, ?2, 'CONSUMED', ?3, ?3)
+           ON CONFLICT(replay_nonce) DO UPDATE SET state = 'CONSUMED', consumed_at = excluded.consumed_at`,
+        )
+        .bind(replay_nonce, decision_id, now)
+        .run()
+      const changes = result.meta?.changes ?? 0
+      return changes > 0
+        ? { status: 'APPENDED', id: replay_nonce, hash: decision_id }
+        : { status: 'ALREADY_EXISTS', id: replay_nonce, hash: decision_id }
+    },
+  }
+}
+
+function buildD1FilesystemValidatorContext(
+  env: FilesystemWriteAdapterEnv,
+  policy_hash: string,
+  replayPort: ReplayRegistryPort,
+): FilesystemValidatorContext {
   return {
     authorityRegistry: {
       readDecision: async (decisionId: string) => {
@@ -106,10 +138,10 @@ function buildD1FilesystemValidatorContext(env: FilesystemWriteAdapterEnv, polic
     },
     replayRegistry: {
       readNonceState: async (replayNonce: string) => {
-        const row = await env.DB.prepare(`SELECT state FROM governed_filesystem_write_nonce_registry WHERE replay_nonce = ?1`).bind(replayNonce).first<any>()
-        return { ok: true, value: row ? String(row.state) : "UNUSED" }
+        const unused = await replayPort.isNonceUnused(replayNonce)
+        return { ok: true, value: unused ? 'UNUSED' : 'CONSUMED' } as any
       },
-      readAeoState: async () => ({ ok: true, value: "UNUSED" }),
+      readAeoState: async () => ({ ok: true, value: 'UNUSED' }),
     },
     filesystem: {
       normalizePath: (path: string) => normalizeGovernedFilesystemPath(path) as any,
@@ -239,19 +271,20 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
     max_diff_lines: FILESYSTEM_WRITE_GATEWAY_POLICY_BODY.max_diff_lines,
   }
 
-  const validator_context = buildD1FilesystemValidatorContext(env, policy_hash)
+  const replayRegistryPort = buildD1ReplayRegistryPort(env.DB)
+  const validator_context = buildD1FilesystemValidatorContext(env, policy_hash, replayRegistryPort)
   const writerHandle = buildD1FilesystemWriter(() => new Date().toISOString())
   const emitted_at = new Date().toISOString()
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context, writer: writerHandle.writer, emitted_at },
+    { validator_context, writer: writerHandle.writer, replay_registry: replayRegistryPort, emitted_at },
   )
 
-  if (outcome.result !== "EXECUTED") {
+  if (outcome.result !== 'EXECUTED' && outcome.result !== 'EXECUTED_UNCOMMITTED') {
     return filesystemWriteResponse({
-      status: "NULL",
-      result: "NULL",
+      status: 'NULL',
+      result: 'NULL',
       stage: outcome.stage,
       reason: outcome.reason,
       validator_denial: outcome.validator_denial,
@@ -261,28 +294,26 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
 
   const captured = writerHandle.capture()
   if (!captured) {
-    return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "execute", reason: "WRITER_CAPTURE_MISSING" })
+    return filesystemWriteResponse({ status: 'NULL', result: 'NULL', stage: 'execute', reason: 'WRITER_CAPTURE_MISSING' })
   }
 
   // The real side effect: persisted only because — and exactly as — the
-  // mandatory chain returned EXECUTED. No other code path writes this row.
-  const content_hash = "sha256:" + sha256Hex(captured.content)
+  // mandatory chain returned EXECUTED or EXECUTED_UNCOMMITTED. No other code
+  // path writes this row. Nonce consumption is handled by the gateway via
+  // ReplayRegistryPort.markNonceConsumed — not by raw SQL here.
+  const content_hash = 'sha256:' + sha256Hex(captured.content)
   const persisted_at = new Date().toISOString()
   await env.DB.prepare(`INSERT INTO governed_filesystem_object_registry (path, content, content_hash, bytes_written, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
     ON CONFLICT(path) DO UPDATE SET content = excluded.content, content_hash = excluded.content_hash, bytes_written = excluded.bytes_written, updated_at = excluded.updated_at`)
     .bind(captured.path, captured.content, content_hash, captured.bytes_written, persisted_at).run()
-
-  await env.DB.prepare(`INSERT INTO governed_filesystem_write_nonce_registry (replay_nonce, decision_id, state, created_at, consumed_at) VALUES (?1, ?2, 'CONSUMED', ?3, ?3)
-    ON CONFLICT(replay_nonce) DO UPDATE SET state = 'CONSUMED', consumed_at = excluded.consumed_at`)
-    .bind(replay_nonce, decision_id, persisted_at).run()
 
   const receipt = outcome.receipt
   await env.DB.prepare(`INSERT INTO governed_filesystem_write_proof_registry (receipt_id, atao_id, validated_object_hash, executed_object_hash, execution_evidence_hash, adapter_surface, decision_id, replay_nonce, target_path, execution_result, creates_authority, emitted_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,0,?11,?12)`)
     .bind(receipt.receipt_id, outcome.atao_id, receipt.validated_object_hash, receipt.executed_object_hash, receipt.execution_evidence_hash, receipt.adapter_surface, receipt.decision_id, receipt.replay_nonce, captured.path, receipt.execution_result, receipt.emitted_at, persisted_at).run()
 
   return filesystemWriteResponse({
-    status: "EXECUTED",
-    result: "EXECUTED",
+    status: outcome.result,
+    result: outcome.result,
     receipt,
     target_path: captured.path,
     bytes_written: captured.bytes_written,
