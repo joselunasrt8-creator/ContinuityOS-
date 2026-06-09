@@ -994,13 +994,29 @@ async function handleAgentToolGatewayFilesystemWrite(env: Env, request: Request)
   const executor = buildD1FilesystemWriteExecutor()
   const emitted_at = new Date().toISOString()
 
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input,
-    binding,
-    validator_context,
-    executor: executor.fn,
-    emitted_at,
-  })
+  // ── Kernel boundary rule (V2 minimization) ────────────────────────────────────
+  // This handler is the adapter shell. It constructs the two arguments the kernel
+  // accepts and enforces the following invariant:
+  //
+  //   The kernel (runFilesystemWriteGatewayAction) never receives:
+  //     Request, Response, URL, headers, env, D1Database,
+  //     HTTP method, route path, or any Cloudflare-specific handle.
+  //
+  //   Intent (FilesystemWriteIntentInput): pure agent data — atao_input and binding.
+  //     Derived from the request body before this call; plain data objects.
+  //
+  //   Context (FilesystemWriteKernelContext): adapter-boundary constructs only.
+  //     validator_context — wraps D1 reads behind read-only interfaces
+  //       (ReadonlyAuthorityRegistry, ReadonlyPolicyRegistry, ReadonlyReplayRegistry,
+  //       ReadonlyFilesystemAdapter, ReadonlyDiffInspector, ReadonlyClock).
+  //     executor — wraps the write side-effect behind FilesystemWriteExecutor;
+  //       the kernel never calls D1 directly.
+  //     emitted_at — an ISO string; no Clock object, no env reference.
+  // ──────────────────────────────────────────────────────────────────────────────
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input, binding },
+    { validator_context, executor: executor.fn, emitted_at },
+  )
 
   if (outcome.result !== "EXECUTED") {
     return filesystemWriteGatewayResponse({
