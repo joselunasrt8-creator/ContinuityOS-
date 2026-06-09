@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs'
 
 const indexSource = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
 const observabilityAdapterSource = readFileSync(new URL('../../src/lib/runtime-observability-adapter.ts', import.meta.url), 'utf8')
+const d1StorageAdapterSource = readFileSync(new URL('../../src/lib/d1-storage-adapter.ts', import.meta.url), 'utf8')
 const source = `${indexSource}
-${observabilityAdapterSource}`
+${observabilityAdapterSource}
+${d1StorageAdapterSource}`
 
 function indexOfRequired(fragment) {
   const index = source.indexOf(fragment)
@@ -14,8 +16,8 @@ function indexOfRequired(fragment) {
 }
 
 test('bootstrap ordering quarantines historical proof lineage before uniqueness enforcement', () => {
-  const quarantine = indexOfRequired('const quarantine = await quarantineHistoricalProofDuplicates(env)')
-  const stabilized = indexOfRequired('if (!await proofRegistryStabilized(env)) throw new BootstrapRegistryUnstableError()')
+  const quarantine = indexOfRequired('const quarantine = await quarantineHistoricalProofDuplicates(env.DB)')
+  const stabilized = indexOfRequired('if (!await proofRegistryStabilized(env.DB)) throw new BootstrapRegistryUnstableError()')
   const uniqueness = indexOfRequired('CREATE UNIQUE INDEX IF NOT EXISTS idx_proof_registry_decision_hash_unique')
   const appendOnly = indexOfRequired('await activateAppendOnlyRegistryEnforcement(env)')
 

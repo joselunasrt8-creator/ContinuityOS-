@@ -36,7 +36,7 @@ function between(start, end) {
   return source.slice(startIndex, endIndex)
 }
 
-const traversalSource = between('type ReconciliationRegistry', 'async function quarantineHistoricalProofDuplicates')
+const traversalSource = between('type ReconciliationRegistry', 'function continuousFateFlags')
 
 test('recursive reconciliation traversal preserves canonical registry ordering', () => {
   const orderBlock = source.match(/const CANONICAL_RECONCILIATION_REGISTRY_ORDER = \[[\s\S]*?\] as const/)?.[0] ?? ''

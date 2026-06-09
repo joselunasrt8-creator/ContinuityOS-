@@ -29,6 +29,14 @@ import {
   type RuntimeTopologyContext,
   type GovernanceConsensusContext,
 } from "./lib/runtime-discovery-adapter.ts"
+import {
+  ensureGovernNonceRegistrySchema,
+  quarantineHistoricalProofDuplicates,
+  backfillProofDecisionHashes,
+  validateProofArchiveCompatibility,
+  proofRegistryStabilized,
+  sortProofLineageRows,
+} from "./lib/d1-storage-adapter.ts"
 
 type LineageStage = "compile" | "validate" | "execute" | "proof"
 
@@ -2049,10 +2057,6 @@ function missingDeploymentProvenance(provenance: DeploymentProvenance): string[]
   return Object.entries(provenance).filter(([, value]) => !value).map(([key]) => key)
 }
 
-function proofDecisionHash(decision_id: string, validated_object_hash: string) {
-  return `${decision_id}\u001f${validated_object_hash}`
-}
-
 
 async function assertSchemaAvailableReadOnly(env: Env) {
   await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='session_registry'`).first<any>()
@@ -2239,12 +2243,12 @@ async function ensureSchema(env: Env, options: { stabilizeProofRegistry?: boolea
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_SCHEMA_INITIALIZED")
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_MIGRATIONS_VALIDATED")
     if (options.stabilizeProofRegistry === false) return
-    await validateProofArchiveCompatibility(env)
-    await backfillProofDecisionHashes(env)
-    const quarantine = await quarantineHistoricalProofDuplicates(env)
+    await validateProofArchiveCompatibility(env.DB)
+    await backfillProofDecisionHashes(env.DB)
+    const quarantine = await quarantineHistoricalProofDuplicates(env.DB)
     if (quarantine.detected) await emitBootstrapDiagnostic(env, "BOOTSTRAP_DUPLICATE_PROOF_DETECTED")
     if (quarantine.quarantined > 0) await emitBootstrapDiagnostic(env, "BOOTSTRAP_DUPLICATE_PROOF_QUARANTINED")
-    if (!await proofRegistryStabilized(env)) throw new BootstrapRegistryUnstableError()
+    if (!await proofRegistryStabilized(env.DB)) throw new BootstrapRegistryUnstableError()
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_PROOF_LINEAGE_RECONCILED")
     await emitBootstrapDiagnostic(env, "BOOTSTRAP_REGISTRY_STABILIZED")
     await env.DB.prepare(`DROP TRIGGER IF EXISTS trg_proof_registry_decision_hash_guard`).run()
@@ -5651,139 +5655,6 @@ async function createObservabilityEnvelope(topology: RevocationTopology, federat
   return Object.freeze({ envelope_id: await sha256Hex(canonicalize({ envelope_type: "ObservabilityEnvelope", canonical_hash })), canonical_hash, ...core })
 }
 
-type ProofDuplicateQuarantineSummary = { detected: boolean, quarantined: number }
-
-function proofLineageMaterial(row: any): Record<string, unknown> {
-  return canonicalRecord({
-    proof_id: String(row.proof_id || ""),
-    session_id: String(row.session_id || ""),
-    execution_id: String(row.execution_id || ""),
-    decision_id: String(row.decision_id || ""),
-    validated_object_hash: String(row.validated_object_hash || ""),
-    surface: row.surface ?? null,
-    run_id: row.run_id ?? null,
-    commit_sha: row.commit_sha ?? null,
-    workflow: row.workflow ?? null,
-    environment: row.environment ?? null,
-    created_at: String(row.created_at || ""),
-    continuity_id: row.continuity_id ?? null,
-    continuity_hash: row.continuity_hash ?? null,
-    identity_id: row.identity_id ?? null,
-    authority_lineage: row.authority_lineage ?? null,
-    execution_lineage: row.execution_lineage ?? null,
-    repository: row.repository ?? null,
-    branch: row.branch ?? null,
-    pull_request_id: row.pull_request_id ?? null,
-    merge_commit_sha: row.merge_commit_sha ?? null,
-    source_tree_hash: row.source_tree_hash ?? null,
-    workflow_run_id: row.workflow_run_id ?? null,
-    workflow_sha: row.workflow_sha ?? null
-  })
-}
-
-async function canonicalProofLineageHash(row: any, canonical_proof_id: string): Promise<string> {
-  return sha256Hex(canonicalize({ canonical_proof_selected: canonical_proof_id, proof: proofLineageMaterial(row) }))
-}
-
-async function deterministicProofQuarantineId(row: any, lineage_hash: string): Promise<string> {
-  return sha256Hex(canonicalize({ quarantine_reason: "duplicate_proof_lineage", proof_id: String(row.proof_id || ""), lineage_hash }))
-}
-
-function sortProofLineageRows(rows: any[]): any[] {
-  return [...rows].sort((a, b) => {
-    const created = String(a.created_at || "").localeCompare(String(b.created_at || ""))
-    if (created !== 0) return created
-    const canonical = canonicalize(proofLineageMaterial(a)).localeCompare(canonicalize(proofLineageMaterial(b)))
-    if (canonical !== 0) return canonical
-    return String(a.proof_id || "").localeCompare(String(b.proof_id || ""))
-  })
-}
-
-async function quarantineHistoricalProofDuplicates(env: Env): Promise<ProofDuplicateQuarantineSummary> {
-  const duplicateRows = await env.DB.prepare(`SELECT rowid AS __rowid,* FROM proof_registry
-    WHERE decision_hash IN (
-      SELECT decision_hash FROM proof_registry GROUP BY decision_hash HAVING COUNT(*) > 1
-    )
-    ORDER BY decision_id ASC, validated_object_hash ASC, created_at ASC, proof_id ASC`).all()
-  const rows = Array.isArray(duplicateRows?.results) ? duplicateRows.results : []
-  if (rows.length === 0) return { detected: false, quarantined: 0 }
-
-  const groups = new Map<string, any[]>()
-  for (const row of rows) {
-    const key = String(row.decision_hash || proofDecisionHash(String(row.decision_id || ""), String(row.validated_object_hash || "")))
-    const group = groups.get(key) || []
-    group.push(row)
-    groups.set(key, group)
-  }
-
-  let quarantined = 0
-  const duplicateRowids: string[] = []
-  for (const group of groups.values()) {
-    const ordered = sortProofLineageRows(group)
-    const canonical = ordered[0]
-    const canonical_proof_id = String(canonical.proof_id || "")
-    for (const duplicate of ordered.slice(1)) {
-      const proof_id = String(duplicate.proof_id || "")
-      const lineage_hash = await canonicalProofLineageHash(duplicate, canonical_proof_id)
-      const quarantine_id = await deterministicProofQuarantineId(duplicate, lineage_hash)
-      const quarantine_generated_at = String(duplicate.created_at || canonical.created_at || "")
-      await env.DB.prepare(`INSERT OR IGNORE INTO proof_registry_duplicate_archive (archive_id,proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at,archived_at,archive_reason,canonical_proof_id)
-        VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,'duplicate_proof_lineage',?14)`).bind(
-          `archive:${proof_id}:duplicate_proof_lineage`,
-          proof_id,
-          String(duplicate.session_id || ""),
-          String(duplicate.execution_id || ""),
-          String(duplicate.decision_id || ""),
-          String(duplicate.validated_object_hash || ""),
-          duplicate.surface ?? null,
-          duplicate.run_id ?? null,
-          duplicate.commit_sha ?? null,
-          duplicate.workflow ?? null,
-          duplicate.environment ?? null,
-          String(duplicate.created_at || ""),
-          quarantine_generated_at,
-          canonical_proof_id
-        ).run()
-      await env.DB.prepare(`INSERT OR IGNORE INTO proof_quarantine_registry (quarantine_id,proof_id,lineage_hash,quarantine_reason,canonical_proof_selected,duplicate_proof_archived,quarantine_generated_at,replay_neutral,evidence_only)
-        VALUES (?1,?2,?3,'duplicate_proof_lineage',?4,?5,?6,'true','true')`).bind(
-          quarantine_id,
-          proof_id,
-          lineage_hash,
-          canonical_proof_id,
-          `archive:${proof_id}:duplicate_proof_lineage`,
-          quarantine_generated_at
-        ).run()
-      duplicateRowids.push(String(duplicate.__rowid || ""))
-      quarantined += 1
-    }
-  }
-
-  for (const rowid of duplicateRowids.filter(Boolean)) {
-    await env.DB.prepare(`DELETE FROM proof_registry WHERE rowid=?1`).bind(rowid).run()
-  }
-  return { detected: true, quarantined }
-}
-
-
-async function backfillProofDecisionHashes(env: Env) {
-  await env.DB.prepare(`UPDATE proof_registry SET decision_hash = decision_id || char(31) || validated_object_hash WHERE decision_hash IS NULL OR decision_hash = ''`).run()
-}
-
-async function validateProofArchiveCompatibility(env: Env) {
-  await env.DB.prepare(`INSERT OR IGNORE INTO proof_registry_duplicate_archive (archive_id,proof_id,session_id,execution_id,decision_id,validated_object_hash,surface,run_id,commit_sha,workflow,environment,created_at,archived_at,archive_reason,canonical_proof_id)
-    SELECT 'bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe',NULL,NULL,NULL,NULL,NULL,'bootstrap_archive_compatibility_probe','bootstrap_archive_compatibility_probe','archive_compatibility_probe','bootstrap_archive_compatibility_probe'
-    WHERE 0`).run()
-}
-
-async function proofRegistryStabilized(env: Env): Promise<boolean> {
-  const duplicates = await env.DB.prepare(`SELECT COUNT(*) AS count FROM (
-    SELECT decision_hash FROM proof_registry WHERE decision_hash IS NULL OR decision_hash = '' OR decision_hash != decision_id || char(31) || validated_object_hash
-    UNION ALL
-    SELECT decision_hash FROM proof_registry GROUP BY decision_hash HAVING COUNT(*) > 1
-  )`).first<any>()
-  return Number(duplicates?.count || 0) === 0
-}
-
 
 
 function continuousFateFlags() {
@@ -8241,7 +8112,7 @@ export default {
           reason = topologyCheck.reason
         }
       }
-      await ensureGovernNonceRegistrySchema(env)
+      await ensureGovernNonceRegistrySchema(env.DB)
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_evidence_registry (evidence_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce TEXT NOT NULL, result TEXT NOT NULL, reason TEXT, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_tool_envelope_registry (envelope_id TEXT PRIMARY KEY, candidate_hash TEXT NOT NULL, nonce_binding TEXT NOT NULL UNIQUE, policy_digest TEXT NOT NULL, topology_digest TEXT NOT NULL, lineage_pointers TEXT NOT NULL, timestamp TEXT NOT NULL, non_operative TEXT NOT NULL CHECK (non_operative IN ('true','false')), tool_surface_descriptor TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_envelope_registry (envelope_id TEXT PRIMARY KEY, envelope_hash TEXT NOT NULL, candidate_hash TEXT NOT NULL, candidate_canonical TEXT NOT NULL, govern_projection_hash TEXT NOT NULL DEFAULT "", nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, policy_class TEXT NOT NULL DEFAULT "", policy_digest TEXT NOT NULL DEFAULT "", topology_attestation_hash TEXT NOT NULL DEFAULT "", status TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
@@ -8534,7 +8405,7 @@ export default {
       const proofEarlyValidation = await env.DB.prepare(`SELECT created_at FROM validation_registry WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3 AND status='VALID' AND result='VALID'`).bind(decision_id,validated_object_hash,invocation_nonce).first<any>()
       if (proofEarlyValidation && !isFresh(String(proofEarlyValidation.created_at || ""), VALIDATION_FRESHNESS_WINDOW_MS)) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"stale_validation" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "HIGH", payload: { route: "/proof", validation_created_at: proofEarlyValidation.created_at || null, freshness_window_ms: VALIDATION_FRESHNESS_WINDOW_MS, indicator: "stale_validation_blocked_at_proof" }, drift_class: "proof_drift" })
       const proof_id = crypto.randomUUID()
-      const decision_hash = proofDecisionHash(decision_id, validated_object_hash)
+      const decision_hash = `${decision_id}${validated_object_hash}`
       const executionSnapshot = await env.DB.prepare(`SELECT * FROM execution_snapshot_registry WHERE execution_id=?1 AND decision_id=?2 AND validated_object_hash=?3 AND invocation_nonce=?4 AND status='EXECUTED' ORDER BY created_at DESC LIMIT 1`).bind(execution_id,decision_id,validated_object_hash,invocation_nonce).first<any>()
       if (!executionSnapshot) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"missing_execution_snapshot" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, severity: "CRITICAL", payload: { route: "/proof", indicator: "missing_execution_snapshot" }, drift_class: "proof_drift" })
       const created_at = new Date().toISOString()
@@ -8728,16 +8599,3 @@ export default {
   }
 }
 
-async function ensureGovernNonceRegistrySchema(env: any): Promise<void> {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry (nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (nonce, nonce_domain))`).run()
-  const tableInfo = await env.DB.prepare(`PRAGMA table_info(govern_nonce_registry)`).all()
-  const columns = Array.isArray(tableInfo?.results) ? tableInfo.results.map((row: any) => String(row?.name || "")) : []
-  if (columns.includes("nonce_domain")) return
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS govern_nonce_registry_v2 (nonce TEXT NOT NULL, nonce_domain TEXT NOT NULL, candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (nonce, nonce_domain))`).run()
-  await env.DB.prepare(`INSERT OR IGNORE INTO govern_nonce_registry_v2 (nonce, nonce_domain, candidate_hash, created_at) SELECT nonce, 'openclaw', candidate_hash, created_at FROM govern_nonce_registry`).run()
-  await env.DB.prepare(`DROP TABLE govern_nonce_registry`).run()
-  await env.DB.prepare(`ALTER TABLE govern_nonce_registry_v2 RENAME TO govern_nonce_registry`).run()
-  const postInfo = await env.DB.prepare(`PRAGMA table_info(govern_nonce_registry)`).all()
-  const postColumns = Array.isArray(postInfo?.results) ? postInfo.results.map((row: any) => String(row?.name || "")) : []
-  if (!postColumns.includes("nonce_domain")) throw new Error("govern_nonce_registry_nonce_domain_upgrade_failed")
-}
