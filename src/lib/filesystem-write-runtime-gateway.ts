@@ -1,7 +1,7 @@
 // Issue #1890: Enforce first runtime Agent Tool Gateway action — filesystem write.
 // Issue #1928: Insert canonical validateAeo gateway stage (Approach B).
 // Issue #1931: Replay Registry Boundary — route replay eligibility through ReplayRegistryPort.
-// Issue #1934: Lineage Registry Boundary — route lineage persistence through LineageRegistryPort.
+// Issue #1934: Lineage Registry Boundary — lineage persistence is route-level, after proof.
 //
 // runFilesystemWriteGatewayAction is the ONLY function in this codebase that can
 // produce an EXECUTED filesystem-write proof. It does so by calling each stage in
@@ -17,7 +17,11 @@
 //   → executeFilesystemAdapter(canonicalAEO, canonical_aeo_hash)
 //                                            (exact-object boundary → EXECUTED | NULL)
 //   → ReplayRegistryPort.markNonceConsumed   (REJECTED → EXECUTED_UNCOMMITTED)
-//   → LineageRegistryPort.appendLineageNode  (EXECUTED path only; EXECUTED_UNCOMMITTED skips)
+//
+// After the gateway returns EXECUTED, the route adapter orchestrates:
+//   → persist filesystem object
+//   → appendProofReceipt  (existing proof path)
+//   → LineageRegistryPort.appendLineageNode  (EXECUTED path only; after proof)
 //
 // canonical_aeo_hash is the sha256 of the CanonicalAEO (with validation.object_hash set).
 // It is passed as validated_object_hash to executeWithAdapter, which recomputes the hash
@@ -26,13 +30,9 @@
 //
 // validateAeo and validateFilesystemAEO are not modified. Rust/TS conformance unchanged.
 //
-// Lineage semantics (lineage-core): kernel constructs the ExecutionLineageNode.
-// Lineage persistence: delegated exclusively to LineageRegistryPort — no direct INSERT in this file.
-//
 // Non-goals (unchanged from the underlying chain):
 //   no authority creation · no reservation semantics · no lineage/proof batching ·
-//   no multi-adapter routing · no shell/network/deploy surfaces ·
-//   no reconciliation · no lineage convergence claims
+//   no multi-adapter routing · no shell/network/deploy surfaces
 
 import type { DenialResult, FilesystemValidatorContext } from './filesystem-aeo-validator.js'
 import { validateFilesystemAEO } from './filesystem-aeo-validator.js'
@@ -51,7 +51,7 @@ import { compileCanonicalAEOFromFilesystem } from './compile-canonical-aeo.js'
 // validateAeo: existing continuity-core canonical gateway — not modified.
 // Mirrors Rust validate_aeo(); governed by V3_CONFORMANCE_SPEC and fixtures/conformance/.
 import { validateAeo } from '../continuity-core.js'
-import type { ReplayRegistryPort, LineageRegistryPort, ExecutionLineageNode } from './storage-adapter.js'
+import type { ReplayRegistryPort } from './storage-adapter.js'
 
 // Intent: pure data from the agent/caller — no adapter context, no runtime handles.
 export type FilesystemWriteIntentInput = {
@@ -65,13 +65,12 @@ export type FilesystemWriteIntentInput = {
 // are adapter-boundary constructs: validator_context wraps D1 reads behind
 // read-only interfaces; writer wraps the write side-effect behind a synchronous
 // contract; replay_registry wraps nonce persistence behind ReplayRegistryPort;
-// lineage_registry wraps lineage traceability writes behind LineageRegistryPort;
 // emitted_at is a plain ISO string.
+// Lineage persistence is route-level (after proof), not gateway-level.
 export type FilesystemWriteKernelContext = {
   readonly validator_context: FilesystemValidatorContext
   readonly writer: FilesystemWriter
   readonly replay_registry: ReplayRegistryPort
-  readonly lineage_registry: LineageRegistryPort
   readonly emitted_at: string
 }
 
@@ -214,28 +213,7 @@ export async function runFilesystemWriteGatewayAction(
     outcome.receipt.decision_id,
   )
   if (commitResult.status === 'REJECTED') {
-    // EXECUTED_UNCOMMITTED: execution occurred but replay state was not committed.
-    // Lineage is not appended — only the EXECUTED path appends lineage.
     return { result: 'EXECUTED_UNCOMMITTED', receipt: outcome.receipt, atao_id: atao.atao_id }
-  }
-
-  // Stage 9 — Lineage append: record execution traceability via LineageRegistryPort.
-  // Lineage semantics (what to record) are computed here in the kernel.
-  // Lineage persistence is delegated entirely to the adapter through the port.
-  // Only reached on the EXECUTED path (after markNonceConsumed succeeds).
-  // NULL path and EXECUTED_UNCOMMITTED never reach this stage.
-  // Proof remains the authoritative execution evidence; lineage is traceability only.
-  // Lineage append failure does not invalidate the proof receipt.
-  if (context.lineage_registry) {
-    const lineageNode: ExecutionLineageNode = {
-      node_id: 'lineage:' + outcome.receipt.receipt_id,
-      canonical_aeo_hash: canonicalResult.canonical_aeo_hash,
-      receipt_id: outcome.receipt.receipt_id,
-      decision_id: outcome.receipt.decision_id,
-      replay_nonce: outcome.receipt.replay_nonce,
-      target_identity: canonicalResult.canonical_aeo.target.path,
-    }
-    await context.lineage_registry.appendLineageNode(lineageNode)
   }
 
   return { result: 'EXECUTED', receipt: outcome.receipt, atao_id: atao.atao_id }

@@ -139,18 +139,13 @@ function makeWriter() {
 
 const EMITTED_AT = '2026-06-08T00:00:01.000Z'
 
-// Permissive mocks for registry ports — used in tests that focus on stages other
-// than replay or lineage. Introduced when #1931 (ReplayRegistryPort) and #1934
-// (LineageRegistryPort) added required ports to FilesystemWriteKernelContext.
+// Permissive replay registry mock — used in tests that focus on stages other
+// than replay. Introduced when #1931 (ReplayRegistryPort) added a required
+// port to FilesystemWriteKernelContext.
 function makePermissiveReplayRegistry() {
   return {
     async isNonceUnused() { return true },
     async markNonceConsumed(nonce, did) { return { status: 'APPENDED', id: nonce, hash: did } },
-  }
-}
-function makeNoopLineageRegistry() {
-  return {
-    async appendLineageNode(node) { return { status: 'APPENDED', id: node.node_id, hash: node.canonical_aeo_hash } },
   }
 }
 
@@ -182,7 +177,7 @@ test('TC-RUN-02 a request that cannot form an ATAO is blocked at capture — no 
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput({ path: '' }), binding: makeBinding() },   // blank path → captureFilesystemWriteATAO returns null
-    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
@@ -195,7 +190,7 @@ test('TC-RUN-03 a captured ATAO with no usable authority binding is blocked at c
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding({ allowed_paths: [] }) },  // compileFilesystemWriteAEO fails closed
-    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'compile')
@@ -214,7 +209,7 @@ test('TC-RUN-04 a compiled AEO that the Ω validator denies is blocked at valida
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: deniedContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: deniedContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
@@ -238,7 +233,7 @@ test('TC-RUN-05 replay-consumed nonce is denied at validate by the Ω validator 
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: replayedContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: replayedContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
@@ -252,7 +247,7 @@ test('TC-RUN-06 VALID end-to-end: ATAO captured → AEO compiled → validated �
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput(), binding: makeBinding() },
-    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
 
   assert.equal(outcome.result, 'EXECUTED')
@@ -289,7 +284,7 @@ test('TC-RUN-07 the validated_object_hash handed to the adapter boundary is the 
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'EXECUTED')
 
@@ -313,7 +308,7 @@ test('TC-BYPASS-01 supplying a binding/context without a capturable ATAO can nev
   const writer = makeWriter()
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: null, binding: makeBinding() },  // no proposed action — nothing to govern
-    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: makeValidatorContext(), writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
@@ -338,7 +333,7 @@ test('TC-BYPASS-02 a denied-path attempt cannot be smuggled through by skipping 
   })
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input: makeATAOInput({ path: 'src/secrets/key.ts' }), binding: makeBinding() },
-    { validator_context: overlappingPolicyContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), lineage_registry: makeNoopLineageRegistry(), emitted_at: EMITTED_AT },
+    { validator_context: overlappingPolicyContext, writer: writer.fn, replay_registry: makePermissiveReplayRegistry(), emitted_at: EMITTED_AT },
   )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
