@@ -1,21 +1,25 @@
 // Issue #1890: Enforce first runtime Agent Tool Gateway action — filesystem write.
-// Updated for Execution Adapter Boundary: Stage 4 now routes through
-// executeFilesystemAdapter + executeWithAdapter (the generic boundary gate)
-// instead of executeFilesystemWrite. The result type carries AdapterProofReceipt.
+// Issue #1928: Insert canonical validateAeo gateway stage (Approach B).
 //
 // runFilesystemWriteGatewayAction is the ONLY function in this codebase that can
 // produce an EXECUTED filesystem-write proof. It does so by calling each stage in
 // strict sequence and refusing to proceed past any stage that does not succeed:
 //
 //   raw input
-//   → captureFilesystemWriteATAO   (no ATAO → NULL, stage="capture")
-//   → compileFilesystemWriteAEO    (no AEO → NULL, stage="compile")
-//   → validateFilesystemAEO        (not VALID → NULL, stage="validate")
-//   → executeFilesystemAdapter     (exact-object boundary → EXECUTED | NULL)
+//   → captureFilesystemWriteATAO             (no ATAO → NULL, stage="capture")
+//   → compileFilesystemWriteAEO              (no AEO → NULL, stage="compile")
+//   → compileCanonicalAEOFromFilesystem      (NULL → stage="canonical")
+//   → validateAeo(canonicalAEO, context)     (not VALID → NULL, stage="canonical")
+//   → validateFilesystemAEO(filesystemAEO)   (not VALID → NULL, stage="validate")
+//   → executeFilesystemAdapter(canonicalAEO, canonical_aeo_hash)
+//                                            (exact-object boundary → EXECUTED | NULL)
 //
-// There is no branch, parameter, or code path through this function that reaches
-// the writer without first holding a captured ATAO, a compiled AEO, and a VALID
-// Ω-validator result bound to that exact AEO's hash.
+// canonical_aeo_hash is the sha256 of the CanonicalAEO (with validation.object_hash set).
+// It is passed as validated_object_hash to executeWithAdapter, which recomputes the hash
+// of the CanonicalAEO at the boundary and requires them to match (exact-object invariant).
+// proof.validated_object_hash == proof.executed_object_hash == canonical_aeo_hash.
+//
+// validateAeo and validateFilesystemAEO are not modified. Rust/TS conformance unchanged.
 //
 // Non-goals (unchanged from the underlying chain):
 //   no authority creation · no replay state mutation by this function ·
@@ -31,9 +35,13 @@ import type {
   FilesystemWriteATAOBinding,
   FilesystemWriteATAOInput,
 } from './filesystem-write-gateway.js'
-import type { AdapterProofReceipt } from './adapter-contract.js'
+import type { AdapterProofReceipt, AdapterTargetedAEO } from './adapter-contract.js'
 import { executeFilesystemAdapter } from './filesystem-execution-adapter.js'
 import type { FilesystemWriter } from './filesystem-execution-adapter.js'
+import { compileCanonicalAEOFromFilesystem } from './compile-canonical-aeo.js'
+// validateAeo: existing continuity-core canonical gateway — not modified.
+// Mirrors Rust validate_aeo(); governed by V3_CONFORMANCE_SPEC and fixtures/conformance/.
+import { validateAeo } from '../continuity-core.js'
 
 // Intent: pure data from the agent/caller — no adapter context, no runtime handles.
 export type FilesystemWriteIntentInput = {
@@ -57,7 +65,7 @@ export type FilesystemWriteKernelContext = {
 // Retained as a migration marker; will be removed in a subsequent cleanup pass.
 export type FilesystemWriteGatewayActionInput = FilesystemWriteIntentInput & FilesystemWriteKernelContext
 
-export type FilesystemWriteGatewayStage = 'capture' | 'compile' | 'validate' | 'execute'
+export type FilesystemWriteGatewayStage = 'capture' | 'compile' | 'canonical' | 'validate' | 'execute'
 
 export type FilesystemWriteGatewayActionResult =
   | {
@@ -113,34 +121,53 @@ export async function runFilesystemWriteGatewayAction(
   const atao = captureFilesystemWriteATAO(intent.atao_input)
   if (!atao) return nullAtStage('capture', 'ATAO_CAPTURE_FAILED')
 
-  // Stage 2 — AEO compilation: ATAO + authority binding → exact validator candidate.
-  // Compilation does not validate, execute, or authorize — it only forms the object
-  // the Ω validator will judge.
+  // Stage 2 — AEO compilation: ATAO + authority binding → FilesystemAEO candidate.
+  // Compilation does not validate, execute, or authorize.
   const aeo = compileFilesystemWriteAEO(atao, intent.binding)
   if (!aeo) return nullAtStage('compile', 'AEO_COMPILE_FAILED')
 
-  // Stage 3 — Ω validation: the exact compiled AEO is judged VALID or NULL.
-  // Only a VALID result carries an aeo_hash forward — that hash is the one and only
-  // validated_object_hash the execution boundary will accept.
-  const validation = await validateFilesystemAEO(aeo, context.validator_context)
-  if (validation.result !== 'VALID') {
-    return nullAtStage('validate', validation.denial_result.denial_reason, {
-      validator_denial: validation.denial_result,
+  // Stage 3 — Canonical projection: FilesystemAEO → CanonicalAEO + context.
+  // Projects the FilesystemAEO into the five-section canonical shape required by
+  // the existing continuity-core validateAeo contract. canonical_authority_id is
+  // derived from authority_lineage_hash as a projection identity, not authority creation.
+  const canonicalResult = compileCanonicalAEOFromFilesystem(aeo)
+  if (!canonicalResult.ok) return nullAtStage('canonical', canonicalResult.denial_reason)
+
+  // Stage 4 — Canonical validation: validateAeo judges the CanonicalAEO VALID or NULL.
+  // Uses the existing continuity-core validateAeo unchanged (src/continuity-core.js).
+  // Checks: exact 5-field shape, authority_id on all sections, scope bounds containment,
+  // and validation.object_hash integrity. Writer is never called if this returns NULL.
+  const canonicalDecision = validateAeo(canonicalResult.canonical_aeo, canonicalResult.context)
+  if (canonicalDecision !== 'VALID') {
+    return nullAtStage('canonical', 'CANONICAL_VALIDATION_NULL')
+  }
+
+  // Stage 5 — Ω validation: validateFilesystemAEO judges the FilesystemAEO VALID or NULL.
+  // Runs the full 10-step pipeline (authority, policy, path/op, replay, pre-state, diff,
+  // finality). This stage is NOT bypassed by the canonical validation above.
+  const omegaValidation = await validateFilesystemAEO(aeo, context.validator_context)
+  if (omegaValidation.result !== 'VALID') {
+    return nullAtStage('validate', omegaValidation.denial_result.denial_reason, {
+      validator_denial: omegaValidation.denial_result,
     })
   }
 
-  // Stage 4 — Execution boundary: FilesystemExecutionAdapter is invoked only now,
-  // only with the exact AEO that was validated, and only bound to the exact hash the
-  // validator returned. executeWithAdapter (called inside executeFilesystemAdapter)
-  // independently recomputes the hash and refuses to call the writer on any mismatch
-  // (validated_object_hash == executed_object_hash).
+  // Stage 6 — Execution boundary: CanonicalAEO is passed to executeWithAdapter with
+  // canonical_aeo_hash as validated_object_hash. executeWithAdapter recomputes the hash
+  // of the CanonicalAEO at the boundary and requires it to match (exact-object invariant).
+  // proof.validated_object_hash == proof.executed_object_hash == canonical_aeo_hash.
   //
-  // content is taken from the captured ATAO — the exact bytes whose hash the Ω
-  // validator approved via proposed_diff_hash. The adapter never re-derives content.
+  // The CanonicalAEO is cast to AdapterTargetedAEO: the TypeScript type does not match,
+  // but the runtime contract is satisfied — the object has exactly 5 keys, target.system
+  // is "filesystem", and validation.decision_id / validation.replay_nonce are present for
+  // proof receipt construction. FilesystemExecutionAdapter reads target.path and
+  // target.operation from the CanonicalAEO, both projected from the FilesystemAEO.
+  //
+  // content is taken from the captured ATAO — the exact bytes approved by the Ω validator.
   const content = atao.proposed_action.parameters.content
   const outcome = executeFilesystemAdapter(
-    aeo,
-    validation.aeo_hash,
+    canonicalResult.canonical_aeo as unknown as AdapterTargetedAEO,
+    canonicalResult.canonical_aeo_hash,
     content,
     context.writer,
     context.emitted_at,
