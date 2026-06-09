@@ -1,0 +1,72 @@
+[
+  {
+    "id": "field-ordering",
+    "description": "Object with keys in reverse alphabetical order must canonicalize to sorted-key form",
+    "input": {"b": 2, "a": 1},
+    "expected_canonical": "{\"a\":1,\"b\":2}",
+    "expected_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777"
+  },
+  {
+    "id": "nested-field-ordering",
+    "description": "Nested object keys must be sorted at every level",
+    "input": {"z": {"y": 2, "x": 1}},
+    "expected_canonical": "{\"z\":{\"x\":1,\"y\":2}}",
+    "expected_hash": "6f952f1c5f3de1f08cb7f731b165aef4a4920506d5a5e2df5425471d55ab1020"
+  },
+  {
+    "id": "array-preserved",
+    "description": "Array element order must be preserved (arrays are not sorted)",
+    "input": {"a": [3, 1, 2]},
+    "expected_canonical": "{\"a\":[3,1,2]}",
+    "expected_hash": "d934227f5a9f29b31bd6a8ceed3213dd498a07ce32bdfa9ae2488de0c0ab68f1"
+  },
+  {
+    "id": "unicode",
+    "description": "Unicode characters above U+001F must pass through unescaped",
+    "input": {"text": "héllo wörld"},
+    "expected_canonical": "{\"text\":\"héllo wörld\"}",
+    "expected_hash": "501cb7f6d86bcb35cb6300320562631c7f8209d301f921322341211b5489f19f"
+  },
+  {
+    "id": "empty-object",
+    "description": "Empty object must canonicalize to {}",
+    "input": {},
+    "expected_canonical": "{}",
+    "expected_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "id": "null-value",
+    "description": "JSON null value must canonicalize to the literal null token",
+    "input": {"a": null},
+    "expected_canonical": "{\"a\":null}",
+    "expected_hash": "d091f9c83c091f79652fe8786375b3fe4ce0861a56f5bfbafedbe431877ff0e8"
+  },
+  {
+    "id": "special-strings",
+    "description": "Newline and tab must be serialised as \\n and \\t escape sequences",
+    "input": {"a": "line1\nline2\ttab"},
+    "expected_canonical": "{\"a\":\"line1\\nline2\\ttab\"}",
+    "expected_hash": "2f52de6b6aa364e47627beb2bcabe8255eae077b4d331a4faf902684f5910440"
+  },
+  {
+    "id": "boolean-values",
+    "description": "Boolean values must canonicalize to lowercase true/false tokens",
+    "input": {"t": true, "f": false},
+    "expected_canonical": "{\"f\":false,\"t\":true}",
+    "expected_hash": "c22848c47426fcf4d27e55573c22f1d23546315c251e8e4bc384820ba5fae568"
+  },
+  {
+    "id": "deep-nesting",
+    "description": "Deeply nested objects must sort keys at every depth",
+    "input": {"a": {"b": {"c": {"d": 1}}}},
+    "expected_canonical": "{\"a\":{\"b\":{\"c\":{\"d\":1}}}}",
+    "expected_hash": "abe39bc6e74bfd75fe45ff647cb05daff2175da7aed62e81849f77bfdfae61ee"
+  },
+  {
+    "id": "large-object",
+    "description": "Ten-key object with keys in reverse order must sort to ascending order",
+    "input": {"z": 26, "y": 25, "x": 24, "w": 23, "v": 22, "u": 21, "t": 20, "s": 19, "r": 18, "q": 17},
+    "expected_canonical": "{\"q\":17,\"r\":18,\"s\":19,\"t\":20,\"u\":21,\"v\":22,\"w\":23,\"x\":24,\"y\":25,\"z\":26}",
+    "expected_hash": "d620cd0fb1fee7b4abaed64df0c02d83687492106b5be4dba4902674bad66ff0"
+  }
+]

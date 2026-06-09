@@ -1,0 +1,20 @@
+{
+  "id": "aeo-valid",
+  "description": "Valid AEO with correct object_hash, consistent authority_id, and in-bounds scope — must classify VALID",
+  "aeo": {
+    "finality": {"authority_id": "authority-1", "mode": "deterministic"},
+    "intent": {"authority_id": "authority-1", "id": "intent-1", "nonce": "nonce-1"},
+    "scope": {"authority_id": "authority-1", "bounds": ["system:alpha", "action:write"]},
+    "target": {"action": "action:write", "authority_id": "authority-1", "system": "system:alpha"},
+    "validation": {
+      "authority_id": "authority-1",
+      "lineage_id": "lineage-1",
+      "object_hash": "5e1758831b5d4dbc778d33f5701bf4e50533e12656151ef635ee408990f4e445"
+    }
+  },
+  "context": {
+    "expected_authority": "authority-1",
+    "maximum_scope": ["system:alpha", "action:write", "action:read"]
+  },
+  "expected_decision": "VALID"
+}

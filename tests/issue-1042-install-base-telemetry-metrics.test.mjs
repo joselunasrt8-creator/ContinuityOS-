@@ -2,7 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+const indexSource = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+const observabilityAdapterSource = readFileSync(new URL('../src/lib/runtime-observability-adapter.ts', import.meta.url), 'utf8')
+const source = `${indexSource}
+${observabilityAdapterSource}`
 const telemetryModule = readFileSync(new URL('../src/telemetry.ts', import.meta.url), 'utf8')
 
 // ── Telemetry module existence and isolation ──────────────────────────────────

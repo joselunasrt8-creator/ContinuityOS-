@@ -1,0 +1,46 @@
+{
+  "id": "proof-fixture",
+  "description": "Proof envelope construction cases",
+  "cases": [
+    {
+      "id": "proof-with-evidence",
+      "description": "Valid evidence object — must produce a non-null proof envelope with correct evidence_hash",
+      "proof_id": "proof-1",
+      "evidence": {
+        "execution_id": "execution-1",
+        "decision_id": "decision-1",
+        "aeo_hash": "117b17bd1cbc85fad1d9e17e33b26779dfacd459c6665339a5b6879077080af0",
+        "target_system": "system:alpha",
+        "target_action": "action:write",
+        "result": "accepted",
+        "timestamp": "2026-06-09T00:00:00Z",
+        "evidence_object": {"observed": true}
+      },
+      "expected_has_envelope": true,
+      "expected_evidence_hash": "517fe0410b426ee5d4402666fdd520487e953669b789ed308b60b962c9968cd5"
+    },
+    {
+      "id": "proof-without-evidence",
+      "description": "Null evidence — must produce no envelope (proof cannot be fabricated from absence)",
+      "proof_id": "proof-2",
+      "evidence": null,
+      "expected_has_envelope": false
+    },
+    {
+      "id": "proof-empty-result",
+      "description": "Evidence with empty result string — must produce no envelope",
+      "proof_id": "proof-3",
+      "evidence": {
+        "execution_id": "execution-3",
+        "decision_id": "decision-3",
+        "aeo_hash": "117b17bd1cbc85fad1d9e17e33b26779dfacd459c6665339a5b6879077080af0",
+        "target_system": "system:alpha",
+        "target_action": "action:write",
+        "result": "",
+        "timestamp": "2026-06-09T00:00:00Z",
+        "evidence_object": {"observed": true}
+      },
+      "expected_has_envelope": false
+    }
+  ]
+}
