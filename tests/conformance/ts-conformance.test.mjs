@@ -172,3 +172,46 @@ test('Reconciliation fixtures', async (t) => {
     })
   }
 })
+
+// ─── 9. Proof chain — complete governed execution (VALID path + NULL path) ────
+//
+// Proves the two core invariants:
+//   validated_object == executed_object
+//     (aeo_hash in proof must equal validation.object_hash in the AEO)
+//   If no valid object exists → nothing happens
+//     (NULL validation produces no proof envelope)
+
+test('Proof chain: VALID path produces proof with matching aeo_hash', () => {
+  const fixture = loadFixture('proof-chain.json')
+  const { aeo, context, expected_validation, execution_evidence, expected_proof } = fixture
+
+  const decision = validateAeo(aeo, context)
+  assert.equal(decision, expected_validation)
+
+  const envelope = buildProofEnvelope(
+    'proof-chain-1',
+    {
+      ...execution_evidence,
+      aeo_hash: aeo.validation.object_hash,
+    }
+  )
+
+  assert.equal(envelope !== null, expected_proof.has_envelope)
+  assert.equal(envelope.aeo_hash, expected_proof.aeo_hash,
+    'aeo_hash in proof must equal validation.object_hash — validated_object == executed_object')
+  assert.equal(envelope.evidence_hash, expected_proof.evidence_hash)
+})
+
+test('Proof chain: NULL path produces no proof envelope', () => {
+  const fixture = loadFixture('proof-chain.json')
+  const { aeo, context, null_path } = fixture
+
+  const mutated = JSON.parse(JSON.stringify(aeo))
+  mutated.target.action = null_path.mutated_aeo_target_action
+
+  const decision = validateAeo(mutated, context)
+  assert.equal(decision, null_path.expected_validation)
+
+  const envelope = buildProofEnvelope('proof-chain-null', null)
+  assert.equal(envelope !== null, null_path.expected_proof_has_envelope)
+})

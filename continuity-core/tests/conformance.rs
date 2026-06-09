@@ -365,3 +365,80 @@ fn reconciliation_fixtures() {
         assert_eq!(recon_state_str(&state), expected, "[{}] reconciliation mismatch", id);
     }
 }
+
+// ─── 9. Proof chain — complete governed execution (VALID path + NULL path) ────
+//
+// Proves the two core invariants:
+//   validated_object == executed_object
+//     (aeo_hash in proof must equal validation.object_hash in the AEO)
+//   If no valid object exists → nothing happens
+//     (NULL validation produces no proof envelope)
+
+#[test]
+fn proof_chain_valid_path() {
+    let fixture = load_fixture("proof-chain.json");
+    let aeo = to_json_value(&fixture["aeo"]);
+    let context = make_aeo_context(&fixture);
+
+    let decision = validate_aeo(&aeo, &context);
+    assert_eq!(aeo_decision_str(&decision), "VALID");
+
+    let aeo_hash_str = fixture["aeo"]["validation"]["object_hash"]
+        .as_str()
+        .expect("object_hash must be present in validated AEO");
+    let aeo_hash = ObjectHash::new(aeo_hash_str).unwrap();
+
+    let evidence_val = &fixture["execution_evidence"];
+    let evidence_object = to_json_value(&evidence_val["evidence_object"]);
+    let evidence = ExecutionEvidence::new(
+        ExecutionId::new(str_field(evidence_val, "execution_id")).unwrap(),
+        DecisionId::new(str_field(evidence_val, "decision_id")).unwrap(),
+        aeo_hash.clone(),
+        TargetSystem::new(str_field(evidence_val, "target_system")).unwrap(),
+        TargetAction::new(str_field(evidence_val, "target_action")).unwrap(),
+        str_field(evidence_val, "result").to_string(),
+        str_field(evidence_val, "timestamp").to_string(),
+        evidence_object,
+    )
+    .expect("evidence construction must succeed for valid chain fixture");
+
+    let envelope = ProofEnvelope::from_evidence(
+        ProofId::new("proof-chain-1").unwrap(),
+        Some(evidence),
+    );
+    assert!(envelope.is_some(), "VALID path must produce a proof envelope");
+
+    let env = envelope.unwrap();
+    assert_eq!(
+        env.aeo_hash.as_str(), aeo_hash_str,
+        "aeo_hash in proof must equal validation.object_hash — validated_object == executed_object"
+    );
+    let expected_evidence_hash = fixture["expected_proof"]["evidence_hash"]
+        .as_str()
+        .expect("expected_evidence_hash must be set in fixture");
+    assert_eq!(env.evidence_hash.as_str(), expected_evidence_hash);
+}
+
+#[test]
+fn proof_chain_null_path() {
+    let fixture = load_fixture("proof-chain.json");
+    let mut aeo = to_json_value(&fixture["aeo"]);
+    let context = make_aeo_context(&fixture);
+
+    let mutated_action = fixture["null_path"]["mutated_aeo_target_action"]
+        .as_str()
+        .expect("mutated_aeo_target_action must be present");
+    aeo.as_object_mut()
+        .unwrap()
+        .get_mut("target")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert("action".to_string(), JsonValue::string(mutated_action));
+
+    let decision = validate_aeo(&aeo, &context);
+    assert_eq!(aeo_decision_str(&decision), "NULL");
+
+    let envelope = ProofEnvelope::from_evidence(ProofId::new("proof-chain-null").unwrap(), None);
+    assert!(envelope.is_none(), "NULL path must produce no proof envelope");
+}

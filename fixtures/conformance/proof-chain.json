@@ -1,0 +1,45 @@
+{
+  "id": "proof-chain-end-to-end",
+  "description": "Complete governed execution chain: AEO validates VALID → execution evidence → proof envelope. Proves validated_object == executed_object: aeo_hash in the proof must equal validation.object_hash in the AEO.",
+  "aeo": {
+    "finality": {"authority_id": "authority-1", "mode": "deterministic"},
+    "intent": {"authority_id": "authority-1", "id": "intent-1", "nonce": "nonce-chain-1"},
+    "scope": {"authority_id": "authority-1", "bounds": ["system:alpha", "action:write"]},
+    "target": {"action": "action:write", "authority_id": "authority-1", "system": "system:alpha"},
+    "validation": {
+      "authority_id": "authority-1",
+      "lineage_id": "lineage-chain-1",
+      "object_hash": "06b2390ff933a582ca662bbe5ba2acfd22923c67fe824d689b52aad8f7e6e18e"
+    }
+  },
+  "context": {
+    "expected_authority": "authority-1",
+    "maximum_scope": ["system:alpha", "action:write", "action:read"]
+  },
+  "expected_validation": "VALID",
+  "execution_evidence": {
+    "execution_id": "execution-chain-1",
+    "decision_id": "decision-chain-1",
+    "aeo_hash": "06b2390ff933a582ca662bbe5ba2acfd22923c67fe824d689b52aad8f7e6e18e",
+    "target_system": "system:alpha",
+    "target_action": "action:write",
+    "result": "accepted",
+    "timestamp": "2026-06-09T00:00:00Z",
+    "evidence_object": {
+      "bytes": 12,
+      "operation": "write",
+      "path": "/tmp/test.txt"
+    }
+  },
+  "expected_proof": {
+    "has_envelope": true,
+    "aeo_hash": "06b2390ff933a582ca662bbe5ba2acfd22923c67fe824d689b52aad8f7e6e18e",
+    "evidence_hash": "60b6635f7c9014246c018bbcb2173462dad8ffcc9071a9044098a7966f00ecaf"
+  },
+  "null_path": {
+    "description": "When validation returns NULL, no proof envelope is produced. If no valid object exists → nothing happens.",
+    "mutated_aeo_target_action": "action:read",
+    "expected_validation": "NULL",
+    "expected_proof_has_envelope": false
+  }
+}
