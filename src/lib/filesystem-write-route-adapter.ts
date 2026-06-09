@@ -14,6 +14,7 @@ import { canonicalize, sha256Hex } from '../canonical.js'
 import { runFilesystemWriteGatewayAction } from './filesystem-write-runtime-gateway.js'
 import type { FilesystemValidatorContext } from './filesystem-aeo-validator.js'
 import type { FilesystemWriter } from './filesystem-execution-adapter.js'
+import { initializeD1RegistryAdapter, bootstrapContinuityRegistrySchema } from './d1-storage-adapter.js'
 
 type FilesystemWriteAdapterEnv = { DB: D1Database }
 
@@ -44,6 +45,10 @@ function filesystemWriteGatewayPolicyHash(): string {
 }
 
 async function ensureFilesystemWriteGatewayRegistry(env: FilesystemWriteAdapterEnv): Promise<void> {
+  // Bootstrap the canonical continuity-core registry schema (adapter_proof_registry,
+  // lineage_registry, govern_nonce_registry). Idempotent — safe to call every request.
+  await bootstrapContinuityRegistrySchema(env.DB)
+
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_object_registry (path TEXT PRIMARY KEY, content TEXT NOT NULL, content_hash TEXT NOT NULL, bytes_written INTEGER NOT NULL, updated_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_decision_registry (decision_id TEXT PRIMARY KEY, status TEXT NOT NULL, authority_lineage_hash TEXT NOT NULL, scope TEXT NOT NULL, expires_at TEXT, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_nonce_registry (replay_nonce TEXT PRIMARY KEY, decision_id TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('UNUSED','RESERVED','CONSUMED','INVALIDATED')), created_at TEXT NOT NULL, consumed_at TEXT)`).run()
@@ -53,6 +58,13 @@ async function ensureFilesystemWriteGatewayRegistry(env: FilesystemWriteAdapterE
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_proof_registry (receipt_id TEXT PRIMARY KEY, atao_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, executed_object_hash TEXT NOT NULL, execution_evidence_hash TEXT NOT NULL, adapter_surface TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_path TEXT NOT NULL, execution_result TEXT NOT NULL CHECK (execution_result IN ('EXECUTED')), creates_authority INTEGER NOT NULL CHECK (creates_authority = 0), emitted_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
+
+  // Route-owned ATAO linkage: receipt_id → atao_id + target_path.
+  // The canonical proof fields live in adapter_proof_registry (written via storageAdapter).
+  // This table is route-specific observability — not authority, not proof fabrication.
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_atao_linkage (receipt_id TEXT PRIMARY KEY, atao_id TEXT NOT NULL, target_path TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_atao_linkage_no_update BEFORE UPDATE ON governed_filesystem_write_atao_linkage BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_atao_linkage is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_atao_linkage_no_delete BEFORE DELETE ON governed_filesystem_write_atao_linkage BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_atao_linkage is append-only'); END`).run()
 
   const now = new Date().toISOString()
   const authority_lineage_hash = "sha256:" + sha256Hex(canonicalize({ decision_id: FILESYSTEM_WRITE_GATEWAY_DECISION_ID, surface: "filesystem_write", scope: "repository" }))
@@ -198,6 +210,7 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
   }
 
   await ensureFilesystemWriteGatewayRegistry(env)
+  const storageAdapter = initializeD1RegistryAdapter(env.DB)
 
   const decisionRow = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_decision_registry WHERE decision_id = ?1`).bind(decision_id).first<any>()
   if (!decisionRow) return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "validate", reason: "decision_not_found", decision_id })
@@ -245,7 +258,7 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context, writer: writerHandle.writer, emitted_at },
+    { validator_context, writer: writerHandle.writer, emitted_at, storageAdapter },
   )
 
   if (outcome.result !== "EXECUTED") {
@@ -277,8 +290,17 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
     .bind(replay_nonce, decision_id, persisted_at).run()
 
   const receipt = outcome.receipt
-  await env.DB.prepare(`INSERT INTO governed_filesystem_write_proof_registry (receipt_id, atao_id, validated_object_hash, executed_object_hash, execution_evidence_hash, adapter_surface, decision_id, replay_nonce, target_path, execution_result, creates_authority, emitted_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,0,?11,?12)`)
-    .bind(receipt.receipt_id, outcome.atao_id, receipt.validated_object_hash, receipt.executed_object_hash, receipt.execution_evidence_hash, receipt.adapter_surface, receipt.decision_id, receipt.replay_nonce, captured.path, receipt.execution_result, receipt.emitted_at, persisted_at).run()
+
+  // Canonical proof persistence: all receipt fields go to adapter_proof_registry
+  // via the storage adapter — no direct proof INSERT in this route.
+  const proofAppend = await storageAdapter.appendProofReceipt(receipt)
+  if (proofAppend.status === "REJECTED") {
+    return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "persist", reason: proofAppend.reason })
+  }
+
+  // Route-owned ATAO linkage: only atao_id + target_path — not proof fabrication.
+  await env.DB.prepare(`INSERT OR IGNORE INTO governed_filesystem_write_atao_linkage (receipt_id, atao_id, target_path, created_at) VALUES (?1, ?2, ?3, ?4)`)
+    .bind(receipt.receipt_id, outcome.atao_id, captured.path, persisted_at).run()
 
   return filesystemWriteResponse({
     status: "EXECUTED",
