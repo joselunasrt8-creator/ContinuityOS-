@@ -258,7 +258,7 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context, writer: writerHandle.writer, emitted_at, storageAdapter },
+    { validator_context, writer: writerHandle.writer, emitted_at },
   )
 
   if (outcome.result !== "EXECUTED") {

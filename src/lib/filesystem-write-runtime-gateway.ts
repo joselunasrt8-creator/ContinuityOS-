@@ -34,8 +34,6 @@ import type {
 import type { AdapterProofReceipt } from './adapter-contract.js'
 import { executeFilesystemAdapter } from './filesystem-execution-adapter.js'
 import type { FilesystemWriter } from './filesystem-execution-adapter.js'
-import type { ContinuityStorageAdapter } from './storage-adapter.js'
-import { validateAeo } from '../continuity-core.js'
 
 // Intent: pure data from the agent/caller — no adapter context, no runtime handles.
 export type FilesystemWriteIntentInput = {
@@ -49,15 +47,10 @@ export type FilesystemWriteIntentInput = {
 // are adapter-boundary constructs: validator_context wraps D1 reads behind
 // read-only interfaces; writer wraps the write side-effect behind a synchronous
 // contract; emitted_at is a plain ISO string.
-//
-// storageAdapter: optional for incremental wiring — the route adapter passes
-// initializeD1RegistryAdapter(env.DB) here so pre-fetch and post-commit use
-// the abstract interface rather than direct D1 handles.
 export type FilesystemWriteKernelContext = {
   readonly validator_context: FilesystemValidatorContext
   readonly writer: FilesystemWriter
   readonly emitted_at: string
-  readonly storageAdapter?: ContinuityStorageAdapter | null
 }
 
 // Backward-compatibility alias. Not imported anywhere outside this file (confirmed).
@@ -125,15 +118,6 @@ export async function runFilesystemWriteGatewayAction(
   // the Ω validator will judge.
   const aeo = compileFilesystemWriteAEO(atao, intent.binding)
   if (!aeo) return nullAtStage('compile', 'AEO_COMPILE_FAILED')
-
-  // Stage 2.5 — continuity-core structural gate: the compiled AEO must pass core
-  // structural validation before the surface-specific Ω validator runs.
-  // validateAeo enforces: exactly 5 required top-level fields, each a non-array
-  // plain object. Full hash enforcement (validation.object_hash) and scope bounds
-  // enforcement (scope.bounds + maximum_scope) activate when FilesystemAEO carries
-  // those fields — until then, executeWithAdapter enforces the hash invariant and
-  // the Ω validator enforces scope/policy.
-  if (validateAeo(aeo, {}) !== 'VALID') return nullAtStage('compile', 'CORE_AEO_VALIDATION_FAILED')
 
   // Stage 3 — Ω validation: the exact compiled AEO is judged VALID or NULL.
   // Only a VALID result carries an aeo_hash forward — that hash is the one and only
