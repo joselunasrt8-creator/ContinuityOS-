@@ -83,6 +83,35 @@ export interface LineageRegistryAppender {
   appendLineageNode(node: LineageNode): Promise<AppendResult>
 }
 
+// ── Lineage Registry Port ──────────────────────────────────────────────────────
+// Write-side port for post-execution lineage traceability.
+// Named consistently with ReplayRegistryPort — the write-side port for the lineage boundary.
+// Lineage semantics (what to record) live in the route orchestrator;
+// lineage persistence lives exclusively in the adapter through this port.
+// Must never be called on a NULL execution path.
+// Proof is the authoritative execution evidence; lineage is traceability only.
+// No reconciliation. No convergence claims.
+
+export type FilesystemExecutionLineageNode = {
+  readonly node_id: string                                   // deterministic: "lineage:" + receipt_id
+  readonly parent_id: string | null                          // null — no parent chain in V3 initial implementation
+  readonly canonical_aeo_hash: string                        // sha256 of the CanonicalAEO (== receipt.validated_object_hash)
+  readonly receipt_id: string                                // bound to the proof receipt for this execution
+  readonly decision_id: string                               // governing decision that authorized execution
+  readonly replay_nonce: string                              // nonce consumed to reach EXECUTED
+  readonly target_system: string                             // "filesystem"
+  readonly target_action: string                             // "write_file"
+  readonly target_path: string                               // target file path from the CanonicalAEO
+  readonly status: "EXECUTED" | "EXECUTED_UNCOMMITTED"       // mirrors gateway execution outcome
+}
+
+export interface LineageRegistryPort {
+  // Appends a lineage traceability record after proof persistence.
+  // Returns AppendResult — ALREADY_EXISTS is allowed (idempotent retry); REJECTED surfaces the error.
+  // Lineage append failure must not erase proof or change execution result.
+  appendLineageNode(node: FilesystemExecutionLineageNode): Promise<AppendResult>
+}
+
 // ── Proof Registry ─────────────────────────────────────────────────────────────
 // Append-only proof persistence after VALID execution.
 // Duplicate receipt_id is a fatal integrity violation — must surface, never silently drop.
