@@ -40,13 +40,27 @@ import type {
   FilesystemWriteExecutor,
 } from './filesystem-write-gateway.js'
 
-export type FilesystemWriteGatewayActionInput = {
+// Intent: pure data from the agent/caller — no adapter context, no runtime handles.
+export type FilesystemWriteIntentInput = {
   readonly atao_input: FilesystemWriteATAOInput | null | undefined
   readonly binding: FilesystemWriteATAOBinding | null | undefined
+}
+
+// Context: provided by the adapter shell (src/index.ts).
+// The kernel never receives: Request, Response, URL, headers, env, D1Database,
+// HTTP method, route path, or any Cloudflare-specific handle. These three fields
+// are adapter-boundary constructs: validator_context wraps D1 reads behind
+// read-only interfaces; executor wraps the write side-effect behind a synchronous
+// contract; emitted_at is a plain ISO string.
+export type FilesystemWriteKernelContext = {
   readonly validator_context: FilesystemValidatorContext
   readonly executor: FilesystemWriteExecutor
   readonly emitted_at: string
 }
+
+// Backward-compatibility alias. Not imported anywhere outside this file (confirmed).
+// Retained as a migration marker; will be removed in a subsequent cleanup pass.
+export type FilesystemWriteGatewayActionInput = FilesystemWriteIntentInput & FilesystemWriteKernelContext
 
 export type FilesystemWriteGatewayStage = 'capture' | 'compile' | 'validate' | 'execute'
 
@@ -87,31 +101,32 @@ function nullAtStage(
 // hold inputs that survive ATAO capture, AEO compilation, and Ω validation — in
 // that order — and whose compiled-AEO hash is the exact hash the validator approved.
 export async function runFilesystemWriteGatewayAction(
-  input: FilesystemWriteGatewayActionInput | null | undefined,
+  intent: FilesystemWriteIntentInput | null | undefined,
+  context: FilesystemWriteKernelContext,
 ): Promise<FilesystemWriteGatewayActionResult> {
-  if (!input) return nullAtStage('capture', 'NULL_GATEWAY_INPUT')
-  if (!input.validator_context) return nullAtStage('validate', 'NULL_VALIDATOR_CONTEXT')
-  if (typeof input.executor !== 'function') return nullAtStage('execute', 'NULL_EXECUTOR')
-  if (typeof input.emitted_at !== 'string' || input.emitted_at.trim().length === 0) {
+  if (!intent) return nullAtStage('capture', 'NULL_GATEWAY_INPUT')
+  if (!context.validator_context) return nullAtStage('validate', 'NULL_VALIDATOR_CONTEXT')
+  if (typeof context.executor !== 'function') return nullAtStage('execute', 'NULL_EXECUTOR')
+  if (typeof context.emitted_at !== 'string' || context.emitted_at.trim().length === 0) {
     return nullAtStage('capture', 'NULL_EMITTED_AT')
   }
 
   // Stage 1 — ATAO capture: non-operative, creates no authority or execution eligibility.
   // A request that cannot form a valid ATAO never produces an AEO, never reaches the
   // validator, and never reaches the executor.
-  const atao = captureFilesystemWriteATAO(input.atao_input)
+  const atao = captureFilesystemWriteATAO(intent.atao_input)
   if (!atao) return nullAtStage('capture', 'ATAO_CAPTURE_FAILED')
 
   // Stage 2 — AEO compilation: ATAO + authority binding → exact validator candidate.
   // Compilation does not validate, execute, or authorize — it only forms the object
   // the Ω validator will judge.
-  const aeo = compileFilesystemWriteAEO(atao, input.binding)
+  const aeo = compileFilesystemWriteAEO(atao, intent.binding)
   if (!aeo) return nullAtStage('compile', 'AEO_COMPILE_FAILED', { /* no AEO exists yet */ })
 
   // Stage 3 — Ω validation: the exact compiled AEO is judged VALID or NULL.
   // Only a VALID result carries an aeo_hash forward — that hash is the one and only
   // validated_object_hash the execution boundary will accept.
-  const validation = await validateFilesystemAEO(aeo, input.validator_context)
+  const validation = await validateFilesystemAEO(aeo, context.validator_context)
   if (validation.result !== 'VALID') {
     return nullAtStage('validate', validation.denial_result.denial_reason, {
       validator_denial: validation.denial_result,
@@ -126,8 +141,8 @@ export async function runFilesystemWriteGatewayAction(
     aeo,
     validated_object_hash: validation.aeo_hash,
     atao,
-    executor: input.executor,
-    emitted_at: input.emitted_at,
+    executor: context.executor,
+    emitted_at: context.emitted_at,
   })
   if (!proof) return nullAtStage('execute', 'EXECUTION_BOUNDARY_REJECTED')
 

@@ -143,8 +143,9 @@ test('source declares runFilesystemWriteGatewayAction as the mandatory chain', (
 
 test('TC-RUN-01 null/undefined gateway input returns NULL at capture, executor never called', async () => {
   const executor = makeExecutor()
+  const context = { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT }
   for (const bad of [null, undefined]) {
-    const outcome = await runFilesystemWriteGatewayAction(bad)
+    const outcome = await runFilesystemWriteGatewayAction(bad, context)
     assert.equal(outcome.result, 'NULL')
     assert.equal(outcome.stage, 'capture')
   }
@@ -153,13 +154,10 @@ test('TC-RUN-01 null/undefined gateway input returns NULL at capture, executor n
 
 test('TC-RUN-02 a request that cannot form an ATAO is blocked at capture — no AEO, no validation, no execution', async () => {
   const executor = makeExecutor()
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput({ path: '' }),   // blank path → captureFilesystemWriteATAO returns null
-    binding: makeBinding(),
-    validator_context: makeValidatorContext(),
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput({ path: '' }), binding: makeBinding() },   // blank path → captureFilesystemWriteATAO returns null
+    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
   assert.equal(outcome.reason, 'ATAO_CAPTURE_FAILED')
@@ -169,13 +167,10 @@ test('TC-RUN-02 a request that cannot form an ATAO is blocked at capture — no 
 
 test('TC-RUN-03 a captured ATAO with no usable authority binding is blocked at compile — never reaches the validator or the executor', async () => {
   const executor = makeExecutor()
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput(),
-    binding: makeBinding({ allowed_paths: [] }),  // compileFilesystemWriteAEO fails closed
-    validator_context: makeValidatorContext(),
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput(), binding: makeBinding({ allowed_paths: [] }) },  // compileFilesystemWriteAEO fails closed
+    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'compile')
   assert.equal(outcome.reason, 'AEO_COMPILE_FAILED')
@@ -191,13 +186,10 @@ test('TC-RUN-04 a compiled AEO that the Ω validator denies is blocked at valida
       readPolicyHash: async () => ({ ok: true, value: 'sha256:fixture-policy-hash' }),
     },
   })
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput(),
-    binding: makeBinding(),
-    validator_context: deniedContext,
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput(), binding: makeBinding() },
+    { validator_context: deniedContext, executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.reason, 'PATH_OR_OPERATION_NOT_ALLOWED')
@@ -215,13 +207,10 @@ test('TC-RUN-05 replay-consumed nonce is denied at validate — replay cannot re
       readAeoState: async () => ({ ok: true, value: 'UNUSED' }),
     },
   })
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput(),
-    binding: makeBinding(),
-    validator_context: replayedContext,
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput(), binding: makeBinding() },
+    { validator_context: replayedContext, executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.validator_denial.failure_class, 'REPLAY_NONCE_CONSUMED_OR_RESERVED')
@@ -232,13 +221,10 @@ test('TC-RUN-05 replay-consumed nonce is denied at validate — replay cannot re
 
 test('TC-RUN-06 VALID end-to-end: ATAO captured → AEO compiled → validated → adapter invoked → proof emitted', async () => {
   const executor = makeExecutor()
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput(),
-    binding: makeBinding(),
-    validator_context: makeValidatorContext(),
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput(), binding: makeBinding() },
+    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+  )
 
   assert.equal(outcome.result, 'EXECUTED')
   assert.notEqual(outcome.proof, null)
@@ -269,13 +255,10 @@ test('TC-RUN-07 the validated_object_hash handed to the adapter boundary is the 
   const atao_input = makeATAOInput({ path: 'src/auth.ts', content: 'export function log() {}\n' })
   const binding = makeBinding()
 
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input,
-    binding,
-    validator_context: makeValidatorContext(),
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input, binding },
+    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'EXECUTED')
 
   // Independently recompile the same ATAO+binding to recompute the AEO hash exactly
@@ -295,13 +278,10 @@ test('TC-RUN-07 the validated_object_hash handed to the adapter boundary is the 
 
 test('TC-BYPASS-01 supplying a binding/context without a capturable ATAO can never produce EXECUTED, regardless of how "valid" the rest looks', async () => {
   const executor = makeExecutor()
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: null,                    // no proposed action — nothing to govern
-    binding: makeBinding(),
-    validator_context: makeValidatorContext(),
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: null, binding: makeBinding() },  // no proposed action — nothing to govern
+    { validator_context: makeValidatorContext(), executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'capture')
   assert.equal(executor.callCount, 0)
@@ -323,13 +303,10 @@ test('TC-BYPASS-02 a denied-path attempt cannot be smuggled through by skipping 
       readPolicyHash: async () => ({ ok: true, value: 'sha256:fixture-policy-hash' }),
     },
   })
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput({ path: 'src/secrets/key.ts' }),
-    binding: makeBinding(),
-    validator_context: overlappingPolicyContext,
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput({ path: 'src/secrets/key.ts' }), binding: makeBinding() },
+    { validator_context: overlappingPolicyContext, executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.validator_denial.failure_class, 'PATH_DENIED')
@@ -337,13 +314,10 @@ test('TC-BYPASS-02 a denied-path attempt cannot be smuggled through by skipping 
 })
 
 test('TC-BYPASS-03 missing executor cannot be papered over by an otherwise-valid chain', async () => {
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput(),
-    binding: makeBinding(),
-    validator_context: makeValidatorContext(),
-    executor: null,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput(), binding: makeBinding() },
+    { validator_context: makeValidatorContext(), executor: null, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'execute')
   assert.equal(outcome.reason, 'NULL_EXECUTOR')
@@ -351,13 +325,10 @@ test('TC-BYPASS-03 missing executor cannot be papered over by an otherwise-valid
 
 test('TC-BYPASS-04 missing validator context fails closed before any chain stage runs', async () => {
   const executor = makeExecutor()
-  const outcome = await runFilesystemWriteGatewayAction({
-    atao_input: makeATAOInput(),
-    binding: makeBinding(),
-    validator_context: null,
-    executor: executor.fn,
-    emitted_at: EMITTED_AT,
-  })
+  const outcome = await runFilesystemWriteGatewayAction(
+    { atao_input: makeATAOInput(), binding: makeBinding() },
+    { validator_context: null, executor: executor.fn, emitted_at: EMITTED_AT },
+  )
   assert.equal(outcome.result, 'NULL')
   assert.equal(outcome.stage, 'validate')
   assert.equal(outcome.reason, 'NULL_VALIDATOR_CONTEXT')
