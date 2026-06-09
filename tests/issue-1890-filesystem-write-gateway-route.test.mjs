@@ -151,14 +151,14 @@ test('ROUTE-01 a well-formed governed write executes, mutates the virtual filesy
 
   assert.equal(out.status, 'EXECUTED')
   assert.equal(out.result, 'EXECUTED')
-  assert.notEqual(out.proof, null)
-  assert.equal(out.proof.execution_result, 'EXECUTED')
-  assert.equal(out.proof.validated_object_hash, out.proof.executed_object_hash)
-  assert.match(out.proof.aeo_hash, /^sha256:[0-9a-f]{64}$/)
-  assert.equal(out.proof.target_path, SEED_PATH)
-  assert.equal(out.proof.target_action, 'modify')
-  assert.equal(out.proof.target_surface, 'filesystem')
-  assert.strictEqual(out.proof.creates_authority, false)
+  assert.notEqual(out.receipt, null)
+  assert.equal(out.receipt.execution_result, 'EXECUTED')
+  assert.equal(out.receipt.validated_object_hash, out.receipt.executed_object_hash)
+  assert.match(out.receipt.validated_object_hash, /^sha256:[0-9a-f]{64}$/)
+  assert.match(out.receipt.receipt_id, /^sha256:[0-9a-f]{64}$/)
+  assert.equal(out.target_path, SEED_PATH)
+  assert.equal(out.receipt.adapter_surface, 'filesystem')
+  assert.strictEqual(out.receipt.creates_authority, false)
 
   // The real side effect: the virtual filesystem object was actually mutated —
   // and with exactly the content the agent proposed and the chain validated.
@@ -216,7 +216,7 @@ test('ROUTE-03 a write outside the governed policy paths is denied at validate a
   assert.equal(out.stage, 'validate')
   assert.notEqual(out.validator_denial, null)
   assert.equal(out.validator_denial.failure_class, 'PATH_NOT_ALLOWED')
-  assert.equal(out.proof, null)
+  assert.equal(out.receipt, null)
   assert.equal(env.objectRegistry.has('wrangler.toml'), false, 'denied path must never be written to the virtual filesystem')
   assert.equal(env.proofRegistry.size, 0)
 })

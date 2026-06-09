@@ -13,7 +13,7 @@
 import { canonicalize, sha256Hex } from '../canonical.js'
 import { runFilesystemWriteGatewayAction } from './filesystem-write-runtime-gateway.js'
 import type { FilesystemValidatorContext } from './filesystem-aeo-validator.js'
-import type { FilesystemWriteExecutor } from './filesystem-write-gateway.js'
+import type { FilesystemWriter } from './filesystem-execution-adapter.js'
 
 type FilesystemWriteAdapterEnv = { DB: D1Database }
 
@@ -47,7 +47,10 @@ async function ensureFilesystemWriteGatewayRegistry(env: FilesystemWriteAdapterE
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_object_registry (path TEXT PRIMARY KEY, content TEXT NOT NULL, content_hash TEXT NOT NULL, bytes_written INTEGER NOT NULL, updated_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_decision_registry (decision_id TEXT PRIMARY KEY, status TEXT NOT NULL, authority_lineage_hash TEXT NOT NULL, scope TEXT NOT NULL, expires_at TEXT, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_nonce_registry (replay_nonce TEXT PRIMARY KEY, decision_id TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('UNUSED','RESERVED','CONSUMED','INVALIDATED')), created_at TEXT NOT NULL, consumed_at TEXT)`).run()
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_proof_registry (proof_id TEXT PRIMARY KEY, atao_id TEXT NOT NULL, aeo_hash TEXT NOT NULL, validated_object_hash TEXT NOT NULL, executed_object_hash TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_path TEXT NOT NULL, target_action TEXT NOT NULL, execution_result TEXT NOT NULL CHECK (execution_result IN ('EXECUTED')), creates_authority INTEGER NOT NULL CHECK (creates_authority = 0), emitted_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
+  // Proof registry: receipt_id (AdapterProofReceipt) is the primary key.
+  // atao_id is stored by the route adapter (not in the generic receipt) for lineage tracing.
+  // target_path is stored from the writer capture for observability.
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_proof_registry (receipt_id TEXT PRIMARY KEY, atao_id TEXT NOT NULL, validated_object_hash TEXT NOT NULL, executed_object_hash TEXT NOT NULL, execution_evidence_hash TEXT NOT NULL, adapter_surface TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_path TEXT NOT NULL, execution_result TEXT NOT NULL CHECK (execution_result IN ('EXECUTED')), creates_authority INTEGER NOT NULL CHECK (creates_authority = 0), emitted_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_proof_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_proof_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_proof_registry is append-only'); END`).run()
 
@@ -130,26 +133,29 @@ function buildD1FilesystemValidatorContext(env: FilesystemWriteAdapterEnv, polic
   } as any
 }
 
-type FilesystemWriteGatewayCapture = {
+type FilesystemWriterCapture = {
   readonly path: string
   readonly content: string
   readonly bytes_written: number
 }
 
-// The execution boundary's executor contract is synchronous — it must return
-// {bytes_written} immediately so the proof can be emitted in the same call.
-// D1 writes are async, so this executor captures exactly the validated
-// path+content the chain handed it; the real persistence to
-// governed_filesystem_object_registry happens immediately afterward, strictly
-// gated on outcome.result === "EXECUTED". There is no other way for that
-// registry to change.
-function buildD1FilesystemWriteExecutor(): { fn: FilesystemWriteExecutor; capture: () => FilesystemWriteGatewayCapture | null } {
-  let captured: FilesystemWriteGatewayCapture | null = null
-  const fn: FilesystemWriteExecutor = (input) => {
-    captured = { path: input.path, content: input.content, bytes_written: input.content.length }
-    return { bytes_written: captured.bytes_written }
+// The FilesystemWriter contract is synchronous — it captures path+content immediately
+// so the proof can be emitted in the same call. D1 writes are async, so the capture
+// is persisted to governed_filesystem_object_registry strictly after the EXECUTED
+// outcome is confirmed. There is no other way for that registry to change.
+function buildD1FilesystemWriter(clock: () => string): {
+  writer: FilesystemWriter
+  capture: () => FilesystemWriterCapture | null
+} {
+  let captured: FilesystemWriterCapture | null = null
+  const writer: FilesystemWriter = ({ path, content }) => {
+    const bytes_written = content.length
+    captured = { path, content, bytes_written }
+    const execution_id = "fs-write:sha256:" + sha256Hex(content)
+    const executed_at = clock()
+    return { execution_id, executed_at, bytes_written }
   }
-  return { fn, capture: () => captured }
+  return { writer, capture: () => captured }
 }
 
 function json(data: unknown, status = 200): Response {
@@ -234,12 +240,12 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
   }
 
   const validator_context = buildD1FilesystemValidatorContext(env, policy_hash)
-  const executor = buildD1FilesystemWriteExecutor()
+  const writerHandle = buildD1FilesystemWriter(() => new Date().toISOString())
   const emitted_at = new Date().toISOString()
 
   const outcome = await runFilesystemWriteGatewayAction(
     { atao_input, binding },
-    { validator_context, executor: executor.fn, emitted_at },
+    { validator_context, writer: writerHandle.writer, emitted_at },
   )
 
   if (outcome.result !== "EXECUTED") {
@@ -249,13 +255,13 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
       stage: outcome.stage,
       reason: outcome.reason,
       validator_denial: outcome.validator_denial,
-      proof: outcome.proof,
+      receipt: outcome.receipt,
     })
   }
 
-  const captured = executor.capture()
+  const captured = writerHandle.capture()
   if (!captured) {
-    return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "execute", reason: "EXECUTOR_CAPTURE_MISSING" })
+    return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "execute", reason: "WRITER_CAPTURE_MISSING" })
   }
 
   // The real side effect: persisted only because — and exactly as — the
@@ -270,14 +276,15 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
     ON CONFLICT(replay_nonce) DO UPDATE SET state = 'CONSUMED', consumed_at = excluded.consumed_at`)
     .bind(replay_nonce, decision_id, persisted_at).run()
 
-  const proof = outcome.proof
-  await env.DB.prepare(`INSERT INTO governed_filesystem_write_proof_registry (proof_id, atao_id, aeo_hash, validated_object_hash, executed_object_hash, decision_id, replay_nonce, target_path, target_action, execution_result, creates_authority, emitted_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,0,?11,?12)`)
-    .bind(proof.proof_id, proof.atao_id, proof.aeo_hash, proof.validated_object_hash, proof.executed_object_hash, decision_id, replay_nonce, proof.target_path, proof.target_action, proof.execution_result, proof.emitted_at, persisted_at).run()
+  const receipt = outcome.receipt
+  await env.DB.prepare(`INSERT INTO governed_filesystem_write_proof_registry (receipt_id, atao_id, validated_object_hash, executed_object_hash, execution_evidence_hash, adapter_surface, decision_id, replay_nonce, target_path, execution_result, creates_authority, emitted_at, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,0,?11,?12)`)
+    .bind(receipt.receipt_id, outcome.atao_id, receipt.validated_object_hash, receipt.executed_object_hash, receipt.execution_evidence_hash, receipt.adapter_surface, receipt.decision_id, receipt.replay_nonce, captured.path, receipt.execution_result, receipt.emitted_at, persisted_at).run()
 
   return filesystemWriteResponse({
     status: "EXECUTED",
     result: "EXECUTED",
-    proof,
+    receipt,
+    target_path: captured.path,
     bytes_written: captured.bytes_written,
     content_hash,
   })
