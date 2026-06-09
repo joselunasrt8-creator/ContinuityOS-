@@ -1,0 +1,62 @@
+{
+  "cases": [
+    {
+      "id": "recon-null-evidence",
+      "description": "null evidence returns NULL",
+      "evidence": null,
+      "expected_state": "NULL"
+    },
+    {
+      "id": "recon-missing-hashes",
+      "description": "missing hashes returns PARTIAL",
+      "evidence": {
+        "expected_hash": null,
+        "observed_hash": null,
+        "lineage_complete": true,
+        "proof_present": true,
+        "observations_complete": true,
+        "ambiguity_detected": false
+      },
+      "expected_state": "PARTIAL"
+    },
+    {
+      "id": "recon-ambiguous",
+      "description": "ambiguity_detected returns AMBIGUOUS even with matching hashes",
+      "evidence": {
+        "expected_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+        "observed_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+        "lineage_complete": true,
+        "proof_present": true,
+        "observations_complete": true,
+        "ambiguity_detected": true
+      },
+      "expected_state": "AMBIGUOUS"
+    },
+    {
+      "id": "recon-reconciled",
+      "description": "matching hashes with complete evidence returns RECONCILED",
+      "evidence": {
+        "expected_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+        "observed_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+        "lineage_complete": true,
+        "proof_present": true,
+        "observations_complete": true,
+        "ambiguity_detected": false
+      },
+      "expected_state": "RECONCILED"
+    },
+    {
+      "id": "recon-divergent",
+      "description": "mismatched hashes returns DIVERGENT",
+      "evidence": {
+        "expected_hash": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+        "observed_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "lineage_complete": true,
+        "proof_present": true,
+        "observations_complete": true,
+        "ambiguity_detected": false
+      },
+      "expected_state": "DIVERGENT"
+    }
+  ]
+}

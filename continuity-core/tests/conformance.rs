@@ -337,64 +337,31 @@ fn recon_state_str(state: &ReconciliationState) -> &'static str {
 }
 
 #[test]
-fn reconciliation_null_evidence() {
-    assert_eq!(recon_state_str(&classify_reconciliation(None)), "NULL");
-}
+fn reconciliation_fixtures() {
+    let fixture = load_fixture("reconciliation-fixtures.json");
+    for case in fixture["cases"].as_array().unwrap() {
+        let id = str_field(case, "id");
+        let expected = str_field(case, "expected_state");
 
-#[test]
-fn reconciliation_missing_hashes_partial() {
-    let evidence = ReconciliationEvidence {
-        expected_hash: None,
-        observed_hash: None,
-        lineage_complete: true,
-        proof_present: true,
-        observations_complete: true,
-        ambiguity_detected: false,
-    };
-    assert_eq!(recon_state_str(&classify_reconciliation(Some(&evidence))), "PARTIAL");
-}
+        let evidence = if case["evidence"].is_null() {
+            None
+        } else {
+            let e = &case["evidence"];
+            let expected_hash = e["expected_hash"].as_str()
+                .map(|s| ObjectHash::new(s).unwrap());
+            let observed_hash = e["observed_hash"].as_str()
+                .map(|s| ObjectHash::new(s).unwrap());
+            Some(ReconciliationEvidence {
+                expected_hash,
+                observed_hash,
+                lineage_complete: e["lineage_complete"].as_bool().unwrap(),
+                proof_present: e["proof_present"].as_bool().unwrap(),
+                observations_complete: e["observations_complete"].as_bool().unwrap(),
+                ambiguity_detected: e["ambiguity_detected"].as_bool().unwrap(),
+            })
+        };
 
-#[test]
-fn reconciliation_ambiguity_even_with_matching_hashes() {
-    let hash_str = "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777";
-    let hash = ObjectHash::new(hash_str).unwrap();
-    let evidence = ReconciliationEvidence {
-        expected_hash: Some(hash.clone()),
-        observed_hash: Some(hash),
-        lineage_complete: true,
-        proof_present: true,
-        observations_complete: true,
-        ambiguity_detected: true,
-    };
-    assert_eq!(recon_state_str(&classify_reconciliation(Some(&evidence))), "AMBIGUOUS");
-}
-
-#[test]
-fn reconciliation_matching_hashes_full_evidence_reconciled() {
-    let hash_str = "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777";
-    let hash = ObjectHash::new(hash_str).unwrap();
-    let evidence = ReconciliationEvidence {
-        expected_hash: Some(hash.clone()),
-        observed_hash: Some(hash),
-        lineage_complete: true,
-        proof_present: true,
-        observations_complete: true,
-        ambiguity_detected: false,
-    };
-    assert_eq!(recon_state_str(&classify_reconciliation(Some(&evidence))), "RECONCILED");
-}
-
-#[test]
-fn reconciliation_mismatched_hashes_divergent() {
-    let h1 = ObjectHash::new("43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777").unwrap();
-    let h2 = ObjectHash::new("44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a").unwrap();
-    let evidence = ReconciliationEvidence {
-        expected_hash: Some(h1),
-        observed_hash: Some(h2),
-        lineage_complete: true,
-        proof_present: true,
-        observations_complete: true,
-        ambiguity_detected: false,
-    };
-    assert_eq!(recon_state_str(&classify_reconciliation(Some(&evidence))), "DIVERGENT");
+        let state = classify_reconciliation(evidence.as_ref());
+        assert_eq!(recon_state_str(&state), expected, "[{}] reconciliation mismatch", id);
+    }
 }
