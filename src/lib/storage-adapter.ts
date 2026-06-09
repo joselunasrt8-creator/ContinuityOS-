@@ -83,6 +83,28 @@ export interface LineageRegistryAppender {
   appendLineageNode(node: LineageNode): Promise<AppendResult>
 }
 
+// ── Lineage Registry Port ──────────────────────────────────────────────────────
+// Write-side port for post-execution lineage traceability.
+// Named consistently with ReplayRegistryPort — the write-side port for the lineage boundary.
+// Lineage semantics (what to record) live in the kernel; lineage persistence lives in the adapter.
+// Must never be called on a NULL execution path or on EXECUTED_UNCOMMITTED.
+// Proof is the authoritative execution evidence; lineage is traceability only.
+
+export type ExecutionLineageNode = {
+  readonly node_id: string            // deterministic id: "lineage:" + receipt_id
+  readonly canonical_aeo_hash: string // sha256 of the CanonicalAEO at the execution boundary
+  readonly receipt_id: string         // bound to the proof receipt for this execution
+  readonly decision_id: string        // governing decision that authorized execution
+  readonly replay_nonce: string       // nonce consumed to reach EXECUTED
+  readonly target_identity: string    // target.path from the CanonicalAEO
+}
+
+export interface LineageRegistryPort {
+  // Appends a lineage traceability record after EXECUTED.
+  // Returns AppendResult — ALREADY_EXISTS is allowed (idempotent retry); REJECTED surfaces the error.
+  appendLineageNode(node: ExecutionLineageNode): Promise<AppendResult>
+}
+
 // ── Proof Registry ─────────────────────────────────────────────────────────────
 // Append-only proof persistence after VALID execution.
 // Duplicate receipt_id is a fatal integrity violation — must surface, never silently drop.
