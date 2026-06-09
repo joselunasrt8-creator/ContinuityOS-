@@ -1,0 +1,125 @@
+{
+  "artifact": "AUTHORITATIVE_MUTATION_SURFACE_FATE_REGISTRY",
+  "issue": "1936",
+  "purpose": "Enumerate every mutation-capable execution surface that can reach an EXECUTED outcome with a proof receipt, and bind each to an authoritative fate-matrix test.",
+  "required_invariant": "validated_object_hash == executed_object_hash, and proof_id/receipt_id is bound to executed_object_hash, on every EXECUTED outcome; any other condition -> NULL",
+  "no_valid_object_invariant": "if no valid object exists -> nothing happens (executor/writer is never invoked)",
+  "fate_matrix_checks": [
+    "INVALID_OBJECT_NULL",
+    "UNAUTHORIZED_OBJECT_NULL",
+    "REPLAYED_OBJECT_NULL",
+    "MUTATED_AFTER_VALIDATION_NULL",
+    "EXECUTED_HASH_EQUALS_VALIDATED_HASH",
+    "PROOF_HASH_BOUND_TO_EXECUTED_HASH",
+    "NOTHING_HAPPENS_WITHOUT_VALID"
+  ],
+  "scope_note": "All other surfaces declared in runtime/MUTATION_SURFACE_EXHAUSTIVENESS.json are EVIDENCE_ONLY, NON_EXECUTABLE, or governed_support_surface with execution_capable=false. They cannot reach EXECUTED with a proof receipt and are out of scope for this registry by definition.",
+  "surfaces": [
+    {
+      "surface_id": "filesystem",
+      "adapter_surface": "filesystem",
+      "module": "src/lib/filesystem-execution-adapter.ts",
+      "entry_function": "executeFilesystemAdapter",
+      "gateway_function": "runFilesystemWriteGatewayAction",
+      "gateway_module": "src/lib/filesystem-write-runtime-gateway.ts",
+      "mechanism": "executeWithAdapter",
+      "fate_test_path": "tests/fate/issue-1936-authoritative-mutation-surface-fate-suite.test.mjs",
+      "replay_mechanism": "ReplayRegistryPort (gateway-level, stage 5)",
+      "checks": [
+        "INVALID_OBJECT_NULL",
+        "UNAUTHORIZED_OBJECT_NULL",
+        "REPLAYED_OBJECT_NULL",
+        "MUTATED_AFTER_VALIDATION_NULL",
+        "EXECUTED_HASH_EQUALS_VALIDATED_HASH",
+        "PROOF_HASH_BOUND_TO_EXECUTED_HASH",
+        "NOTHING_HAPPENS_WITHOUT_VALID"
+      ]
+    },
+    {
+      "surface_id": "cloudflare_worker",
+      "adapter_surface": "cloudflare_worker",
+      "module": "src/lib/cloudflare-adapter.ts",
+      "entry_function": "executeCloudflareAdapter",
+      "mechanism": "executeWithAdapter",
+      "fate_test_path": "tests/fate/issue-1936-authoritative-mutation-surface-fate-suite.test.mjs",
+      "replay_mechanism": "enforced one layer up (gateway/route); executeWithAdapter is replay-neutral by design",
+      "checks": [
+        "INVALID_OBJECT_NULL",
+        "UNAUTHORIZED_OBJECT_NULL",
+        "MUTATED_AFTER_VALIDATION_NULL",
+        "EXECUTED_HASH_EQUALS_VALIDATED_HASH",
+        "PROOF_HASH_BOUND_TO_EXECUTED_HASH",
+        "NOTHING_HAPPENS_WITHOUT_VALID"
+      ]
+    },
+    {
+      "surface_id": "d1",
+      "adapter_surface": "d1",
+      "module": "src/lib/d1-storage-adapter.ts",
+      "entry_function": "executeD1Adapter",
+      "mechanism": "executeWithAdapter",
+      "fate_test_path": "tests/fate/issue-1936-authoritative-mutation-surface-fate-suite.test.mjs",
+      "replay_mechanism": "enforced one layer up (gateway/route); executeWithAdapter is replay-neutral by design",
+      "checks": [
+        "INVALID_OBJECT_NULL",
+        "UNAUTHORIZED_OBJECT_NULL",
+        "MUTATED_AFTER_VALIDATION_NULL",
+        "EXECUTED_HASH_EQUALS_VALIDATED_HASH",
+        "PROOF_HASH_BOUND_TO_EXECUTED_HASH",
+        "NOTHING_HAPPENS_WITHOUT_VALID"
+      ]
+    },
+    {
+      "surface_id": "github",
+      "adapter_surface": "github",
+      "module": "src/lib/github-issue-comment-gateway.ts",
+      "entry_function": "executeGitHubIssueComment",
+      "mechanism": "standalone",
+      "fate_test_path": "tests/fate/issue-1936-authoritative-mutation-surface-fate-suite.test.mjs",
+      "replay_mechanism": "enforced one layer up (gateway/route) via consumed_replay_nonces",
+      "checks": [
+        "INVALID_OBJECT_NULL",
+        "UNAUTHORIZED_OBJECT_NULL",
+        "MUTATED_AFTER_VALIDATION_NULL",
+        "EXECUTED_HASH_EQUALS_VALIDATED_HASH",
+        "PROOF_HASH_BOUND_TO_EXECUTED_HASH",
+        "NOTHING_HAPPENS_WITHOUT_VALID"
+      ]
+    },
+    {
+      "surface_id": "runtime_execute_route",
+      "adapter_surface": null,
+      "module": "src/index.ts",
+      "entry_function": "/execute route handler (execution_registry insert)",
+      "mechanism": "static_source",
+      "fate_test_path": "tests/fate/issue-1936-authoritative-mutation-surface-fate-suite.test.mjs",
+      "static_closure_sources": [
+        "tests/fate/exact-object-enforcement.test.mjs",
+        "tests/fate/hash-mutation.test.mjs",
+        "tests/fate/null-result-contract.test.mjs",
+        "tests/fate/replay-resistance.test.mjs"
+      ],
+      "replay_mechanism": "invocation_registry single-use nonce (canonical spine)",
+      "checks": [
+        "INVALID_OBJECT_NULL",
+        "UNAUTHORIZED_OBJECT_NULL",
+        "REPLAYED_OBJECT_NULL",
+        "MUTATED_AFTER_VALIDATION_NULL",
+        "EXECUTED_HASH_EQUALS_VALIDATED_HASH",
+        "PROOF_HASH_BOUND_TO_EXECUTED_HASH",
+        "NOTHING_HAPPENS_WITHOUT_VALID"
+      ]
+    }
+  ],
+  "closure_verification": {
+    "issue": "1936",
+    "invariant": "every adapter_surface constant exported from src/lib/*-adapter.ts, plus the github issue comment gateway and the canonical /execute route, must appear in surfaces[] above",
+    "exported_surface_constants": [
+      "FILESYSTEM_ADAPTER_SURFACE",
+      "CLOUDFLARE_ADAPTER_SURFACE",
+      "D1_ADAPTER_SURFACE"
+    ],
+    "undeclared_mutation_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
+    "non_authoritative": false
+  }
+}
