@@ -12,9 +12,9 @@
   "additional_routes_created": false,
   "fail_closed_on_ambiguity": true,
   "legacy_schema_conflict": true,
-  "runtime_schema_authoritative_for_runtime_validator": true,
+  "runtime_schema_authoritative_for_runtime_validator": false,
   "legacy_schema_replacement_required_by_future_SCO": true,
-  "reconciliation_status": "CONFLICT_RECORDED_NO_REPLACEMENT",
+  "reconciliation_status": "DEAD_CONTRACT_RETIRED",
   "legacy_proof_schema": {
     "source_id": "legacy_proof_schema",
     "path": "schemas/proof.schema.json",
@@ -30,8 +30,8 @@
       "validated_object_hash",
       "execution_hash"
     ],
-    "runtime_authoritative": true
+    "runtime_authoritative": false
   },
   "replacement_boundary": "No legacy schema replacement without future SCO.",
-  "proof_schema_reconciliation_hash": "a374e518150d466a4d56571dd49dea127f9faed705323cb6d4851d23b4707b42"
+  "proof_schema_reconciliation_hash": "1770fab75413502dff803946e672b4d0121d1849647f4fe93203845e284cf904"
 }

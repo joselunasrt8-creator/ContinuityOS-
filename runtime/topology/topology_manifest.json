@@ -53,17 +53,17 @@
   ],
   "hashes": {
     "runtime_surface_inventory_hash": "781f68a266ca38395e335644fd8ccfad9f32c131c5eb2d4d87e96eeb904a536c",
-    "schema_source_map_hash": "0fe964c67eaf7d364a6c222514374e69612542e22004129a18ef533ab3719e14",
+    "schema_source_map_hash": "1c79f002ab3e61ee9b1bd2eaba6bc156f243ca96dc391cdc0ca4c07c261a13ae",
     "topology_graph_hash": "fece0d5caa8f8395436ae47e1e97319ee75fdc571e42dd7a5cb5408ec766bbe0",
     "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5",
-    "proof_schema_reconciliation_hash": "a374e518150d466a4d56571dd49dea127f9faed705323cb6d4851d23b4707b42",
+    "proof_schema_reconciliation_hash": "1770fab75413502dff803946e672b4d0121d1849647f4fe93203845e284cf904",
     "topology_reconciliation_policy_hash": "e4736787f6121b0dd410473af83fc9d64cb3f271f3857160421f1daccf874946",
     "topology_reconciliation_engine_hash": "9dbd1866b9532ee9920531959c7bca3bede2b3d996bb78b8eb799a7b60bcbc79",
     "topology_reconciliation_registry_migration_hash": "a16ac2ecfcb17ce4241a7c46f24c3db6099811b2acfcb3179add21267da8192c"
   },
   "schema_reconciliation": {
     "legacy_schema_conflict": true,
-    "runtime_schema_authoritative_for_runtime_validator": true,
+    "runtime_schema_authoritative_for_runtime_validator": false,
     "legacy_schema_replacement_required_by_future_SCO": true
   },
   "governance_policy_map": {
@@ -123,5 +123,5 @@
     ],
     "governance_policy_set_hash": "c7b02557aebbf262fed2eae11f57847734f1c48f3a06f961c493a8ebc3e5b2a5"
   },
-  "topology_manifest_hash": "b57acab415c93f5c95d2d2dd7609c3a34455533176189bfa45b46f08457ff03d"
+  "topology_manifest_hash": "cf8c08e8fca2456fd81dfda0939a5ac5c50bf22a8d59e34da2c84cbcd05989fa"
 }
