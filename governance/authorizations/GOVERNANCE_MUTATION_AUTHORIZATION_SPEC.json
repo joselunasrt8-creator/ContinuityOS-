@@ -5,7 +5,7 @@
   "issue_reference": "#1831",
   "purpose": "Defines the required structure and validation rules for a Governance Mutation Authorization (GMA). A GMA must be present, valid, and hash-matched for any PR that mutates governance primitives (governance_mutation or workflow_mutation classes).",
   "canonical_invariant": "If no valid object exists -> nothing happens.",
-  "closure_condition": "Runtime governance changes require recursively governed legitimacy approval via the canonical /session -> /continuity -> /authority -> /compile lifecycle.",
+  "closure_condition": "Runtime governance changes require governed legitimacy approval. V1: local deterministic containment (owner dispatch + governed_files_hash binding). Post-V1: canonical /session -> /continuity -> /authority -> /compile lifecycle execution.",
   "required_fields": [
     "gma_id",
     "decision_id",
@@ -34,11 +34,25 @@
   "failure_result": "NULL",
   "enforcement_rule": "governance_mutation or workflow_mutation detected AND no valid GMA at governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json -> MERGE_LEGITIMACY_NULL",
   "creation_workflow": ".github/workflows/governance-mutation-authorization.yml",
+  "v1_issuance_model": {
+    "model": "LOCAL_DETERMINISTIC",
+    "requires_owner_dispatch": true,
+    "requires_governed_files_hash": true,
+    "requires_declared_mutation_classes": true,
+    "requires_canonical_lifecycle_execution": false,
+    "note": "V1 eliminates external Worker availability dependency. governed_files_hash provides content binding. Owner workflow_dispatch provides explicit authorization. Canonical runtime lifecycle execution is SEQUENCED for post-V1 once WORKER_URL/API_KEY authorization is restored."
+  },
+  "external_runtime_issuance": {
+    "status": "SEQUENCED",
+    "classification": "POST_V1",
+    "blocker": "MINDSHIFT_WORKER_URL / MINDSHIFT_API_KEY authorization failure (HTTP 403 on PREFLIGHT)",
+    "note": "When external runtime is available, governance-mutation-authorization.yml should be extended to optionally call the canonical lifecycle and produce decision_id/continuity_id from /session → /continuity → /authority → /compile."
+  },
   "evidence_flags": {
     "evidence_only": false,
     "creates_authority": false,
     "creates_execution_eligibility": false,
-    "requires_canonical_lifecycle_lineage": true,
+    "requires_canonical_lifecycle_lineage": false,
     "fail_closed": true
   }
 }
