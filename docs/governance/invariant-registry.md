@@ -1,6 +1,8 @@
 # Invariant Registry
 
-Status: Non-Operative
+Status: LEGACY / Non-Operative
+
+Legacy note: retained because existing docs cite this governance-scoped invariant snapshot. The broader canonical invariant summary is `docs/invariant-registry.md`; do not treat this file as a runtime validator, authority source, execution input, or replacement for current FATE fixtures.
 
 ---
 
