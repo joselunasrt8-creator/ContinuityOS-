@@ -22,7 +22,9 @@
     "graph:aeo": "npx tsx graph/aeo/ingest_aeo_instances.ts",
     "graph:full": "npm run graph:extract && npm run graph:load && npm run graph:runtime && npm run graph:governance",
     "governance:regenerate": "node scripts/regenerate-governance-artifacts.mjs",
-    "graph:view": "npx tsx scripts/render-topology-graph-viewer.ts"
+    "graph:view": "npx tsx scripts/render-topology-graph-viewer.ts",
+    "demo": "node demo/portability/filesystem-governed-execution.mjs",
+    "demo:portability": "node demo/portability/filesystem-governed-execution.mjs"
   },
   "devDependencies": {
     "tsx": "^4.22.3",
