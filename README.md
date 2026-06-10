@@ -29,6 +29,90 @@ See `demo/portability/README.md` for details and
 
 ---
 
+# Recorded Demo Evidence
+
+The output below is a real run of `npm run demo` from a clean checkout
+(`demo/portability/filesystem-governed-execution.mjs`). It is shown here so
+the governed-execution wedge can be evaluated without running anything.
+
+Full transcript (clone → `npm install` → `npm run demo`):
+[`demo/portability/RECORDED_DEMO.md`](demo/portability/RECORDED_DEMO.md)
+
+## VALID — execution + proof
+
+```json
+{
+  "status": "EXECUTED",
+  "target_path": "governed/filesystem-write-gateway/seed.md",
+  "bytes_written": 49,
+  "receipt_id": "sha256:11d01f34c0a16ee6f2d280b6306170e9bba7c211a0ca1ba11fe7971bff7353a5",
+  "validated_object_hash": "sha256:e41c6e2d731642223b6f1a1a0a05058a6042b176c19a4eefe5545b49cf82fadc",
+  "executed_object_hash": "sha256:e41c6e2d731642223b6f1a1a0a05058a6042b176c19a4eefe5545b49cf82fadc",
+  "exact_object_preserved": true,
+  "proof_persisted": true,
+  "lineage_persisted": true,
+  "proof_lineage_bound": true
+}
+```
+
+`validated_object_hash == executed_object_hash` — the object that was
+validated is the exact object that was executed. A proof receipt and a
+lineage node were both persisted and are bound to each other.
+
+## REPLAY_NULL — execution blocked, no proof
+
+The same `replay_nonce` is resubmitted with different content.
+
+```json
+{
+  "agent_visible_response": {
+    "result": "NULL",
+    "execution_performed": false,
+    "proof_emitted": false,
+    "correlation_id": "null_evt_cef02c9657297af9fd3e3e055240a2c5"
+  },
+  "operator_audit_record": {
+    "reason_class": "REPLAY_NULL",
+    "stage": "replay",
+    "denial_reason": "REPLAY_NONCE_CONSUMED"
+  },
+  "no_new_proof": true,
+  "no_new_lineage": true
+}
+```
+
+The agent receives only a bounded, non-enumerating NULL response. The full
+diagnostic detail (`reason_class`, `stage`, `denial_reason`) is recoverable
+by an operator from the internal audit registry via `correlation_id`, but is
+never exposed to the calling agent.
+
+## POLICY_NULL — execution blocked, no proof
+
+A write to a denied path (`wrangler.toml`) is attempted.
+
+```json
+{
+  "agent_visible_response": {
+    "result": "NULL",
+    "execution_performed": false,
+    "proof_emitted": false,
+    "correlation_id": "null_evt_9b3ffaa49994d4381d79dda187b19cdb"
+  },
+  "operator_audit_record": {
+    "reason_class": "POLICY_NULL",
+    "stage": "validate",
+    "denial_reason": "PATH_NOT_ALLOWED"
+  },
+  "no_new_proof": true,
+  "no_new_lineage": true
+}
+```
+
+Same bounded shape, same fail-closed result: no write, no proof, no lineage —
+regardless of *why* execution was denied.
+
+---
+
 # What You Just Saw
 
 ```text
