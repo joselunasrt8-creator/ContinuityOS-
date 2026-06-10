@@ -39,6 +39,7 @@ permissions:
 
 jobs:
   create-governance-mutation-authorization:
+    if: ${{ !startsWith(github.ref_name, 'proof-registry/') }}
     runs-on: ubuntu-latest
 
     env:
@@ -65,17 +66,6 @@ jobs:
           fi
 
           echo "Dispatch authorized by ${{ github.actor }} on ${{ github.ref_name }}"
-
-      - name: SKIP — proof-registry branches are exempt
-        run: |
-          set -euo pipefail
-
-          case "${WORKFLOW_REF_NAME}" in
-            proof-registry/*)
-              echo "SKIP — governance mutation authorization is not required for proof-registry branches"
-              exit 0
-              ;;
-          esac
 
       - name: Checkout
         uses: actions/checkout@v4
