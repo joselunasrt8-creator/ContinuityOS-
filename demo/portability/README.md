@@ -56,3 +56,32 @@ record for the replay and policy-denial scenarios.
 - The reference adapter is the existing filesystem-write runtime gateway and route adapter.
 - The demo D1 adapter is local process state only; it is not a durable database implementation.
 - The output is evidence for portability and installability planning, not a deployment approval or distributed finality proof.
+
+## Portability: second mutation surface (GitHub issue comment)
+
+```bash
+npm run demo:portability:github
+```
+
+This second demo, [`github-issue-comment-governed-execution.mjs`](github-issue-comment-governed-execution.mjs),
+proves the same execution contract used above for filesystem writes also holds
+for a structurally different mutation surface: creating a comment on a GitHub
+issue.
+
+It calls `src/lib/github-issue-comment-gateway.ts` directly — capture ATAO →
+compile AEO → Omega validator (`VALID`/`NULL`) → execution boundary → proof —
+with a mock executor (no network calls, no credentials required), mirroring
+the same VALID / replay-NULL / policy-NULL scenarios as the filesystem demo.
+
+Both demos produce AEOs with the same five top-level fields (`intent`, `scope`,
+`validation`, `target`, `finality`), the same `VALID`/`NULL` validator
+boundary, and proofs that satisfy
+`validated_object_hash == executed_object_hash`. The payload, target, and
+proof receipt fields differ by surface (file path/bytes vs.
+owner/repo/issue/comment), but the contract shape and legitimacy flow are
+identical — that is the portability claim.
+
+This demo is gateway-module-level only: unlike the filesystem surface, there
+is no `/gateway/tool/github-issue-comment` HTTP route, D1 registry, or
+`src/index.ts` wiring yet. It does not introduce a new authority source,
+execution surface, or bypass path.
