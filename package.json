@@ -27,6 +27,7 @@
     "demo:portability": "node demo/portability/filesystem-governed-execution.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "wrangler": "^4.93.1",

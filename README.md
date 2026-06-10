@@ -57,6 +57,29 @@ Mutation after validation is considered a boundary violation.
 
 ---
 
+# Try the Governed Demo
+
+The fastest way to see the runtime in action is the governed filesystem demo. It
+requires no Cloudflare credentials and runs against the existing
+`POST /gateway/tool/filesystem-write` route.
+
+```bash
+npm install
+npm run demo
+```
+
+This exercises three scenarios and prints a JSON summary:
+
+- **VALID path** — a governed file write with a proof receipt and lineage node,
+  verifying `validated_object_hash == executed_object_hash`
+- **Replay NULL path** — a replayed nonce that emits no new proof or lineage
+- **Policy NULL path** — a denied write that fails closed with no proof or lineage
+
+See `demo/portability/README.md` for details and
+`docs/issues/first-installable-path.md` for the design rationale.
+
+---
+
 # Repository Governance
 
 Repository mutation governance is enforced through:

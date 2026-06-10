@@ -10,6 +10,7 @@ The demo does **not** introduce a new authority source, execution surface, or by
 ## Run
 
 ```bash
+npm install
 npm run demo
 ```
 
