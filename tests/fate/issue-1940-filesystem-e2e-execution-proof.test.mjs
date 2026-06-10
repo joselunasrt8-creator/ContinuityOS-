@@ -494,7 +494,8 @@ test('issue #1940 [proof-to-lineage] NULL path (malformed input): no proof, no l
   const res = await worker.fetch(post({ agent_id: '', session_id: '', intent: '', path: '', replay_nonce: '' }), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
+  assert.equal(out.result, 'NULL')
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
   assert.equal(env.proofRegistry.size, 0, 'no proof on NULL path')
   assert.equal(env.lineageRegistry.size, 0, 'no lineage on NULL path')
 })
@@ -506,8 +507,8 @@ test('issue #1940 [proof-to-lineage] NULL path (Ω-denied path): no proof, no li
   const res = await worker.fetch(post(makeRequestBody({ path: 'wrangler.toml' })), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
-  assert.equal(out.stage, 'validate')
+  assert.equal(out.result, 'NULL')
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
   assert.equal(env.proofRegistry.size, 0)
   assert.equal(env.lineageRegistry.size, 0)
   assert.equal(env.objectRegistry.has('wrangler.toml'), false, 'denied path must never be written')
@@ -528,9 +529,8 @@ test('issue #1940 [proof-to-lineage] replayed nonce: NULL at replay stage, no pr
   // Second call with the same nonce must be rejected before execution.
   const second = await (await worker.fetch(post({ ...body, content: 'A second, different write attempt.\n' }), env)).json()
 
-  assert.equal(second.status, 'NULL')
-  assert.equal(second.stage, 'replay')
-  assert.equal(second.reason, 'REPLAY_NONCE_CONSUMED')
+  assert.equal(second.result, 'NULL')
+  assert.match(second.correlation_id, /^null_evt_[0-9a-f]{32}$/)
 
   // No new proof or lineage record was created for the replayed attempt.
   assert.equal(env.proofRegistry.size, 1, 'replayed attempt must not add a new proof record')

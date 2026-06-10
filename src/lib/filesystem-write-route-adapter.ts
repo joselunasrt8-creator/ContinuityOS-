@@ -14,7 +14,14 @@ import { canonicalize, sha256Hex } from '../canonical.js'
 import { runFilesystemWriteGatewayAction } from './filesystem-write-runtime-gateway.js'
 import type { FilesystemValidatorContext } from './filesystem-aeo-validator.js'
 import type { FilesystemWriter } from './filesystem-execution-adapter.js'
-import type { ReplayRegistryPort, LineageRegistryPort, FilesystemExecutionLineageNode, AppendResult } from './storage-adapter.js'
+import type { ReplayRegistryPort, LineageRegistryPort, FilesystemExecutionLineageNode, NullAuditRegistryPort, AppendResult } from './storage-adapter.js'
+import {
+  generateCorrelationId,
+  classifyReasonClass,
+  buildBoundedNullResponse,
+  NULL_AUDIT_VALIDATOR_VERSION,
+} from './null-audit.js'
+import type { NullAuditRecord } from './null-audit.js'
 
 type FilesystemWriteAdapterEnv = { DB: D1Database }
 
@@ -61,6 +68,13 @@ async function ensureFilesystemWriteGatewayRegistry(env: FilesystemWriteAdapterE
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_lineage_registry (node_id TEXT PRIMARY KEY, parent_id TEXT, canonical_aeo_hash TEXT NOT NULL, receipt_id TEXT NOT NULL, decision_id TEXT NOT NULL, replay_nonce TEXT NOT NULL, target_system TEXT NOT NULL, target_action TEXT NOT NULL, target_path TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('EXECUTED','EXECUTED_UNCOMMITTED')), created_at TEXT NOT NULL)`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_lineage_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_lineage_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_lineage_registry is append-only'); END`).run()
   await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_lineage_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_lineage_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_lineage_registry is append-only'); END`).run()
+
+  // NULL audit registry: internal diagnostic record for bounded NULL responses.
+  // Audit/observability only — never proof, never authority, never replay state.
+  // execution_performed and proof_emitted are structurally false (CHECK constraints).
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS governed_filesystem_write_null_audit_registry (correlation_id TEXT PRIMARY KEY, reason_class TEXT NOT NULL, stage TEXT, denial_reason TEXT, agent_id TEXT, session_id TEXT, atao_id TEXT, canonical_aeo_hash TEXT, decision_id TEXT, replay_nonce TEXT, validator_version TEXT NOT NULL, execution_performed INTEGER NOT NULL CHECK (execution_performed = 0), proof_emitted INTEGER NOT NULL CHECK (proof_emitted = 0), created_at TEXT NOT NULL)`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_null_audit_registry_append_only_update BEFORE UPDATE ON governed_filesystem_write_null_audit_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_null_audit_registry is append-only'); END`).run()
+  await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS governed_filesystem_write_null_audit_registry_append_only_delete BEFORE DELETE ON governed_filesystem_write_null_audit_registry BEGIN SELECT RAISE(ABORT, 'governed_filesystem_write_null_audit_registry is append-only'); END`).run()
 
   const now = new Date().toISOString()
   const authority_lineage_hash = "sha256:" + sha256Hex(canonicalize({ decision_id: FILESYSTEM_WRITE_GATEWAY_DECISION_ID, surface: "filesystem_write", scope: "repository" }))
@@ -133,6 +147,82 @@ function buildD1LineageRegistryPort(db: D1Database): LineageRegistryPort {
       return { status: 'ALREADY_EXISTS', id: node.node_id, hash: node.canonical_aeo_hash }
     },
   }
+}
+
+function buildD1NullAuditRegistryPort(db: D1Database): NullAuditRegistryPort {
+  return {
+    async appendNullAuditRecord(record: NullAuditRecord): Promise<AppendResult> {
+      const result = await db
+        .prepare(
+          `INSERT INTO governed_filesystem_write_null_audit_registry
+             (correlation_id, reason_class, stage, denial_reason, agent_id, session_id,
+              atao_id, canonical_aeo_hash, decision_id, replay_nonce, validator_version,
+              execution_performed, proof_emitted, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, 0, ?12)
+           ON CONFLICT(correlation_id) DO NOTHING`,
+        )
+        .bind(
+          record.correlation_id, record.reason_class, record.stage, record.denial_reason,
+          record.agent_id, record.session_id, record.atao_id, record.canonical_aeo_hash,
+          record.decision_id, record.replay_nonce, record.validator_version, record.created_at,
+        )
+        .run()
+      const changes = result.meta?.changes ?? 0
+      if (changes > 0) return { status: 'APPENDED', id: record.correlation_id, hash: record.reason_class }
+      return { status: 'ALREADY_EXISTS', id: record.correlation_id, hash: record.reason_class }
+    },
+  }
+}
+
+// respondBoundedNull: the only path that produces an agent-visible NULL response.
+//
+// reason_class is computed for the audit record only — it is never serialized
+// into the response. The agent receives exactly { result, execution_performed,
+// proof_emitted, correlation_id }. The full diagnostic detail (stage,
+// denial_reason, atao/aeo linkage) is persisted to
+// governed_filesystem_write_null_audit_registry, resolvable by an operator via
+// correlation_id.
+async function respondBoundedNull(
+  auditPort: NullAuditRegistryPort,
+  partial: {
+    readonly stage: string | null
+    readonly reason: string | null
+    readonly failure_class?: string | null
+    readonly null_reason?: string | null
+    readonly agent_id: string | null
+    readonly session_id: string | null
+    readonly atao_id?: string | null
+    readonly canonical_aeo_hash?: string | null
+    readonly decision_id?: string | null
+    readonly replay_nonce?: string | null
+  },
+): Promise<Response> {
+  const reason_class = classifyReasonClass({
+    stage: partial.stage,
+    reason: partial.reason,
+    failure_class: partial.failure_class ?? null,
+    null_reason: partial.null_reason ?? null,
+  })
+  const correlation_id = generateCorrelationId()
+  const record: NullAuditRecord = {
+    correlation_id,
+    result: 'NULL',
+    reason_class,
+    stage: partial.stage,
+    denial_reason: partial.failure_class ?? partial.reason,
+    agent_id: partial.agent_id,
+    session_id: partial.session_id,
+    atao_id: partial.atao_id ?? null,
+    canonical_aeo_hash: partial.canonical_aeo_hash ?? null,
+    decision_id: partial.decision_id ?? null,
+    replay_nonce: partial.replay_nonce ?? null,
+    validator_version: NULL_AUDIT_VALIDATOR_VERSION,
+    execution_performed: false,
+    proof_emitted: false,
+    created_at: new Date().toISOString(),
+  }
+  await auditPort.appendNullAuditRecord(record)
+  return filesystemWriteResponse(buildBoundedNullResponse(correlation_id))
 }
 
 function buildD1FilesystemValidatorContext(
@@ -247,8 +337,15 @@ function filesystemWriteResponse(data: Record<string, unknown>, status = 200): R
 // The kernel receives only FilesystemWriteIntentInput (pure agent data) and
 // FilesystemWriteKernelContext (adapter-boundary constructs with no transport handles).
 export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv, request: Request): Promise<Response> {
+  await ensureFilesystemWriteGatewayRegistry(env)
+  const nullAuditRegistryPort = buildD1NullAuditRegistryPort(env.DB)
+
   const b = await request.json().catch(() => null) as Record<string, unknown> | null
-  if (!b || typeof b !== "object") return filesystemWriteResponse({ status: "NULL", result: "NULL", reason: "malformed_request" })
+  if (!b || typeof b !== "object") {
+    return respondBoundedNull(nullAuditRegistryPort, {
+      stage: "capture", reason: "malformed_request", agent_id: null, session_id: null,
+    })
+  }
 
   const agent_id = String(b.agent_id || "")
   const session_id = String(b.session_id || "")
@@ -259,17 +356,26 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
   const replay_nonce = String(b.replay_nonce || "")
 
   if (!agent_id || !session_id || !intent || !path || !replay_nonce) {
-    return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "capture", reason: "missing_required_fields" })
+    return respondBoundedNull(nullAuditRegistryPort, {
+      stage: "capture", reason: "missing_required_fields",
+      agent_id: agent_id || null, session_id: session_id || null,
+    })
   }
 
-  await ensureFilesystemWriteGatewayRegistry(env)
-
   const decisionRow = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_decision_registry WHERE decision_id = ?1`).bind(decision_id).first<any>()
-  if (!decisionRow) return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "validate", reason: "decision_not_found", decision_id })
+  if (!decisionRow) {
+    return respondBoundedNull(nullAuditRegistryPort, {
+      stage: "validate", reason: "decision_not_found",
+      agent_id, session_id, decision_id, replay_nonce,
+    })
+  }
 
   const nonceRow = await env.DB.prepare(`SELECT * FROM governed_filesystem_write_nonce_registry WHERE replay_nonce = ?1`).bind(replay_nonce).first<any>()
   if (nonceRow && String(nonceRow.decision_id) !== decision_id) {
-    return filesystemWriteResponse({ status: "NULL", result: "NULL", stage: "validate", reason: "replay_nonce_decision_mismatch", replay_nonce })
+    return respondBoundedNull(nullAuditRegistryPort, {
+      stage: "validate", reason: "replay_nonce_decision_mismatch",
+      agent_id, session_id, decision_id, replay_nonce,
+    })
   }
 
   const existingObject = await env.DB.prepare(`SELECT * FROM governed_filesystem_object_registry WHERE path = ?1`).bind(path).first<any>()
@@ -316,19 +422,22 @@ export async function handleFilesystemWriteRoute(env: FilesystemWriteAdapterEnv,
   )
 
   if (outcome.result !== 'EXECUTED' && outcome.result !== 'EXECUTED_UNCOMMITTED') {
-    return filesystemWriteResponse({
-      status: 'NULL',
-      result: 'NULL',
+    return respondBoundedNull(nullAuditRegistryPort, {
       stage: outcome.stage,
       reason: outcome.reason,
-      validator_denial: outcome.validator_denial,
-      receipt: outcome.receipt,
+      failure_class: outcome.validator_denial?.failure_class ?? null,
+      agent_id, session_id, decision_id, replay_nonce,
+      canonical_aeo_hash: outcome.validator_denial?.aeo_hash ?? null,
     })
   }
 
   const captured = writerHandle.capture()
   if (!captured) {
-    return filesystemWriteResponse({ status: 'NULL', result: 'NULL', stage: 'execute', reason: 'WRITER_CAPTURE_MISSING' })
+    return respondBoundedNull(nullAuditRegistryPort, {
+      stage: 'execute', reason: 'WRITER_CAPTURE_MISSING',
+      agent_id, session_id, decision_id, replay_nonce, atao_id: outcome.atao_id,
+      canonical_aeo_hash: outcome.receipt.validated_object_hash,
+    })
   }
 
   // The real side effect: persisted only because — and exactly as — the
