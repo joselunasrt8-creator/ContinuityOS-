@@ -1,12 +1,12 @@
 {
-  "gma_id": "GMA-claude/github-merge-guard-action-u82h6y-local-1781080371502",
-  "decision_id": "ae8166982863f0abebabbde0c9a2616368b53021ca812e5adda5ff14575560cc",
-  "continuity_id": "4725cdd520c4dcf8512d9509546dbd6830f00142629dab67fe6238b7c62166a6",
-  "session_id": "5f71cc2f6022521338bdf45eaf54fbd4df42ffb78f67f3e8552c4bf367aa14e2",
-  "validated_object_hash": "994cc229616413239caf03327098b60ede2f0990160107db5709b40cf74530b5",
-  "governed_files_hash": "1bd4c9668b46e19d52691065aaa0ed73b7d2c61e16a56fc8c0667b3888780433",
+  "gma_id": "GMA-claude/gma-proof-registry-guard-muh2h1-local-1781090424035",
+  "decision_id": "fb9b328c3cc69bee3909c78bbb26860380c2359fe76157969474761a33bae352",
+  "continuity_id": "61e23707451d8026120c7950b94ec7523441bc5b9ae5d6ff144a20d3f9a212da",
+  "session_id": "57687e9803eb9839c0053526e3c77feda5ce2818cccc46e219f9537bcf638a12",
+  "validated_object_hash": "a48eba36d095a623d50955db6e2c9cebd097d5b7059ef4f6ce0ef5ab27b8e05d",
+  "governed_files_hash": "6deb2ee765aec5939244509a452b701fd15196f0a39d224d72563720d95294de",
   "governed_files": [
-    ".github/workflows/continuity-merge-guard.yml"
+    ".github/workflows/governance-mutation-authorization.yml"
   ],
   "mutation_classes": [
     "workflow_mutation"
@@ -15,14 +15,14 @@
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Add ContinuityOS Merge Guard packaged GitHub Action (v1) and its dogfooding workflow .github/workflows/continuity-merge-guard.yml",
+  "intent": "Skip governance mutation authorization on proof-registry branches",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/mindshift-demo",
-  "branch": "claude/github-merge-guard-action-u82h6y",
-  "head_sha": "9708b149f1ef91ef69a88574169bc79689d8d1e4",
-  "workflow_run_id": "local-1781080371502",
-  "created_at": "2026-06-10T08:32:51Z",
-  "expires_at": "2027-06-10T08:32:51Z",
+  "branch": "claude/gma-proof-registry-guard-muh2h1",
+  "head_sha": "3c57847b672d623e9a918346620572c89c773782",
+  "workflow_run_id": "local-1781090424035",
+  "created_at": "2026-06-10T11:20:24Z",
+  "expires_at": "2027-06-10T11:20:24Z",
   "status": "GMA_VALID"
 }
