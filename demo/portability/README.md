@@ -7,6 +7,8 @@ This demo is the first runnable external-developer path for the filesystem gover
 
 The demo does **not** introduce a new authority source, execution surface, or bypass path. It bundles `src/index.ts`, invokes `POST /gateway/tool/filesystem-write`, and supplies an in-memory D1-compatible adapter so the path can be run without Cloudflare credentials.
 
+For a recorded transcript of the expected output, see [`RECORDED_DEMO.md`](RECORDED_DEMO.md). The top-level [README](../../README.md#recorded-demo-evidence) also shows the VALID / replay-NULL / policy-NULL output inline.
+
 ## Run
 
 ```bash
