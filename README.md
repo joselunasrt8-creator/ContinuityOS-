@@ -1,20 +1,62 @@
 # ContinuityOS
 
-ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
+AI systems can decide what to do.
+ContinuityOS governs whether they are allowed to do it.
 
-ContinuityOS is the runtime infrastructure project derived from the MindShift canon.
+---
 
-MindShift remains the canon and research umbrella.
-ContinuityOS is the runtime substrate.
+# Try the Governed Demo
 
-ContinuityOS governs whether state-changing actions are permitted to exist before execution occurs.
+The fastest way to see the runtime in action is the governed filesystem demo. It
+requires no Cloudflare credentials and runs against the existing
+`POST /gateway/tool/filesystem-write` route.
 
-Core invariant:
+```bash
+npm install
+npm run demo
+```
+
+Expected output:
+
+```
+VALID        → proof receipt + lineage node, validated_object_hash == executed_object_hash
+Replay NULL  → no new proof, no new lineage
+Policy NULL  → fails closed, no proof, no lineage
+```
+
+See `demo/portability/README.md` for details and
+`docs/issues/first-installable-path.md` for the design rationale.
+
+---
+
+# What You Just Saw
+
+```text
+Agent
+→ Proposed Action
+→ Validation
+→ Execution Boundary
+→ Proof
+```
+
+A proposed action is only executed if it passes validation. If validation
+fails — a replayed nonce, a denied path — nothing executes and nothing is
+recorded.
+
+---
+
+# Core Invariants
 
 ```text
 If no valid object exists
 → nothing happens
 ```
+
+```text
+validated_object == executed_object
+```
+
+Mutation after validation is considered a boundary violation.
 
 ---
 
@@ -46,37 +88,6 @@ ContinuityOS runtime is built around:
 - non-bypassable execution boundaries
 - authority integrity
 - continuity lineage
-
-Canonical invariant:
-
-```text
-validated_object == executed_object
-```
-
-Mutation after validation is considered a boundary violation.
-
----
-
-# Try the Governed Demo
-
-The fastest way to see the runtime in action is the governed filesystem demo. It
-requires no Cloudflare credentials and runs against the existing
-`POST /gateway/tool/filesystem-write` route.
-
-```bash
-npm install
-npm run demo
-```
-
-This exercises three scenarios and prints a JSON summary:
-
-- **VALID path** — a governed file write with a proof receipt and lineage node,
-  verifying `validated_object_hash == executed_object_hash`
-- **Replay NULL path** — a replayed nonce that emits no new proof or lineage
-- **Policy NULL path** — a denied write that fails closed with no proof or lineage
-
-See `demo/portability/README.md` for details and
-`docs/issues/first-installable-path.md` for the design rationale.
 
 ---
 
@@ -114,6 +125,11 @@ Canonical external statement:
 ```text
 ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
 ```
+
+ContinuityOS is the runtime infrastructure project derived from the MindShift canon.
+MindShift remains the canon and research umbrella; ContinuityOS is the runtime
+substrate. ContinuityOS governs whether state-changing actions are permitted to
+exist before execution occurs.
 
 Execution gate:
 
