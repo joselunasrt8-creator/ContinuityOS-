@@ -1,0 +1,12 @@
+{
+  "description": "head_sha missing — fails closed to NULL",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "1970",
+    "head_sha": "",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "some-contributor"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": ["head_sha"]
+}
