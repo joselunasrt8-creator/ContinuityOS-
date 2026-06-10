@@ -111,6 +111,21 @@ A write to a denied path (`wrangler.toml`) is attempted.
 Same bounded shape, same fail-closed result: no write, no proof, no lineage —
 regardless of *why* execution was denied.
 
+## Agent runtime integration: LangChain
+
+The same governed route is wired into a LangChain tool
+(`@langchain/core/tools` `DynamicStructuredTool`). The tool has no
+filesystem-write code of its own — `tool.invoke(...)` only calls
+`POST /gateway/tool/filesystem-write` and returns the result.
+
+```bash
+npm run demo:langchain
+```
+
+See [`demo/integrations/langchain/README.md`](demo/integrations/langchain/README.md)
+for the integration guide and [`governed-filesystem-tool.mjs`](demo/integrations/langchain/governed-filesystem-tool.mjs)
+for the tool implementation.
+
 ---
 
 # What You Just Saw

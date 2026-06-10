@@ -24,17 +24,19 @@
     "governance:regenerate": "node scripts/regenerate-governance-artifacts.mjs",
     "graph:view": "npx tsx scripts/render-topology-graph-viewer.ts",
     "demo": "node demo/portability/filesystem-governed-execution.mjs",
-    "demo:portability": "node demo/portability/filesystem-governed-execution.mjs"
+    "demo:portability": "node demo/portability/filesystem-governed-execution.mjs",
+    "demo:langchain": "node demo/integrations/langchain/governed-agent-demo.mjs"
   },
   "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "esbuild": "^0.28.0",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
-    "wrangler": "^4.93.1",
-    "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "wrangler": "^4.93.1"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.48",
     "neo4j-driver": "^6.0.1"
   },
   "description": "ContinuityOS runtime infrastructure derived from the MindShift canon",
