@@ -1,0 +1,12 @@
+{
+  "description": "Complete object-identity payload — all required fields present",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "1970",
+    "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "some-contributor"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": []
+}
