@@ -77,6 +77,7 @@ function makeFilesystemGatewayEnv() {
   const objectRegistry = new Map()
   const proofRegistry = new Map()
   const lineageRegistry = new Map()
+  const nullAuditRegistry = new Map()
   const writes = []
 
   const env = {
@@ -86,6 +87,7 @@ function makeFilesystemGatewayEnv() {
     objectRegistry,
     proofRegistry,
     lineageRegistry,
+    nullAuditRegistry,
     writes,
     DB: {
       prepare(sql) {
@@ -175,6 +177,42 @@ function makeFilesystemGatewayEnv() {
               return { meta: { changes: 1 } }
             }
 
+            if (sql.includes('INSERT INTO governed_filesystem_write_null_audit_registry')) {
+              const [
+                correlation_id,
+                reason_class,
+                stage,
+                denial_reason,
+                agent_id,
+                session_id,
+                atao_id,
+                canonical_aeo_hash,
+                decision_id,
+                replay_nonce,
+                validator_version,
+                created_at,
+              ] = this.args
+              if (!nullAuditRegistry.has(correlation_id)) {
+                nullAuditRegistry.set(correlation_id, {
+                  correlation_id,
+                  reason_class,
+                  stage,
+                  denial_reason,
+                  agent_id,
+                  session_id,
+                  atao_id,
+                  canonical_aeo_hash,
+                  decision_id,
+                  replay_nonce,
+                  validator_version,
+                  execution_performed: false,
+                  proof_emitted: false,
+                  created_at,
+                })
+              }
+              return { meta: { changes: 1 } }
+            }
+
             if (sql.includes('governed_filesystem_write_lineage_registry') && sql.includes('INSERT INTO')) {
               const [
                 node_id,
@@ -261,12 +299,10 @@ function summarizeValid(out, env) {
 }
 
 function summarizeNull(out, env, before) {
+  const audit = env.nullAuditRegistry.get(out.correlation_id) ?? null
   return {
-    status: out.status,
-    stage: out.stage,
-    reason: out.reason ?? out.validator_denial?.failure_class ?? null,
-    validator_failure_class: out.validator_denial?.failure_class ?? null,
-    receipt: out.receipt ?? null,
+    agent_visible_response: out,
+    operator_audit_record: audit,
     proof_count_before: before.proofCount,
     proof_count_after: env.proofRegistry.size,
     lineage_count_before: before.lineageCount,
@@ -299,9 +335,13 @@ async function main() {
     ...validAction,
     content: `Replay attempt from ${model}; this content must not land.\n`,
   })
-  assert.equal(replay.status, 'NULL')
-  assert.equal(replay.stage, 'replay')
-  assert.equal(replay.reason, 'REPLAY_NONCE_CONSUMED')
+  assert.equal(replay.result, 'NULL')
+  assert.equal(replay.execution_performed, false)
+  assert.equal(replay.proof_emitted, false)
+  const replayAudit = env.nullAuditRegistry.get(replay.correlation_id)
+  assert.equal(replayAudit.reason_class, 'REPLAY_NULL')
+  assert.equal(replayAudit.stage, 'replay')
+  assert.equal(replayAudit.denial_reason, 'REPLAY_NONCE_CONSUMED')
   assert.equal(env.proofRegistry.size, replayBefore.proofCount)
   assert.equal(env.lineageRegistry.size, replayBefore.lineageCount)
 
@@ -312,9 +352,13 @@ async function main() {
     path: 'wrangler.toml',
     content: 'Denied portability demo write.\n',
   }))
-  assert.equal(denied.status, 'NULL')
-  assert.equal(denied.stage, 'validate')
-  assert.equal(denied.validator_denial.failure_class, 'PATH_NOT_ALLOWED')
+  assert.equal(denied.result, 'NULL')
+  assert.equal(denied.execution_performed, false)
+  assert.equal(denied.proof_emitted, false)
+  const deniedAudit = env.nullAuditRegistry.get(denied.correlation_id)
+  assert.equal(deniedAudit.reason_class, 'POLICY_NULL')
+  assert.equal(deniedAudit.stage, 'validate')
+  assert.equal(deniedAudit.denial_reason, 'PATH_NOT_ALLOWED')
   assert.equal(env.objectRegistry.has('wrangler.toml'), false)
   assert.equal(env.proofRegistry.size, deniedBefore.proofCount)
   assert.equal(env.lineageRegistry.size, deniedBefore.lineageCount)
