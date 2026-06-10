@@ -1,0 +1,59 @@
+name: 'ContinuityOS Merge Guard'
+description: >
+  Smallest-release legitimacy check for a pull request: builds a canonical
+  object-identity payload {repo, pr_number, head_sha, base_sha, actor},
+  hashes it, and emits VALID or NULL (fail-closed) plus a proof artifact.
+  Designed to be added as a required status check.
+
+inputs:
+  repo:
+    description: 'owner/repo'
+    required: true
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  head-sha:
+    description: 'PR head commit SHA'
+    required: true
+  base-sha:
+    description: 'PR base commit SHA'
+    required: true
+  actor:
+    description: 'PR author / actor login'
+    required: true
+
+outputs:
+  result:
+    description: 'VALID or NULL'
+    value: ${{ steps.merge-guard.outputs.result }}
+  proof_id:
+    description: 'Proof identifier bound to pr_number and head_sha'
+    value: ${{ steps.merge-guard.outputs.proof_id }}
+  proof_hash:
+    description: 'sha256 of the canonical payload'
+    value: ${{ steps.merge-guard.outputs.proof_hash }}
+  proof_url:
+    description: 'Path to the uploaded MERGE_GUARD_PROOF.json artifact'
+    value: ${{ steps.merge-guard.outputs.proof_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run legitimacy check
+      id: merge-guard
+      shell: bash
+      env:
+        MERGE_GUARD_REPO: ${{ inputs.repo }}
+        MERGE_GUARD_PR_NUMBER: ${{ inputs.pr-number }}
+        MERGE_GUARD_HEAD_SHA: ${{ inputs.head-sha }}
+        MERGE_GUARD_BASE_SHA: ${{ inputs.base-sha }}
+        MERGE_GUARD_ACTOR: ${{ inputs.actor }}
+      run: node "${{ github.action_path }}/check.mjs"
+
+    - name: Upload merge guard proof
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: MERGE_GUARD_PROOF
+        path: MERGE_GUARD_PROOF.json
+        if-no-files-found: ignore

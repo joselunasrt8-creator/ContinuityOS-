@@ -29,6 +29,28 @@ See `demo/portability/README.md` for details and
 
 ---
 
+# Try the Merge Guard Action
+
+A second installable wedge: a packaged GitHub Action that checks a pull
+request's identity object (`repo`, `pr_number`, `head_sha`, `base_sha`,
+`actor`), hashes it, and returns `VALID` or `NULL` (fail-closed) with a
+proof artifact — designed to be added as a required status check.
+
+```yaml
+- uses: joselunasrt8-creator/mindshift-demo/actions/continuity-merge-guard@main
+  with:
+    repo: ${{ github.repository }}
+    pr-number: ${{ github.event.pull_request.number }}
+    head-sha: ${{ github.event.pull_request.head.sha }}
+    base-sha: ${{ github.event.pull_request.base.sha }}
+    actor: ${{ github.event.pull_request.user.login }}
+```
+
+See `actions/continuity-merge-guard/README.md` for the full wedge
+explanation, proof schema, and v2 roadmap.
+
+---
+
 # Recorded Demo Evidence
 
 The output below is a real run of `npm run demo` from a clean checkout
