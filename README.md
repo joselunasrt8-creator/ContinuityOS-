@@ -126,6 +126,36 @@ See [`demo/integrations/langchain/README.md`](demo/integrations/langchain/README
 for the integration guide and [`governed-filesystem-tool.mjs`](demo/integrations/langchain/governed-filesystem-tool.mjs)
 for the tool implementation.
 
+## Portability: second mutation surface (GitHub issue comment)
+
+The same execution contract — ATAO → AEO → Ω validator (`VALID`/`NULL`) →
+execution boundary → proof — also holds for a structurally different
+mutation surface: creating a comment on a GitHub issue.
+
+```bash
+npm run demo:portability:github
+```
+
+```json
+{
+  "status": "EXECUTED",
+  "target_owner": "joselunasrt8-creator",
+  "target_repo": "mindshift-demo",
+  "target_issue_number": 1954,
+  "validated_object_hash": "sha256:50b536ace02934020397ea3498d626a7eab28c5325958a131593e0a90425f29a",
+  "executed_object_hash": "sha256:50b536ace02934020397ea3498d626a7eab28c5325958a131593e0a90425f29a",
+  "exact_object_preserved": true,
+  "comment_id": "demo-comment-0001",
+  "comment_url": "https://github.com/joselunasrt8-creator/mindshift-demo/issues/1954#issuecomment-demo-0001"
+}
+```
+
+Same contract shape, second mutation surface: `validated_object_hash ==
+executed_object_hash`, and a `VALID`/`NULL` validator boundary, now applied to
+an external GitHub API mutation instead of a local filesystem write. See
+[`demo/portability/README.md`](demo/portability/README.md#portability-second-mutation-surface-github-issue-comment)
+for details and scope notes.
+
 ---
 
 # What You Just Saw

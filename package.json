@@ -25,6 +25,7 @@
     "graph:view": "npx tsx scripts/render-topology-graph-viewer.ts",
     "demo": "node demo/portability/filesystem-governed-execution.mjs",
     "demo:portability": "node demo/portability/filesystem-governed-execution.mjs",
+    "demo:portability:github": "node demo/portability/github-issue-comment-governed-execution.mjs",
     "demo:langchain": "node demo/integrations/langchain/governed-agent-demo.mjs"
   },
   "devDependencies": {
