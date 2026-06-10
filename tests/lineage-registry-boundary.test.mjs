@@ -344,7 +344,7 @@ test('lineage boundary: NULL outcome — no lineage appended', async () => {
   const res = await worker.fetch(post({ agent_id: '', session_id: '', intent: '', path: '', replay_nonce: '' }), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
+  assert.equal(out.result, 'NULL')
   assert.equal(env.lineageRegistry.size, 0, 'no lineage may be appended on NULL path')
 })
 
@@ -355,8 +355,8 @@ test('lineage boundary: denied path (NULL at validate) — no lineage appended',
   const res = await worker.fetch(post(makeRequestBody({ path: 'wrangler.toml' })), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
-  assert.equal(out.stage, 'validate')
+  assert.equal(out.result, 'NULL')
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
   assert.equal(env.lineageRegistry.size, 0, 'no lineage may be appended on NULL path')
 })
 
@@ -365,7 +365,7 @@ test('lineage boundary: NULL path — no proof appended either', async () => {
   const env = makeEnv()
 
   const res = await worker.fetch(post({ agent_id: '', session_id: '', intent: '', path: '', replay_nonce: '' }), env)
-  assert.equal((await res.json()).status, 'NULL')
+  assert.equal((await res.json()).result, 'NULL')
   assert.equal(env.proofRegistry.size, 0)
   assert.equal(env.lineageRegistry.size, 0)
 })

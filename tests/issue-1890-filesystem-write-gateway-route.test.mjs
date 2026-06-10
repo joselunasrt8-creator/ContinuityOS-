@@ -59,6 +59,7 @@ function makeFilesystemGatewayEnv() {
   const nonceRegistry = new Map()
   const objectRegistry = new Map()
   const proofRegistry = new Map()
+  const nullAuditRegistry = new Map()
   const writes = []
 
   const env = {
@@ -67,6 +68,7 @@ function makeFilesystemGatewayEnv() {
     nonceRegistry,
     objectRegistry,
     proofRegistry,
+    nullAuditRegistry,
     writes,
     DB: {
       prepare(sql) {
@@ -110,6 +112,21 @@ function makeFilesystemGatewayEnv() {
             if (sql.includes('INSERT INTO governed_filesystem_write_proof_registry')) {
               const [proof_id] = this.args
               proofRegistry.set(proof_id, this.args)
+              return { meta: { changes: 1 } }
+            }
+
+            if (sql.includes('INSERT INTO governed_filesystem_write_null_audit_registry')) {
+              const [
+                correlation_id, reason_class, stage, denial_reason, agent_id, session_id,
+                atao_id, canonical_aeo_hash, decision_id, replay_nonce, validator_version,
+                _execution_performed, _proof_emitted, created_at,
+              ] = this.args
+              if (nullAuditRegistry.has(correlation_id)) return { meta: { changes: 0 } }
+              nullAuditRegistry.set(correlation_id, {
+                correlation_id, reason_class, stage, denial_reason, agent_id, session_id,
+                atao_id, canonical_aeo_hash, decision_id, replay_nonce, validator_version,
+                execution_performed: 0, proof_emitted: 0, created_at,
+              })
               return { meta: { changes: 1 } }
             }
 
@@ -190,11 +207,17 @@ test('ROUTE-02 replaying the same nonce is denied at validate and does not mutat
   const replay = await worker.fetch(post(replayBody), env)
   const out = await replay.json()
 
-  assert.equal(out.status, 'NULL')
   assert.equal(out.result, 'NULL')
-  assert.equal(out.stage, 'validate')
-  assert.notEqual(out.validator_denial, null)
-  assert.equal(out.validator_denial.failure_class, 'REPLAY_NONCE_CONSUMED_OR_RESERVED')
+  assert.equal(out.execution_performed, false)
+  assert.equal(out.proof_emitted, false)
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
+  for (const leaked of ['stage', 'reason', 'validator_denial', 'receipt', 'reason_class']) {
+    assert.equal(out[leaked], undefined, `NULL response must not expose "${leaked}"`)
+  }
+
+  const auditRow = env.nullAuditRegistry.get(out.correlation_id)
+  assert.ok(auditRow, 'a NULL audit record must be persisted for the correlation_id')
+  assert.equal(auditRow.reason_class, 'REPLAY_NULL')
 
   // The registry must be untouched by the replay — same content as after the
   // first (legitimate) execution, not the replay's payload.
@@ -212,11 +235,18 @@ test('ROUTE-03 a write outside the governed policy paths is denied at validate a
   const res = await worker.fetch(post(body), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
-  assert.equal(out.stage, 'validate')
-  assert.notEqual(out.validator_denial, null)
-  assert.equal(out.validator_denial.failure_class, 'PATH_NOT_ALLOWED')
-  assert.equal(out.receipt, null)
+  assert.equal(out.result, 'NULL')
+  assert.equal(out.execution_performed, false)
+  assert.equal(out.proof_emitted, false)
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
+  for (const leaked of ['stage', 'reason', 'validator_denial', 'receipt', 'reason_class']) {
+    assert.equal(out[leaked], undefined, `NULL response must not expose "${leaked}"`)
+  }
+
+  const auditRow = env.nullAuditRegistry.get(out.correlation_id)
+  assert.ok(auditRow, 'a NULL audit record must be persisted for the correlation_id')
+  assert.equal(auditRow.reason_class, 'POLICY_NULL')
+
   assert.equal(env.objectRegistry.has('wrangler.toml'), false, 'denied path must never be written to the virtual filesystem')
   assert.equal(env.proofRegistry.size, 0)
 })
@@ -230,9 +260,19 @@ test('ROUTE-04 a malformed request is rejected at capture before any chain stage
   const res = await worker.fetch(post({ agent_id: '', session_id: '', intent: '', path: '', replay_nonce: '' }), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
-  assert.equal(out.stage, 'capture')
-  assert.equal(out.reason, 'missing_required_fields')
+  assert.equal(out.result, 'NULL')
+  assert.equal(out.execution_performed, false)
+  assert.equal(out.proof_emitted, false)
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
+  for (const leaked of ['stage', 'reason', 'validator_denial', 'receipt', 'reason_class']) {
+    assert.equal(out[leaked], undefined, `NULL response must not expose "${leaked}"`)
+  }
+
+  const auditRow = env.nullAuditRegistry.get(out.correlation_id)
+  assert.ok(auditRow, 'a NULL audit record must be persisted for the correlation_id')
+  assert.equal(auditRow.stage, 'capture')
+  assert.equal(auditRow.denial_reason, 'missing_required_fields')
+
   assert.equal(env.objectRegistry.size <= 1, true, 'only the seed object may exist — request must not have mutated anything')
   assert.equal(env.proofRegistry.size, 0)
 })
@@ -245,9 +285,19 @@ test('ROUTE-05 an unknown decision_id is rejected and never reaches execution', 
   const res = await worker.fetch(post(body), env)
   const out = await res.json()
 
-  assert.equal(out.status, 'NULL')
-  assert.equal(out.reason, 'decision_not_found')
+  assert.equal(out.result, 'NULL')
+  assert.equal(out.execution_performed, false)
+  assert.equal(out.proof_emitted, false)
+  assert.match(out.correlation_id, /^null_evt_[0-9a-f]{32}$/)
   assert.equal(out.proof, undefined)
+  for (const leaked of ['stage', 'reason', 'validator_denial', 'receipt', 'reason_class']) {
+    assert.equal(out[leaked], undefined, `NULL response must not expose "${leaked}"`)
+  }
+
+  const auditRow = env.nullAuditRegistry.get(out.correlation_id)
+  assert.ok(auditRow, 'a NULL audit record must be persisted for the correlation_id')
+  assert.equal(auditRow.denial_reason, 'decision_not_found')
+
   assert.equal(env.proofRegistry.size, 0)
 })
 
