@@ -30,6 +30,24 @@ The script executes three scenarios:
 2. **Replay NULL path** — resubmits the same nonce with different content and verifies no new proof or lineage is emitted.
 3. **Policy NULL path** — attempts to write `wrangler.toml` and verifies path validation fails closed with no write, proof, or lineage.
 
+## Reading the NULL output
+
+Both NULL scenarios print two objects:
+
+- `agent_visible_response` — exactly what the calling agent receives:
+  `{ result: "NULL", execution_performed: false, proof_emitted: false, correlation_id }`.
+  This response is intentionally bounded and non-enumerating: it carries no
+  `stage` or `reason`, so an agent cannot binary-search policy, authority, or
+  replay boundaries via repeated NULLs.
+- `operator_audit_record` — the internal diagnostic record persisted to
+  `governed_filesystem_write_null_audit_registry`, resolvable by an operator
+  via the same `correlation_id`. It carries `reason_class` (`REPLAY_NULL` /
+  `POLICY_NULL` / `MUTATION_NULL`), `stage`, and `denial_reason`.
+
+The demo asserts on both: the bounded shape of the agent-visible response,
+and the expected `reason_class`/`stage`/`denial_reason` in the operator audit
+record for the replay and policy-denial scenarios.
+
 ## Boundary notes
 
 - The mutation-capable surface remains the existing `/gateway/tool/filesystem-write` route.

@@ -13,6 +13,7 @@
 // SQLite and Postgres adapters are planned for V3 step 7.
 
 import type { AdapterProofReceipt } from './adapter-contract.js'
+import type { NullAuditRecord } from './null-audit.js'
 
 // ── Shared Result Types ────────────────────────────────────────────────────────
 
@@ -142,6 +143,22 @@ export interface ValidCommitPort {
   // Atomic commit of the post-VALID write group.
   // Returns REJECTED if any write fails; caller receives no partial commit.
   commitValidatedExecution(record: ValidExecutionCommit): Promise<AppendResult>
+}
+
+// ── NULL Audit Registry ────────────────────────────────────────────────────────
+// Audit/observability surface for bounded NULL responses (governed
+// filesystem-write route). A NullAuditRecord is never proof, never authority,
+// and never affects replay eligibility:
+//   NULL audit record != proof
+//   NULL audit record != authority
+//   NULL audit record != replay eligibility
+// execution_performed and proof_emitted are structurally false.
+// Must never be called on an EXECUTED / EXECUTED_UNCOMMITTED path.
+
+export interface NullAuditRegistryPort {
+  // Persists the internal diagnostic record for a bounded NULL response.
+  // Returns AppendResult so audit-write failures are never silently hidden.
+  appendNullAuditRecord(record: NullAuditRecord): Promise<AppendResult>
 }
 
 // ── Composite Storage Adapter Interface ───────────────────────────────────────
