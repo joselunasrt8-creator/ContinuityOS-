@@ -38,6 +38,28 @@ Those are deliberately deferred — see [v2](#v2-not-yet-built) below. v1 is
 a legitimacy check on object identity, not a review system, agent
 classifier, or policy engine.
 
+## Replay and idempotency semantics
+
+Merge Guard's `check.mjs` is a **stateless, pure function** of the five
+identity inputs (`repo`, `pr_number`, `head_sha`, `base_sha`, `actor`). It
+holds no nonce, registry, or persisted state of its own:
+
+- Re-running the workflow on the same PR at the same `head_sha` /
+  `base_sha` always reproduces the same `canonical_hash` and the same
+  `result` (`VALID` or `NULL`). This is **idempotent by construction** —
+  unlike the canonical runtime's `/proof` and `/execute` surfaces (see the
+  top-level `README.md`'s `REPLAY_NULL` example), there is no
+  `replay_nonce` to consume, so a repeat run is never itself a cause of a
+  `NULL` result.
+- A `result` can only change between runs if the **inputs** change (a new
+  commit pushed to the PR changes `head_sha`, a rebase changes `base_sha`,
+  etc.) or if the validator implementation (`check.mjs`) itself changes
+  between a `@v0.1.0`-pinned run and a different ref.
+- Because Merge Guard performs no mutation (it only reads its five inputs
+  and writes a proof artifact), it has no replay-attack surface in the
+  sense the canonical runtime defines: there is nothing for a replayed
+  identity object to consume or invalidate.
+
 ## Output
 
 Each run produces:
