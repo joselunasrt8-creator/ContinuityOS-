@@ -87,6 +87,27 @@ test('selectGmaEntry picks the matching (branch, governed_files_hash, GMA_VALID,
   assert.equal(selected.gma_id, 'GMA-correct');
 });
 
+test('selectGmaEntry deterministically picks the most recently created entry when multiple GMAs match', () => {
+  const hash = 'a'.repeat(64);
+  const older = gmaEntry({
+    gma_id: 'GMA-older',
+    branch: 'feature',
+    governed_files_hash: hash,
+    created_at: new Date(Date.now() - 60_000).toISOString(),
+  });
+  const newer = gmaEntry({
+    gma_id: 'GMA-newer',
+    branch: 'feature',
+    governed_files_hash: hash,
+    created_at: new Date().toISOString(),
+  });
+
+  // Order in the registry should not affect the outcome — selection is by created_at, not position.
+  assert.equal(selectGmaEntry([older, newer], { branch: 'feature', governedFilesHash: hash }).gma_id, 'GMA-newer');
+  assert.equal(selectGmaEntry([newer, older], { branch: 'feature', governedFilesHash: hash }).gma_id, 'GMA-newer');
+});
+
+
 test('selectGmaEntry returns null when no entry matches', () => {
   const entries = [gmaEntry({ gma_id: 'GMA-other', branch: 'feature', governed_files_hash: 'a'.repeat(64) })];
   const selected = selectGmaEntry(entries, { branch: 'feature', governedFilesHash: 'b'.repeat(64) });
@@ -141,6 +162,22 @@ test('merge-proof.yml wires governance_mutation_proof generation and registry pe
   assert.match(workflow, /from '\.\/runtime\/governance-mutation-proof\.mjs'/);
   assert.match(workflow, /_record_type: "governance_mutation_proof"/);
   assert.match(workflow, /GOVERNANCE_MUTATION_PROOF\.json/);
+});
+
+test('governance_mutation_proof append is gated behind the existing MERGE_PROOF idempotency checks (replay-safe)', () => {
+  const workflow = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  const appendStep = workflow.slice(workflow.indexOf('name: Append proof to registry via PR'));
+
+  const idempotency1 = appendStep.indexOf('Idempotency 1');
+  const idempotency2 = appendStep.indexOf('Idempotency 2');
+  const govProofAppend = appendStep.indexOf('_record_type: "governance_mutation_proof"');
+
+  assert.ok(idempotency1 >= 0 && idempotency2 >= 0 && govProofAppend >= 0);
+  // Both idempotency early-exits must precede the governance_mutation_proof append,
+  // so a rerun against an already-persisted proof_id skips both entries together
+  // rather than appending a duplicate governance_mutation_proof line.
+  assert.ok(idempotency1 < govProofAppend);
+  assert.ok(idempotency2 < govProofAppend);
 });
 
 test('GOVERNANCE_MUTATION_PROOF_SPEC documents proof_status values and registry persistence', () => {
