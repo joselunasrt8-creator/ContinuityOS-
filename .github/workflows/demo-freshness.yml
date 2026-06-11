@@ -1,0 +1,64 @@
+name: demo-freshness
+# owner: #1955
+# policy: README "Try the Governed Demo" / "Agent runtime integration: LangChain"
+# issue-lineage: #1952 -> #1953 -> #1954 -> #1955
+#
+# Converts installability from a recorded claim (RECORDED_DEMO.md) into a
+# standing gate: every PR to main must reproduce, from a clean checkout,
+# the exact install + demo path documented in README.md.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  demo-freshness:
+    name: Fresh-clone install + demo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run demo
+        run: npm run demo | tee demo-portability.log
+
+      - name: npm run demo:langchain
+        run: npm run demo:langchain | tee demo-langchain.log
+
+      - name: Verify VALID and NULL outcomes observed
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in demo-portability.log demo-langchain.log; do
+            grep -qE '"(status|result)": "EXECUTED"' "$f" || { echo "$f: missing EXECUTED outcome"; exit 1; }
+            grep -q '"result": "NULL"' "$f" || { echo "$f: missing NULL result"; exit 1; }
+          done
+          echo "VALID (EXECUTED) and NULL outcomes observed in both demos."
+
+      - name: Upload demo logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-freshness-logs
+          path: |
+            demo-portability.log
+            demo-langchain.log
+          retention-days: 90
