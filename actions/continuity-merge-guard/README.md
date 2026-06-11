@@ -38,6 +38,14 @@ Those are deliberately deferred — see [v2](#v2-not-yet-built) below. v1 is
 a legitimacy check on object identity, not a review system, agent
 classifier, or policy engine.
 
+v1 is **stateless and idempotent**, not replay-tracked: re-running the action
+against an identical `{repo, pr_number, head_sha, base_sha, actor}` payload
+(e.g. a re-run of the same workflow on an unchanged PR) re-evaluates to the
+same `result`/`canonical_hash` every time. This differs from the
+replay-nonce model used by the Stage 1 governed-execution gateway
+(`npm run demo`, `REPLAY_NULL`/`REPLAY_NONCE_CONSUMED`); Merge Guard v1 has no
+equivalent "consumed nonce" concept.
+
 ## Output
 
 Each run produces:
