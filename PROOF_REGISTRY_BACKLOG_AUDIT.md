@@ -62,13 +62,29 @@ abstractions and zero net new lines beyond the 8 entries themselves.
 
 ---
 
-## Action taken in this change
+## Outcome (closed out 2026-06-11)
 
-This change does **not** merge or rebase these PRs — merging PRs and
-force-pushing rebased branches are shared-state operations on `main` and on
-branches this session does not own, outside the scope of the
-`claude/continuityos-dependency-proof-hzu5kd` development branch. The
-analysis above is provided so the merges can be executed quickly (per-PR:
-checkout, rebase, resolve the single-line JSONL conflict by insertion order,
-force-push, merge) — see `DEPENDENCY_PROOF_IMPLEMENTATION_PLAN.md` for the
-recommended execution sequence and risk notes.
+All actions in the recommended merge order above were executed:
+
+| PR | Result |
+|---|---|
+| #1924 | **Merged** as-is (`93c40fb`). |
+| #1880 | **Closed, not merged.** Its audit content (closure-readiness chain #1833→#1834→#1831) was found stale at merge time — those issues were already resolved on `main` via #1899/#1834/#1831 — and an unresolved reviewer thread independently flagged the same staleness. Closed with an explanatory comment instead of merged. |
+| #1887 | **Merged** (`109dee1`), after rebasing `proof-registry/PROOF-1886-1ed83e3e` to re-insert `PROOF-1886-1ed83e3e` as the new last line. |
+| #1889 | **Merged** (`8412e83`), chained on top of #1887's rebase, appending `PROOF-1888-bf58bc41`. |
+| #1892 | **Merged** (`85f7047`), appending `PROOF-1891-16799d98`. |
+| #1896 | **Merged** (`5d244cc`), appending `PROOF-1893-39813033`. |
+| #1898 | **Merged** (`1ce9c28`), appending `PROOF-1897-1ef5c034`. |
+| #1900 | **Merged** (`4eca739`), appending `PROOF-1899-f4800d51`. |
+| #1904 | **Merged** (`03fe737`), appending `PROOF-1903-96bf359c`. |
+
+Each of the 7 rebased branches was force-pushed (`--force-with-lease`) with a
+single new commit re-appending its `proof_entry` JSON line at the end of
+`merge_proof_registry.jsonl`, then merged once `merge-governance-check`,
+`constitutional-integrity`, and the other required checks passed.
+
+`governance/merge-legitimacy/merge_proof_registry.jsonl` grew from 87 → 96
+lines (8 of the 8 originally-open `proof_id`s persisted — #1880 was the only
+PR in this audit that did not contribute a registry entry, since it was a
+documentation PR, not a `proof-registry/*` PR). 7 of 8 `proof-registry/*` PRs
+required the rebase described above; #1924 merged cleanly as predicted.
