@@ -116,12 +116,12 @@ The purpose of this registry is to:
 | risk_class | P0 |
 | bypass_condition | Governance primitives mutate without governed legitimacy validation |
 | closure_condition | Runtime governance changes require recursively governed legitimacy approval |
-| current_state | PARTIAL — GMA (Governance Mutation Authorization) enforcement active: governance_mutation and workflow_mutation class PRs require a valid GMA artifact with canonical lifecycle lineage (/session → /continuity → /authority → /compile). Enforcement in merge-governance-check.yml. Creation workflow: governance-mutation-authorization.yml. Spec: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json. Bootstrap exemption (GMA_BOOTSTRAP_EXEMPTION) applies only to the single PR introducing GAP-005 GMA infrastructure — self-limiting, non-reusable, auditable. Once merged, all subsequent governance mutations fully enforce GMA. Remaining gap: runtime proof persistence (/execute → /proof) for governance mutations not yet enforced. |
+| current_state | PARTIAL — GMA (Governance Mutation Authorization) enforcement active: governance_mutation and workflow_mutation class PRs require a valid GMA artifact with canonical lifecycle lineage (/session → /continuity → /authority → /compile). Enforcement in merge-governance-check.yml. Creation workflow: governance-mutation-authorization.yml. Spec: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json. Bootstrap exemption (GMA_BOOTSTRAP_EXEMPTION) applies only to the single PR introducing GAP-005 GMA infrastructure — self-limiting, non-reusable, auditable. Once merged, all subsequent governance mutations fully enforce GMA. /execute → /proof: merge-proof.yml now generates and persists a governance_mutation_proof entry (record_type governance_mutation_proof, proof_status GENERATED/MISSING_AUTHORIZER) in merge_proof_registry.jsonl for every merged governance_mutation/workflow_mutation PR, binding it to the GMA that authorized it via gma_registry.jsonl. Spec: governance/merge-legitimacy/GOVERNANCE_MUTATION_PROOF_SPEC.json. Logic: runtime/governance-mutation-proof.mjs. |
 | issue_reference | #1831 |
 | required_tests | governance mutation validation, recursive approval lineage, policy drift invalidation |
 | required_proofs | governance lineage persistence, immutable governance mutation evidence |
-| remaining_closure | Wire /execute → /proof stage for governance mutations; add governance_mutation_proof to proof registry |
-| status | PARTIAL |
+| remaining_closure | Observe a real governance/workflow-mutation PR produce a persisted governance_mutation_proof entry with proof_status GENERATED in merge_proof_registry.jsonl |
+| status | PARTIAL — proof generation/persistence wired; pending observed real-PR evidence |
 
 ---
 

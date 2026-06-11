@@ -427,6 +427,64 @@ jobs:
           echo "PROOF_HASH=$CANONICAL_HASH" >> "$GITHUB_ENV"
           echo "PR_NUMBER_FOR_COMMIT=$PR_NUMBER" >> "$GITHUB_ENV"
 
+      - name: Detect governance mutation and authorizing GMA (GAP-005 / Issue #1831)
+        run: |
+          set -euo pipefail
+
+          MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          HEAD_REF="${{ github.event.pull_request.head.ref }}"
+          MERGE_PROOF_ID=$(jq -r .proof_id MERGE_PROOF.json)
+          GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          export MERGE_COMMIT_SHA PR_NUMBER HEAD_REF MERGE_PROOF_ID GENERATED_AT
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import {
+            classifyGovernedFiles,
+            computeGovernedFilesHash,
+            selectGmaEntry,
+            buildGovernanceMutationProof,
+          } from './runtime/governance-mutation-proof.mjs';
+
+          const changedFiles = readFileSync('changed_files_proof.txt', 'utf8').split('\n').filter(Boolean);
+          const { governedFiles, mutationClasses } = classifyGovernedFiles(changedFiles);
+
+          if (mutationClasses.length === 0) {
+            console.log('No governance_mutation/workflow_mutation in this merge — no governance_mutation_proof generated.');
+            process.exit(0);
+          }
+
+          const mergeCommitSha = process.env.MERGE_COMMIT_SHA;
+          const readAtMergeCommit = (file) => execFileSync('git', ['show', `${mergeCommitSha}:${file}`]);
+          const governedFilesHash = computeGovernedFilesHash(governedFiles, readAtMergeCommit);
+
+          let registryEntries = [];
+          if (existsSync('governance/authorizations/gma_registry.jsonl')) {
+            registryEntries = readFileSync('governance/authorizations/gma_registry.jsonl', 'utf8')
+              .split('\n').filter(Boolean)
+              .map((line) => { try { return JSON.parse(line); } catch (_) { return null; } })
+              .filter(Boolean);
+          }
+
+          const gma = selectGmaEntry(registryEntries, { branch: process.env.HEAD_REF, governedFilesHash });
+
+          const proof = buildGovernanceMutationProof({
+            pr_number: Number(process.env.PR_NUMBER),
+            merge_commit_sha: mergeCommitSha,
+            merge_proof_id: process.env.MERGE_PROOF_ID,
+            gma,
+            mutationClasses,
+            governedFilesHash,
+            generatedAt: process.env.GENERATED_AT,
+          });
+
+          writeFileSync('GOVERNANCE_MUTATION_PROOF.json', JSON.stringify(proof, null, 2));
+          console.log(`governance_mutation_proof generated: ${proof.proof_id} (proof_status: ${proof.canonical_payload.proof_status})`);
+          NODE
+
       - name: Append proof to registry via PR
         env:
           MERGE_PROOF_PR_TOKEN: ${{ secrets.MERGE_PROOF_PR_TOKEN }}
@@ -490,6 +548,37 @@ jobs:
 
           echo "$ENTRY" >> "$REGISTRY_PATH"
 
+          # GAP-005 / Issue #1831: if this merge was a governance/workflow mutation,
+          # also append a governance_mutation_proof entry binding it to its GMA.
+          if [ -f GOVERNANCE_MUTATION_PROOF.json ]; then
+            GOV_PROOF_ENTRY=$(jq -cn \
+              --arg proof_id "$(jq -r .proof_id GOVERNANCE_MUTATION_PROOF.json)" \
+              --arg proof_status "$(jq -r .canonical_payload.proof_status GOVERNANCE_MUTATION_PROOF.json)" \
+              --arg merge_proof_id "$(jq -r .canonical_payload.merge_proof_id GOVERNANCE_MUTATION_PROOF.json)" \
+              --arg gma_id "$(jq -r '.canonical_payload.gma_id // ""' GOVERNANCE_MUTATION_PROOF.json)" \
+              --arg governed_files_hash "$(jq -r .canonical_payload.governed_files_hash GOVERNANCE_MUTATION_PROOF.json)" \
+              --argjson mutation_classes "$(jq -c .canonical_payload.mutation_classes GOVERNANCE_MUTATION_PROOF.json)" \
+              --arg canonical_hash "$(jq -r .canonical_hash GOVERNANCE_MUTATION_PROOF.json)" \
+              --argjson pr_number "$PR_NUMBER" \
+              --arg merge_commit_sha "$MERGE_COMMIT_SHA" \
+              --arg appended_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{
+                _record_type: "governance_mutation_proof",
+                proof_id: $proof_id,
+                proof_status: $proof_status,
+                merge_proof_id: $merge_proof_id,
+                gma_id: ($gma_id | if . == "" then null else . end),
+                governed_files_hash: $governed_files_hash,
+                mutation_classes: $mutation_classes,
+                canonical_hash: $canonical_hash,
+                pr_number: $pr_number,
+                merge_commit_sha: $merge_commit_sha,
+                appended_at: $appended_at
+              }')
+
+            echo "$GOV_PROOF_ENTRY" >> "$REGISTRY_PATH"
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$REGISTRY_PATH"
@@ -508,6 +597,17 @@ jobs:
             echo "- merge_commit_sha: ${MERGE_COMMIT_SHA}"
             echo "- merged_at: ${MERGED_AT}"
             echo ""
+            if [ -f GOVERNANCE_MUTATION_PROOF.json ]; then
+              echo "## Governance mutation proof (GAP-005 / Issue #1831)"
+              echo ""
+              echo "This PR mutated governance/workflow primitives. A governance_mutation_proof entry binding this merge to its authorizing GMA is also appended."
+              echo ""
+              echo "- proof_id: $(jq -r .proof_id GOVERNANCE_MUTATION_PROOF.json)"
+              echo "- proof_status: $(jq -r .canonical_payload.proof_status GOVERNANCE_MUTATION_PROOF.json)"
+              echo "- gma_id: $(jq -r '.canonical_payload.gma_id // "(none)"' GOVERNANCE_MUTATION_PROOF.json)"
+              echo "- mutation_classes: $(jq -c .canonical_payload.mutation_classes GOVERNANCE_MUTATION_PROOF.json)"
+              echo ""
+            fi
             echo "Governance invariant: proof generated ≠ proof persisted. Direct persistence to main is NULL and non-retryable; this branch must be admitted through the same governed path as every other main mutation."
           } > registry_pr_body.md
 
@@ -527,6 +627,7 @@ jobs:
             CANONICAL_PAYLOAD.json
             review_legitimacy_result.json
             EXACT_OBJECT_ADMISSION.json
+            GOVERNANCE_MUTATION_PROOF.json
           if-no-files-found: ignore
 
       - name: Emit merge proof summary
@@ -547,4 +648,11 @@ jobs:
             echo '```json'
             cat MERGE_PROOF.json
             echo '```'
+            if [ -f GOVERNANCE_MUTATION_PROOF.json ]; then
+              echo ""
+              echo "#### GOVERNANCE_MUTATION_PROOF.json (GAP-005 / Issue #1831)"
+              echo '```json'
+              cat GOVERNANCE_MUTATION_PROOF.json
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "governance_mutation_proof_spec",
+  "issue_reference": "#1831",
+  "gap_reference": "GAP-005",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "proof_specification",
+  "generated_at": "2026-06-11",
+  "scope": {
+    "purpose": "Define the specification for a governance_mutation_proof — an evidence record, generated alongside MERGE_PROOF, that binds a merged governance/workflow mutation back to the GMA (Governance Mutation Authorization) that authorized it. Closes the /execute -> /proof stage of GAP-005 for governance primitive mutations.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+  "evidentiary_nature": {
+    "observational_only": true,
+    "re_decides_admission": false,
+    "note": "The admission decision (GMA validity, governed_files_hash match, mutation_class coverage) is made exclusively by merge-governance-check.yml at PR-check time, per GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json. This artifact records, after the fact, which GMA (if any) was bound to a merged governance/workflow mutation. It does not re-validate, authorize, or block — it is evidence, not a second validator."
+  },
+  "proof_object": {
+    "type": "GOVERNANCE_MUTATION_PROOF",
+    "canonicalization": "deterministic_json_canonicalization_required",
+    "proof_status_values": ["GENERATED", "MISSING_AUTHORIZER"],
+    "default_proof_status": "MISSING_AUTHORIZER"
+  },
+  "required_fields": {
+    "identity": {
+      "proof_id": {
+        "type": "string",
+        "format": "GMPROOF-{pr_number}-{merge_commit_sha_prefix}",
+        "description": "Unique identifier for this governance mutation proof",
+        "missing_result": "field_absent_record_invalid"
+      },
+      "merge_proof_id": {
+        "type": "string",
+        "format": "PROOF-{pr_number}-{merge_commit_sha_prefix}",
+        "description": "Identifier of the corresponding MERGE_PROOF for the same merge event, binding the two records",
+        "missing_result": "field_absent_record_invalid"
+      },
+      "canonical_hash": {
+        "type": "string",
+        "format": "sha256_hex",
+        "description": "SHA-256 hash of the canonical_payload (deterministic JSON of pr_number, merge_commit_sha, merge_proof_id, governed_files_hash, mutation_classes, gma_id, decision_id, continuity_id, session_id, proof_status)"
+      }
+    },
+    "merge_context": {
+      "pr_number": {
+        "type": "integer",
+        "description": "GitHub PR number that was merged"
+      },
+      "merge_commit_sha": {
+        "type": "string",
+        "format": "40_character_git_sha",
+        "description": "The exact commit SHA that entered main — same value bound in the corresponding MERGE_PROOF"
+      },
+      "mutation_classes": {
+        "type": "array",
+        "items": "string",
+        "description": "governance_mutation and/or workflow_mutation classes detected for this merged diff"
+      },
+      "governed_files_hash": {
+        "type": "string",
+        "format": "sha256_hex",
+        "description": "governed_files_hash computed over the merged governed diff, using the same algorithm as GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json (governed_files_hash_input)"
+      }
+    },
+    "gma_binding": {
+      "gma_id": {
+        "type": ["string", "null"],
+        "description": "Identifier of the gma_registry.jsonl entry whose (branch, governed_files_hash) matched this merge — null when proof_status is MISSING_AUTHORIZER",
+        "null_when": "proof_status == MISSING_AUTHORIZER"
+      },
+      "decision_id": {
+        "type": ["string", "null"],
+        "description": "decision_id from the bound GMA entry, or null when MISSING_AUTHORIZER"
+      },
+      "continuity_id": {
+        "type": ["string", "null"],
+        "description": "continuity_id from the bound GMA entry, or null when MISSING_AUTHORIZER"
+      },
+      "session_id": {
+        "type": ["string", "null"],
+        "description": "session_id from the bound GMA entry, or null when MISSING_AUTHORIZER"
+      },
+      "proof_status": {
+        "type": "string",
+        "enum": ["GENERATED", "MISSING_AUTHORIZER"],
+        "description": "GENERATED when a gma_registry.jsonl entry matching (branch, governed_files_hash, GMA_VALID, unexpired) was found and bound at proof-generation time. MISSING_AUTHORIZER when this PR's diff was classified as governance_mutation/workflow_mutation but no such entry could be located — recorded as evidence of a process anomaly for audit. Does not alter merge legitimacy, which was already decided at admission time."
+      }
+    },
+    "generation": {
+      "generated_at": {
+        "type": "string",
+        "format": "ISO8601_UTC",
+        "description": "Timestamp of governance_mutation_proof generation"
+      }
+    }
+  },
+  "applicability": {
+    "rule": "Generated only when the merged PR's diff (relative to its base) contains governed files classified as governance_mutation or workflow_mutation per classifyGovernedFiles in runtime/governance-mutation-proof.mjs (mirroring merge-governance-check.yml's classifier, excluding governance/authorizations/** and merge_proof_registry.jsonl).",
+    "non_governance_prs": "No governance_mutation_proof record is generated; only MERGE_PROOF is produced."
+  },
+  "proof_storage_requirements": {
+    "persistence": "governance_mutation_proof must be proposed for durable, append-only registry storage through the same pull request that persists the corresponding MERGE_PROOF entry.",
+    "registry_location": "governance/merge-legitimacy/merge_proof_registry.jsonl",
+    "record_type_field": "_record_type",
+    "record_type_value": "governance_mutation_proof",
+    "admission_path": "PR_REQUIRED",
+    "persistence_branch": "proof-registry/{merge_proof_id}",
+    "direct_main_push": "FORBIDDEN_NULL_NON_RETRYABLE",
+    "registry_entry_required_fields": [
+      "proof_id",
+      "proof_status",
+      "merge_proof_id",
+      "gma_id",
+      "governed_files_hash",
+      "mutation_classes",
+      "canonical_hash",
+      "pr_number",
+      "merge_commit_sha",
+      "appended_at"
+    ],
+    "deduplication": "proof_id must be unique per registry entry; appended in the same registry PR as the corresponding MERGE_PROOF entry, subject to the same idempotency checks (existing PR-by-proof_id / already-in-registry).",
+    "audit_access": "Proof registry must be readable for lineage reconstruction without requiring runtime mutation access",
+    "retention": "Proof must be retained for the lifetime of the repository to support retrospective audit"
+  },
+  "failure_semantics": {
+    "no_matching_gma": "proof_status = MISSING_AUTHORIZER; record still generated and persisted as evidence; does not fail the merge-proof job and does not affect MERGE_PROOF persistence",
+    "non_governance_diff": "no governance_mutation_proof record generated"
+  },
+  "gap_005_closure": {
+    "remaining_closure_addressed": "Wires /execute -> /proof for governance mutations by generating and persisting governance_mutation_proof entries in merge_proof_registry.jsonl, bound to the authorizing GMA via gma_registry.jsonl.",
+    "observational_closure_pending": "GAP-005 status remains PARTIAL until at least one real governance/workflow-mutation PR produces a persisted governance_mutation_proof entry with proof_status GENERATED in merge_proof_registry.jsonl."
+  }
+}
