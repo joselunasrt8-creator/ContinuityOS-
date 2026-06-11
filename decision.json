@@ -1,4 +1,16 @@
 {
+  "fixture_classification": "FIXTURE_ONLY_NON_AUTHORITATIVE",
+  "runtime_effect": "none",
+  "authority_status": "non_authoritative_fixture",
+  "canonical_runtime_spine": [
+    "/session",
+    "/continuity",
+    "/authority",
+    "/compile",
+    "/validate",
+    "/execute",
+    "/proof"
+  ],
   "decision_id": "decision-001",
   "intent": "transfer_webhook",
   "scope": {

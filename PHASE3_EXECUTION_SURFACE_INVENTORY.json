@@ -267,7 +267,7 @@
     ],
     "Q8_non_mutation_surfaces": [
       "server.js (disabled)", "gateway.js (demo)", "worker.js (demo)",
-      "registry.js (demo)", "compile-decision.js (demo)",
+      "registry.js (tombstoned)", "compile-decision.js (tombstoned)",
       "package.json (deploy script disabled)", "wrangler.toml (config only)",
       ".github/workflows/conformance.yml", ".github/workflows/constitutional-integrity.yml",
       ".github/workflows/merge-governance-check.yml", ".github/workflows/preo-candidate.yml",
@@ -866,8 +866,8 @@
     {
       "surface_id": "legacy:registry.js",
       "path": "registry.js",
-      "classification": "NON_EXECUTING",
-      "mutation_type": "none — demo only",
+      "classification": "TOMBSTONED_FAIL_CLOSED",
+      "mutation_type": "none — tombstoned fail-closed",
       "creates_execution_eligibility": false,
       "creates_authority_record": false,
       "creates_validation_record": false,
@@ -878,15 +878,15 @@
       "governance_bound": false,
       "replay_safe": true,
       "bypass_path": false,
-      "quarantine_status": "DEMO_ONLY",
-      "rationale": "Legacy registry surface. Demo-only. Not production-capable."
+      "quarantine_status": "TOMBSTONED — throws on validate()",
+      "rationale": "Legacy registry surface tombstoned fail-closed. It cannot emit VALID or operate as validation authority; canonical runtime spine only."
     },
 
     {
       "surface_id": "legacy:compile-decision.js",
       "path": "compile-decision.js",
-      "classification": "NON_EXECUTING",
-      "mutation_type": "none — demo only",
+      "classification": "TOMBSTONED_FAIL_CLOSED",
+      "mutation_type": "none — tombstoned fail-closed",
       "creates_execution_eligibility": false,
       "creates_authority_record": false,
       "creates_validation_record": false,
@@ -897,8 +897,8 @@
       "governance_bound": false,
       "replay_safe": true,
       "bypass_path": false,
-      "quarantine_status": "DEMO_ONLY",
-      "rationale": "Legacy compile script. Demo-only. Not production-capable."
+      "quarantine_status": "TOMBSTONED — throws on execution",
+      "rationale": "Legacy compile script tombstoned fail-closed. It cannot generate root runtime objects, signatures, receipts, or proof-like artifacts; canonical runtime spine only."
     },
 
     {
