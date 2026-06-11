@@ -99,7 +99,11 @@ jobs:
 ```
 
 Then, in repo settings → Branches → branch protection rule for `main`,
-add `continuity-merge-guard / merge-guard` as a required status check.
+add the required status check named **`merge-guard`** (this is the exact
+check-run name GitHub reports for the `merge-guard` job above; the
+workflow file name shows as grouping context in the UI but is not part of
+the required-check name itself — select `merge-guard`, not
+`continuity-merge-guard / merge-guard`).
 
 Once required, ContinuityOS becomes part of the operational definition of
 "mergeable" for that branch:
@@ -121,6 +125,23 @@ Merge allowed | Merge blocked
 - `@main` — floating reference. Acceptable for exploration/evaluation, but
   not recommended once a consumer relies on the result for merge
   eligibility.
+
+A `v0.1.1` tag is planned at the current `main` HEAD (the commit that
+fixed this README's stale `mindshift-demo` install path). Relative to
+`v0.1.0`, only this README changes — `action.yml`, `check.mjs`,
+`test.mjs`, and `fixtures/` are byte-identical, so `result`, `proof_id`,
+and `canonical_hash` are unaffected by a `v0.1.0` → `v0.1.1` move. See
+`continuityos-sandbox`'s `VERSION_UPGRADE.md` for the continuity
+assessment.
+
+### Known external consumers
+
+- [`joselunasrt8-creator/continuityos-sandbox`](https://github.com/joselunasrt8-creator/continuityos-sandbox) —
+  pins `@v0.1.0`; `merge-guard` is a **required** status check on `main`
+  (`LOAD-BEARING_ACTIVE`). See that repo's `LOAD_BEARING_READINESS.md`,
+  `NULL_ENFORCEMENT_PROOF.md`, and `EXTERNAL_DEPENDENCY_PROOF.md` for the
+  install path, required-check configuration, and proof that real PRs'
+  merge eligibility depends on the Merge Guard result.
 
 ## Portability
 
