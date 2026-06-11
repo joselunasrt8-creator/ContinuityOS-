@@ -444,21 +444,26 @@ jobs:
           import { execFileSync } from 'node:child_process';
           import {
             classifyGovernedFiles,
+            selectProofMutationClasses,
             computeGovernedFilesHash,
             selectGmaEntry,
             buildGovernanceMutationProof,
-          } from './runtime/governance-mutation-proof.mjs';
+          } from './governance/runtime/governance-mutation-proof.mjs';
 
           const changedFiles = readFileSync('changed_files_proof.txt', 'utf8').split('\n').filter(Boolean);
           const { governedFiles, mutationClasses } = classifyGovernedFiles(changedFiles);
+          const proofMutationClasses = selectProofMutationClasses(mutationClasses);
 
-          if (mutationClasses.length === 0) {
+          if (proofMutationClasses.length === 0) {
             console.log('No governance_mutation/workflow_mutation in this merge — no governance_mutation_proof generated.');
             process.exit(0);
           }
 
           const mergeCommitSha = process.env.MERGE_COMMIT_SHA;
           const readAtMergeCommit = (file) => execFileSync('git', ['show', `${mergeCommitSha}:${file}`]);
+          // Hash the FULL governed-files set (mirroring merge-governance-check.yml's
+          // governed_files.txt), not just the governance_mutation/workflow_mutation
+          // subset, so this matches the governed_files_hash the GMA was issued for.
           const governedFilesHash = computeGovernedFilesHash(governedFiles, readAtMergeCommit);
 
           let registryEntries = [];
@@ -476,7 +481,7 @@ jobs:
             merge_commit_sha: mergeCommitSha,
             merge_proof_id: process.env.MERGE_PROOF_ID,
             gma,
-            mutationClasses,
+            mutationClasses: proofMutationClasses,
             governedFilesHash,
             generatedAt: process.env.GENERATED_AT,
           });

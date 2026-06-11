@@ -70,7 +70,7 @@
       "governed_files_hash": {
         "type": "string",
         "format": "sha256_hex",
-        "description": "governed_files_hash computed over the merged governed diff, using the same algorithm as GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json (governed_files_hash_input)"
+        "description": "governed_files_hash computed over the FULL governed-files set of the merged diff (governance/**, .github/workflows/**, src/**, schema.sql, migrations/**, wrangler.toml, governance/merge-legitimacy/merge_proof_registry.jsonl — excluding governance/authorizations/**), using the same algorithm and scope as GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json (governed_files_hash_input / governed_files_hash_scope), so it matches the hash the binding GMA was issued for"
       }
     },
     "gma_binding": {
@@ -106,7 +106,7 @@
     }
   },
   "applicability": {
-    "rule": "Generated only when the merged PR's diff (relative to its base) contains governed files classified as governance_mutation or workflow_mutation per classifyGovernedFiles in runtime/governance-mutation-proof.mjs (mirroring merge-governance-check.yml's classifier, excluding governance/authorizations/** and merge_proof_registry.jsonl).",
+    "rule": "Generated only when the merged PR's diff (relative to its base) contains files classified as governance_mutation or workflow_mutation per classifyGovernedFiles + selectProofMutationClasses in governance/runtime/governance-mutation-proof.mjs (mirroring merge-governance-check.yml's full governed-paths classifier, excluding governance/authorizations/**). governed_files_hash is computed over the full governed-files set returned by classifyGovernedFiles, not just the governance_mutation/workflow_mutation subset, so it matches the hash merge-governance-check.yml used to select the GMA.",
     "non_governance_prs": "No governance_mutation_proof record is generated; only MERGE_PROOF is produced."
   },
   "proof_storage_requirements": {

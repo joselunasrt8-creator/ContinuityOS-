@@ -5,10 +5,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   classifyGovernedFiles,
+  selectProofMutationClasses,
   computeGovernedFilesHash,
   selectGmaEntry,
   buildGovernanceMutationProof,
-} from '../../runtime/governance-mutation-proof.mjs';
+} from '../../governance/runtime/governance-mutation-proof.mjs';
 
 const root = process.cwd();
 
@@ -31,7 +32,13 @@ function gmaEntry(overrides = {}) {
   };
 }
 
-test('classifyGovernedFiles tags governance/** and .github/workflows/** with the correct mutation classes', () => {
+test('the governance_mutation_proof binding logic lives under governance/ so changes to it are themselves governance_mutation', () => {
+  const { governedFiles, mutationClasses } = classifyGovernedFiles(['governance/runtime/governance-mutation-proof.mjs']);
+  assert.deepEqual(governedFiles, ['governance/runtime/governance-mutation-proof.mjs']);
+  assert.deepEqual(mutationClasses, ['governance_mutation']);
+});
+
+test('classifyGovernedFiles tags the FULL governed-files set (governance/**, .github/workflows/**, src/**, etc.) mirroring merge-governance-check.yml', () => {
   const { governedFiles, mutationClasses } = classifyGovernedFiles([
     'governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json',
     'governance/merge-legitimacy/merge_proof_registry.jsonl',
@@ -44,14 +51,47 @@ test('classifyGovernedFiles tags governance/** and .github/workflows/** with the
   assert.deepEqual(governedFiles, [
     '.github/workflows/merge-proof.yml',
     'governance/merge-legitimacy/MERGE_PROOF_SPEC.json',
+    'governance/merge-legitimacy/merge_proof_registry.jsonl',
+    'src/index.ts',
   ]);
-  assert.deepEqual(mutationClasses, ['governance_mutation', 'workflow_mutation']);
+  assert.deepEqual(mutationClasses, ['governance_mutation', 'proof_persistence', 'runtime_mutation', 'workflow_mutation']);
 });
 
-test('classifyGovernedFiles returns no mutation classes for a non-governance diff', () => {
-  const { governedFiles, mutationClasses } = classifyGovernedFiles(['src/index.ts', 'README.md']);
+test('classifyGovernedFiles returns no governed files or mutation classes for a non-governed diff', () => {
+  const { governedFiles, mutationClasses } = classifyGovernedFiles(['README.md', 'docs/notes.md']);
   assert.deepEqual(governedFiles, []);
   assert.deepEqual(mutationClasses, []);
+});
+
+test('selectProofMutationClasses narrows the full mutation class set to governance_mutation/workflow_mutation only', () => {
+  assert.deepEqual(
+    selectProofMutationClasses(['governance_mutation', 'proof_persistence', 'runtime_mutation', 'workflow_mutation']),
+    ['governance_mutation', 'workflow_mutation'],
+  );
+  assert.deepEqual(selectProofMutationClasses(['runtime_mutation', 'schema_mutation']), []);
+});
+
+test('computeGovernedFilesHash over the FULL governed-files set matches the hash merge-governance-check.yml used to admit the GMA, even when src/** is also changed', () => {
+  const { governedFiles, mutationClasses } = classifyGovernedFiles([
+    '.github/workflows/merge-proof.yml',
+    'src/index.ts',
+  ]);
+  assert.deepEqual(governedFiles, ['.github/workflows/merge-proof.yml', 'src/index.ts']);
+  assert.deepEqual(selectProofMutationClasses(mutationClasses), ['workflow_mutation']);
+
+  const files = {
+    '.github/workflows/merge-proof.yml': Buffer.from('workflow\n'),
+    'src/index.ts': Buffer.from('export {}\n'),
+  };
+  // The GMA's governed_files_hash was computed over governed_files.txt, which
+  // includes src/index.ts even though src/** alone isn't governance/workflow_mutation.
+  const expectedParts = Object.keys(files)
+    .sort()
+    .map((f) => `${f}:${createHash('sha256').update(files[f]).digest('hex')}`);
+  const expected = createHash('sha256').update(expectedParts.join('\n')).digest('hex');
+
+  const actual = computeGovernedFilesHash(governedFiles, (f) => files[f]);
+  assert.equal(actual, expected);
 });
 
 test('computeGovernedFilesHash matches the documented sorted "path:sha256(content)" algorithm', () => {
@@ -159,7 +199,7 @@ test('merge-proof.yml wires governance_mutation_proof generation and registry pe
   const workflow = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
 
   assert.match(workflow, /name: Detect governance mutation and authorizing GMA \(GAP-005 \/ Issue #1831\)/);
-  assert.match(workflow, /from '\.\/runtime\/governance-mutation-proof\.mjs'/);
+  assert.match(workflow, /from '\.\/governance\/runtime\/governance-mutation-proof\.mjs'/);
   assert.match(workflow, /_record_type: "governance_mutation_proof"/);
   assert.match(workflow, /GOVERNANCE_MUTATION_PROOF\.json/);
 });

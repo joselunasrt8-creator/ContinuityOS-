@@ -1,12 +1,20 @@
 import { createHash } from 'node:crypto';
 
 /**
- * Classify changed files into governed files / mutation classes.
+ * Classify changed files into the full governed-files set and their mutation
+ * classes, mirroring the path-pattern rules in
+ * .github/workflows/merge-governance-check.yml ("Detect changed files and
+ * governed paths") exactly — including src/**, schema.sql, migrations/**,
+ * wrangler.toml, and the merge_proof_registry.jsonl proof_persistence
+ * surface — so that computeGovernedFilesHash() over `governedFiles` derives
+ * the same governed_files_hash that merge-governance-check.yml used to
+ * select/admit a GMA. governance/authorizations/** is exempt per
+ * GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json.
  *
- * Mirrors the path-pattern rules in .github/workflows/merge-governance-check.yml
- * ("Detect changed files and governed paths"), restricted to the classes relevant
- * to GAP-005 (governance_mutation, workflow_mutation). governance/authorizations/**
- * and the proof registry itself are exempt per GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json.
+ * `mutationClasses` is the full set of detected classes (including
+ * runtime_mutation, schema_mutation, etc.); use
+ * selectProofMutationClasses() to narrow to the governance_mutation /
+ * workflow_mutation classes relevant to governance_mutation_proof.
  */
 export function classifyGovernedFiles(changedFiles) {
   const governedFiles = [];
@@ -14,20 +22,52 @@ export function classifyGovernedFiles(changedFiles) {
 
   for (const file of changedFiles) {
     if (!file) continue;
-    if (file.startsWith('governance/authorizations/')) continue;
-    if (file === 'governance/merge-legitimacy/merge_proof_registry.jsonl') continue;
 
-    if (file.startsWith('governance/')) {
+    if (file.startsWith('governance/authorizations/')) {
+      continue;
+    } else if (file === 'governance/merge-legitimacy/merge_proof_registry.jsonl') {
+      governedFiles.push(file);
+      mutationClasses.add('proof_persistence');
+    } else if (file.startsWith('governance/')) {
       governedFiles.push(file);
       mutationClasses.add('governance_mutation');
     } else if (file.startsWith('.github/workflows/')) {
       governedFiles.push(file);
       mutationClasses.add('workflow_mutation');
+    } else if (file.startsWith('src/')) {
+      governedFiles.push(file);
+      mutationClasses.add('runtime_mutation');
+    } else if (file === 'schema.sql') {
+      governedFiles.push(file);
+      mutationClasses.add('schema_mutation');
+    } else if (file.startsWith('migrations/')) {
+      governedFiles.push(file);
+      mutationClasses.add('migration_mutation');
+    } else if (file === 'wrangler.toml') {
+      governedFiles.push(file);
+      mutationClasses.add('deployment_config_mutation');
     }
   }
 
   governedFiles.sort();
   return { governedFiles, mutationClasses: [...mutationClasses].sort() };
+}
+
+/**
+ * The mutation classes governance_mutation_proof binds to a GMA: a
+ * governance/workflow mutation requires a GMA per
+ * GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json, while the other governed
+ * classes (runtime_mutation, schema_mutation, etc.) only widen the
+ * governed_files_hash and do not by themselves trigger proof generation.
+ */
+export const GOVERNANCE_MUTATION_PROOF_CLASSES = ['governance_mutation', 'workflow_mutation'];
+
+/**
+ * Narrow a full mutationClasses set to the governance_mutation /
+ * workflow_mutation classes relevant to governance_mutation_proof.
+ */
+export function selectProofMutationClasses(mutationClasses) {
+  return mutationClasses.filter((cls) => GOVERNANCE_MUTATION_PROOF_CLASSES.includes(cls)).sort();
 }
 
 /**
@@ -80,6 +120,9 @@ export function selectGmaEntry(registryEntries, { branch, governedFilesHash, now
  * Evidence-only: this record never authorizes or blocks anything. proof_status is
  * GENERATED when a GMA was bound, or MISSING_AUTHORIZER when no matching GMA entry
  * could be located in gma_registry.jsonl at proof-generation time.
+ *
+ * `mutationClasses` here is expected to already be narrowed to
+ * governance_mutation/workflow_mutation via selectProofMutationClasses().
  */
 export function buildGovernanceMutationProof({
   pr_number,
