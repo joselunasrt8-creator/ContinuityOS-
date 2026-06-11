@@ -323,6 +323,7 @@ jobs:
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
         run: |
           set -euo pipefail
 
@@ -330,11 +331,11 @@ jobs:
           # so the append-only proof ledger becomes the budget-consumption ledger
           # (policy-bound GMA, STANDING_AUTHORITY_SPEC.json). To stamp the SAME authority
           # the merge gate admitted under, reproduce the gate's selection exactly: read
-          # the standing authority registry AND the budget ledger from the PR's BASE_SHA
-          # (never the head checkout), and apply the REAL proof ledger so a budget-
-          # exhausted authority is skipped just as the gate skipped it. Without the real
-          # ledger this step could re-pick a newer, exhausted authority and consume the
-          # wrong budget, letting the authorizing authority exceed max_merges (P1 fix).
+          # the standing authority registry, the budget ledger AND the derivation module
+          # from the PR's BASE_SHA (never the head checkout), apply the REAL proof ledger
+          # so a budget-exhausted authority is skipped just as the gate skipped it, and
+          # evaluate TTL at the MERGE timestamp (not proof-generation time) so an authority
+          # that expires after merge still records its budget consumption.
           SA_REGISTRY="governance/authorizations/standing_authority_registry.jsonl"
           PROOF_REGISTRY="governance/merge-legitimacy/merge_proof_registry.jsonl"
           if git cat-file -e "${BASE_SHA}:${SA_REGISTRY}" 2>/dev/null; then
@@ -347,18 +348,26 @@ jobs:
           else
             : > proof_registry_base.jsonl
           fi
+          if git cat-file -e "${BASE_SHA}:runtime/standing-authority.mjs" 2>/dev/null; then
+            git show "${BASE_SHA}:runtime/standing-authority.mjs" > sa_verifier_base.mjs
+          else
+            : > sa_verifier_base.mjs
+          fi
 
-          if [ ! -s sa_registry_base.jsonl ]; then
+          if [ ! -s sa_registry_base.jsonl ] || [ ! -s sa_verifier_base.mjs ]; then
             echo "STANDING_AUTHORITY_ID=" >> "$GITHUB_ENV"
-            echo "No base-branch standing authority registry — no attribution."
+            echo "No base-branch standing authority registry or verifier — no attribution."
             exit 0
           fi
 
           node --input-type=module <<'NODE'
           import { readFileSync, appendFileSync } from 'node:fs';
-          import { selectStandingAuthority } from './runtime/standing-authority.mjs';
+          const { selectStandingAuthority } = await import('./sa_verifier_base.mjs');
 
           // Classify governed files using the same rules as merge-governance-check.
+          // Only governance_mutation / workflow_mutation files are GMA-gated and subject
+          // to Standing Authority path containment; proof_persistence and other classes
+          // are excluded so a mixed PR is not falsely declined.
           const changed = readFileSync('changed_files_proof.txt', 'utf8').split('\n').filter(Boolean);
           const governedFiles = [];
           const detectedClasses = [];
@@ -367,16 +376,12 @@ jobs:
             if (f === 'governance/merge-legitimacy/merge_proof_registry.jsonl') continue;
             if (f.startsWith('governance/')) { governedFiles.push(f); detectedClasses.push('governance_mutation'); }
             else if (f.startsWith('.github/workflows/')) { governedFiles.push(f); detectedClasses.push('workflow_mutation'); }
-            else if (f.startsWith('src/')) { governedFiles.push(f); detectedClasses.push('runtime_mutation'); }
-            else if (f === 'schema.sql') { governedFiles.push(f); detectedClasses.push('schema_mutation'); }
-            else if (f.startsWith('migrations/')) { governedFiles.push(f); detectedClasses.push('migration_mutation'); }
-            else if (f === 'wrangler.toml') { governedFiles.push(f); detectedClasses.push('deployment_config_mutation'); }
           }
 
-          // Only governance/workflow mutations are gated by GMA/Standing Authority.
-          // A PR with none of those classes never used a SA — attributing it would
-          // vacuously satisfy all bounds and wrongly drain budget. Skip attribution.
+          // A PR with no governance/workflow mutation never used a SA — attributing it
+          // would vacuously satisfy all bounds and wrongly drain budget. Skip attribution.
           const govClasses = detectedClasses.filter((c) => c === 'governance_mutation' || c === 'workflow_mutation');
+          const mergedAt = process.env.MERGED_AT ? new Date(process.env.MERGED_AT) : new Date();
           const sel = govClasses.length === 0
             ? { authorized: false, reason: 'no governance/workflow mutation — GMA not required' }
             : selectStandingAuthority({
@@ -384,7 +389,7 @@ jobs:
                 headRef: process.env.HEAD_REF,
                 governedFiles,
                 detectedClasses,
-                now: new Date(),
+                now: mergedAt, // evaluate TTL at merge time, not proof-generation time
                 proofRegistryText: readFileSync('proof_registry_base.jsonl', 'utf8'), // real ledger reproduces the gate's budgeted choice
               });
           const id = sel.authorized ? sel.authority.authority_id : '';

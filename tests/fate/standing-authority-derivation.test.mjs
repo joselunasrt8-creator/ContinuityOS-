@@ -261,11 +261,14 @@ test('parseRegistry separates authorities from revocations and ignores malformed
   assert.equal(revocations.length, 1);
 });
 
-test('countConsumedBudget counts only matching authority_id', () => {
+test('countConsumedBudget counts only well-formed proof_entry records, deduped by proof_id', () => {
   const proofs = [
-    { standing_authority_id: 'SA-a' },
-    { standing_authority_id: 'SA-b' },
-    { standing_authority_id: 'SA-a' },
+    { _record_type: 'proof_entry', proof_id: 'P1', standing_authority_id: 'SA-a' },
+    { _record_type: 'proof_entry', proof_id: 'P2', standing_authority_id: 'SA-b' },
+    { _record_type: 'proof_entry', proof_id: 'P3', standing_authority_id: 'SA-a' },
+    { _record_type: 'proof_entry', proof_id: 'P3', standing_authority_id: 'SA-a' }, // duplicate proof_id — not double-counted
+    { standing_authority_id: 'SA-a' },                                              // no _record_type / proof_id — ignored (budget-DoS guard)
+    { _record_type: 'proof_entry', standing_authority_id: 'SA-a' },                 // missing proof_id — ignored
     { proof_id: 'no-sa' },
   ].map((p) => JSON.stringify(p)).join('\n');
   assert.equal(countConsumedBudget(proofs, 'SA-a'), 2);
@@ -301,10 +304,31 @@ test('merge-governance-check derives Standing Authorities from the BASE branch o
   assert.match(wf, /proof_registry_base\.jsonl/, 'budget must be counted from the base-branch proof ledger');
 });
 
-test('merge-proof attributes from the BASE branch with the real proof ledger (P1: correct budget consumption)', () => {
+test('merge-governance-check loads the derivation verifier from the BASE branch (P1: no head-checkout code execution)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  assert.match(wf, /git show "\$\{BASE_SHA\}:runtime\/standing-authority\.mjs" > sa_verifier_base\.mjs/, 'verifier must be extracted from BASE_SHA');
+  assert.match(wf, /await import\('\.\/sa_verifier_base\.mjs'\)/, 'Tier 3 must import the base verifier, not the head module');
+});
+
+test('merge-governance-check validates appended standing authority records (P1: shape/consistency)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  assert.match(wf, /Validate appended standing authority records/, 'a dedicated SA record validation step must exist');
+  assert.match(wf, /source_authority must be OWNER_WORKFLOW_DISPATCH/, 'appended records must declare owner-dispatch source');
+  assert.match(wf, /authority_hash does not match its bounds/, 'authority_hash must be recomputed and checked');
+});
+
+test('merge-governance-check restricts SA path containment to GMA-gated files (P2: no false NULL on mixed PRs)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  assert.match(wf, /const authFiles = governedFiles\.filter/, 'path containment must use only governance/workflow files');
+  assert.match(wf, /governedFiles: authFiles/, 'filtered file list must be passed to selectStandingAuthority');
+});
+
+test('merge-proof attributes from the BASE branch with the real proof ledger and merge-time TTL (P1/P2)', () => {
   const wf = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
   assert.match(wf, /git show "\$\{BASE_SHA\}:\$\{SA_REGISTRY\}" > sa_registry_base\.jsonl/, 'attribution must read the SA registry from BASE_SHA');
   assert.match(wf, /readFileSync\('proof_registry_base\.jsonl', 'utf8'\)/, 'attribution must apply the real base proof ledger so the gate choice is reproduced');
+  assert.match(wf, /await import\('\.\/sa_verifier_base\.mjs'\)/, 'attribution must run the base verifier');
+  assert.match(wf, /now: mergedAt/, 'TTL must be evaluated at merge time, not proof-generation time');
 });
 
 test('merge-governance-check enforces append-only growth of the standing authority registry', () => {

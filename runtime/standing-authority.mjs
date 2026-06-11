@@ -91,9 +91,16 @@ export function parseRegistry(registryText) {
  * Count merge_proof_registry.jsonl entries that consumed budget against a given
  * authority_id. Each governed merge derived under a SA stamps standing_authority_id
  * into its proof entry, so the append-only proof ledger IS the budget ledger.
+ *
+ * Only well-formed proof_entry records with a proof_id are counted, and counting is
+ * de-duplicated by proof_id. merge_proof_registry.jsonl is classified proof_persistence
+ * (not GMA-gated), so a proof-registry PR could otherwise append bogus lines citing an
+ * active standing_authority_id to exhaust that authority (budget DoS). Requiring the
+ * canonical proof_entry shape + unique proof_id raises the bar; full proof_hash
+ * verification against the canonical payload is sequenced for post-V1.
  */
 export function countConsumedBudget(proofRegistryText, authorityId) {
-  let n = 0;
+  const proofIds = new Set();
   for (const line of (proofRegistryText || '').split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -103,9 +110,14 @@ export function countConsumedBudget(proofRegistryText, authorityId) {
     } catch (_) {
       continue;
     }
-    if (rec && rec.standing_authority_id === authorityId) n++;
+    if (rec
+      && rec._record_type === 'proof_entry'
+      && rec.standing_authority_id === authorityId
+      && rec.proof_id) {
+      proofIds.add(rec.proof_id);
+    }
   }
-  return n;
+  return proofIds.size;
 }
 
 /**
