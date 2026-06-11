@@ -1,12 +1,12 @@
 {
-  "gma_id": "GMA-claude/gma-proof-registry-guard-muh2h1-local-1781090648531",
-  "decision_id": "1b55b6ab8b289a9357140135990217e984dbc4cc8220d983e582c709c9ce4d29",
-  "continuity_id": "ae544b8cdb9a32b7777a4cd990d6a9c36f83f8bd084a92de2844da144c776e76",
-  "session_id": "680fdc09e5a8af69dfeb62ff7380fe032e626ae5109e1d6c6e39023b752f5bd9",
-  "validated_object_hash": "5e7561f71bf84f24be9ddcaba0d2bd8aabc365ea32d941d7c879d8d6b2ffcdcd",
-  "governed_files_hash": "1badd32a5419061753ea45bd3bb3c9e0d2ae3ed0924a45e70ab82d58bb485c73",
+  "gma_id": "GMA-claude/continuityos-dependency-proof-hzu5kd-local-1781168153333",
+  "decision_id": "2d2f3bd97c1a6beceda746bc0f1cfd8b60c2acc93e78eb75ab3a515411c94033",
+  "continuity_id": "e2dc7177eaebec783ccb3a829b2f537231c12810abd644657b04a54575e2af93",
+  "session_id": "9e5e106329b21f17be6643f662bc9b762f5bf9c1ff3b0fd0ff9486eb8c664c0d",
+  "validated_object_hash": "a969e44fba473f28a2f38d03ef6e225c68291b20b561b4e373eae832380f6317",
+  "governed_files_hash": "4419c5b6c6ade9d8d27de8b8a0d4e8c7d2cab637644b2e13548333a17076d0a2",
   "governed_files": [
-    ".github/workflows/governance-mutation-authorization.yml"
+    ".github/workflows/demo-freshness.yml"
   ],
   "mutation_classes": [
     "workflow_mutation"
@@ -15,14 +15,14 @@
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Skip governance mutation authorization on proof-registry branches",
+  "intent": "Add demo-freshness CI workflow (PR #1980): runs npm run demo and npm run demo:langchain on push/PR to main, asserts EXECUTED/NULL outcomes, uploads logs as artifacts. Read-only CI, no deploy capability.",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
-  "repo": "joselunasrt8-creator/mindshift-demo",
-  "branch": "claude/gma-proof-registry-guard-muh2h1",
-  "head_sha": "19fcb25f959dde78cb7e09ad3f192a0d88acf331",
-  "workflow_run_id": "local-1781090648531",
-  "created_at": "2026-06-10T11:24:08Z",
-  "expires_at": "2027-06-10T11:24:08Z",
+  "repo": "joselunasrt8-creator/ContinuityOS-",
+  "branch": "claude/continuityos-dependency-proof-hzu5kd",
+  "head_sha": "ee30e5725e3705bd780634f381b09323ff4bbac4",
+  "workflow_run_id": "local-1781168153333",
+  "created_at": "2026-06-11T08:55:53Z",
+  "expires_at": "2027-06-11T08:55:53Z",
   "status": "GMA_VALID"
 }
