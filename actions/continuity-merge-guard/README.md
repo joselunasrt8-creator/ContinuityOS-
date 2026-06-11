@@ -88,7 +88,7 @@ jobs:
   merge-guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: joselunasrt8-creator/mindshift-demo/actions/continuity-merge-guard@main
+      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0
         id: merge-guard
         with:
           repo: ${{ github.repository }}
@@ -111,6 +111,16 @@ ContinuityOS Merge Guard: VALID or NULL
  ↓
 Merge allowed | Merge blocked
 ```
+
+### Version reference
+
+- `@v0.1.0` — pinned, stable validator surface. Recommended for any
+  consumer that treats the Merge Guard result as load-bearing (a required
+  status check), so that a changed result can only come from a changed PR
+  object, never from a changed validator implementation.
+- `@main` — floating reference. Acceptable for exploration/evaluation, but
+  not recommended once a consumer relies on the result for merge
+  eligibility.
 
 ## Portability
 

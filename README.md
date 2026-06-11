@@ -37,7 +37,7 @@ request's identity object (`repo`, `pr_number`, `head_sha`, `base_sha`,
 proof artifact — designed to be added as a required status check.
 
 ```yaml
-- uses: joselunasrt8-creator/mindshift-demo/actions/continuity-merge-guard@main
+- uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@main
   with:
     repo: ${{ github.repository }}
     pr-number: ${{ github.event.pull_request.number }}
