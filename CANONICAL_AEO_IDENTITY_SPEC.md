@@ -1,7 +1,7 @@
 # Canonical AEO & Identity Anchor Specification
 
 **Issue:** #1691
-**Repository:** joselunasrt8-creator/mindshift-demo
+**Repository:** joselunasrt8-creator/ContinuityOS-
 **Branch:** claude/session-1691-ANOHu
 **Date:** 2026-06-01
 **Mode:** Non-operative. Derived exclusively from existing repository state.

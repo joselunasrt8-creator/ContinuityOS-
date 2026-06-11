@@ -8,8 +8,8 @@ section.
 To reproduce:
 
 ```bash
-git clone https://github.com/joselunasrt8-creator/mindshift-demo.git
-cd mindshift-demo
+git clone https://github.com/joselunasrt8-creator/ContinuityOS-.git
+cd ContinuityOS-
 npm install
 npm run demo
 ```
@@ -26,7 +26,7 @@ found 0 vulnerabilities
 
 $ npm run demo
 
-> mindshift-demo@1.0.0 demo
+> continuityos@1.0.0 demo
 > node demo/portability/filesystem-governed-execution.mjs
 
 {
