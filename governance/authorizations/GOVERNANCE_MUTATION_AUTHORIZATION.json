@@ -1,28 +1,28 @@
 {
-  "gma_id": "GMA-claude/continuityos-dependency-proof-hzu5kd-local-1781168153333",
-  "decision_id": "2d2f3bd97c1a6beceda746bc0f1cfd8b60c2acc93e78eb75ab3a515411c94033",
-  "continuity_id": "e2dc7177eaebec783ccb3a829b2f537231c12810abd644657b04a54575e2af93",
-  "session_id": "9e5e106329b21f17be6643f662bc9b762f5bf9c1ff3b0fd0ff9486eb8c664c0d",
-  "validated_object_hash": "a969e44fba473f28a2f38d03ef6e225c68291b20b561b4e373eae832380f6317",
-  "governed_files_hash": "4419c5b6c6ade9d8d27de8b8a0d4e8c7d2cab637644b2e13548333a17076d0a2",
+  "gma_id": "GMA-work-local-20260611-legacy-helper-tombstones-gma",
+  "decision_id": "384b6fa7ce20f3d2356a7a6c93b22875c3159bbb10ce7a2d69f4d7904ccbe9bc",
+  "continuity_id": "b7da108a9b1251a3ac6296680ff066f21e7b3e20ac8eee50e19cefcdf276f4cb",
+  "session_id": "a3a7b4933e1eded1bd5a8d42fd07b7129500f045e1a7616428d1a1bd043dba78",
+  "validated_object_hash": "688ac3a896c08608dfb89a8b81ed56f7e23b1fda30ee0076722923fb4e536f78",
+  "governed_files_hash": "b227a9860ad7e541bb8f5afe3e3e4b78c52fe024727fc4983fdcc68af1099c2e",
   "governed_files": [
-    ".github/workflows/demo-freshness.yml"
+    "governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json"
   ],
   "mutation_classes": [
-    "workflow_mutation"
+    "governance_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
-  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Add demo-freshness CI workflow (PR #1980): runs npm run demo and npm run demo:langchain on push/PR to main, asserts EXECUTED/NULL outcomes, uploads logs as artifacts. Read-only CI, no deploy capability.",
+  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session \u2192 /continuity \u2192 /authority \u2192 /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
+  "intent": "Authorize Phase 1 tombstoning of legacy root helpers and active governance inventory reconciliation: registry.js, compile-decision.js, mindshift_bundle_generator.sh, decision.json fixture-only classification, and REPO_EXECUTION_MAP topology visibility update. No Cloudflare deploy or D1 migration governance changes.",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "claude/continuityos-dependency-proof-hzu5kd",
-  "head_sha": "ee30e5725e3705bd780634f381b09323ff4bbac4",
-  "workflow_run_id": "local-1781168153333",
-  "created_at": "2026-06-11T08:55:53Z",
-  "expires_at": "2027-06-11T08:55:53Z",
+  "branch": "work",
+  "head_sha": "d44edb3d4559e46b81f1e01f60c76d9b0ef3fa6f",
+  "workflow_run_id": "local-20260611-legacy-helper-tombstones-gma",
+  "created_at": "2026-06-11T09:45:00Z",
+  "expires_at": "2027-06-11T09:45:00Z",
   "status": "GMA_VALID"
 }

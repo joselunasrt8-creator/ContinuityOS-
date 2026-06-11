@@ -118,8 +118,8 @@
     {
       "finding_id": "RIF-003",
       "severity": "medium",
-      "status": "open_risk",
-      "finding": "Legacy/demo files remain present; disabled entrypoints reduce risk, but registry.js/compile-decision.js/static demo objects must remain quarantined from production authority."
+      "status": "bounded_by_phase1_tombstones",
+      "finding": "Legacy root helpers are tombstoned fail-closed or fixture-only: registry.js, compile-decision.js, and mindshift_bundle_generator.sh cannot emit VALID, runtime objects, signatures, receipts, or proof-like artifacts; decision.json is fixture-only and non-authoritative."
     },
     {
       "finding_id": "RIF-004",
