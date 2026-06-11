@@ -20,6 +20,8 @@
       "observability": "Cloudflare dashboard deploy log only; not bound to MindShift proof registry",
       "status": "OPEN — account-level disable required",
       "closure_condition": "Git Integration disabled at Cloudflare account level and verified by administrator",
+      "evidence_path": "governance/runtime/evidence/ (RB-001_<date>.json, see RUNBOOK.md)",
+      "evidence_status": "NO_EVIDENCE_RECORDED — remains OPEN",
       "break_glass": false
     },
     {
@@ -33,7 +35,10 @@
       "status": "CLASSIFIED_OPEN — root break-glass authority",
       "closure_condition": "CLOUDFLARE_API_TOKEN scoped to GitHub Actions OIDC only; no static token capable of production deploy",
       "break_glass": true,
-      "break_glass_classification": "EXPLICIT_ROOT_AUTHORITY"
+      "break_glass_classification": "EXPLICIT_ROOT_AUTHORITY",
+      "mitigation_note": "#1989 added a 'production' GitHub Environment gate (required reviewers) to governed-deploy.yml's workflow_dispatch path. This bounds the governed wrapper invocation only; it does not constrain a credential holder running wrangler deploy directly outside any GitHub workflow.",
+      "evidence_path": "governance/runtime/evidence/ (RB-002_<date>.json, see RUNBOOK.md)",
+      "evidence_status": "NO_EVIDENCE_RECORDED — remains OPEN/BREAK_GLASS"
     },
     {
       "bypass_id": "RB-003",

@@ -19,8 +19,9 @@
       "containment_status": "CONTAINMENT_REQUIRED",
       "containment_action": "Disable Git Integration at Cloudflare account level for the mindshift-demo worker. Cannot be enforced from wrangler.toml; requires account-level administrative action.",
       "observability": "EXTERNAL_ONLY — deploy events visible in Cloudflare dashboard and Workers analytics; not visible to MindShift proof registry",
-      "evidence_path": ["wrangler.toml"],
-      "issue_reference": "#584"
+      "evidence_path": ["wrangler.toml", "governance/runtime/evidence/ (RB-001_<date>.json, see RUNBOOK.md)"],
+      "evidence_status": "NO_EVIDENCE_RECORDED — containment_status remains CONTAINMENT_REQUIRED",
+      "issue_reference": "#584, #1989"
     },
     {
       "surface_id": "CF-002",
@@ -35,8 +36,9 @@
       "containment_status": "CLASSIFIED_OPEN",
       "containment_action": "Scope token to minimum required permissions. Rotate token after each use or bind to GitHub Actions OIDC. Classify as root break-glass authority.",
       "observability": "PARTIAL — wrangler deploy emits Cloudflare deployment record; not bound to MindShift proof registry unless governed workflow ran",
-      "evidence_path": ["governance/root_authority_registry.json", ".github/workflows/governed-deploy.yml"],
-      "issue_reference": "#584"
+      "evidence_path": ["governance/root_authority_registry.json", ".github/workflows/governed-deploy.yml", "governance/runtime/evidence/ (RB-002_<date>.json, see RUNBOOK.md)"],
+      "evidence_status": "NO_EVIDENCE_RECORDED — containment_status remains CLASSIFIED_OPEN",
+      "issue_reference": "#584, #1989"
     },
     {
       "surface_id": "CF-003",
@@ -80,11 +82,11 @@
       "governed_by_mindshift": true,
       "bypass_risk": "P1",
       "bypass_condition": "workflow_dispatch with fabricated decision_id/validated_object_hash/invocation_nonce; requires /compile hash match to pass",
-      "containment_status": "GOVERNED — canonical chain validated before deploy; replay protection via nonce reservation",
-      "containment_action": "Caller workflow ref validated. All seven canonical endpoints must return canonical responses. Replay rejected. Authority expiry derived from /authority response.",
+      "containment_status": "GOVERNED — canonical chain validated before deploy; replay protection via nonce reservation; production GitHub Environment approval gate added (#1989)",
+      "containment_action": "Caller workflow ref validated. All seven canonical endpoints must return canonical responses. Replay rejected. Authority expiry derived from /authority response. governed-production-deploy job runs under environment: production, requiring required-reviewer approval configured in repository settings.",
       "observability": "FULL — all canonical chain responses uploaded as GitHub Actions artifacts; proof persisted in MindShift proof registry",
       "evidence_path": [".github/workflows/governed-deploy.yml", ".github/workflows/prepare-governed-deploy.yml"],
-      "issue_reference": "#584"
+      "issue_reference": "#584, #1989"
     }
   ],
   "containment_requirements": {
