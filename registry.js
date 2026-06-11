@@ -1,24 +1,5 @@
-export function validate(aeo) {
-
-  // required fields check
-  if (
-    !aeo.intent ||
-    !aeo.scope ||
-    !aeo.validation ||
-    !aeo.target ||
-    !aeo.finality
-  ) {
-    return "NULL";
-  }
-
-  // authority check
-  if (aeo.validation.decision_id !== "MS-DEMO-001") {
-    return "NULL";
-  }
-
-  if (aeo.validation.signature !== "demo-signature-v1") {
-    return "NULL";
-  }
-
-  return "VALID";
+export function validate() {
+  throw new Error(
+    'Legacy registry.js helper disabled. Root helper validation is non-authoritative; use the canonical runtime spine: /session -> /continuity -> /authority -> /compile -> /validate -> /execute -> /proof.'
+  )
 }

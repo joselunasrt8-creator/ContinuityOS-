@@ -35,10 +35,10 @@ CLASSIFICATION_INCOMPLETE_UNKNOWN_SURFACES_REMAIN
 | `server.js` | Legacy runtime surface | Mark non-operative or remove |
 | `gateway.js` | Legacy gateway surface | Mark non-operative or remove |
 | `worker.js` | Legacy worker surface | Mark non-operative or remove |
-| `registry.js` | Legacy registry surface | Mark non-operative or remove |
-| `compile-decision.js` | Legacy compile script | Mark non-operative or remove |
+| `registry.js` | Legacy registry surface | Tombstoned fail-closed; non-authoritative; canonical runtime spine only |
+| `compile-decision.js` | Legacy compile script | Tombstoned fail-closed; cannot generate root runtime objects or signatures |
 | `aeo.json` | Static demo object | Mark demo-only |
-| `decision.json` | Static demo authority | Mark demo-only |
+| `decision.json` | Static decision fixture | Fixture-only / non-authoritative; no runtime effect |
 | `CURRENT_SYSTEM_SNAPSHOT.md` | Historical/demo snapshot | Mark historical non-operative |
 
 ## GOVERNANCE_ONLY

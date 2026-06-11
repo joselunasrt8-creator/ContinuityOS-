@@ -637,7 +637,7 @@
     },
     {
       "path": "Save the final script as mindshift_bundle_generator.sh",
-      "role": "supporting_artifact",
+      "role": "superseded_legacy_instruction",
       "bytes": 6094,
       "sha256": "f154134adfee4a85a2b67743ac76b1663e7baae5d6847a103c2e2ce788300eac",
       "execution_surface": false,
@@ -645,12 +645,10 @@
       "registry_surface": false,
       "proof_surface": false,
       "signals": [
-        "curl",
-        "validate_route",
-        "execute_route",
-        "proof_route"
+        "superseded_by_phase1_tombstone"
       ],
-      "bypass_risk": "none"
+      "bypass_risk": "none_superseded_instruction",
+      "classification": "SUPERSEDED_NON_AUTHORITATIVE_REFERENCE"
     },
     {
       "path": "aeo.json",
@@ -686,27 +684,36 @@
     },
     {
       "path": "compile-decision.js",
-      "role": "runtime_or_operator_config",
-      "bytes": 952,
-      "sha256": "d85d00d23242ed4917c995cc9bbbcfaaa6289a412a0755d6772dfb35140011dd",
+      "role": "tombstoned_legacy_helper",
+      "bytes": 266,
+      "sha256": "298e4d5d06fb33b64a9d047c12aee861b159b9540244660130446c2d00733f23",
       "execution_surface": false,
       "mutation_capable": false,
       "registry_surface": false,
       "proof_surface": false,
-      "signals": [],
-      "bypass_risk": "none"
+      "signals": [
+        "tombstone",
+        "canonical_runtime_spine"
+      ],
+      "bypass_risk": "closed_by_fail_closed_tombstone",
+      "classification": "TOMBSTONED_FAIL_CLOSED_NON_AUTHORITATIVE"
     },
     {
       "path": "decision.json",
-      "role": "machine_object_fixture",
-      "bytes": 397,
-      "sha256": "5490eb9177eaddbfc5b4836e57e80fde89c9d9f6ff07c113f9b43f3e07cba5d3",
+      "role": "machine_object_fixture_only_non_authoritative",
+      "bytes": 690,
+      "sha256": "717fdf1e425799fa2bd8e4d4ab07dafdd77644031bb23580d7718fceea9d12a9",
       "execution_surface": false,
       "mutation_capable": false,
       "registry_surface": false,
       "proof_surface": false,
-      "signals": [],
-      "bypass_risk": "none"
+      "signals": [
+        "fixture_only",
+        "non_authoritative",
+        "canonical_runtime_spine"
+      ],
+      "bypass_risk": "none_fixture_only",
+      "classification": "FIXTURE_ONLY_NON_AUTHORITATIVE"
     },
     {
       "path": "docs/prod-deploy-boundary.md",
@@ -1185,20 +1192,19 @@
     },
     {
       "path": "mindshift_bundle_generator.sh",
-      "role": "supporting_artifact",
-      "bytes": 5970,
-      "sha256": "fdd9e6126d127d7a6a7d02da848878fe15b6fc4a61d0953de18da6b894ca78b8",
+      "role": "tombstoned_legacy_helper",
+      "bytes": 344,
+      "sha256": "2c42abfb73a9a08fb71862014ebb64c4136dba0c26d0302efd6b1888a16a8f2c",
       "execution_surface": false,
       "mutation_capable": false,
       "registry_surface": false,
       "proof_surface": false,
       "signals": [
-        "curl",
-        "validate_route",
-        "execute_route",
-        "proof_route"
+        "tombstone",
+        "canonical_runtime_spine"
       ],
-      "bypass_risk": "none"
+      "bypass_risk": "closed_by_fail_closed_tombstone",
+      "classification": "TOMBSTONED_FAIL_CLOSED_NON_AUTHORITATIVE"
     },
     {
       "path": "mindshift_checklist_v4.pdf",
@@ -1271,15 +1277,19 @@
     },
     {
       "path": "registry.js",
-      "role": "runtime_or_operator_config",
-      "bytes": 394,
-      "sha256": "ee25e8ee8c550947cacc536d55016aa6743fd9d0e87ed4cb87ad1ff1552d51cb",
+      "role": "tombstoned_legacy_helper",
+      "bytes": 260,
+      "sha256": "11c1eebc6836d4a2d0e47996ceb7508e34799834497461f0f6f9fc83764edf8b",
       "execution_surface": false,
       "mutation_capable": false,
       "registry_surface": false,
       "proof_surface": false,
-      "signals": [],
-      "bypass_risk": "none"
+      "signals": [
+        "tombstone",
+        "canonical_runtime_spine"
+      ],
+      "bypass_risk": "closed_by_fail_closed_tombstone",
+      "classification": "TOMBSTONED_FAIL_CLOSED_NON_AUTHORITATIVE"
     },
     {
       "path": "schema.sql",
@@ -1512,13 +1522,13 @@
     },
     {
       "surface": "mindshift_bundle_generator.sh",
-      "risk": "operator_document_or_script_contains_execution_examples",
-      "status": "non_runtime_but_requires_scope_label"
+      "risk": "legacy_root_helper_tombstoned_fail_closed",
+      "status": "closed_by_phase1_tombstone"
     },
     {
       "surface": "Save the final script as mindshift_bundle_generator.sh",
-      "risk": "operator_document_or_script_contains_execution_examples",
-      "status": "non_runtime_but_requires_scope_label"
+      "risk": "superseded_legacy_generation_instruction",
+      "status": "superseded_by_phase1_tombstone"
     }
   ],
   "validation_requirements": [
