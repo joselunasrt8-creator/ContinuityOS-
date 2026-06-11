@@ -1,12 +1,14 @@
 {
-  "gma_id": "GMA-claude/fix-gma-workflow-uyvxi5-local-1781194002515",
-  "decision_id": "de618e348d11eb6a26834bb59334801a651bb36777df084aae1b3fe20ca7a771",
-  "continuity_id": "330df9a7cf26265e13dfd00a240ee74ed5aca53d8cd2bef7c53c6f4c7d71e179",
-  "session_id": "147aca9d6c5cb10499f6d4905217af1b13efa8e566fbbd223f87638032f5b689",
-  "validated_object_hash": "d65685a9bdf2aedcb5d59e44537e0ee1c9a2f4cd62a02dc62cba11cbda0d4e72",
-  "governed_files_hash": "62c6ce32f19808730708574c45f8bbb4e0a78e817add4ada25e15cae5d358977",
+  "gma_id": "GMA-claude/policy-bound-gma-go69v3-27378956144",
+  "decision_id": "882f87241d93c61df584d4c8524b0e3f70f48a39a2fcb270d2197bf695f4a2aa",
+  "continuity_id": "3691666452041114ae356f731774aba462ef6e73908e9a727f70a9fcf4b5d9bf",
+  "session_id": "6bf7ed5a00eed82823b97cc5de7b0b23fea8a7b8beadf34126847dd8e58c9b51",
+  "validated_object_hash": "b21b0ee1313bc532375af8a51248d31a351ae2809f3217b5c7c49c01067da4c3",
+  "governed_files_hash": "c3798585a301cfe763f8c1e65e3dfb70ef6a5f98e18a651a2145ab1a6b27dfbc",
   "governed_files": [
-    ".github/workflows/governance-mutation-authorization.yml"
+    ".github/workflows/merge-governance-check.yml",
+    ".github/workflows/merge-proof.yml",
+    ".github/workflows/standing-authority-issuance.yml"
   ],
   "mutation_classes": [
     "workflow_mutation"
@@ -14,15 +16,15 @@
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
-  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session -> /continuity -> /authority -> /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Fix invalid YAML in governance-mutation-authorization.yml (zero-indented commit-message body lines broke the run: | block scalar, causing the issuer workflow to fail YAML validation on every run since creation).",
+  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
+  "intent": "Authorize Policy-Bound GMA (Standing Authority) bootstrap implementation.  This governance mutation introduces Standing Authority issuance and check-time derivation as a third admission path while preserving existing GMA tiers, fail-closed behavior, bounded authority, and proof-bound governance mutation lineage.",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "claude/fix-gma-workflow-uyvxi5",
-  "head_sha": "db026f18deae57badb10be96cd14b8b1e8f603bd",
-  "workflow_run_id": "local-1781194002515",
-  "created_at": "2026-06-11T16:06:42Z",
-  "expires_at": "2027-06-11T16:06:42Z",
+  "branch": "claude/policy-bound-gma-go69v3",
+  "head_sha": "d0728459dd97f1798702a96741a9942a6307c7cf",
+  "workflow_run_id": "27378956144",
+  "created_at": "2026-06-11T21:35:55Z",
+  "expires_at": "2027-06-11T21:35:55Z",
   "status": "GMA_VALID"
 }
