@@ -37,7 +37,7 @@ request's identity object (`repo`, `pr_number`, `head_sha`, `base_sha`,
 proof artifact — designed to be added as a required status check.
 
 ```yaml
-- uses: joselunasrt8-creator/mindshift-demo/actions/continuity-merge-guard@main
+- uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0
   with:
     repo: ${{ github.repository }}
     pr-number: ${{ github.event.pull_request.number }}
@@ -46,8 +46,22 @@ proof artifact — designed to be added as a required status check.
     actor: ${{ github.event.pull_request.user.login }}
 ```
 
+`@v0.1.0` is the published, pinnable version. `@main` remains usable for
+exploration but is not recommended once a consumer treats the result as
+load-bearing (a required status check).
+
 See `actions/continuity-merge-guard/README.md` for the full wedge
 explanation, proof schema, and v2 roadmap.
+
+### Live external consumer
+
+[`joselunasrt8-creator/continuityos-sandbox`](https://github.com/joselunasrt8-creator/continuityos-sandbox)
+installs Merge Guard at `@v0.1.0` and has made `merge-guard` a **required**
+status check on its `main` branch — `LOAD-BEARING_ACTIVE`. Real PRs in
+that repo have exercised both outcomes: a `VALID` result allows merge, and
+a `NULL` result reports `failure` and leaves the PR `blocked`. See that
+repo's `LOAD_BEARING_READINESS.md` and `NULL_ENFORCEMENT_PROOF.md` for the
+evidence.
 
 ---
 
