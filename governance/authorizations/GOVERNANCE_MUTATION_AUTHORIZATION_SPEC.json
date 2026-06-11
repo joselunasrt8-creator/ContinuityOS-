@@ -32,8 +32,41 @@
   ],
   "exemption_rationale": "Two classes of paths are exempt from governance_mutation classification: (1) GMA artifacts at governance/authorizations/ are authorization evidence, not governance primitives — self-referentially exempt to break bootstrap circularity. (2) merge_proof_registry.jsonl is an append-only proof evidence surface that records merge events after the fact; it does not define governance rules, authority, policy, or validation logic. Evidence persistence != governance self-mutation.",
   "failure_result": "NULL",
-  "enforcement_rule": "governance_mutation or workflow_mutation detected AND no valid GMA at governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json -> MERGE_LEGITIMACY_NULL",
+  "enforcement_rule": "governance_mutation or workflow_mutation detected AND no GMA entry in governance/authorizations/gma_registry.jsonl (or, as a transitional fallback, governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json) matching this PR's governed diff -> MERGE_LEGITIMACY_NULL",
   "creation_workflow": ".github/workflows/governance-mutation-authorization.yml",
+  "registry_model": {
+    "issue_reference": "#1984",
+    "status": "ACTIVE",
+    "store": "governance/authorizations/gma_registry.jsonl",
+    "format": "JSON Lines — one immutable GMA object per line, append-only",
+    "rationale": "The prior model stored a single mutable GMA file overwritten by every governance-mutation PR, causing concurrent governance PRs to collide on the same artifact and forcing rebase/reissuance loops (observed: PR #1982 closed as redundant after colliding with main). Append-only lineage lets each PR issue its own immutable GMA entry without contending for a shared file.",
+    "selection_key": "(branch, governed_files_hash)",
+    "selection_rule": "merge-governance-check selects the gma_registry.jsonl entry where entry.branch === this PR's head ref AND entry.governed_files_hash === this PR's computed governed_files_hash AND entry.status === 'GMA_VALID' AND entry.expires_at is in the future AND entry.authority_lineage_bound === true AND entry.mutation_classes covers all governance_mutation/workflow_mutation classes detected in the PR. If multiple entries match, the most recently created one is used.",
+    "branch_binding_rationale": "Binding to the requesting branch (not just content hash) prevents a GMA issued for one branch's diff from authorizing an identical-hash mutation proposed on a different branch (replay safety). head_sha is intentionally NOT part of the selection key because it changes on every rebase/push; binding to branch keeps a previously issued GMA valid across rebases as long as the governed diff is unchanged.",
+    "append_only_enforcement": "merge-governance-check includes a dedicated step ('Enforce append-only GMA registry') that, when gma_registry.jsonl is among the PR's changed files, asserts the base-branch version of the file is a byte-exact prefix of the head-branch version — i.e. existing entries may never be modified or removed, only new entries appended. This is required because governance/authorizations/** is exempt from normal governed-file classification and would otherwise be invisible to the governance check.",
+    "merge_union_driver": {
+      "declared_in": ".gitattributes",
+      "attribute": "merge=union",
+      "applies_to": [
+        "governance/authorizations/gma_registry.jsonl",
+        "governance/merge-legitimacy/merge_proof_registry.jsonl"
+      ],
+      "effect": "On a local/CLI 3-way merge or rebase, conflicting appended lines from both sides are kept (union) instead of raising a conflict — eliminating mechanical line conflicts between concurrent registry-appending branches.",
+      "limitation": "merge=union is honored by git's local merge/rebase machinery only. It does NOT apply to GitHub's server-side 'Merge'/'Rebase and merge' buttons, which do not invoke local merge drivers. The semantic fix against contention is the lookup-by-(branch, governed_files_hash) selection rule above, which works regardless of merge venue; merge=union is a supplementary mechanical aid for local/CLI workflows."
+    }
+  },
+  "migration": {
+    "model": "5-phase dual-write",
+    "current_phase": "PHASE_1_2_ACTIVE",
+    "phases": {
+      "phase_1": "Issuance workflow dual-writes: appends a GMA entry to gma_registry.jsonl AND continues writing the legacy singleton GOVERNANCE_MUTATION_AUTHORIZATION.json.",
+      "phase_2": "Validation is registry-first: gma_registry.jsonl is checked via the (branch, governed_files_hash) selection rule; if no match is found, the legacy singleton is checked as a fallback (matched by governed_files_hash alone, unbound to branch).",
+      "phase_3": "Observe several real governance/workflow-mutation PRs admitted via the registry path with no singleton-fallback usage.",
+      "phase_4": "Deprecate the singleton: stop dual-writing GOVERNANCE_MUTATION_AUTHORIZATION.json in the issuance workflow.",
+      "phase_5": "Remove the singleton file and its fallback branch from merge-governance-check entirely."
+    },
+    "note": "This spec currently reflects phases 1-2. Phases 3-5 are explicit follow-ups and must not be performed prematurely — the singleton fallback is a deliberate de-risking measure during cutover."
+  },
   "v1_issuance_model": {
     "model": "LOCAL_DETERMINISTIC",
     "requires_owner_dispatch": true,

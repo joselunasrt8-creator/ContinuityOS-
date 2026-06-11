@@ -311,13 +311,61 @@ jobs:
               status: "SCO_CANDIDATE"
             }' > SCO_CANDIDATE.json
 
-      - name: Validate governance mutation authorization (GAP-005)
+      - name: Enforce append-only GMA registry (Issue #1984)
         if: github.event_name != 'merge_group'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
 
-          # GAP-005: governance_mutation or workflow_mutation requires a valid GMA
-          # with canonical lifecycle lineage (session -> continuity -> authority -> compile)
+          # Issue #1984: gma_registry.jsonl is append-only authorization lineage.
+          # governance/authorizations/** is exempt from governed-file detection, so
+          # this dedicated guard ensures existing registry entries can never be
+          # modified or removed — the base-branch version must be a byte-exact
+          # PREFIX of the head version (new entries only ever appended at the end).
+          # Without this, registry history could be rewritten to preserve a green merge.
+          REGISTRY="governance/authorizations/gma_registry.jsonl"
+
+          if ! grep -qxF "$REGISTRY" changed_files.txt 2>/dev/null; then
+            echo "gma_registry.jsonl not modified by this PR — append-only check not applicable."
+            exit 0
+          fi
+
+          if ! git cat-file -e "${BASE_SHA}:${REGISTRY}" 2>/dev/null; then
+            echo "gma_registry.jsonl is newly introduced by this PR — all additions, append-only by construction."
+            exit 0
+          fi
+
+          git show "${BASE_SHA}:${REGISTRY}" > gma_registry_base.jsonl
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const base = readFileSync('gma_registry_base.jsonl');
+          const head = readFileSync('governance/authorizations/gma_registry.jsonl');
+          if (head.length < base.length || !head.subarray(0, base.length).equals(base)) {
+            console.error('NULL — gma_registry.jsonl modified non-append-only: existing entries changed or removed.');
+            console.error('The base-branch registry must be a byte-exact prefix of the head registry (Issue #1984 append-only policy).');
+            console.error('Result: MERGE_LEGITIMACY_NULL');
+            process.exit(1);
+          }
+          const added = head.subarray(base.length).toString('utf8').split('\n').filter(Boolean).length;
+          console.log(`gma_registry.jsonl change is append-only: ${added} new entr${added === 1 ? 'y' : 'ies'} appended.`);
+          NODE
+
+      - name: Validate governance mutation authorization (GAP-005 / Issue #1984)
+        if: github.event_name != 'merge_group'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          # GAP-005: governance_mutation or workflow_mutation requires a valid GMA.
+          # Issue #1984: authorizations are append-only lineage in gma_registry.jsonl,
+          # selected by the composite key (branch + governed_files_hash). The legacy
+          # singleton GOVERNANCE_MUTATION_AUTHORIZATION.json is retained as a
+          # transitional fallback (Phase 2 of the migration), selected by
+          # governed_files_hash alone.
           HAS_GOV_MUTATION=$(grep -qE '^(governance_mutation|workflow_mutation)$' mutation_classes.txt 2>/dev/null && echo "true" || echo "false")
 
           if [ "$HAS_GOV_MUTATION" = "false" ]; then
@@ -330,7 +378,6 @@ jobs:
           # this PR is the bootstrap PR that introduces GAP-005 GMA infrastructure.
           # Enforcement is deferred ONLY for this PR. Once merged, the workflow exists on main
           # and all subsequent governance mutation PRs are fully enforced — no follow-up needed.
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
           if ! git cat-file -e "${BASE_SHA}:.github/workflows/governance-mutation-authorization.yml" 2>/dev/null; then
             echo "GMA_BOOTSTRAP_EXEMPTION — governance-mutation-authorization.yml is absent from base branch at ${BASE_SHA}."
             echo "Classification: SELF_BLOCKING_GMA_BOOTSTRAP (Path A repair — split bootstrap)"
@@ -341,44 +388,25 @@ jobs:
             exit 0
           fi
 
-          GMA_FILE="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+          REGISTRY="governance/authorizations/gma_registry.jsonl"
+          SINGLETON="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
 
-          if [ ! -f "$GMA_FILE" ]; then
-            echo "NULL — governance_mutation or workflow_mutation detected but no GMA found at $GMA_FILE"
-            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch,"
-            echo "then commit the output GMA artifact to governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
-            echo "Result: MERGE_LEGITIMACY_NULL (GAP-005)"
+          if [ ! -f "$REGISTRY" ] && [ ! -f "$SINGLETON" ]; then
+            echo "NULL — governance/workflow mutation detected but neither GMA registry nor singleton found."
+            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch to append a GMA entry."
+            echo "Result: MERGE_LEGITIMACY_NULL (GAP-005 / Issue #1984)"
             exit 1
           fi
 
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { createHash } from 'node:crypto';
-          import { readFileSync } from 'node:fs';
+          import { readFileSync, existsSync } from 'node:fs';
 
-          const gma = JSON.parse(readFileSync('governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json', 'utf8'));
+          const headRef = process.env.HEAD_REF;
+          assert.ok(headRef, 'head ref must be available for branch-bound GMA selection');
 
-          // Required fields
-          const required = ['gma_id', 'decision_id', 'continuity_id', 'session_id',
-            'validated_object_hash', 'governed_files_hash', 'mutation_classes',
-            'gm_control_class', 'authority_lineage_bound', 'expires_at', 'status'];
-          for (const field of required) {
-            assert.ok(gma[field] !== undefined && gma[field] !== null && gma[field] !== '',
-              `GMA missing required field: ${field}`);
-          }
-
-          // Status check
-          assert.equal(gma.status, 'GMA_VALID', 'GMA status must be GMA_VALID');
-
-          // Expiry check
-          const now = new Date();
-          const expiry = new Date(gma.expires_at);
-          assert.ok(expiry > now, `GMA has expired at ${gma.expires_at} — rerun governance-mutation-authorization workflow`);
-
-          // Authority lineage bound
-          assert.equal(gma.authority_lineage_bound, true, 'GMA must declare authority_lineage_bound: true');
-
-          // Governed files hash check
+          // Compute governed_files_hash for THIS PR's governed diff (unchanged algorithm)
           const governedFiles = readFileSync('governed_files.txt', 'utf8').split('\n').filter(Boolean).sort();
           const parts = governedFiles.map(f => {
             let content;
@@ -390,28 +418,84 @@ jobs:
             const hash = createHash('sha256').update(content).digest('hex');
             return `${f}:${hash}`;
           });
-          const combined = parts.join('\n');
-          const computedHash = createHash('sha256').update(combined).digest('hex');
+          const computedHash = createHash('sha256').update(parts.join('\n')).digest('hex');
 
-          assert.equal(
-            gma.governed_files_hash,
-            computedHash,
-            `GMA governed_files_hash mismatch.\nExpected: ${computedHash}\nGot: ${gma.governed_files_hash}\nThe GMA was created for a different set of governed file changes. Rerun governance-mutation-authorization.yml.`
-          );
+          const detectedClasses = readFileSync('mutation_classes.txt', 'utf8')
+            .split('\n').filter(Boolean)
+            .filter(c => c === 'governance_mutation' || c === 'workflow_mutation');
 
-          // Mutation class coverage
-          const gmaMutationClasses = new Set(gma.mutation_classes);
-          const detectedClasses = readFileSync('mutation_classes.txt', 'utf8').split('\n').filter(Boolean);
-          for (const cls of detectedClasses) {
-            if (cls === 'governance_mutation' || cls === 'workflow_mutation') {
-              assert.ok(gmaMutationClasses.has(cls), `GMA does not cover detected mutation class: ${cls}`);
+          const now = new Date();
+
+          // Shared structural/temporal validation for a selected GMA entry.
+          function checkEntry(gma) {
+            const required = ['gma_id', 'decision_id', 'continuity_id', 'session_id',
+              'validated_object_hash', 'governed_files_hash', 'mutation_classes',
+              'gm_control_class', 'authority_lineage_bound', 'expires_at', 'status'];
+            for (const field of required) {
+              assert.ok(gma[field] !== undefined && gma[field] !== null && gma[field] !== '',
+                `GMA missing required field: ${field}`);
+            }
+            assert.equal(gma.status, 'GMA_VALID', 'GMA status must be GMA_VALID');
+            assert.ok(new Date(gma.expires_at) > now,
+              `GMA has expired at ${gma.expires_at} — rerun governance-mutation-authorization workflow`);
+            assert.equal(gma.authority_lineage_bound, true, 'GMA must declare authority_lineage_bound: true');
+            assert.equal(gma.governed_files_hash, computedHash,
+              `GMA governed_files_hash mismatch.\nExpected: ${computedHash}\nGot: ${gma.governed_files_hash}\nThe GMA was issued for a different set of governed file changes.`);
+            const gmaClasses = new Set(gma.mutation_classes);
+            for (const cls of detectedClasses) {
+              assert.ok(gmaClasses.has(cls), `GMA does not cover detected mutation class: ${cls}`);
             }
           }
 
-          console.log(`GMA_VALID: ${gma.gma_id}`);
-          console.log(`governed_files_hash: ${gma.governed_files_hash}`);
-          console.log(`decision_id: ${gma.decision_id}`);
-          console.log('Result: GMA_VALID — governance mutation authorized via canonical lifecycle (GAP-005)');
+          // PRIMARY (Issue #1984): append-only registry, selected by (branch + governed_files_hash).
+          // Two PRs may share a governed_files_hash; branch binding makes the registry
+          // lineage rather than a shared authorization pool and blocks cross-branch replay.
+          const REGISTRY = 'governance/authorizations/gma_registry.jsonl';
+          let matched = null;
+          let source = null;
+          if (existsSync(REGISTRY)) {
+            const candidates = readFileSync(REGISTRY, 'utf8').split('\n').filter(Boolean)
+              .map(l => { try { return JSON.parse(l); } catch (_) { return null; } })
+              .filter(e => e
+                && e.governed_files_hash === computedHash
+                && e.branch === headRef
+                && e.status === 'GMA_VALID'
+                && new Date(e.expires_at) > now)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            if (candidates.length > 0) {
+              matched = candidates[0];
+              source = 'registry (branch+hash)';
+            }
+          }
+
+          // FALLBACK (transitional, Phase 2): legacy singleton, selected by governed_files_hash.
+          const SINGLETON = 'governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json';
+          if (!matched && existsSync(SINGLETON)) {
+            try {
+              const gma = JSON.parse(readFileSync(SINGLETON, 'utf8'));
+              if (gma.governed_files_hash === computedHash) {
+                matched = gma;
+                source = 'singleton-fallback';
+              }
+            } catch (_) { /* malformed singleton ignored — registry is authoritative */ }
+          }
+
+          if (!matched) {
+            console.error("NULL — no valid GMA for this PR's governed diff.");
+            console.error(`computed governed_files_hash: ${computedHash}`);
+            console.error(`branch: ${headRef}`);
+            console.error('Append a GMA via .github/workflows/governance-mutation-authorization.yml on this branch.');
+            console.error('Result: MERGE_LEGITIMACY_NULL (GAP-005 / Issue #1984)');
+            process.exit(1);
+          }
+
+          checkEntry(matched);
+
+          console.log(`GMA_VALID: ${matched.gma_id} (source: ${source})`);
+          console.log(`governed_files_hash: ${matched.governed_files_hash}`);
+          console.log(`branch: ${matched.branch || '(legacy singleton, unbound)'}`);
+          console.log(`decision_id: ${matched.decision_id}`);
+          console.log('Result: GMA_VALID — governance mutation authorized via append-only lineage (GAP-005 / Issue #1984)');
           NODE
 
       - name: Validate PREO/SCO binding

@@ -173,7 +173,7 @@ jobs:
           GOVERNED_FILES_JSON=$(jq -R . gma_governed_files.txt | jq -sc '.')
 
           node --input-type=module <<NODE
-          import { writeFileSync } from 'node:fs';
+          import { writeFileSync, appendFileSync, existsSync, readFileSync } from 'node:fs';
 
           const gma = {
             gma_id: "${GMA_ID}",
@@ -200,11 +200,34 @@ jobs:
             status: "GMA_VALID"
           };
 
+          // Issue #1984 — Phase 1 dual-write:
+          //  (1) legacy singleton: transitional fallback for merge-governance-check
+          //  (2) append-only registry: primary selection surface, keyed by
+          //      (branch + governed_files_hash); immutable lineage, no overwrite.
           writeFileSync(
             'governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json',
             JSON.stringify(gma, null, 2) + '\n'
           );
-          console.log('GMA written.');
+
+          const REGISTRY = 'governance/authorizations/gma_registry.jsonl';
+          const existing = existsSync(REGISTRY) ? readFileSync(REGISTRY, 'utf8') : '';
+          const duplicate = existing.split('\n').filter(Boolean).some(line => {
+            try {
+              const e = JSON.parse(line);
+              return e.gma_id === gma.gma_id
+                || (e.governed_files_hash === gma.governed_files_hash
+                    && e.branch === gma.branch
+                    && e.status === 'GMA_VALID');
+            } catch (_) { return false; }
+          });
+          if (duplicate) {
+            console.log('GMA entry already present for this gma_id or (governed_files_hash, branch) — append skipped (idempotent).');
+          } else {
+            appendFileSync(REGISTRY, JSON.stringify(gma) + '\n');
+            console.log('GMA entry appended to append-only registry.');
+          }
+
+          console.log('GMA written (singleton + registry).');
           console.log('gma_id:', gma.gma_id);
           console.log('governed_files_hash:', gma.governed_files_hash);
           console.log('gm_control_class:', gma.gm_control_class);
@@ -219,6 +242,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json
+          git add governance/authorizations/gma_registry.jsonl
 
           if git diff --cached --quiet; then
             echo "No changes to GMA artifact — hash unchanged."
