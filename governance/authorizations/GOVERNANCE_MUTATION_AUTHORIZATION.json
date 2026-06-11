@@ -1,28 +1,28 @@
 {
-  "gma_id": "GMA-work-local-20260611-legacy-helper-tombstones-gma",
-  "decision_id": "384b6fa7ce20f3d2356a7a6c93b22875c3159bbb10ce7a2d69f4d7904ccbe9bc",
-  "continuity_id": "b7da108a9b1251a3ac6296680ff066f21e7b3e20ac8eee50e19cefcdf276f4cb",
-  "session_id": "a3a7b4933e1eded1bd5a8d42fd07b7129500f045e1a7616428d1a1bd043dba78",
-  "validated_object_hash": "688ac3a896c08608dfb89a8b81ed56f7e23b1fda30ee0076722923fb4e536f78",
-  "governed_files_hash": "b227a9860ad7e541bb8f5afe3e3e4b78c52fe024727fc4983fdcc68af1099c2e",
+  "gma_id": "GMA-claude/fix-gma-workflow-uyvxi5-local-1781194002515",
+  "decision_id": "de618e348d11eb6a26834bb59334801a651bb36777df084aae1b3fe20ca7a771",
+  "continuity_id": "330df9a7cf26265e13dfd00a240ee74ed5aca53d8cd2bef7c53c6f4c7d71e179",
+  "session_id": "147aca9d6c5cb10499f6d4905217af1b13efa8e566fbbd223f87638032f5b689",
+  "validated_object_hash": "d65685a9bdf2aedcb5d59e44537e0ee1c9a2f4cd62a02dc62cba11cbda0d4e72",
+  "governed_files_hash": "62c6ce32f19808730708574c45f8bbb4e0a78e817add4ada25e15cae5d358977",
   "governed_files": [
-    "governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json"
+    ".github/workflows/governance-mutation-authorization.yml"
   ],
   "mutation_classes": [
-    "governance_mutation"
+    "workflow_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
-  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session \u2192 /continuity \u2192 /authority \u2192 /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Authorize Phase 1 tombstoning of legacy root helpers and active governance inventory reconciliation: registry.js, compile-decision.js, mindshift_bundle_generator.sh, decision.json fixture-only classification, and REPO_EXECUTION_MAP topology visibility update. No Cloudflare deploy or D1 migration governance changes.",
+  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session -> /continuity -> /authority -> /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
+  "intent": "Fix invalid YAML in governance-mutation-authorization.yml (zero-indented commit-message body lines broke the run: | block scalar, causing the issuer workflow to fail YAML validation on every run since creation).",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "work",
-  "head_sha": "d44edb3d4559e46b81f1e01f60c76d9b0ef3fa6f",
-  "workflow_run_id": "local-20260611-legacy-helper-tombstones-gma",
-  "created_at": "2026-06-11T09:45:00Z",
-  "expires_at": "2027-06-11T09:45:00Z",
+  "branch": "claude/fix-gma-workflow-uyvxi5",
+  "head_sha": "db026f18deae57badb10be96cd14b8b1e8f603bd",
+  "workflow_run_id": "local-1781194002515",
+  "created_at": "2026-06-11T16:06:42Z",
+  "expires_at": "2027-06-11T16:06:42Z",
   "status": "GMA_VALID"
 }
