@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "document": "CLOUDFLARE_DEPLOY_AUTHORITY_EVIDENCE_RECORD",
+  "bypass_id": "RB-001 | RB-002",
+  "verification_date": "YYYY-MM-DD",
+  "verifier": "name or identity of person performing verification",
+  "source": "where this evidence was obtained, e.g. Cloudflare dashboard path, Cloudflare API response, GitHub repository settings page",
+  "evidence_description": "plain-language description of what was observed",
+  "evidence_reference": "path, hash, or link to the underlying artifact (screenshot, exported config, audit log excerpt)",
+  "resulting_classification": "DOWNGRADED | CLOSED | NO_CHANGE",
+  "notes": "any caveats, scope limitations, or follow-up actions"
+}
