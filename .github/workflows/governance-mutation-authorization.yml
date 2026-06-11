@@ -254,10 +254,10 @@ jobs:
 
           git commit -m "gma: local-deterministic authorization ${GMA_ID}
 
-governed_files_hash: ${HASH}
-authorized_by: ${{ github.actor }}
-issuance_method: LOCAL_DETERMINISTIC
-canonical_lifecycle_executed: false"
+          governed_files_hash: ${HASH}
+          authorized_by: ${{ github.actor }}
+          issuance_method: LOCAL_DETERMINISTIC
+          canonical_lifecycle_executed: false"
 
           git push origin HEAD:"$WORKFLOW_REF_NAME"
           echo "GMA committed and pushed."
