@@ -318,39 +318,45 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Issue #1984: gma_registry.jsonl is append-only authorization lineage.
+          # Append-only authorization lineage guard.
+          #   Issue #1984:     gma_registry.jsonl (per-PR GMA lineage)
+          #   GAP-005 Phase 2: standing_authority_registry.jsonl (policy-bound authority lineage)
           # governance/authorizations/** is exempt from governed-file detection, so
           # this dedicated guard ensures existing registry entries can never be
           # modified or removed — the base-branch version must be a byte-exact
           # PREFIX of the head version (new entries only ever appended at the end).
           # Without this, registry history could be rewritten to preserve a green merge.
-          REGISTRY="governance/authorizations/gma_registry.jsonl"
+          for REGISTRY in \
+            governance/authorizations/gma_registry.jsonl \
+            governance/authorizations/standing_authority_registry.jsonl
+          do
+            if ! grep -qxF "$REGISTRY" changed_files.txt 2>/dev/null; then
+              echo "$REGISTRY not modified by this PR — append-only check not applicable."
+              continue
+            fi
 
-          if ! grep -qxF "$REGISTRY" changed_files.txt 2>/dev/null; then
-            echo "gma_registry.jsonl not modified by this PR — append-only check not applicable."
-            exit 0
-          fi
+            if ! git cat-file -e "${BASE_SHA}:${REGISTRY}" 2>/dev/null; then
+              echo "$REGISTRY is newly introduced by this PR — all additions, append-only by construction."
+              continue
+            fi
 
-          if ! git cat-file -e "${BASE_SHA}:${REGISTRY}" 2>/dev/null; then
-            echo "gma_registry.jsonl is newly introduced by this PR — all additions, append-only by construction."
-            exit 0
-          fi
+            git show "${BASE_SHA}:${REGISTRY}" > registry_base.jsonl
 
-          git show "${BASE_SHA}:${REGISTRY}" > gma_registry_base.jsonl
-
-          node --input-type=module <<'NODE'
+            REGISTRY_PATH="$REGISTRY" node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
-          const base = readFileSync('gma_registry_base.jsonl');
-          const head = readFileSync('governance/authorizations/gma_registry.jsonl');
+          const registry = process.env.REGISTRY_PATH;
+          const base = readFileSync('registry_base.jsonl');
+          const head = readFileSync(registry);
           if (head.length < base.length || !head.subarray(0, base.length).equals(base)) {
-            console.error('NULL — gma_registry.jsonl modified non-append-only: existing entries changed or removed.');
-            console.error('The base-branch registry must be a byte-exact prefix of the head registry (Issue #1984 append-only policy).');
+            console.error(`NULL — ${registry} modified non-append-only: existing entries changed or removed.`);
+            console.error('The base-branch registry must be a byte-exact prefix of the head registry (append-only policy).');
             console.error('Result: MERGE_LEGITIMACY_NULL');
             process.exit(1);
           }
           const added = head.subarray(base.length).toString('utf8').split('\n').filter(Boolean).length;
-          console.log(`gma_registry.jsonl change is append-only: ${added} new entr${added === 1 ? 'y' : 'ies'} appended.`);
+          console.log(`${registry} change is append-only: ${added} new entr${added === 1 ? 'y' : 'ies'} appended.`);
           NODE
+          done
 
       - name: Validate governance mutation authorization (GAP-005 / Issue #1984)
         if: github.event_name != 'merge_group'
@@ -480,11 +486,44 @@ jobs:
             } catch (_) { /* malformed singleton ignored — registry is authoritative */ }
           }
 
+          // TIER 3 (Policy-Bound GMA — Standing Authority derivation, GAP-005 Phase 2):
+          // If no explicit GMA matches, evaluate the governed diff against the
+          // append-only standing authority registry. A valid, in-scope, non-expired,
+          // non-exhausted Standing Authority derives a scoped authorization for a
+          // bounded CLASS of mutations (branch + class + path + TTL + budget), so the
+          // owner authorizes once instead of per PR. The merge proof later stamps
+          // standing_authority_id, consuming the proof-ledger budget.
+          // Guarded by registry existence so the standalone validator extraction test
+          // (issue-1984) — which has no SA registry — never attempts the import.
+          const SA_REGISTRY = 'governance/authorizations/standing_authority_registry.jsonl';
+          if (!matched && existsSync(SA_REGISTRY)) {
+            const { selectStandingAuthority } = await import('./runtime/standing-authority.mjs');
+            const PROOF_REGISTRY = 'governance/merge-legitimacy/merge_proof_registry.jsonl';
+            const proofRegistryText = existsSync(PROOF_REGISTRY) ? readFileSync(PROOF_REGISTRY, 'utf8') : '';
+            const sel = selectStandingAuthority({
+              registryText: readFileSync(SA_REGISTRY, 'utf8'),
+              headRef,
+              governedFiles,
+              detectedClasses,
+              now,
+              proofRegistryText,
+            });
+            if (sel.authorized) {
+              console.log(`GMA_VALID: derived (source: standing-authority-derivation; authority_id=${sel.authority.authority_id})`);
+              console.log(`branch: ${headRef}`);
+              console.log(`bounds: ${JSON.stringify(sel.authority.bounds)}`);
+              console.log('Result: GMA_VALID — governance mutation authorized via Standing Authority (GAP-005 Phase 2, policy-bound).');
+              process.exit(0);
+            }
+            console.error('Standing-authority derivation declined: ' + sel.reason);
+          }
+
           if (!matched) {
             console.error("NULL — no valid GMA for this PR's governed diff.");
             console.error(`computed governed_files_hash: ${computedHash}`);
             console.error(`branch: ${headRef}`);
-            console.error('Append a GMA via .github/workflows/governance-mutation-authorization.yml on this branch.');
+            console.error('Append a GMA via .github/workflows/governance-mutation-authorization.yml on this branch,');
+            console.error('or authorize a class of mutations via .github/workflows/standing-authority-issuance.yml (policy-bound GMA).');
             console.error('Result: MERGE_LEGITIMACY_NULL (GAP-005 / Issue #1984)');
             process.exit(1);
           }

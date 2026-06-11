@@ -1,0 +1,133 @@
+{
+  "artifact": "standing_authority_spec",
+  "version": "1.0",
+  "gap_reference": "GAP-005",
+  "phase": "GMA_PHASE_2_POLICY_BOUND",
+  "purpose": "Defines the Standing Authority (SA) — a bounded, owner-issued authority from which a scoped governance-mutation authorization is DERIVED automatically at merge-check time, instead of requiring a manual per-PR GMA. One issuance -> many bounded derivations. This is the bridge from governed demo (per-mutation authorization) to governed operations (policy-bound authorization).",
+  "canonical_invariant": "If no valid object exists -> nothing happens.",
+  "compressed_rule": "Manual GMA governs one mutation. Standing Authority governs a bounded class of mutations. Both must end in proof.",
+  "relationship_to_gma": {
+    "manual_gma": "Per-mutation authorization: one governed PR -> one owner workflow_dispatch -> one GMA entry. Safe, explicit, expensive. Remains the path for rare/one-off governance mutations.",
+    "standing_authority": "Policy-bound authorization: owner issues a bounded authority once; every fitting PR derives a scoped authorization automatically. Required for continuous governed action.",
+    "invariant_preserved": "Authority is issued once and bounded, not weakened. No valid authority -> no governance mutation still holds."
+  },
+  "issuance_model": {
+    "model": "OWNER_DISPATCH_LOCAL_DETERMINISTIC",
+    "requires_owner_dispatch": true,
+    "creation_workflow": ".github/workflows/standing-authority-issuance.yml",
+    "authority_before_execution": "Owner workflow_dispatch is the preexisting authority (per governance/recursive/RECURSIVE_GOVERNANCE_CONTAINMENT_MODEL.json). Implicit authority is forbidden.",
+    "no_gma_required_to_issue": "The SA registry lives under governance/authorizations/**, which is exempt from governed-file classification (authorization evidence != governance primitive). Issuing a SA therefore needs no GMA and introduces no bootstrap circularity.",
+    "default_scope_guidance": "V1 issues narrow by default — one mutation class / one surface (e.g. claude/* x workflow_mutation x .github/workflows/** x 24h x <=2 merges). Reusable authority should start narrow and widen only after the path is exercised."
+  },
+  "store": "governance/authorizations/standing_authority_registry.jsonl",
+  "format": "JSON Lines — append-only. One immutable standing_authority record per line; revocations are appended as standing_authority_revocation records (no deletion or mutation of prior lines).",
+  "append_only_enforcement": "merge-governance-check asserts the base-branch version of standing_authority_registry.jsonl is a byte-exact PREFIX of the head version (same guarantee as gma_registry.jsonl, Issue #1984). Existing entries may never be modified or removed.",
+  "merge_union_driver": {
+    "declared_in": ".gitattributes",
+    "attribute": "merge=union",
+    "applies_to": ["governance/authorizations/standing_authority_registry.jsonl"]
+  },
+  "standing_authority_record": {
+    "required_fields": [
+      "_record_type",
+      "authority_id",
+      "authority_hash",
+      "intent",
+      "issued_by",
+      "source_authority",
+      "bounds",
+      "ttl_hours",
+      "issued_at",
+      "expires_at",
+      "authority_lineage_bound",
+      "status"
+    ],
+    "bounds_fields": ["branch_pattern", "mutation_classes", "path_globs", "max_merges"],
+    "valid_status": "STANDING_AUTHORITY_VALID",
+    "authority_hash_input": "sha256 of JSON{branch_pattern, sorted mutation_classes, sorted path_globs, max_merges, ttl_hours, issued_at} — repo-verifiable, no external runtime",
+    "example": {
+      "_record_type": "standing_authority",
+      "authority_id": "SA-<slug>-<workflow_run_id>",
+      "authority_hash": "<sha256>",
+      "intent": "Claude may modify workflows on claude/* for 24h up to 2 merges",
+      "issued_by": "<github_actor>",
+      "source_authority": "OWNER_WORKFLOW_DISPATCH",
+      "bounds": {
+        "branch_pattern": "claude/*",
+        "mutation_classes": ["workflow_mutation"],
+        "path_globs": [".github/workflows/**"],
+        "max_merges": 2
+      },
+      "ttl_hours": 24,
+      "issued_at": "<ISO8601_UTC>",
+      "expires_at": "<ISO8601_UTC>",
+      "authority_lineage_bound": true,
+      "status": "STANDING_AUTHORITY_VALID"
+    }
+  },
+  "revocation_record": {
+    "required_fields": ["_record_type", "authority_id", "revoked_by", "revoked_at"],
+    "semantics": "Append-only revocation. A standing_authority whose authority_id is cited by any standing_authority_revocation record is non-selectable for derivation, regardless of its TTL.",
+    "example": {
+      "_record_type": "standing_authority_revocation",
+      "authority_id": "SA-...",
+      "revoked_by": "<github_actor>",
+      "revoked_at": "<ISO8601_UTC>",
+      "reason": "<string>"
+    }
+  },
+  "derivation_rule": {
+    "evaluator": "runtime/standing-authority.mjs#selectStandingAuthority",
+    "enforcement_point": ".github/workflows/merge-governance-check.yml (Tier 3 of the GMA validation step)",
+    "admission_tiers": [
+      "Tier 1: explicit per-PR GMA in gma_registry.jsonl, keyed by (branch, governed_files_hash).",
+      "Tier 2: legacy singleton GOVERNANCE_MUTATION_AUTHORIZATION.json, keyed by governed_files_hash (transitional fallback).",
+      "Tier 3: Standing Authority derivation — if no explicit GMA matches, evaluate the governed diff against the SA registry."
+    ],
+    "authorized_iff_all": [
+      "status === STANDING_AUTHORITY_VALID AND not revoked",
+      "now < expires_at  (TTL — HARD bound)",
+      "head ref matches bounds.branch_pattern  (where)",
+      "every detected governance_mutation/workflow_mutation class is in bounds.mutation_classes  (what)",
+      "every governed file matches >=1 bounds.path_globs  (scope containment — nothing outside the bounded surface)",
+      "consumed budget < bounds.max_merges  (async proof-ledger budget — see bound_model)"
+    ],
+    "tie_break": "If multiple SAs qualify, the most-recently-issued is chosen (deterministic).",
+    "failure_result": "MERGE_LEGITIMACY_NULL"
+  },
+  "bound_model": {
+    "ttl": "HARD bound. Synchronous and exact: now < expires_at is evaluated at merge-check time.",
+    "max_merges": "Async proof-ledger BUDGET. Best-effort, observed via the append-only merge_proof_registry.jsonl.",
+    "statement": "V1 standing authority is TTL-hard-bound and proof-budget-observed. It is not strictly serial-budget-enforced until a merge queue or synchronous proof reservation exists.",
+    "rationale": "Proof persistence is async (a separate proof-registry/* PR), so the budget count lags; concurrent PRs under one SA can briefly overshoot max_merges. TTL bounds the blast radius regardless. This matches the existing system's async-proof consistency model — it is not a regression and the system does NOT claim strict serial replay safety under concurrent PRs."
+  },
+  "proof_binding": {
+    "requirement": "Every governed merge derived under a SA must end in a merge proof. merge-proof.yml stamps standing_authority_id (and governed_files_hash) into the proof's canonical_payload and into the appended merge_proof_registry.jsonl entry.",
+    "effect": "The append-only proof ledger IS the budget-consumption ledger. proof_must_follow_execution is preserved."
+  },
+  "invariant_mapping": {
+    "reference": "runtime/math/legitimacy_calculus.json",
+    "AUTHORIZED": "SA preexists via owner dispatch; implicit authority forbidden.",
+    "BOUNDED": "branch_pattern AND mutation_classes AND path_globs AND ttl_hours AND max_merges.",
+    "REPLAY_SAFE": "branch-pattern binding; out-of-scope/cross-branch diffs not derivable; budget consumed via append-only, nonce-bound proofs. Strict serial replay safety is NOT claimed under concurrent PRs (see bound_model).",
+    "PROOF_BOUND": "admission still requires the downstream merge proof, which stamps standing_authority_id.",
+    "CONTINUOUS": "one issuance -> many bounded derivations.",
+    "fail_closed": "no explicit GMA and no covering SA -> MERGE_LEGITIMACY_NULL."
+  },
+  "known_limitations": [
+    "max_merges is best-effort (async proof-ledger budget), not strictly serial-enforced — see bound_model. Strict serialization requires a merge queue (currently DISABLED_FOR_GOVERNED_BRANCHES per CI-003) or synchronous proof reservation.",
+    "Tier 3 widens what can merge without per-PR human action; mitigated by owner-only issuance, narrow default scope, short TTL, append-only + revocable authorities, and the merge gate remaining the single enforcement point."
+  ],
+  "out_of_scope_v1": [
+    "External canonical-lifecycle (/session -> /continuity -> /authority -> /compile) issuance (SEQUENCED, post-V1).",
+    "Cryptographic signatures on SAs (V1 stays repo-verifiable deterministic).",
+    "Synchronous budget reservation / merge-queue serialization."
+  ],
+  "evidence_flags": {
+    "evidence_only": false,
+    "creates_authority": true,
+    "creates_execution_eligibility": false,
+    "requires_canonical_lifecycle_lineage": false,
+    "fail_closed": true
+  }
+}

@@ -319,6 +319,64 @@ jobs:
           console.log('exact_object_admission_status=' + result.merge_legitimacy_status);
           NODE
 
+      - name: Derive standing authority attribution (GAP-005 Phase 2)
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          # Attribute this merge to the Standing Authority that authorized it (if any),
+          # so the append-only proof ledger becomes the budget-consumption ledger
+          # (policy-bound GMA, STANDING_AUTHORITY_SPEC.json). Budget is intentionally
+          # NOT re-applied here — it is enforced at the merge gate; this step records
+          # WHICH authority covers the governed diff. Attribution is conservative: a PR
+          # that also carried an explicit per-PR GMA may still be attributed to a
+          # covering SA, erring toward tighter budget — the safe direction.
+          SA_REGISTRY="governance/authorizations/standing_authority_registry.jsonl"
+          if [ ! -f "$SA_REGISTRY" ]; then
+            echo "STANDING_AUTHORITY_ID=" >> "$GITHUB_ENV"
+            echo "No standing authority registry — no attribution."
+            exit 0
+          fi
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          import { selectStandingAuthority } from './runtime/standing-authority.mjs';
+
+          // Classify governed files using the same rules as merge-governance-check.
+          const changed = readFileSync('changed_files_proof.txt', 'utf8').split('\n').filter(Boolean);
+          const governedFiles = [];
+          const detectedClasses = [];
+          for (const f of changed) {
+            if (f.startsWith('governance/authorizations/')) continue;
+            if (f === 'governance/merge-legitimacy/merge_proof_registry.jsonl') continue;
+            if (f.startsWith('governance/')) { governedFiles.push(f); detectedClasses.push('governance_mutation'); }
+            else if (f.startsWith('.github/workflows/')) { governedFiles.push(f); detectedClasses.push('workflow_mutation'); }
+            else if (f.startsWith('src/')) { governedFiles.push(f); detectedClasses.push('runtime_mutation'); }
+            else if (f === 'schema.sql') { governedFiles.push(f); detectedClasses.push('schema_mutation'); }
+            else if (f.startsWith('migrations/')) { governedFiles.push(f); detectedClasses.push('migration_mutation'); }
+            else if (f === 'wrangler.toml') { governedFiles.push(f); detectedClasses.push('deployment_config_mutation'); }
+          }
+
+          // Only governance/workflow mutations are gated by GMA/Standing Authority.
+          // A PR with none of those classes never used a SA — attributing it would
+          // vacuously satisfy all bounds and wrongly drain budget. Skip attribution.
+          const govClasses = detectedClasses.filter((c) => c === 'governance_mutation' || c === 'workflow_mutation');
+          const sel = govClasses.length === 0
+            ? { authorized: false, reason: 'no governance/workflow mutation — GMA not required' }
+            : selectStandingAuthority({
+                registryText: readFileSync('governance/authorizations/standing_authority_registry.jsonl', 'utf8'),
+                headRef: process.env.HEAD_REF,
+                governedFiles,
+                detectedClasses,
+                now: new Date(),
+                proofRegistryText: '', // attribution ignores budget; budget is enforced at the gate
+              });
+          const id = sel.authorized ? sel.authority.authority_id : '';
+          appendFileSync(process.env.GITHUB_ENV, `STANDING_AUTHORITY_ID=${id}\n`);
+          console.log(id ? `Attributed to standing authority: ${id}` : `No standing authority attribution (${sel.reason || 'n/a'})`);
+          NODE
+
       - name: Generate merge proof
         run: |
           set -euo pipefail
@@ -379,6 +437,7 @@ jobs:
             --arg approved_object_hash "${APPROVED_OBJECT_HASH:-}" \
             --arg merged_object_hash "${MERGED_OBJECT_HASH:-}" \
             --arg merge_legitimacy_status "${MERGE_LEGITIMACY_STATUS:-UNKNOWN}" \
+            --arg standing_authority_id "${STANDING_AUTHORITY_ID:-}" \
             '{
               pr_number: $pr_number,
               merge_commit_sha: $merge_commit_sha,
@@ -395,7 +454,8 @@ jobs:
               reviewed_object_hash: $reviewed_object_hash,
               approved_object_hash: $approved_object_hash,
               merged_object_hash: $merged_object_hash,
-              merge_legitimacy_status: $merge_legitimacy_status
+              merge_legitimacy_status: $merge_legitimacy_status,
+              standing_authority_id: $standing_authority_id
             }' > CANONICAL_PAYLOAD.json
 
           CANONICAL_HASH=$(sha256sum CANONICAL_PAYLOAD.json | cut -d' ' -f1)
@@ -471,6 +531,10 @@ jobs:
             exit 0
           fi
 
+          # standing_authority_id (policy-bound GMA, GAP-005 Phase 2): when present,
+          # this proof entry consumes one unit of the authority's max_merges budget.
+          SA_ID=$(jq -r '.canonical_payload.standing_authority_id // ""' MERGE_PROOF.json)
+
           ENTRY=$(jq -cn \
             --arg proof_id "$PROOF_ID" \
             --arg proof_hash "$PROOF_HASH" \
@@ -478,6 +542,7 @@ jobs:
             --arg merge_commit_sha "$MERGE_COMMIT_SHA" \
             --arg merged_at "$MERGED_AT" \
             --arg appended_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg standing_authority_id "$SA_ID" \
             '{
               _record_type: "proof_entry",
               proof_id: $proof_id,
@@ -486,7 +551,8 @@ jobs:
               merge_commit_sha: $merge_commit_sha,
               merged_at: $merged_at,
               appended_at: $appended_at
-            }')
+            }
+            + (if $standing_authority_id == "" then {} else {standing_authority_id: $standing_authority_id} end)')
 
           echo "$ENTRY" >> "$REGISTRY_PATH"
 

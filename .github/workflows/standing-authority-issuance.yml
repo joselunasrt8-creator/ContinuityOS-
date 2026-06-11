@@ -1,0 +1,203 @@
+name: standing-authority-issuance
+# owner: #1831
+# policy: GAP-005 — Policy-Bound GMA (Standing Authority, GMA Phase 2)
+# policy-path: governance/authorizations/STANDING_AUTHORITY_SPEC.json
+# gap-reference: GAP-005
+#
+# Issues a Standing Authority (SA): a bounded, owner-issued authority from which
+# scoped governance-mutation authorizations are DERIVED automatically at merge-check
+# time (Tier 3 of merge-governance-check.yml), instead of a manual per-PR GMA.
+#
+# One issuance -> many bounded derivations. The compressed rule:
+#   Manual GMA governs one mutation.
+#   Standing Authority governs a bounded class of mutations.
+#   Both must end in proof.
+#
+# Bound model: TTL = hard bound; max_merges = async proof-ledger budget.
+# V1 issues NARROW by default (one mutation class / one surface). Widen later.
+#
+# No GMA is required to issue a SA: governance/authorizations/** is exempt from
+# governed-file classification (authorization evidence != governance primitive).
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_pattern:
+        description: 'Branch glob the authority applies to (e.g. claude/*)'
+        required: true
+        default: 'claude/*'
+      mutation_classes:
+        description: 'Comma-separated allowed mutation classes (e.g. workflow_mutation)'
+        required: true
+        default: 'workflow_mutation'
+      path_globs:
+        description: 'Comma-separated allowed path globs (e.g. .github/workflows/**)'
+        required: true
+        default: '.github/workflows/**'
+      ttl_hours:
+        description: 'Time-to-live in hours (hard bound)'
+        required: false
+        default: '24'
+      max_merges:
+        description: 'Async proof-ledger budget — max governed merges under this authority'
+        required: false
+        default: '2'
+      intent:
+        description: 'Human-readable description of the bounded authority'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  issue-standing-authority:
+    if: ${{ !startsWith(github.ref_name, 'proof-registry/') }}
+    runs-on: ubuntu-latest
+
+    env:
+      BRANCH_PATTERN: ${{ inputs.branch_pattern }}
+      MUTATION_CLASSES: ${{ inputs.mutation_classes }}
+      PATH_GLOBS: ${{ inputs.path_globs }}
+      TTL_HOURS: ${{ inputs.ttl_hours || '24' }}
+      MAX_MERGES: ${{ inputs.max_merges || '2' }}
+      AUTHORITY_INTENT: ${{ inputs.intent }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: HARD FAIL — Guard against non-dispatch invocation
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit workflow_dispatch invocation allowed"
+            exit 1
+          fi
+          if [ -z "${AUTHORITY_INTENT:-}" ]; then
+            echo "NULL — intent input is required"
+            exit 1
+          fi
+          if [ -z "${BRANCH_PATTERN:-}" ] || [ -z "${MUTATION_CLASSES:-}" ] || [ -z "${PATH_GLOBS:-}" ]; then
+            echo "NULL — branch_pattern, mutation_classes and path_globs are required"
+            exit 1
+          fi
+
+          echo "Standing Authority dispatch authorized by ${{ github.actor }} on ${{ github.ref_name }}"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate and append standing authority
+        run: |
+          set -euo pipefail
+
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EXPIRY=$(date -u -d "+${TTL_HOURS} hour" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v+"${TTL_HOURS}"H +"%Y-%m-%dT%H:%M:%SZ")
+
+          export ISSUED_AT="$NOW"
+          export EXPIRES_AT="$EXPIRY"
+          export AUTHORIZED_BY="${{ github.actor }}"
+
+          node --input-type=module <<'NODE'
+          import { writeFileSync, appendFileSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+          import { computeAuthorityHash } from './runtime/standing-authority.mjs';
+
+          const splitList = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
+
+          const branch_pattern = process.env.BRANCH_PATTERN;
+          const mutation_classes = splitList(process.env.MUTATION_CLASSES);
+          const path_globs = splitList(process.env.PATH_GLOBS);
+          const max_merges = Number(process.env.MAX_MERGES);
+          const ttl_hours = Number(process.env.TTL_HOURS);
+          const issued_at = process.env.ISSUED_AT;
+          const expires_at = process.env.EXPIRES_AT;
+
+          if (!Number.isInteger(max_merges) || max_merges < 1) {
+            console.error('NULL — max_merges must be a positive integer');
+            process.exit(1);
+          }
+          if (!Number.isFinite(ttl_hours) || ttl_hours <= 0) {
+            console.error('NULL — ttl_hours must be a positive number');
+            process.exit(1);
+          }
+
+          const authority_hash = computeAuthorityHash({
+            branch_pattern, mutation_classes, path_globs, max_merges, ttl_hours, issued_at,
+          });
+
+          const sa = {
+            _record_type: 'standing_authority',
+            authority_id: `SA-${process.env.WORKFLOW_REF_NAME}-${process.env.WORKFLOW_RUN_ID}`,
+            authority_hash,
+            intent: process.env.AUTHORITY_INTENT,
+            issued_by: process.env.AUTHORIZED_BY,
+            source_authority: 'OWNER_WORKFLOW_DISPATCH',
+            bounds: { branch_pattern, mutation_classes, path_globs, max_merges },
+            ttl_hours,
+            issued_at,
+            expires_at,
+            authority_lineage_bound: true,
+            status: 'STANDING_AUTHORITY_VALID',
+          };
+
+          mkdirSync('governance/authorizations', { recursive: true });
+          const REGISTRY = 'governance/authorizations/standing_authority_registry.jsonl';
+          const existing = existsSync(REGISTRY) ? readFileSync(REGISTRY, 'utf8') : '';
+          const duplicate = existing.split('\n').filter(Boolean).some((line) => {
+            try {
+              const e = JSON.parse(line);
+              return e._record_type === 'standing_authority'
+                && (e.authority_id === sa.authority_id || e.authority_hash === sa.authority_hash);
+            } catch (_) { return false; }
+          });
+          if (duplicate) {
+            console.log('Standing authority already present for this authority_id or authority_hash — append skipped (idempotent).');
+          } else {
+            appendFileSync(REGISTRY, JSON.stringify(sa) + '\n');
+            console.log('Standing authority appended to append-only registry.');
+          }
+
+          writeFileSync('standing_authority_summary.json', JSON.stringify(sa, null, 2) + '\n');
+          console.log('authority_id:', sa.authority_id);
+          console.log('authority_hash:', sa.authority_hash);
+          console.log('expires_at:', sa.expires_at);
+          NODE
+
+      - name: Commit and push standing authority
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add governance/authorizations/standing_authority_registry.jsonl
+
+          if git diff --cached --quiet; then
+            echo "No changes to standing authority registry — entry unchanged (idempotent)."
+            exit 0
+          fi
+
+          AUTHORITY_ID=$(node -e "const s=require('./standing_authority_summary.json'); console.log(s.authority_id)")
+          AUTHORITY_HASH=$(node -e "const s=require('./standing_authority_summary.json'); console.log(s.authority_hash)")
+
+          git commit -m "standing-authority: issue bounded authority ${AUTHORITY_ID}
+
+          authority_hash: ${AUTHORITY_HASH}
+          issued_by: ${{ github.actor }}
+          bound_model: TTL-hard, max_merges-proof-budget-observed"
+
+          git push origin HEAD:"$WORKFLOW_REF_NAME"
+          echo "Standing authority committed and pushed."
+
+      - name: Summary
+        run: |
+          echo "=== Standing Authority Summary ==="
+          cat standing_authority_summary.json
+          echo ""
+          echo "Bound model: TTL = hard bound; max_merges = async proof-ledger budget."
+          echo "Derivation: scoped GMA is derived automatically at merge-check (Tier 3)."
+          echo "Every derived merge must end in a proof stamping standing_authority_id."
+          echo "=== End Summary ==="
