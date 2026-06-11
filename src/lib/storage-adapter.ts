@@ -13,6 +13,7 @@
 // SQLite and Postgres adapters are planned for V3 step 7.
 
 import type { AdapterProofReceipt } from './adapter-contract.js'
+import type { NullAuditRecord } from './null-audit.js'
 
 // ── Shared Result Types ────────────────────────────────────────────────────────
 
@@ -83,6 +84,35 @@ export interface LineageRegistryAppender {
   appendLineageNode(node: LineageNode): Promise<AppendResult>
 }
 
+// ── Lineage Registry Port ──────────────────────────────────────────────────────
+// Write-side port for post-execution lineage traceability.
+// Named consistently with ReplayRegistryPort — the write-side port for the lineage boundary.
+// Lineage semantics (what to record) live in the route orchestrator;
+// lineage persistence lives exclusively in the adapter through this port.
+// Must never be called on a NULL execution path.
+// Proof is the authoritative execution evidence; lineage is traceability only.
+// No reconciliation. No convergence claims.
+
+export type FilesystemExecutionLineageNode = {
+  readonly node_id: string                                   // deterministic: "lineage:" + receipt_id
+  readonly parent_id: string | null                          // null — no parent chain in V3 initial implementation
+  readonly canonical_aeo_hash: string                        // sha256 of the CanonicalAEO (== receipt.validated_object_hash)
+  readonly receipt_id: string                                // bound to the proof receipt for this execution
+  readonly decision_id: string                               // governing decision that authorized execution
+  readonly replay_nonce: string                              // nonce consumed to reach EXECUTED
+  readonly target_system: string                             // "filesystem"
+  readonly target_action: string                             // "write_file"
+  readonly target_path: string                               // target file path from the CanonicalAEO
+  readonly status: "EXECUTED" | "EXECUTED_UNCOMMITTED"       // mirrors gateway execution outcome
+}
+
+export interface LineageRegistryPort {
+  // Appends a lineage traceability record after proof persistence.
+  // Returns AppendResult — ALREADY_EXISTS is allowed (idempotent retry); REJECTED surfaces the error.
+  // Lineage append failure must not erase proof or change execution result.
+  appendLineageNode(node: FilesystemExecutionLineageNode): Promise<AppendResult>
+}
+
 // ── Proof Registry ─────────────────────────────────────────────────────────────
 // Append-only proof persistence after VALID execution.
 // Duplicate receipt_id is a fatal integrity violation — must surface, never silently drop.
@@ -113,6 +143,22 @@ export interface ValidCommitPort {
   // Atomic commit of the post-VALID write group.
   // Returns REJECTED if any write fails; caller receives no partial commit.
   commitValidatedExecution(record: ValidExecutionCommit): Promise<AppendResult>
+}
+
+// ── NULL Audit Registry ────────────────────────────────────────────────────────
+// Audit/observability surface for bounded NULL responses (governed
+// filesystem-write route). A NullAuditRecord is never proof, never authority,
+// and never affects replay eligibility:
+//   NULL audit record != proof
+//   NULL audit record != authority
+//   NULL audit record != replay eligibility
+// execution_performed and proof_emitted are structurally false.
+// Must never be called on an EXECUTED / EXECUTED_UNCOMMITTED path.
+
+export interface NullAuditRegistryPort {
+  // Persists the internal diagnostic record for a bounded NULL response.
+  // Returns AppendResult so audit-write failures are never silently hidden.
+  appendNullAuditRecord(record: NullAuditRecord): Promise<AppendResult>
 }
 
 // ── Composite Storage Adapter Interface ───────────────────────────────────────

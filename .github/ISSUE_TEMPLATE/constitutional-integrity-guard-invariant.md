@@ -1,7 +1,11 @@
 ---
-name: "Constitutional-Integrity Guard Invariant Documentation"
-about: "Document invariants for path-based and declaration-based detection in constitutional-integrity guards."
-labels: ["documentation", "constitutional-integrity", "path-scoping"]
+name: Constitutional-Integrity Guard Invariant Documentation
+about: Document invariants for path-based and declaration-based detection in constitutional-integrity
+  guards.
+title: ''
+labels: documentation
+assignees: ''
+
 ---
 
 ### Summary

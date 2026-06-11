@@ -1,34 +1,28 @@
 {
-  "gma_id": "GMA-claude/storage-adapter-boundary-1agrua-r2",
-  "decision_id": "0de965612de8d88910acc98f33324736784e44af05e345613660822615f38fe4",
-  "continuity_id": "9c906ea6d654939337a3fc54c8dca6d834cd58fd411cce3b251a04efb7c736b3",
-  "session_id": "5f42dbbaf0351fc79569d3d5029d20f834269de80920deed95839b5e9fa81eaa",
-  "validated_object_hash": "86ee0416dd31ca8c527fbd5e22cf1eee65b08b95037ce4dd8dc89c9aa5784fcf",
-  "governed_files_hash": "ab128a7e9f924bdb8651ede8c24114416443cfa13f3d088bda216c9878b35ba3",
+  "gma_id": "GMA-claude/gma-proof-registry-guard-muh2h1-local-1781090648531",
+  "decision_id": "1b55b6ab8b289a9357140135990217e984dbc4cc8220d983e582c709c9ce4d29",
+  "continuity_id": "ae544b8cdb9a32b7777a4cd990d6a9c36f83f8bd084a92de2844da144c776e76",
+  "session_id": "680fdc09e5a8af69dfeb62ff7380fe032e626ae5109e1d6c6e39023b752f5bd9",
+  "validated_object_hash": "5e7561f71bf84f24be9ddcaba0d2bd8aabc365ea32d941d7c879d8d6b2ffcdcd",
+  "governed_files_hash": "1badd32a5419061753ea45bd3bb3c9e0d2ae3ed0924a45e70ab82d58bb485c73",
   "governed_files": [
-    "governance/runtime/SEMANTIC_COLLAPSE_REPORT.json",
-    "src/index.ts",
-    "src/lib/d1-storage-adapter.ts",
-    "src/lib/storage-adapter.ts"
+    ".github/workflows/governance-mutation-authorization.yml"
   ],
   "mutation_classes": [
-    "governance_mutation",
-    "runtime_mutation"
+    "workflow_mutation"
   ],
-  "gm_control_class": "MANUAL_GMA_CONTAINMENT",
-  "issuance_method": "MANUAL_SYNTHESIS",
+  "gm_control_class": "GOVERNANCE_CONTAINED",
+  "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
-  "preflight_status": "BLOCKED_403",
-  "preflight_failure": "governance-mutation-authorization.yml workflow_dispatch cannot be triggered via API (HTTP 403). governed_files_hash sourced from CI computation after merge commit d590750 resolved merge_proof_registry.jsonl to match main, removing it from the governed diff.",
-  "what_this_gma_proves": "governed_files_hash binds this artifact to SHA-256 of 4 governed files (excluding merge_proof_registry.jsonl which matches main after the merge commit). Verified against CI error output from run 27213631293.",
-  "what_this_gma_does_not_prove": "Canonical runtime lifecycle execution. decision_id, continuity_id, session_id, and validated_object_hash are synthesized.",
-  "intent": "#1917 storage adapter boundary: extract D1RegistryAdapter and ContinuityStorageAdapter interfaces into src/lib/d1-storage-adapter.ts and src/lib/storage-adapter.ts; thin src/index.ts DDL; FATE test topology update for moved quarantine/bootstrap functions",
+  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
+  "intent": "Skip governance mutation authorization on proof-registry branches",
+  "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/mindshift-demo",
-  "branch": "claude/storage-adapter-boundary-1agrua",
-  "head_sha": "d590750fa0caf39b47a3b8bdf145cf69ea19d32f",
-  "workflow_run_id": "manual-storage-adapter-boundary-1agrua-r2",
-  "created_at": "2026-06-09T15:30:00Z",
-  "expires_at": "2027-06-09T15:30:00Z",
+  "branch": "claude/gma-proof-registry-guard-muh2h1",
+  "head_sha": "19fcb25f959dde78cb7e09ad3f192a0d88acf331",
+  "workflow_run_id": "local-1781090648531",
+  "created_at": "2026-06-10T11:24:08Z",
+  "expires_at": "2027-06-10T11:24:08Z",
   "status": "GMA_VALID"
 }

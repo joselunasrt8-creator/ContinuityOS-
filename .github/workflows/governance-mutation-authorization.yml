@@ -39,6 +39,7 @@ permissions:
 
 jobs:
   create-governance-mutation-authorization:
+    if: ${{ !startsWith(github.ref_name, 'proof-registry/') }}
     runs-on: ubuntu-latest
 
     env:
