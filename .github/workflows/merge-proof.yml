@@ -322,20 +322,35 @@ jobs:
       - name: Derive standing authority attribution (GAP-005 Phase 2)
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
 
           # Attribute this merge to the Standing Authority that authorized it (if any),
           # so the append-only proof ledger becomes the budget-consumption ledger
-          # (policy-bound GMA, STANDING_AUTHORITY_SPEC.json). Budget is intentionally
-          # NOT re-applied here — it is enforced at the merge gate; this step records
-          # WHICH authority covers the governed diff. Attribution is conservative: a PR
-          # that also carried an explicit per-PR GMA may still be attributed to a
-          # covering SA, erring toward tighter budget — the safe direction.
+          # (policy-bound GMA, STANDING_AUTHORITY_SPEC.json). To stamp the SAME authority
+          # the merge gate admitted under, reproduce the gate's selection exactly: read
+          # the standing authority registry AND the budget ledger from the PR's BASE_SHA
+          # (never the head checkout), and apply the REAL proof ledger so a budget-
+          # exhausted authority is skipped just as the gate skipped it. Without the real
+          # ledger this step could re-pick a newer, exhausted authority and consume the
+          # wrong budget, letting the authorizing authority exceed max_merges (P1 fix).
           SA_REGISTRY="governance/authorizations/standing_authority_registry.jsonl"
-          if [ ! -f "$SA_REGISTRY" ]; then
+          PROOF_REGISTRY="governance/merge-legitimacy/merge_proof_registry.jsonl"
+          if git cat-file -e "${BASE_SHA}:${SA_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${SA_REGISTRY}" > sa_registry_base.jsonl
+          else
+            : > sa_registry_base.jsonl
+          fi
+          if git cat-file -e "${BASE_SHA}:${PROOF_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${PROOF_REGISTRY}" > proof_registry_base.jsonl
+          else
+            : > proof_registry_base.jsonl
+          fi
+
+          if [ ! -s sa_registry_base.jsonl ]; then
             echo "STANDING_AUTHORITY_ID=" >> "$GITHUB_ENV"
-            echo "No standing authority registry — no attribution."
+            echo "No base-branch standing authority registry — no attribution."
             exit 0
           fi
 
@@ -365,12 +380,12 @@ jobs:
           const sel = govClasses.length === 0
             ? { authorized: false, reason: 'no governance/workflow mutation — GMA not required' }
             : selectStandingAuthority({
-                registryText: readFileSync('governance/authorizations/standing_authority_registry.jsonl', 'utf8'),
+                registryText: readFileSync('sa_registry_base.jsonl', 'utf8'),
                 headRef: process.env.HEAD_REF,
                 governedFiles,
                 detectedClasses,
                 now: new Date(),
-                proofRegistryText: '', // attribution ignores budget; budget is enforced at the gate
+                proofRegistryText: readFileSync('proof_registry_base.jsonl', 'utf8'), // real ledger reproduces the gate's budgeted choice
               });
           const id = sel.authorized ? sel.authority.authority_id : '';
           appendFileSync(process.env.GITHUB_ENV, `STANDING_AUTHORITY_ID=${id}\n`);

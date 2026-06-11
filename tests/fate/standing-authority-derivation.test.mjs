@@ -178,6 +178,37 @@ test('most-recently-issued qualifying authority wins (deterministic)', () => {
   assert.equal(r.authority.authority_id, 'SA-new');
 });
 
+test('when the newest covering authority is budget-exhausted, an older one with room authorizes (and is what gets stamped)', () => {
+  // Reproduces the merge gate's budgeted choice: selection must skip the exhausted
+  // newest authority and pick the older one that actually has remaining budget, so the
+  // merge proof (which reruns selection with the real ledger) consumes the correct one.
+  const older = sa({
+    authority_id: 'SA-old',
+    bounds: { max_merges: 5 },
+    issued_at: new Date(Date.now() - 10 * HOUR).toISOString(),
+    expires_at: new Date(Date.now() + 14 * HOUR).toISOString(),
+  });
+  const newer = sa({
+    authority_id: 'SA-new',
+    bounds: { max_merges: 1 },
+    issued_at: new Date(Date.now() - 1 * HOUR).toISOString(),
+    expires_at: new Date(Date.now() + 23 * HOUR).toISOString(),
+  });
+  const proofs = JSON.stringify({
+    _record_type: 'proof_entry', proof_id: 'PROOF-x', standing_authority_id: 'SA-new',
+  }) + '\n'; // SA-new is at 1/1 → exhausted
+
+  const r = selectStandingAuthority({
+    registryText: registry([older, newer]),
+    headRef: 'claude/x',
+    governedFiles: ['.github/workflows/ci.yml'],
+    detectedClasses: ['workflow_mutation'],
+    proofRegistryText: proofs,
+  });
+  assert.equal(r.authorized, true, r.reason);
+  assert.equal(r.authority.authority_id, 'SA-old', 'must skip the exhausted newest and pick the older authority with budget');
+});
+
 test('empty registry fails closed', () => {
   const r = selectStandingAuthority({
     registryText: '',
@@ -261,6 +292,19 @@ test('merge-governance-check imports the shared module and admits via Tier 3', (
   assert.match(wf, /runtime\/standing-authority\.mjs/, 'Tier 3 must import the shared derivation module');
   assert.match(wf, /selectStandingAuthority/, 'Tier 3 must call selectStandingAuthority');
   assert.match(wf, /standing-authority-derivation/, 'admission source must be logged');
+});
+
+test('merge-governance-check derives Standing Authorities from the BASE branch only (P1: no PR-local self-authorization)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  assert.match(wf, /git show "\$\{BASE_SHA\}:\$\{SA_REGISTRY\}" > sa_registry_base\.jsonl/, 'Tier 3 must read the SA registry from BASE_SHA');
+  assert.match(wf, /readFileSync\('sa_registry_base\.jsonl'/, 'Tier 3 must derive from the base-branch SA registry file');
+  assert.match(wf, /proof_registry_base\.jsonl/, 'budget must be counted from the base-branch proof ledger');
+});
+
+test('merge-proof attributes from the BASE branch with the real proof ledger (P1: correct budget consumption)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  assert.match(wf, /git show "\$\{BASE_SHA\}:\$\{SA_REGISTRY\}" > sa_registry_base\.jsonl/, 'attribution must read the SA registry from BASE_SHA');
+  assert.match(wf, /readFileSync\('proof_registry_base\.jsonl', 'utf8'\)/, 'attribution must apply the real base proof ledger so the gate choice is reproduced');
 });
 
 test('merge-governance-check enforces append-only growth of the standing authority registry', () => {

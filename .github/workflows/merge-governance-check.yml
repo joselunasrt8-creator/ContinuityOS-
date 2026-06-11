@@ -396,10 +396,34 @@ jobs:
 
           REGISTRY="governance/authorizations/gma_registry.jsonl"
           SINGLETON="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+          SA_REGISTRY="governance/authorizations/standing_authority_registry.jsonl"
+          PROOF_REGISTRY="governance/merge-legitimacy/merge_proof_registry.jsonl"
 
-          if [ ! -f "$REGISTRY" ] && [ ! -f "$SINGLETON" ]; then
-            echo "NULL — governance/workflow mutation detected but neither GMA registry nor singleton found."
-            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch to append a GMA entry."
+          # P1 (security): Standing Authorities and the budget ledger are read from the
+          # BASE branch only, never the PR checkout. An authority appended within the
+          # same PR must not be able to authorize that PR — it must first land on the
+          # base branch through governed admission. governance/authorizations/** is
+          # exempt from governed-file detection and the append-only guard only proves
+          # entries were appended, so reading head here would let an ordinary PR mint a
+          # reusable broad authority and self-authorize. Base-only derivation closes that.
+          if git cat-file -e "${BASE_SHA}:${SA_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${SA_REGISTRY}" > sa_registry_base.jsonl
+          else
+            : > sa_registry_base.jsonl
+          fi
+          if git cat-file -e "${BASE_SHA}:${PROOF_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${PROOF_REGISTRY}" > proof_registry_base.jsonl
+          else
+            : > proof_registry_base.jsonl
+          fi
+
+          # P2: a repository that has completed the migration to Standing-Authority-only
+          # authorization (no gma_registry, no singleton) must still admit via Tier 3, so
+          # a base-branch standing authority also satisfies this prerequisite.
+          if [ ! -f "$REGISTRY" ] && [ ! -f "$SINGLETON" ] && [ ! -s sa_registry_base.jsonl ]; then
+            echo "NULL — governance/workflow mutation detected but no GMA registry, singleton, or base-branch standing authority found."
+            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch to append a GMA entry,"
+            echo "or land a Standing Authority on the base branch via .github/workflows/standing-authority-issuance.yml."
             echo "Result: MERGE_LEGITIMACY_NULL (GAP-005 / Issue #1984)"
             exit 1
           fi
@@ -488,34 +512,41 @@ jobs:
 
           // TIER 3 (Policy-Bound GMA — Standing Authority derivation, GAP-005 Phase 2):
           // If no explicit GMA matches, evaluate the governed diff against the
-          // append-only standing authority registry. A valid, in-scope, non-expired,
+          // BASE-branch standing authority registry (sa_registry_base.jsonl, extracted
+          // from BASE_SHA in the shell preamble — never the PR checkout, so a PR-local
+          // authority cannot authorize its own PR). A valid, in-scope, non-expired,
           // non-exhausted Standing Authority derives a scoped authorization for a
           // bounded CLASS of mutations (branch + class + path + TTL + budget), so the
           // owner authorizes once instead of per PR. The merge proof later stamps
-          // standing_authority_id, consuming the proof-ledger budget.
-          // Guarded by registry existence so the standalone validator extraction test
-          // (issue-1984) — which has no SA registry — never attempts the import.
-          const SA_REGISTRY = 'governance/authorizations/standing_authority_registry.jsonl';
-          if (!matched && existsSync(SA_REGISTRY)) {
-            const { selectStandingAuthority } = await import('./runtime/standing-authority.mjs');
-            const PROOF_REGISTRY = 'governance/merge-legitimacy/merge_proof_registry.jsonl';
-            const proofRegistryText = existsSync(PROOF_REGISTRY) ? readFileSync(PROOF_REGISTRY, 'utf8') : '';
-            const sel = selectStandingAuthority({
-              registryText: readFileSync(SA_REGISTRY, 'utf8'),
-              headRef,
-              governedFiles,
-              detectedClasses,
-              now,
-              proofRegistryText,
-            });
-            if (sel.authorized) {
-              console.log(`GMA_VALID: derived (source: standing-authority-derivation; authority_id=${sel.authority.authority_id})`);
-              console.log(`branch: ${headRef}`);
-              console.log(`bounds: ${JSON.stringify(sel.authority.bounds)}`);
-              console.log('Result: GMA_VALID — governance mutation authorized via Standing Authority (GAP-005 Phase 2, policy-bound).');
-              process.exit(0);
+          // standing_authority_id, consuming the proof-ledger budget. The budget is
+          // counted from the base-branch proof ledger (proof_registry_base.jsonl) so a
+          // PR cannot rewrite the ledger to free budget.
+          // Guarded by the base registry file existing+non-empty so the standalone
+          // validator extraction test (issue-1984) — which has no base SA registry —
+          // never attempts the import.
+          if (!matched && existsSync('sa_registry_base.jsonl')) {
+            const saRegistryText = readFileSync('sa_registry_base.jsonl', 'utf8');
+            if (saRegistryText.trim()) {
+              const { selectStandingAuthority } = await import('./runtime/standing-authority.mjs');
+              const proofRegistryText = existsSync('proof_registry_base.jsonl')
+                ? readFileSync('proof_registry_base.jsonl', 'utf8') : '';
+              const sel = selectStandingAuthority({
+                registryText: saRegistryText,
+                headRef,
+                governedFiles,
+                detectedClasses,
+                now,
+                proofRegistryText,
+              });
+              if (sel.authorized) {
+                console.log(`GMA_VALID: derived (source: standing-authority-derivation; authority_id=${sel.authority.authority_id})`);
+                console.log(`branch: ${headRef}`);
+                console.log(`bounds: ${JSON.stringify(sel.authority.bounds)}`);
+                console.log('Result: GMA_VALID — governance mutation authorized via Standing Authority (GAP-005 Phase 2, policy-bound).');
+                process.exit(0);
+              }
+              console.error('Standing-authority derivation declined: ' + sel.reason);
             }
-            console.error('Standing-authority derivation declined: ' + sel.reason);
           }
 
           if (!matched) {

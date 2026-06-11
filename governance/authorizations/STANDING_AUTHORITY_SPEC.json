@@ -93,6 +93,8 @@
       "consumed budget < bounds.max_merges  (async proof-ledger budget — see bound_model)"
     ],
     "tie_break": "If multiple SAs qualify, the most-recently-issued is chosen (deterministic).",
+    "base_branch_provenance": "Tier 3 derives ONLY from authorities present on the PR's base branch (read from BASE_SHA), never from the PR checkout. governance/authorizations/** is exempt from governed-file detection and the append-only guard only proves entries were appended, so reading the head registry would let an ordinary PR append a broad authority and self-authorize — minting a reusable authority outside the owner-dispatch issuance model. A Standing Authority must therefore first land on the base branch through governed admission before it can authorize any PR. The budget ledger is likewise read from the base branch so a PR cannot rewrite it to free budget.",
+    "budget_attribution": "merge-proof.yml stamps the authority by reproducing the gate's selection exactly: it reads the SA registry and proof ledger from the same BASE_SHA and applies the REAL proof ledger, so a budget-exhausted authority is skipped just as the gate skipped it and the authority that actually authorized the merge is the one whose budget is consumed.",
     "failure_result": "MERGE_LEGITIMACY_NULL"
   },
   "bound_model": {
