@@ -9,6 +9,14 @@ name: governed-deploy
 # reviewers in repository settings (Settings > Environments > production).
 # This adds a human approval step between workflow_dispatch and the deploy
 # step, in addition to (not instead of) the canonical legitimacy chain below.
+#
+# Fail-closed ordering (#1991 follow-up):
+# The "preflight" job below has no environment gate and rejects malformed
+# workflow_dispatch invocations (bad inputs, wrong caller, branch mismatch)
+# before they can occupy the "production" environment's approval queue. It
+# duplicates only the secret-free checks from "governed-production-deploy"'s
+# first step; the canonical legitimacy chain, secrets, and deploy step are
+# unchanged and remain solely in the gated job.
 
 on:
   workflow_dispatch:
@@ -32,7 +40,60 @@ permissions:
   actions: read
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    # No environment gate: this job rejects malformed dispatches before
+    # they can occupy the "production" environment's approval queue.
+
+    env:
+      DECISION_ID: ${{ github.event.inputs.decision_id }}
+      VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
+      INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
+      DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: HARD FAIL — Malformed dispatch (secret-free checks)
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit invocation allowed"
+            exit 1
+          fi
+
+          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/$DEPLOY_WORKFLOW@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through governed-deploy.yml"
+              exit 1
+              ;;
+          esac
+
+          if [ "$DEPLOY_ENVIRONMENT" != "production" ] || [ "$DEPLOY_INTENT" != "deploy_production" ] || [ "$DEPLOY_WORKFLOW" != "governed-deploy.yml" ]; then
+            echo "NULL — Canonical production workflow binding mismatch"
+            exit 1
+          fi
+
+          if [ "$DEPLOY_BRANCH" != "$WORKFLOW_REF_NAME" ]; then
+            echo "NULL — Branch/ref_name mismatch"
+            exit 1
+          fi
+
   governed-production-deploy:
+    needs: preflight
     runs-on: ubuntu-latest
     environment: production
 

@@ -109,8 +109,8 @@
       "authority_capable": false,
       "execution_capable": true,
       "creates_legitimacy": true,
-      "residual_gap": "workflow_dispatch with fabricated decision_id/validated_object_hash/invocation_nonce is theoretically possible but blocked by /compile hash match requirement. approval_gated=false: no additional human approval gate before deploy step.",
-      "closure_action": "Add GitHub environment approval gate to governed-deploy.yml production environment. Monitor for workflow definition drift via constitutional-integrity.yml.",
+      "residual_gap": "workflow_dispatch with fabricated decision_id/validated_object_hash/invocation_nonce is theoretically possible but blocked by /compile hash match requirement. governed-deploy.yml declares environment: production (#1989), which is a precondition for required-reviewer approval but does not by itself prove reviewers are configured (approval_gated=UNVERIFIED). Whether the production environment has required reviewers configured is a GitHub repository-settings fact not verifiable from repository code.",
+      "closure_action": "Operator: configure required reviewers on the 'production' GitHub Environment and record evidence per governance/runtime/evidence/RUNBOOK.md. Monitor for workflow definition drift via constitutional-integrity.yml.",
       "linked_issue": "#584"
     },
     {
