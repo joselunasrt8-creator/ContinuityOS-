@@ -15,7 +15,7 @@
     "/proof"
   ],
   "summary": {
-    "total_files": 66,
+    "total_files": 63,
     "execution_or_mutation_related_files": 16,
     "runtime_routes_detected": 7,
     "github_workflows_detected": 2,
@@ -923,24 +923,6 @@
       "bypass_risk": "none"
     },
     {
-      "path": "gateway.js",
-      "role": "runtime_or_operator_config",
-      "bytes": 142,
-      "sha256": "9b7b9cb75e9bcea4b07452200624eb159e685ef7f029a9eeebde064f6519733c",
-      "execution_surface": false,
-      "mutation_capable": false,
-      "registry_surface": false,
-      "proof_surface": false,
-      "signals": [
-        "authority_route",
-        "compile_route",
-        "validate_route",
-        "execute_route",
-        "proof_route"
-      ],
-      "bypass_risk": "none"
-    },
-    {
       "path": "github_governed_deploy_spec.pdf",
       "role": "supporting_artifact",
       "bytes": 4741,
@@ -1297,24 +1279,6 @@
       "bypass_risk": "none"
     },
     {
-      "path": "server.js",
-      "role": "runtime_or_operator_config",
-      "bytes": 141,
-      "sha256": "9aefe5661860194dee5456eaffc49693bdc980b4dc3c59720b8130fb8654c9cb",
-      "execution_surface": false,
-      "mutation_capable": false,
-      "registry_surface": false,
-      "proof_surface": false,
-      "signals": [
-        "authority_route",
-        "compile_route",
-        "validate_route",
-        "execute_route",
-        "proof_route"
-      ],
-      "bypass_risk": "none"
-    },
-    {
       "path": "src/index.ts",
       "role": "cloudflare_worker_runtime_boundary",
       "bytes": 38403,
@@ -1419,18 +1383,6 @@
       "role": "supporting_artifact",
       "bytes": 503546,
       "sha256": "df71d8155e07997393301aa8e79ec6c690c3f1ee5793667d0f01bbe4378aef45",
-      "execution_surface": false,
-      "mutation_capable": false,
-      "registry_surface": false,
-      "proof_surface": false,
-      "signals": [],
-      "bypass_risk": "none"
-    },
-    {
-      "path": "worker.js",
-      "role": "runtime_or_operator_config",
-      "bytes": 102,
-      "sha256": "7fccd45e87ba5e5dcf86a56384ac053db065abb3da01dae8d7b63371a57f4508",
       "execution_surface": false,
       "mutation_capable": false,
       "registry_surface": false,
