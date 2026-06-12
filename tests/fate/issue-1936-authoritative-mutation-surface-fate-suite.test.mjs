@@ -285,10 +285,10 @@ test('[github] UNAUTHORIZED_OBJECT_NULL: blank or forged validated_object_hash r
   const state = { calls: 0 }
   const executor = makeGithubExecutor(state)
 
-  const blank = executeGitHubIssueComment({ aeo, atao, validated_object_hash: '', executor, emitted_at: EMITTED_AT })
+  const blank = executeGitHubIssueComment({ aeo, atao, validated_object_hash: '', validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
   assert.equal(blank, null)
 
-  const forged = executeGitHubIssueComment({ aeo, atao, validated_object_hash: 'sha256:' + '0'.repeat(64), executor, emitted_at: EMITTED_AT })
+  const forged = executeGitHubIssueComment({ aeo, atao, validated_object_hash: 'sha256:' + '0'.repeat(64), validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
   assert.equal(forged, null)
 
   assert.equal(state.calls, 0, 'executor must not run for an unauthorized hash')
@@ -302,7 +302,7 @@ test('[github] MUTATED_AFTER_VALIDATION_NULL: aeo mutated after hash computed re
   const state = { calls: 0 }
   const executor = makeGithubExecutor(state)
 
-  const out = executeGitHubIssueComment({ aeo: mutatedAeo, atao, validated_object_hash: validHash, executor, emitted_at: EMITTED_AT })
+  const out = executeGitHubIssueComment({ aeo: mutatedAeo, atao, validated_object_hash: validHash, validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
   assert.equal(out, null)
   assert.equal(state.calls, 0, 'executor must not run when the validated object was mutated')
 })
@@ -313,7 +313,7 @@ test('[github] EXECUTED_HASH_EQUALS_VALIDATED_HASH: proof.validated_object_hash 
   const state = { calls: 0 }
   const executor = makeGithubExecutor(state)
 
-  const proof = executeGitHubIssueComment({ aeo, atao, validated_object_hash: hash, executor, emitted_at: EMITTED_AT })
+  const proof = executeGitHubIssueComment({ aeo, atao, validated_object_hash: hash, validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
   assert.notEqual(proof, null)
   assert.equal(proof.execution_result, 'EXECUTED')
   assert.equal(proof.validated_object_hash, hash)
@@ -326,12 +326,12 @@ test('[github] PROOF_HASH_BOUND_TO_EXECUTED_HASH: proof_id changes when executed
   const a = makeGithubAEO()
   const hashA = computeGitHubIssueCommentAEOHash(a.aeo)
   const stateA = { calls: 0 }
-  const proofA = executeGitHubIssueComment({ aeo: a.aeo, atao: a.atao, validated_object_hash: hashA, executor: makeGithubExecutor(stateA), emitted_at: EMITTED_AT })
+  const proofA = executeGitHubIssueComment({ aeo: a.aeo, atao: a.atao, validated_object_hash: hashA, validation_result: 'VALID', executor: makeGithubExecutor(stateA), emitted_at: EMITTED_AT })
 
   const b = makeGithubAEO('Authoritative mutation surface fate suite check-in — different body.')
   const hashB = computeGitHubIssueCommentAEOHash(b.aeo)
   const stateB = { calls: 0 }
-  const proofB = executeGitHubIssueComment({ aeo: b.aeo, atao: b.atao, validated_object_hash: hashB, executor: makeGithubExecutor(stateB), emitted_at: EMITTED_AT })
+  const proofB = executeGitHubIssueComment({ aeo: b.aeo, atao: b.atao, validated_object_hash: hashB, validation_result: 'VALID', executor: makeGithubExecutor(stateB), emitted_at: EMITTED_AT })
 
   assert.notEqual(proofA, null)
   assert.notEqual(proofB, null)
@@ -348,10 +348,11 @@ test('[github] NOTHING_HAPPENS_WITHOUT_VALID: executor never invoked across all 
   const executor = makeGithubExecutor(state)
 
   executeGitHubIssueComment(null)
-  executeGitHubIssueComment({ aeo: null, atao, validated_object_hash: validHash, executor, emitted_at: EMITTED_AT })
-  executeGitHubIssueComment({ aeo, atao, validated_object_hash: '', executor, emitted_at: EMITTED_AT })
-  executeGitHubIssueComment({ aeo, atao, validated_object_hash: 'sha256:' + '0'.repeat(64), executor, emitted_at: EMITTED_AT })
-  executeGitHubIssueComment({ aeo: mutatedAeo, atao, validated_object_hash: validHash, executor, emitted_at: EMITTED_AT })
+  executeGitHubIssueComment({ aeo: null, atao, validated_object_hash: validHash, validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
+  executeGitHubIssueComment({ aeo, atao, validated_object_hash: validHash, validation_result: 'NULL', executor, emitted_at: EMITTED_AT })
+  executeGitHubIssueComment({ aeo, atao, validated_object_hash: '', validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
+  executeGitHubIssueComment({ aeo, atao, validated_object_hash: 'sha256:' + '0'.repeat(64), validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
+  executeGitHubIssueComment({ aeo: mutatedAeo, atao, validated_object_hash: validHash, validation_result: 'VALID', executor, emitted_at: EMITTED_AT })
 
   assert.equal(state.calls, 0, 'no NULL branch may invoke the github executor')
 })

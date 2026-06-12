@@ -24,6 +24,16 @@ export const GITHUB_ISSUE_COMMENT_AEO_REQUIRED_KEYS = [
   'validation',
 ] as const
 
+export const GITHUB_ISSUE_COMMENT_PROOF_FIELDS = [
+  'validated_object_hash',
+  'executed_object_hash',
+  'aeo_hash',
+  'comment_id',
+  'comment_url',
+  'execution_evidence_hash',
+  'emitted_at',
+] as const
+
 export type GitHubIssueCommentValidatorResult = 'VALID' | 'NULL'
 
 export type GitHubIssueCommentATAO = {
@@ -146,6 +156,7 @@ export type GitHubIssueCommentExecutionProof = {
   readonly atao_id: string
   readonly validated_object_hash: string
   readonly executed_object_hash: string
+  readonly aeo_hash: string
   readonly target_surface: 'github'
   readonly target_action: 'comment_issue'
   readonly owner: string
@@ -162,6 +173,7 @@ export type GitHubIssueCommentExecutionProof = {
 export type GitHubIssueCommentExecuteInput = {
   readonly aeo: GitHubIssueCommentAEO | null | undefined
   readonly validated_object_hash: string
+  readonly validation_result: GitHubIssueCommentValidatorResult
   readonly atao: GitHubIssueCommentATAO | null | undefined
   readonly executor: GitHubIssueCommentExecutor
   readonly emitted_at: string
@@ -189,6 +201,12 @@ function hasExactKeys(value: unknown, expectedKeys: readonly string[]): value is
 
 function isNumberArray(value: unknown): value is readonly number[] {
   return Array.isArray(value) && value.every(isPositiveInteger)
+}
+
+function equalsStringArray(value: unknown, expected: readonly string[]): value is readonly string[] {
+  return Array.isArray(value) &&
+    value.length === expected.length &&
+    value.every((entry, index) => entry === expected[index])
 }
 
 export function computeGitHubIssueCommentAEOHash(aeo: GitHubIssueCommentAEO): string {
@@ -287,14 +305,7 @@ export function compileGitHubIssueCommentAEO(
       proof_required: true as const,
       proof_type: 'github_issue_comment_execution' as const,
       expected_result: 'single_bounded_issue_comment' as const,
-      proof_fields: Object.freeze([
-        'validated_object_hash',
-        'executed_object_hash',
-        'comment_id',
-        'comment_url',
-        'execution_evidence_hash',
-        'emitted_at',
-      ]) as readonly string[],
+      proof_fields: Object.freeze([...GITHUB_ISSUE_COMMENT_PROOF_FIELDS]) as readonly string[],
       registry_required: true as const,
       reconciliation_required: true as const,
       replay_state_after_success: 'CONSUMED' as const,
@@ -360,7 +371,7 @@ export function validateGitHubIssueCommentAEO(
   if (candidate.finality.proof_required !== true) return 'NULL'
   if (candidate.finality.proof_type !== 'github_issue_comment_execution') return 'NULL'
   if (candidate.finality.expected_result !== 'single_bounded_issue_comment') return 'NULL'
-  if (!Array.isArray(candidate.finality.proof_fields) || candidate.finality.proof_fields.length === 0) return 'NULL'
+  if (!equalsStringArray(candidate.finality.proof_fields, GITHUB_ISSUE_COMMENT_PROOF_FIELDS)) return 'NULL'
   if (candidate.finality.registry_required !== true) return 'NULL'
   if (candidate.finality.reconciliation_required !== true) return 'NULL'
   if (candidate.finality.replay_state_after_success !== 'CONSUMED') return 'NULL'
@@ -390,6 +401,7 @@ export function executeGitHubIssueComment(
   if (!input.aeo) return null
   if (!input.atao) return null
   if (!isNonBlankString(input.validated_object_hash)) return null
+  if (input.validation_result !== 'VALID') return null
   if (!isNonBlankString(input.emitted_at)) return null
   if (typeof input.executor !== 'function') return null
 
@@ -412,6 +424,7 @@ export function executeGitHubIssueComment(
     atao_id: input.atao.atao_id,
     validated_object_hash: input.validated_object_hash,
     executed_object_hash: executedObjectHash,
+    aeo_hash: executedObjectHash,
     target_surface: 'github' as const,
     target_action: 'comment_issue' as const,
     owner: input.aeo.target.owner,
