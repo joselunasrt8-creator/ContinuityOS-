@@ -1,0 +1,16 @@
+name: sa-tier3-offscope
+# Issue #2002 — NEGATIVE control for the Standing Authority operational proof.
+# This is a DIFFERENT workflow file, NOT covered by the narrow authority's
+# path_globs (.github/workflows/sa-tier3-demo.yml). A claude/* PR mutating this
+# file with no explicit GMA MUST be declined by Tier 3 (file outside authority
+# path scope) and resolve to MERGE_LEGITIMACY_NULL — proving fail-closed
+# containment: capability != authority.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offscope-marker:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "out-of-scope negative control for issue #2002"
