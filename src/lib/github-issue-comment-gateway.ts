@@ -28,8 +28,12 @@ export const GITHUB_ISSUE_COMMENT_PROOF_FIELDS = [
   'validated_object_hash',
   'executed_object_hash',
   'aeo_hash',
+  'target_issue',
   'comment_id',
   'comment_url',
+  'action_hash',
+  'timestamp',
+  'result',
   'execution_evidence_hash',
   'emitted_at',
 ] as const
@@ -139,7 +143,7 @@ export type GitHubIssueCommentValidationContext = {
 }
 
 export type GitHubIssueCommentExecutionEvidence = {
-  readonly comment_id: string
+  readonly comment_id?: string
   readonly comment_url: string
   readonly executed_at: string
 }
@@ -162,8 +166,16 @@ export type GitHubIssueCommentExecutionProof = {
   readonly owner: string
   readonly repo: string
   readonly issue_number: number
-  readonly comment_id: string
+  readonly target_issue: {
+    readonly owner: string
+    readonly repo: string
+    readonly issue_number: number
+  }
+  readonly comment_id?: string
   readonly comment_url: string
+  readonly action_hash: string
+  readonly timestamp: string
+  readonly result: 'EXECUTED'
   readonly execution_evidence_hash: string
   readonly execution_result: 'EXECUTED'
   readonly creates_authority: false
@@ -177,6 +189,8 @@ export type GitHubIssueCommentExecuteInput = {
   readonly atao: GitHubIssueCommentATAO | null | undefined
   readonly executor: GitHubIssueCommentExecutor
   readonly emitted_at: string
+  readonly consumed_action_hashes?: ReadonlySet<string>
+  readonly persistProof?: (proof: GitHubIssueCommentExecutionProof) => void
 }
 
 function isNonBlankString(value: unknown): value is string {
@@ -211,6 +225,17 @@ function equalsStringArray(value: unknown, expected: readonly string[]): value i
 
 export function computeGitHubIssueCommentAEOHash(aeo: GitHubIssueCommentAEO): string {
   return `sha256:${sha256Hex(canonicalize(aeo))}`
+}
+
+export function computeGitHubIssueCommentActionHash(aeo: GitHubIssueCommentAEO): string {
+  return `sha256:${sha256Hex(canonicalize({
+    system: aeo.target.system,
+    action: aeo.target.action,
+    owner: aeo.target.owner,
+    repo: aeo.target.repo,
+    issue_number: aeo.target.issue_number,
+    body: aeo.target.body,
+  }))}`
 }
 
 export function captureGitHubIssueCommentATAO(
@@ -408,6 +433,9 @@ export function executeGitHubIssueComment(
   const executedObjectHash = computeGitHubIssueCommentAEOHash(input.aeo)
   if (executedObjectHash !== input.validated_object_hash) return null
 
+  const actionHash = computeGitHubIssueCommentActionHash(input.aeo)
+  if (input.consumed_action_hashes?.has(actionHash)) return null
+
   const evidence = input.executor({
     owner: input.aeo.target.owner,
     repo: input.aeo.target.repo,
@@ -415,7 +443,7 @@ export function executeGitHubIssueComment(
     body: input.aeo.target.body,
   })
   if (!evidence) return null
-  if (!isNonBlankString(evidence.comment_id)) return null
+  if (evidence.comment_id !== undefined && !isNonBlankString(evidence.comment_id)) return null
   if (!isNonBlankString(evidence.comment_url)) return null
   if (!isNonBlankString(evidence.executed_at)) return null
 
@@ -430,13 +458,23 @@ export function executeGitHubIssueComment(
     owner: input.aeo.target.owner,
     repo: input.aeo.target.repo,
     issue_number: input.aeo.target.issue_number,
-    comment_id: evidence.comment_id,
+    target_issue: Object.freeze({
+      owner: input.aeo.target.owner,
+      repo: input.aeo.target.repo,
+      issue_number: input.aeo.target.issue_number,
+    }),
+    ...(evidence.comment_id === undefined ? {} : { comment_id: evidence.comment_id }),
     comment_url: evidence.comment_url,
+    action_hash: actionHash,
+    timestamp: input.emitted_at,
+    result: 'EXECUTED' as const,
     execution_evidence_hash: evidenceHash,
     execution_result: 'EXECUTED' as const,
     creates_authority: false as const,
     emitted_at: input.emitted_at,
   })
   const proof_id = `sha256:${sha256Hex(canonicalize(proofBody))}`
-  return Object.freeze({ proof_id, ...proofBody })
+  const proof = Object.freeze({ proof_id, ...proofBody })
+  input.persistProof?.(proof)
+  return proof
 }
