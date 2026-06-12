@@ -430,3 +430,18 @@ test('STANDING_AUTHORITY_SPEC documents the bound model and the compressed rule'
   assert.match(JSON.stringify(spec.bound_model), /TTL/);
   assert.match(JSON.stringify(spec), /Both must end in proof/);
 });
+
+test('operational-risk markdown audits remain evidence-only in merge admission classifiers', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+
+  assert.match(gate, /governance\/operational-risk\/\*\.md\)/, 'merge gate must classify operational-risk markdown explicitly');
+  assert.match(gate, /operational_risk_evidence/, 'merge gate must emit evidence-only mutation class for operational-risk audits');
+  assert.match(proof, /\^governance\\\/operational-risk\\\/\[\^\/\]\+\\\.md\$/, 'merge proof must share the same operational-risk evidence classifier');
+  assert.match(proof, /operational_risk_evidence/, 'merge proof must not attribute operational-risk evidence to Standing Authority budget');
+
+  const gateOperationalIndex = gate.indexOf('governance/operational-risk/*.md)');
+  const gateGenericGovernanceIndex = gate.indexOf('governance/*)', gateOperationalIndex);
+  assert.ok(gateOperationalIndex > -1 && gateGenericGovernanceIndex > gateOperationalIndex,
+    'operational-risk evidence exception must precede generic governance mutation classification');
+});

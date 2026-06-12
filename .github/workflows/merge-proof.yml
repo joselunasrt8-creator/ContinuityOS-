@@ -383,6 +383,7 @@ jobs:
             else if (f.startsWith('governance/authorizations/')) continue;
             else if (f === 'runtime/standing-authority.mjs') cls = 'governance_mutation';
             else if (f === 'governance/merge-legitimacy/merge_proof_registry.jsonl') cls = 'proof_persistence';
+            else if (/^governance\/operational-risk\/[^/]+\.md$/.test(f)) cls = 'operational_risk_evidence';
             else if (f.startsWith('governance/')) cls = 'governance_mutation';
             else if (f.startsWith('.github/workflows/')) cls = 'workflow_mutation';
             else if (f.startsWith('src/')) cls = 'runtime_mutation';
@@ -438,6 +439,7 @@ jobs:
             f.startsWith('.github/workflows/')
             || (f.startsWith('governance/')
                 && !f.startsWith('governance/authorizations/')
+                && !/^governance\/operational-risk\/[^/]+\.md$/.test(f)
                 && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl');
 
           let sel;
