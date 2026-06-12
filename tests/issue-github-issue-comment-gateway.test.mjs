@@ -14,6 +14,7 @@ const {
   computeGitHubIssueCommentAEOHash,
   executeGitHubIssueComment,
   validateGitHubIssueCommentAEO,
+  GITHUB_ISSUE_COMMENT_PROOF_FIELDS,
 } = await import('../src/lib/github-issue-comment-gateway.ts')
 
 function makeATAOInput(overrides = {}) {
@@ -134,6 +135,7 @@ test('AEO compilation requires authority binding and stays scoped to comment_iss
   assert.notEqual(aeo, null)
   assert.equal(aeo.target.action, 'comment_issue')
   assert.equal(aeo.finality.proof_type, 'github_issue_comment_execution')
+  assert.deepEqual(aeo.finality.proof_fields, GITHUB_ISSUE_COMMENT_PROOF_FIELDS)
 })
 
 // ── Validator VALID|NULL boundary ────────────────────────────────────────────
@@ -165,6 +167,10 @@ test('invalid, replayed, mutated, missing-authority, or extra-field objects retu
   assert.equal(validateGitHubIssueCommentAEO(aeo, makeContext({ authority: { ...makeContext().authority, status: 'REVOKED' } })), 'NULL')
   assert.equal(validateGitHubIssueCommentAEO({ ...aeo, extra_field: true }, makeContext()), 'NULL')
   assert.equal(validateGitHubIssueCommentAEO({ ...aeo, target: { ...aeo.target, extra_field: true } }, makeContext()), 'NULL')
+  assert.equal(validateGitHubIssueCommentAEO({
+    ...aeo,
+    finality: { ...aeo.finality, proof_fields: ['comment_id'] },
+  }, makeContext()), 'NULL')
 })
 
 // ── Execution proof boundary ─────────────────────────────────────────────────
@@ -177,6 +183,7 @@ test('execution proof emits only after comment execution evidence exists and pro
   const proof = executeGitHubIssueComment({
     aeo,
     validated_object_hash: validatedHash,
+    validation_result: 'VALID',
     atao,
     executor,
     emitted_at: '2026-06-04T00:02:00.000Z',
@@ -185,10 +192,45 @@ test('execution proof emits only after comment execution evidence exists and pro
   assert.equal(executor.calls.length, 1)
   assert.equal(proof.validated_object_hash, validatedHash)
   assert.equal(proof.executed_object_hash, validatedHash)
+  assert.equal(proof.aeo_hash, validatedHash)
   assert.equal(proof.target_surface, 'github')
   assert.equal(proof.target_action, 'comment_issue')
   assert.equal(proof.comment_id, 'comment-123')
   assert.match(proof.execution_evidence_hash, /^sha256:[0-9a-f]{64}$/)
+  assert.deepEqual(Object.keys(proof).sort(), [
+    'aeo_hash',
+    'atao_id',
+    'comment_id',
+    'comment_url',
+    'creates_authority',
+    'emitted_at',
+    'executed_object_hash',
+    'execution_evidence_hash',
+    'execution_result',
+    'issue_number',
+    'owner',
+    'proof_id',
+    'repo',
+    'target_action',
+    'target_surface',
+    'validated_object_hash',
+  ])
+})
+
+test('execution boundary does not post unless validator result is VALID', () => {
+  const { atao, aeo } = makeAEO()
+  const validatedHash = computeGitHubIssueCommentAEOHash(aeo)
+  const executor = makeExecutor()
+  const proof = executeGitHubIssueComment({
+    aeo,
+    validated_object_hash: validatedHash,
+    validation_result: 'NULL',
+    atao,
+    executor,
+    emitted_at: '2026-06-04T00:02:00.000Z',
+  })
+  assert.equal(proof, null)
+  assert.equal(executor.calls.length, 0)
 })
 
 test('proof is not emitted when executor returns no comment evidence', () => {
@@ -198,6 +240,7 @@ test('proof is not emitted when executor returns no comment evidence', () => {
   const proof = executeGitHubIssueComment({
     aeo,
     validated_object_hash: validatedHash,
+    validation_result: 'VALID',
     atao,
     executor: () => {
       called = true
@@ -223,6 +266,7 @@ test('execution boundary rejects object mutation after validation and does not c
   const proof = executeGitHubIssueComment({
     aeo: mutated,
     validated_object_hash: validatedHash,
+    validation_result: 'VALID',
     atao,
     executor,
     emitted_at: '2026-06-04T00:02:00.000Z',
