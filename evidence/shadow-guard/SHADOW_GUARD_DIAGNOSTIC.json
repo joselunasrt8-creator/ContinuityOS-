@@ -1,0 +1,691 @@
+{
+  "schema_version": "shadow_guard_phase_a_diagnostic_v1",
+  "phase": "Phase A",
+  "mode": "diagnostic_demo",
+  "diagnostic_only": true,
+  "enforcement": false,
+  "branch_protection": false,
+  "authority_created": false,
+  "governance_runtime_state_mutation": false,
+  "null_semantics": {
+    "meaning": "undeclared_or_insufficiently_classified_mutation_surface_detected",
+    "blocks": false,
+    "enforces": false,
+    "emits_diagnostic_evidence_only": true
+  },
+  "summary": {
+    "human_review_pass_count": 39,
+    "shadow_guard_pass_count": 23,
+    "shadow_guard_null_count": 16,
+    "divergence_entry_count": 16
+  },
+  "findings": [
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0001",
+      "surface_id": "package_script:package.json:script:d1:migrate:local|wrangler d1 migrations apply mindshift-demo-local --local",
+      "file": "package.json",
+      "surface_kind": "package_script",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "script:d1:migrate:local",
+        "wrangler d1 migrations apply mindshift-demo-local --local"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0002",
+      "surface_id": "package_script:package.json:script:deploy:dry-run|npx wrangler deploy src/index.ts --name mindshift-demo --compatibility-dat",
+      "file": "package.json",
+      "surface_kind": "package_script",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "script:deploy:dry-run",
+        "npx wrangler deploy src/index.ts --name mindshift-demo --compatibility-date 2026-05-18 --dry-run"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0003",
+      "surface_id": "package_script:package.json:script:shadow-guard:demo|node scripts/shadow-guard.mjs",
+      "file": "package.json",
+      "surface_kind": "package_script",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "script:shadow-guard:demo",
+        "node scripts/shadow-guard.mjs"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0004",
+      "surface_id": "database_mutation:scripts/append-release-provenance.mjs:update",
+      "file": "scripts/append-release-provenance.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0005",
+      "surface_id": "filesystem_write:scripts/append-release-provenance.mjs:writeFileSync",
+      "file": "scripts/append-release-provenance.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0006",
+      "surface_id": "database_mutation:scripts/bypass-audit-detector.mjs:update",
+      "file": "scripts/bypass-audit-detector.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0007",
+      "surface_id": "deployment_mutation:scripts/bypass-audit-detector.mjs:wrangler deploy",
+      "file": "scripts/bypass-audit-detector.mjs",
+      "surface_kind": "deployment_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "wrangler deploy"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0008",
+      "surface_id": "filesystem_write:scripts/bypass-audit-detector.mjs:writeFileSync",
+      "file": "scripts/bypass-audit-detector.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0009",
+      "surface_id": "filesystem_write:scripts/execution_surface_closure_scanner.mjs:writeFileSync",
+      "file": "scripts/execution_surface_closure_scanner.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0010",
+      "surface_id": "filesystem_write:scripts/fix-data-url-imports.mjs:writeFileSync",
+      "file": "scripts/fix-data-url-imports.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0011",
+      "surface_id": "deployment_mutation:scripts/governed-deploy.ts:wrangler deploy",
+      "file": "scripts/governed-deploy.ts",
+      "surface_kind": "deployment_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "wrangler deploy"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0012",
+      "surface_id": "filesystem_write:scripts/governed-deploy.ts:mkdirSync",
+      "file": "scripts/governed-deploy.ts",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "mkdirSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0013",
+      "surface_id": "network_mutation:scripts/local-validator-adapter.mjs:method: 'POST'",
+      "file": "scripts/local-validator-adapter.mjs",
+      "surface_kind": "network_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "method: 'POST'"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0014",
+      "surface_id": "database_mutation:scripts/reconcile-proof-schema-hashes.mjs:delete",
+      "file": "scripts/reconcile-proof-schema-hashes.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "delete"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0015",
+      "surface_id": "filesystem_write:scripts/reconcile-proof-schema-hashes.mjs:writeFileSync",
+      "file": "scripts/reconcile-proof-schema-hashes.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0016",
+      "surface_id": "database_mutation:scripts/reconcile-release-provenance-registry.mjs:update",
+      "file": "scripts/reconcile-release-provenance-registry.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0017",
+      "surface_id": "database_mutation:scripts/regenerate-governance-artifacts.mjs:INSERT",
+      "file": "scripts/regenerate-governance-artifacts.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "INSERT"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0018",
+      "surface_id": "filesystem_write:scripts/regenerate-governance-artifacts.mjs:writeFileSync",
+      "file": "scripts/regenerate-governance-artifacts.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0019",
+      "surface_id": "database_mutation:scripts/release-provenance-causal-ordering.mjs:update",
+      "file": "scripts/release-provenance-causal-ordering.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0020",
+      "surface_id": "database_mutation:scripts/release-provenance-consumption-boundary.mjs:update",
+      "file": "scripts/release-provenance-consumption-boundary.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0021",
+      "surface_id": "database_mutation:scripts/release-provenance-dependency-contracts.mjs:update",
+      "file": "scripts/release-provenance-dependency-contracts.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0022",
+      "surface_id": "database_mutation:scripts/release-provenance-finality-checkpoints.mjs:update",
+      "file": "scripts/release-provenance-finality-checkpoints.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0023",
+      "surface_id": "database_mutation:scripts/release-provenance-policy-bindings.mjs:update",
+      "file": "scripts/release-provenance-policy-bindings.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0024",
+      "surface_id": "database_mutation:scripts/release-provenance-policy-finality.mjs:update",
+      "file": "scripts/release-provenance-policy-finality.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0025",
+      "surface_id": "database_mutation:scripts/release-provenance-policy-reconciliation.mjs:update",
+      "file": "scripts/release-provenance-policy-reconciliation.mjs",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "update"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0026",
+      "surface_id": "filesystem_write:scripts/render-topology-graph-viewer.ts:writeFileSync",
+      "file": "scripts/render-topology-graph-viewer.ts",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0027",
+      "surface_id": "filesystem_write:scripts/runtime_reference_reconciler.mjs:writeFileSync",
+      "file": "scripts/runtime_reference_reconciler.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0028",
+      "surface_id": "filesystem_write:scripts/semantic_collapse_validator.mjs:writeFileSync",
+      "file": "scripts/semantic_collapse_validator.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "writeFileSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0029",
+      "surface_id": "filesystem_write:scripts/shadow-guard.mjs:mkdirSync",
+      "file": "scripts/shadow-guard.mjs",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "mkdirSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0030",
+      "surface_id": "database_mutation:src/lib/cloudflare-adapter.ts:DELETE",
+      "file": "src/lib/cloudflare-adapter.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "DELETE"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0031",
+      "surface_id": "database_mutation:src/lib/d1-storage-adapter.ts:INSERT",
+      "file": "src/lib/d1-storage-adapter.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "INSERT"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0032",
+      "surface_id": "database_mutation:src/lib/filesystem-aeo.ts:delete",
+      "file": "src/lib/filesystem-aeo.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "delete"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0033",
+      "surface_id": "database_mutation:src/lib/filesystem-write-route-adapter.ts:delete",
+      "file": "src/lib/filesystem-write-route-adapter.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "delete"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0034",
+      "surface_id": "database_mutation:src/lib/filesystem-write-runtime-gateway.ts:Insert",
+      "file": "src/lib/filesystem-write-runtime-gateway.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "NULL",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "undeclared or insufficiently classified mutation surface detected; NULL is diagnostic evidence only",
+      "evidence": [
+        "Insert"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0035",
+      "surface_id": "database_mutation:src/lib/runtime-discovery-adapter.ts:INSERT",
+      "file": "src/lib/runtime-discovery-adapter.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "INSERT"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0036",
+      "surface_id": "database_mutation:src/lib/runtime-observability-adapter.ts:INSERT",
+      "file": "src/lib/runtime-observability-adapter.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "INSERT"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0037",
+      "surface_id": "database_mutation:src/lib/shadow-guard-scanner.ts:INSERT",
+      "file": "src/lib/shadow-guard-scanner.ts",
+      "surface_kind": "database_mutation",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "INSERT"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0038",
+      "surface_id": "filesystem_delete:src/lib/shadow-guard-scanner.ts:rmSync",
+      "file": "src/lib/shadow-guard-scanner.ts",
+      "surface_kind": "filesystem_delete",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "rmSync"
+      ]
+    },
+    {
+      "finding_id": "shadow_guard_phase_a_finding_0039",
+      "surface_id": "filesystem_write:src/lib/shadow-guard-scanner.ts:writeFileSync",
+      "file": "src/lib/shadow-guard-scanner.ts",
+      "surface_kind": "filesystem_write",
+      "human_review": "PASS",
+      "shadow_guard": "PASS",
+      "diagnostic_only": true,
+      "enforcement": false,
+      "branch_protection": false,
+      "authority_created": false,
+      "governance_runtime_state_mutation": false,
+      "reason": "mutation surface is explicitly marked as diagnostic/evidence/observability only for this Phase A scan",
+      "evidence": [
+        "writeFileSync"
+      ]
+    }
+  ],
+  "divergence_registry_path": "evidence/shadow-guard/legitimacy_divergence_registry.jsonl"
+}
