@@ -22,21 +22,23 @@ const REQUIRED_PATHWAYS = [
 const VALID_CLASSIFICATIONS = [
   'GOVERNED',
   'PARTIAL',
-  'UNKNOWN',
   'BREAK_GLASS',
-  'CONTAINED',
-  'UNGOVERNED',
+  'UNKNOWN',
 ];
 
 const REQUIRED_PATHWAY_FIELDS = [
   'pathway',
   'mechanism',
-  'actor_class',
   'required_control',
   'current_evidence',
   'classification',
-  'classification_reason',
-  'required_closure_action',
+  'closure_state',
+];
+
+const VALID_CLOSURE_STATES = [
+  'OPEN',
+  'PENDING_EXTERNAL_VERIFICATION',
+  'CLOSED',
 ];
 
 let passed = 0;
@@ -125,10 +127,10 @@ for (const pathway of inventory.pathways) {
     );
   });
 
-  test(`pathway "${id}" required_control is an array`, () => {
+  test(`pathway "${id}" required_control is a non-empty string`, () => {
     assert.ok(
-      Array.isArray(pathway.required_control),
-      `pathway "${id}" required_control must be an array`,
+      typeof pathway.required_control === 'string' && pathway.required_control.length > 0,
+      `pathway "${id}" required_control must be a non-empty string`,
     );
   });
 
@@ -139,10 +141,10 @@ for (const pathway of inventory.pathways) {
     );
   });
 
-  test(`pathway "${id}" required_closure_action is an array`, () => {
+  test(`pathway "${id}" closure_state is a valid value`, () => {
     assert.ok(
-      Array.isArray(pathway.required_closure_action),
-      `pathway "${id}" required_closure_action must be an array`,
+      VALID_CLOSURE_STATES.includes(pathway.closure_state),
+      `pathway "${id}" has invalid closure_state "${pathway.closure_state}"`,
     );
   });
 

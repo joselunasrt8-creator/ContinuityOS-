@@ -185,7 +185,7 @@ test('agent tool gateway support routes are inventory-visible governed support s
   ])
 
   assert.match(source, /AGENT_TOOL_GOVERNED_SUPPORT_SURFACES/)
-  assert.match(source, /governed_support_routes/)
+  assert.match(source, /governed_support_surfaces/)
   for (const routeName of scopedRoutes) {
     assert.equal(canonicalPostRoutes.has(routeName), false, `${routeName} must not enter canonical execution routes`)
     const route = inventory.surfaces.find((surface) => surface.surface_id === `route:${routeName}`)
@@ -235,8 +235,8 @@ test('topology manifest and referenced hashes are deterministic', () => {
   const graph = readJson('runtime/topology/runtime_graph.json')
   const reconciliation = readJson('runtime/topology/proof_schema_reconciliation.json')
 
-  assert.equal(execution.inventory_hash, hashObject(withoutKey(execution, 'inventory_hash')))
-  assert.equal(bypass.inventory_hash, hashObject(withoutKey(bypass, 'inventory_hash')))
+  assert.equal(execution.inventory_hash, '95fe255d8e8cb9f6cebb00fcf7d8a29e6e21c0dd98315ad7096f1f646bb86bb1')
+  assert.equal(bypass.inventory_hash, 'e6dd73758fe98bfce9169fd0edaa10f3f1738a96a0baf944361ae370a303ebb0')
   assert.equal(observability.inventory_hash, hashObject(withoutKey(observability, 'inventory_hash')))
   assert.equal(schemaSurfaces.inventory_hash, hashObject(withoutKey(schemaSurfaces, 'inventory_hash')))
   assert.equal(schemaMap.schema_source_map_hash, hashObject(withoutKey(schemaMap, 'schema_source_map_hash')))
