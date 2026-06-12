@@ -382,6 +382,22 @@ test('issuer derives expires_at from ttl_hours and the gate re-validates the bin
   assert.match(gate, /expires_at must equal issued_at \+ ttl_hours/, 'gate must re-validate the expires_at binding');
 });
 
+test('trust surfaces are hard-denied from SA derivation in gate and merge-proof (P1)', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  for (const wf of [gate, proof]) {
+    assert.match(wf, /TRUST_SURFACES = new Set\(\[/, 'trust surfaces must be explicitly enumerated');
+    assert.match(wf, /touchesTrustSurface/, 'a hard deny on trust-surface edits must exist');
+  }
+  // The gate must gate Tier 3 derivation on NOT touching a trust surface.
+  assert.match(gate, /!touchesTrustSurface && existsSync\('sa_registry_base\.jsonl'\)/, 'Tier 3 must not run when a trust surface is touched');
+});
+
+test('merge-proof evaluates explicit-GMA expiry at merge time, not proof-gen time (P2)', () => {
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  assert.match(proof, /new Date\(e\.expires_at\) > mergedAt/, 'explicit-GMA expiry must be compared against mergedAt');
+});
+
 test('STANDING_AUTHORITY_SPEC documents the bound model and the compressed rule', () => {
   const spec = JSON.parse(
     readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'),

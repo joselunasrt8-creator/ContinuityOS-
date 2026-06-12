@@ -686,7 +686,20 @@ jobs:
           if (!matched && isFork) {
             console.error(`Standing-authority derivation declined: fork PR (head repo ${process.env.HEAD_REPO} != ${process.env.BASE_REPO}) — explicit GMA required.`);
           }
-          if (!matched && !isFork && existsSync('sa_registry_base.jsonl') && existsSync('sa_verifier_base.mjs')) {
+          // HARD DENY: the Standing Authority trust surfaces (the registry and the
+          // verifier) must NEVER be authorized by a Standing Authority — that would let a
+          // broad SA (e.g. governance/** or runtime/**) widen/disable the authority layer
+          // it derives from. Editing either always falls through to an explicit manual GMA.
+          // This is an absolute rule, independent of any SA's path_globs.
+          const TRUST_SURFACES = new Set([
+            'governance/authorizations/standing_authority_registry.jsonl',
+            'runtime/standing-authority.mjs',
+          ]);
+          const touchesTrustSurface = governedFiles.some((f) => TRUST_SURFACES.has(f));
+          if (!matched && touchesTrustSurface) {
+            console.error('Standing-authority derivation declined: PR edits a Standing Authority trust surface (registry or verifier) — explicit GMA required (never SA-derivable).');
+          }
+          if (!matched && !isFork && !touchesTrustSurface && existsSync('sa_registry_base.jsonl') && existsSync('sa_verifier_base.mjs')) {
             const saRegistryText = readFileSync('sa_registry_base.jsonl', 'utf8');
             const verifierText = readFileSync('sa_verifier_base.mjs', 'utf8');
             if (saRegistryText.trim() && verifierText.trim()) {
@@ -697,13 +710,10 @@ jobs:
               // authorization (governance_mutation / workflow_mutation). proof_persistence
               // (merge_proof_registry.jsonl) and non-gated classes (src/schema/migration/
               // deployment_config) are excluded so an in-scope PR that also touches such a
-              // file is not falsely declined. The Standing Authority registry and verifier
-              // are themselves governance_mutation paths, so they ARE included — a routine
-              // SA cannot cover them, forcing an explicit GMA for those higher-privilege edits.
+              // file is not falsely declined. (Trust-surface paths can never reach here —
+              // they are hard-denied above.)
               const isAuthGated = (f) =>
                 f.startsWith('.github/workflows/')
-                || f === 'governance/authorizations/standing_authority_registry.jsonl'
-                || f === 'runtime/standing-authority.mjs'
                 || (f.startsWith('governance/')
                     && !f.startsWith('governance/authorizations/')
                     && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl');
