@@ -1,12 +1,12 @@
 {
-  "gma_id": "GMA-claude/standing-authority-operational-proof-yur14k-27399592517",
-  "decision_id": "f1b21161cf4fa68b498d21d2ad42c74637763e61cdda519e27727be36993a7f9",
-  "continuity_id": "0d8692abfb28dfd73e6c806c7679d165f9e537ad4f10182c4b2c4fdd01500772",
-  "session_id": "35dbb2e4d150f54327150627fa382523fad8066e475ca3f50800f4b8f3548467",
-  "validated_object_hash": "1cf41ffdf44d15ea56a06fda82b229178eb2b21d7c82d41bd81e5a1cf120c65f",
-  "governed_files_hash": "6f25380714eee0cd36f687852a2a6106261a60884494a58ed78ac6cdcb710e38",
+  "gma_id": "GMA-claude/standing-authority-operational-proof-yur14k-27402723808",
+  "decision_id": "251b119a098d78b76189d306df80d714d6feae42838b18dda3e7659985d71ede",
+  "continuity_id": "1ed57c7cc093c3c1007915188cc70fd93417723d332b87262cf114ba676ca26a",
+  "session_id": "7abd283bedde77d769246655266a62ca7eb796bea9aab885854828529eea37f7",
+  "validated_object_hash": "3c10b045b10bcb48cd359565afb34c4c0bc80b3e4007b32877b4760ecb997378",
+  "governed_files_hash": "08bdad7d2c474010245ef6a5c36346780701c57319e0178a26b176ba055b9132",
   "governed_files": [
-    "governance/authorizations/standing_authority_registry.jsonl"
+    "governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json"
   ],
   "mutation_classes": [
     "governance_mutation"
@@ -15,14 +15,14 @@
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Re-issue GMA bound to single-file SA-registry change (post main-sync) authorizing Standing Authority SA-claude/standing-authority-operational-proof-yur14k-27399384732 for issue #2002 bootstrap.",
+  "intent": "Authorize governance_mutation adding governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json (V1 agent attribution spec for issue #2003, PR #2026)",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
   "branch": "claude/standing-authority-operational-proof-yur14k",
-  "head_sha": "01c022fecd1d1fd68c561c300e4fcf032571c2a6",
-  "workflow_run_id": "27399592517",
-  "created_at": "2026-06-12T06:47:03Z",
-  "expires_at": "2027-06-12T06:47:03Z",
+  "head_sha": "0474ad63496ade5284eb44ae4a5884f1f8d47642",
+  "workflow_run_id": "27402723808",
+  "created_at": "2026-06-12T07:57:10Z",
+  "expires_at": "2027-06-12T07:57:10Z",
   "status": "GMA_VALID"
 }
