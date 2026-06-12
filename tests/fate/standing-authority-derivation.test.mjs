@@ -346,6 +346,42 @@ test('.gitattributes declares merge=union for the standing authority registry', 
   assert.match(gitattributes, /governance\/authorizations\/standing_authority_registry\.jsonl\s+merge=union/);
 });
 
+test('SA trust surfaces are GMA-gated (gate-both) in BOTH classifiers, byte-aligned', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const issuer = readFileSync(join(root, '.github', 'workflows', 'governance-mutation-authorization.yml'), 'utf8');
+  for (const wf of [gate, issuer]) {
+    assert.match(wf, /governance\/authorizations\/standing_authority_registry\.jsonl\)/, 'SA registry must be a classified (governed) path');
+    assert.match(wf, /runtime\/standing-authority\.mjs\)/, 'verifier must be a classified (governed) path');
+  }
+  // The specific SA-registry case must precede the governance/authorizations/* exemption.
+  for (const wf of [gate, issuer]) {
+    const specific = wf.indexOf('governance/authorizations/standing_authority_registry.jsonl)');
+    const exempt = wf.indexOf('governance/authorizations/*)');
+    assert.ok(specific !== -1 && exempt !== -1 && specific < exempt, 'specific SA-registry case must precede the exemption');
+  }
+});
+
+test('Tier 3 and merge-proof refuse fork-origin PRs (P2 fork safety)', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  for (const wf of [gate, proof]) {
+    assert.match(wf, /HEAD_REPO !== process\.env\.BASE_REPO/, 'fork PRs must be excluded from SA derivation/attribution');
+  }
+});
+
+test('merge-proof skips SA attribution when an explicit GMA admitted the PR (P2 precedence)', () => {
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  assert.match(proof, /admitted by explicit GMA \(tiers 1-2\)/, 'explicit-GMA merges must not consume SA budget');
+  assert.match(proof, /e\.governed_files_hash === computedHash && e\.branch === headRef/, 'must reproduce the gate registry match');
+});
+
+test('issuer derives expires_at from ttl_hours and the gate re-validates the binding (P2)', () => {
+  const issuer = readFileSync(join(root, '.github', 'workflows', 'standing-authority-issuance.yml'), 'utf8');
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  assert.match(issuer, /new Date\(issued_at\)\.getTime\(\) \+ ttl_hours \* 3600 \* 1000/, 'issuer must derive expires_at from issued_at + ttl_hours');
+  assert.match(gate, /expires_at must equal issued_at \+ ttl_hours/, 'gate must re-validate the expires_at binding');
+});
+
 test('STANDING_AUTHORITY_SPEC documents the bound model and the compressed rule', () => {
   const spec = JSON.parse(
     readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'),

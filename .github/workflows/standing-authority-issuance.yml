@@ -94,11 +94,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          EXPIRY=$(date -u -d "+${TTL_HOURS} hour" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v+"${TTL_HOURS}"H +"%Y-%m-%dT%H:%M:%SZ")
-
-          export ISSUED_AT="$NOW"
-          export EXPIRES_AT="$EXPIRY"
+          export ISSUED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           export AUTHORIZED_BY="${{ github.actor }}"
 
           node --input-type=module <<'NODE'
@@ -113,7 +109,6 @@ jobs:
           const max_merges = Number(process.env.MAX_MERGES);
           const ttl_hours = Number(process.env.TTL_HOURS);
           const issued_at = process.env.ISSUED_AT;
-          const expires_at = process.env.EXPIRES_AT;
 
           if (!Number.isInteger(max_merges) || max_merges < 1) {
             console.error('NULL — max_merges must be a positive integer');
@@ -123,6 +118,12 @@ jobs:
             console.error('NULL — ttl_hours must be a positive number');
             process.exit(1);
           }
+
+          // expires_at is DERIVED exactly from issued_at + ttl_hours so the hard TTL
+          // bound cannot be inflated independently of the hashed ttl_hours. The merge
+          // gate validates this exact relationship on every appended record.
+          const expires_at = new Date(new Date(issued_at).getTime() + ttl_hours * 3600 * 1000)
+            .toISOString().replace(/\.\d{3}Z$/, 'Z');
 
           const authority_hash = computeAuthorityHash({
             branch_pattern, mutation_classes, path_globs, max_merges, ttl_hours, issued_at,

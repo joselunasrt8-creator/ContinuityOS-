@@ -74,8 +74,27 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
+              governance/authorizations/standing_authority_registry.jsonl)
+                # GAP-005 Phase 2: the Standing Authority registry grants reusable
+                # capability (not mere evidence), so issuing/revoking an authority is a
+                # governance_mutation requiring a GMA — the owner-dispatch provenance for
+                # the authority layer. (Must precede the governance/authorizations/* exemption.)
+                echo "$file" >> governed_files.txt
+                echo "governance_mutation" >> mutation_classes.txt
+                echo "standing_authority_registry" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
+                ;;
               governance/authorizations/*)
                 # GMA artifacts: authorization evidence, not governance primitives (GAP-005)
+                ;;
+              runtime/standing-authority.mjs)
+                # GAP-005 Phase 2: the Standing Authority derivation verifier is the
+                # admission oracle loaded at merge-check time; editing it must require a
+                # GMA so it cannot be silently widened/disabled outside governance.
+                echo "$file" >> governed_files.txt
+                echo "governance_mutation" >> mutation_classes.txt
+                echo "standing_authority_verifier" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
                 ;;
               governance/merge-legitimacy/merge_proof_registry.jsonl)
                 # Append-only proof evidence surface: records merge proof events after merge.
@@ -453,6 +472,13 @@ jobs:
             if (!(new Date(rec.expires_at) > new Date(rec.issued_at))) {
               fail('appended standing authority expires_at must be after issued_at.');
             }
+            // expires_at must equal issued_at + ttl_hours exactly. authority_hash covers
+            // ttl_hours but not expires_at, so without this a record could declare a short
+            // (hashed) TTL yet set expires_at far in the future to extend the hard bound.
+            const expectedExpiry = new Date(rec.issued_at).getTime() + Number(rec.ttl_hours) * 3600 * 1000;
+            if (new Date(rec.expires_at).getTime() !== expectedExpiry) {
+              fail(`appended standing authority expires_at must equal issued_at + ttl_hours (expected ${new Date(expectedExpiry).toISOString()}).`);
+            }
             if (computeAuthorityHash) {
               const expected = computeAuthorityHash({
                 branch_pattern: b.branch_pattern,
@@ -475,6 +501,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -649,7 +677,16 @@ jobs:
           // Guarded by the base registry AND base verifier existing+non-empty, so the
           // standalone validator extraction test (issue-1984) — which has neither —
           // never attempts the import.
-          if (!matched && existsSync('sa_registry_base.jsonl') && existsSync('sa_verifier_base.mjs')) {
+          // Fork safety: head.ref is only a branch name, so a base-repo authority for
+          // claude/* would otherwise match a fork branch named claude/foo. A Standing
+          // Authority is for the repository's own automation branches, so derivation is
+          // refused for PRs originating from a different head repository (fork).
+          const isFork = process.env.HEAD_REPO && process.env.BASE_REPO
+            && process.env.HEAD_REPO !== process.env.BASE_REPO;
+          if (!matched && isFork) {
+            console.error(`Standing-authority derivation declined: fork PR (head repo ${process.env.HEAD_REPO} != ${process.env.BASE_REPO}) — explicit GMA required.`);
+          }
+          if (!matched && !isFork && existsSync('sa_registry_base.jsonl') && existsSync('sa_verifier_base.mjs')) {
             const saRegistryText = readFileSync('sa_registry_base.jsonl', 'utf8');
             const verifierText = readFileSync('sa_verifier_base.mjs', 'utf8');
             if (saRegistryText.trim() && verifierText.trim()) {
@@ -658,14 +695,19 @@ jobs:
                 ? readFileSync('proof_registry_base.jsonl', 'utf8') : '';
               // Path containment applies only to files whose mutation requires GMA
               // authorization (governance_mutation / workflow_mutation). proof_persistence
-              // (merge_proof_registry.jsonl) and other classes (runtime/schema/migration/
-              // deployment_config) are not GMA-gated, so excluding them avoids a false
-              // MERGE_LEGITIMACY_NULL when an in-scope PR also touches such a file.
-              const authFiles = governedFiles.filter(f =>
+              // (merge_proof_registry.jsonl) and non-gated classes (src/schema/migration/
+              // deployment_config) are excluded so an in-scope PR that also touches such a
+              // file is not falsely declined. The Standing Authority registry and verifier
+              // are themselves governance_mutation paths, so they ARE included — a routine
+              // SA cannot cover them, forcing an explicit GMA for those higher-privilege edits.
+              const isAuthGated = (f) =>
                 f.startsWith('.github/workflows/')
+                || f === 'governance/authorizations/standing_authority_registry.jsonl'
+                || f === 'runtime/standing-authority.mjs'
                 || (f.startsWith('governance/')
                     && !f.startsWith('governance/authorizations/')
-                    && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl'));
+                    && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl');
+              const authFiles = governedFiles.filter(isAuthGated);
               const sel = selectStandingAuthority({
                 registryText: saRegistryText,
                 headRef,

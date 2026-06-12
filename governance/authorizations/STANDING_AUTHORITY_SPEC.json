@@ -16,8 +16,18 @@
     "requires_owner_dispatch": true,
     "creation_workflow": ".github/workflows/standing-authority-issuance.yml",
     "authority_before_execution": "Owner workflow_dispatch is the preexisting authority (per governance/recursive/RECURSIVE_GOVERNANCE_CONTAINMENT_MODEL.json). Implicit authority is forbidden.",
-    "no_gma_required_to_issue": "The SA registry lives under governance/authorizations/**, which is exempt from governed-file classification (authorization evidence != governance primitive). Issuing a SA therefore needs no GMA and introduces no bootstrap circularity.",
+    "no_gma_required_to_issue": "Superseded (GAP-005 Phase 2, gate-both). The Standing Authority registry and the derivation verifier ARE governed: see trust_surface_gating.",
     "default_scope_guidance": "V1 issues narrow by default — one mutation class / one surface (e.g. claude/* x workflow_mutation x .github/workflows/** x 24h x <=2 merges). Reusable authority should start narrow and widen only after the path is exercised."
+  },
+  "trust_surface_gating": {
+    "decision": "GATE_BOTH",
+    "rationale": "The surfaces the merge gate trusts must themselves require governance authorization, otherwise a no-GMA PR could swap the admission oracle or forge/revoke an authority. Both are classified as governance_mutation (GMA-required) in the issuer AND merge-governance-check classifiers (kept byte-aligned so governed_files_hash matches):",
+    "governed_paths": [
+      "runtime/standing-authority.mjs — the derivation verifier (admission oracle). Editing it requires a GMA so it cannot be silently widened or disabled.",
+      "governance/authorizations/standing_authority_registry.jsonl — issuing OR revoking a Standing Authority requires a GMA, giving the authority layer owner-dispatch provenance. This intentionally overrides the governance/authorizations/** evidence exemption for this one file."
+    ],
+    "consequence": "Issuing or revoking a Standing Authority is now itself a governed mutation requiring a manual GMA (the rare governance act). The per-PR DERIVATIONS under an authority remain automatic — that is the throughput win. A routine Standing Authority cannot cover these two paths in its path_globs, so edits to the verifier or registry always fall through to an explicit GMA.",
+    "fork_safety": "head.ref is only a branch name, so a base-repo authority for claude/* would otherwise match a fork branch claude/foo. Tier 3 derivation (and merge-proof attribution) is refused when github.event.pull_request.head.repo.full_name != github.repository — forks must use an explicit GMA."
   },
   "store": "governance/authorizations/standing_authority_registry.jsonl",
   "format": "JSON Lines — append-only. One immutable standing_authority record per line; revocations are appended as standing_authority_revocation records (no deletion or mutation of prior lines).",
@@ -98,6 +108,8 @@
     "appended_record_validation": "When a PR modifies standing_authority_registry.jsonl, every newly appended record is validated for shape and internal consistency (required fields present, source_authority === OWNER_WORKFLOW_DISPATCH, status === STANDING_AUTHORITY_VALID, well-formed bounds, expires_at after issued_at, and authority_hash recomputed from the bounds via the BASE verifier). A malformed or internally inconsistent record fails the merge as MERGE_LEGITIMACY_NULL. This raises the bar against forged authorities, but is NOT cryptographic issuance provenance: signing is post-V1, so a reviewer must still vet that an appended authority was legitimately issued by the owner-dispatch workflow.",
     "path_containment_scope": "Standing Authority path_globs containment is applied ONLY to files whose mutation requires GMA authorization (governance_mutation / workflow_mutation). proof_persistence (merge_proof_registry.jsonl) and non-gated classes (runtime/schema/migration/deployment_config) are excluded, so an in-scope PR that also touches such a file is not falsely declined.",
     "budget_attribution": "merge-proof.yml stamps the authority by reproducing the gate's selection exactly: it reads the SA registry, proof ledger and verifier from the same BASE_SHA, applies the REAL proof ledger so a budget-exhausted authority is skipped just as the gate skipped it, and evaluates TTL at the merge timestamp (merged_at) — not proof-generation time — so an authority that authorized a merge but expires shortly after still records its budget consumption. Budget is counted only from well-formed proof_entry records with a unique proof_id (forged or duplicate ledger lines do not consume budget).",
+    "attribution_tier_precedence": "Before attributing to a Standing Authority, merge-proof reproduces the gate's tier order: it recomputes governed_files_hash and checks for a matching explicit GMA (registry branch+hash, or singleton hash). If an explicit GMA admitted the PR, no Standing Authority budget is consumed — manual-GMA merges on a covered branch never drain SA budget or misattribute proofs.",
+    "expires_at_binding": "expires_at is DERIVED by the issuer as exactly issued_at + ttl_hours, and the appended-record validation re-checks this equality. authority_hash covers ttl_hours; binding expires_at to it prevents a hand-appended record from declaring a short (hashed) TTL while setting expires_at far in the future to extend the hard bound.",
     "failure_result": "MERGE_LEGITIMACY_NULL"
   },
   "bound_model": {

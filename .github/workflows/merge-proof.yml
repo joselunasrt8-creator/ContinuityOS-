@@ -324,6 +324,8 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MERGED_AT: ${{ github.event.pull_request.merged_at }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -361,37 +363,87 @@ jobs:
           fi
 
           node --input-type=module <<'NODE'
-          import { readFileSync, appendFileSync } from 'node:fs';
+          import { readFileSync, existsSync, appendFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
           const { selectStandingAuthority } = await import('./sa_verifier_base.mjs');
 
-          // Classify governed files using the same rules as merge-governance-check.
-          // Only governance_mutation / workflow_mutation files are GMA-gated and subject
-          // to Standing Authority path containment; proof_persistence and other classes
-          // are excluded so a mixed PR is not falsely declined.
+          const headRef = process.env.HEAD_REF;
+          const isFork = process.env.HEAD_REPO && process.env.BASE_REPO
+            && process.env.HEAD_REPO !== process.env.BASE_REPO;
+
+          // Full governed-file classification — must match merge-governance-check exactly.
+          // Used both to recompute governed_files_hash (to detect an explicit GMA) and to
+          // derive the GMA-gated subset for Standing Authority path containment.
           const changed = readFileSync('changed_files_proof.txt', 'utf8').split('\n').filter(Boolean);
           const governedFiles = [];
           const detectedClasses = [];
           for (const f of changed) {
-            if (f.startsWith('governance/authorizations/')) continue;
-            if (f === 'governance/merge-legitimacy/merge_proof_registry.jsonl') continue;
-            if (f.startsWith('governance/')) { governedFiles.push(f); detectedClasses.push('governance_mutation'); }
-            else if (f.startsWith('.github/workflows/')) { governedFiles.push(f); detectedClasses.push('workflow_mutation'); }
+            let cls = null;
+            if (f === 'governance/authorizations/standing_authority_registry.jsonl') cls = 'governance_mutation';
+            else if (f.startsWith('governance/authorizations/')) continue;
+            else if (f === 'runtime/standing-authority.mjs') cls = 'governance_mutation';
+            else if (f === 'governance/merge-legitimacy/merge_proof_registry.jsonl') cls = 'proof_persistence';
+            else if (f.startsWith('governance/')) cls = 'governance_mutation';
+            else if (f.startsWith('.github/workflows/')) cls = 'workflow_mutation';
+            else if (f.startsWith('src/')) cls = 'runtime_mutation';
+            else if (f === 'schema.sql') cls = 'schema_mutation';
+            else if (f.startsWith('migrations/')) cls = 'migration_mutation';
+            else if (f === 'wrangler.toml') cls = 'deployment_config_mutation';
+            else continue;
+            governedFiles.push(f);
+            detectedClasses.push(cls);
+          }
+          const govClasses = detectedClasses.filter((c) => c === 'governance_mutation' || c === 'workflow_mutation');
+
+          // Recompute governed_files_hash exactly as the gate (sorted path:sha256(content)).
+          const parts = [...governedFiles].sort().map((f) => {
+            let content; try { content = readFileSync(f); } catch (_) { content = Buffer.from('DELETED'); }
+            return `${f}:${createHash('sha256').update(content).digest('hex')}`;
+          });
+          const computedHash = createHash('sha256').update(parts.join('\n')).digest('hex');
+
+          // Reproduce the gate's tier precedence: an explicit GMA (registry branch+hash, or
+          // singleton hash) admits before Tier 3, so a manual-GMA merge must NOT consume
+          // Standing Authority budget. Read the explicit-GMA surfaces from the merged tree.
+          const now = new Date();
+          let explicitGma = false;
+          const GMA_REGISTRY = 'governance/authorizations/gma_registry.jsonl';
+          if (existsSync(GMA_REGISTRY)) {
+            explicitGma = readFileSync(GMA_REGISTRY, 'utf8').split('\n').filter(Boolean)
+              .map((l) => { try { return JSON.parse(l); } catch (_) { return null; } })
+              .some((e) => e && e.governed_files_hash === computedHash && e.branch === headRef
+                && e.status === 'GMA_VALID' && new Date(e.expires_at) > now);
+          }
+          const SINGLETON = 'governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json';
+          if (!explicitGma && existsSync(SINGLETON)) {
+            try {
+              const g = JSON.parse(readFileSync(SINGLETON, 'utf8'));
+              if (g.governed_files_hash === computedHash) explicitGma = true;
+            } catch (_) { /* malformed singleton ignored */ }
           }
 
-          // A PR with no governance/workflow mutation never used a SA — attributing it
-          // would vacuously satisfy all bounds and wrongly drain budget. Skip attribution.
-          const govClasses = detectedClasses.filter((c) => c === 'governance_mutation' || c === 'workflow_mutation');
+          const isAuthGated = (f) =>
+            f.startsWith('.github/workflows/')
+            || f === 'governance/authorizations/standing_authority_registry.jsonl'
+            || f === 'runtime/standing-authority.mjs'
+            || (f.startsWith('governance/')
+                && !f.startsWith('governance/authorizations/')
+                && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl');
           const mergedAt = process.env.MERGED_AT ? new Date(process.env.MERGED_AT) : new Date();
-          const sel = govClasses.length === 0
-            ? { authorized: false, reason: 'no governance/workflow mutation — GMA not required' }
-            : selectStandingAuthority({
-                registryText: readFileSync('sa_registry_base.jsonl', 'utf8'),
-                headRef: process.env.HEAD_REF,
-                governedFiles,
-                detectedClasses,
-                now: mergedAt, // evaluate TTL at merge time, not proof-generation time
-                proofRegistryText: readFileSync('proof_registry_base.jsonl', 'utf8'), // real ledger reproduces the gate's budgeted choice
-              });
+
+          let sel;
+          if (govClasses.length === 0) sel = { authorized: false, reason: 'no governance/workflow mutation — GMA not required' };
+          else if (explicitGma) sel = { authorized: false, reason: 'admitted by explicit GMA (tiers 1-2) — no Standing Authority consumed' };
+          else if (isFork) sel = { authorized: false, reason: 'fork PR — Standing Authority derivation not applicable' };
+          else sel = selectStandingAuthority({
+            registryText: readFileSync('sa_registry_base.jsonl', 'utf8'),
+            headRef,
+            governedFiles: governedFiles.filter(isAuthGated),
+            detectedClasses,
+            now: mergedAt, // evaluate TTL at merge time, not proof-generation time
+            proofRegistryText: readFileSync('proof_registry_base.jsonl', 'utf8'), // real ledger reproduces the gate's budgeted choice
+          });
+
           const id = sel.authorized ? sel.authority.authority_id : '';
           appendFileSync(process.env.GITHUB_ENV, `STANDING_AUTHORITY_ID=${id}\n`);
           console.log(id ? `Attributed to standing authority: ${id}` : `No standing authority attribution (${sel.reason || 'n/a'})`);
