@@ -93,7 +93,11 @@ test('authorized authority mutation request succeeds with active session', async
   const response = await worker.fetch(new Request('https://runtime.test/authority', {
     method: 'POST',
     headers: { 'X-API-Key': 'test-key', 'content-type': 'application/json' },
-    body: JSON.stringify({ session_id: 'session-1', continuity_id: 'continuity-1', decision_id: 'decision-1', owner: 'tester' })
+    // /authority now requires a governed_tool_envelope_id (else it fails closed with
+    // governed_tool_envelope_missing before the continuity check) and topology-epoch
+    // admission fields. Supplying them lets the request reach the original assertion:
+    // either the ACTIVE success path or the invalid_continuity fail-closed branch.
+    body: JSON.stringify({ session_id: 'session-1', continuity_id: 'continuity-1', decision_id: 'decision-1', owner: 'tester', governed_tool_envelope_id: 'gte-enf-1', topology_epoch: 0, epoch_lineage_parent: 'epoch-root', epoch_nonce: 'epoch-nonce-enf-1', topology_visibility_state: 'VISIBLE' })
   }), env)
   const payload = await response.json()
 

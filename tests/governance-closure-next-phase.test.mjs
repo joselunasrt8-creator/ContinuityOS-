@@ -67,7 +67,12 @@ test('branch protection required checks resolve to emitted GitHub Actions job ch
 
   assert.deepEqual(
     requiredChecks,
-    ['merge-governance-check', 'generate-preo-candidate', 'generate-sco-candidate'],
+    [
+      'merge-governance-check',
+      'generate-preo-candidate',
+      'generate-sco-candidate',
+      'constitutional-integrity',
+    ],
     'branch protection must require emitted job names, not workflow-only names',
   );
 
@@ -136,10 +141,21 @@ test('protection-critical emitted checks are represented canonically with no sta
   const requiredChecks = branchProtection.required_controls.required_status_checks;
   const mergeRequiredChecks = mergeRules.required_checks;
 
+  const requiredCheckSet = new Set(requiredChecks);
+  const mergeOnlyChecks = mergeRequiredChecks.filter((name) => !requiredCheckSet.has(name));
   assert.deepEqual(
-    [...requiredChecks].sort(),
-    [...mergeRequiredChecks].sort(),
-    'branch protection and merge governance required checks must remain identical',
+    mergeOnlyChecks,
+    [],
+    'every merge governance required check must also be a branch protection required check',
+  );
+
+  const branchProtectionOnlyChecks = requiredChecks.filter(
+    (name) => !mergeRequiredChecks.includes(name),
+  );
+  assert.deepEqual(
+    [...branchProtectionOnlyChecks].sort(),
+    ['constitutional-integrity'],
+    'branch protection requires constitutional-integrity in addition to the merge governance required checks',
   );
 
   const canonicalChecks = branchProtection.emitted_check_inventory.map((entry) => entry.required_check);
@@ -163,7 +179,7 @@ test('PREO, PR template, and branch protection artifacts align on merge legitima
 
   assert.match(prTemplate, /`npm test`/, 'PR template must require test evidence before merge');
   assert.match(prTemplate, /`npx tsc --noEmit`/, 'PR template must require static verification evidence before merge');
-  assert.equal(branchProtection.status, 'policy_only_non_enforcing');
+  assert.equal(branchProtection.status, 'enforcement_activation_recorded');
 });
 
 test('governed deploy and constitutional workflows are emitted and non-authoritative for branch protection', () => {

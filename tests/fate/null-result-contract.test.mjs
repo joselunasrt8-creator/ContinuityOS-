@@ -170,6 +170,11 @@ test('null_result_preserves_drift_classification: RECONCILED legitimacy is LEGIT
     execution_registry: [],
     proof_registry: [],
     invocation_registry: [],
+    preo_registry: [],
+    runtime_topology_registry: [],
+    recursive_governance_containment_registry: [],
+    root_authority_observability_registry: [],
+    unauthorized_mutation_closure_registry: [],
   })
   assert.equal(clean.legitimacy_status, 'LEGITIMATE', 'empty registry must produce LEGITIMATE legitimacy')
   assert.deepEqual(clean.drift_classes, [], 'LEGITIMATE result must have no drift classes')
@@ -200,7 +205,7 @@ test('valid_result_contract_remains_compatible: validator valid result has no re
 
 test('valid_result_contract_remains_compatible: execute canonical success path remains intact', () => {
   assert.match(source, /return json\(\{ status:"EXECUTED", session_id, execution_id \}\)/, 'execute success path must be unchanged')
-  assert.match(source, /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, classification_evidence:/, 'validate success path must include classification_evidence')
+  assert.match(source, /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, \.\.\.\(validateGovernLineage \|\| \{\}\), policy_class:[\s\S]*classification_evidence: \{/, 'validate success path must include classification_evidence')
 })
 
 // ── Telemetry semantic consistency ──────────────────────────────────────────

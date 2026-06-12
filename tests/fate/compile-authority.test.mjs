@@ -44,10 +44,38 @@ const TEST_SNAPSHOT = {
   workflow_identity: 'governed-deploy.yml', replay_epoch: '2026'
 }
 
-async function seedAuthority(post, decision_id) {
+// Topology-epoch admission now precedes the authority/compile checks these tests
+// exercise. With an empty epoch_registry, topology_epoch=0 with a lineage parent, a
+// (unique) nonce and VISIBLE topology is admitted as the genesis epoch. /authority and
+// /compile do not reserve the epoch_nonce, so a fresh nonce per call keeps each request
+// past admission and at the original authority assertion.
+let epochNonceCounter = 0
+function epochFields() {
+  epochNonceCounter += 1
+  return {
+    topology_epoch: 0,
+    epoch_lineage_parent: 'epoch-root',
+    epoch_nonce: `epoch-nonce-${epochNonceCounter}`,
+    topology_visibility_state: 'VISIBLE'
+  }
+}
+
+// /authority now persists a governed_tool_envelope_id and /compile's
+// verifyGovernedToolEnvelopeLinkage requires that the referenced governed_tool_envelope
+// exists and is operative (non_operative='false'). We seed one operative envelope per
+// decision and bind it on the authority so the lifecycle proceeds to the original
+// ACTIVE/expired/status authority assertions instead of failing closed on the envelope.
+function seedEnvelope(dbPath, decision_id) {
+  const envelope_id = `gte-${decision_id}`
+  runSqlite([dbPath, `INSERT INTO governed_tool_envelope_registry (envelope_id, candidate_hash, nonce_binding, policy_digest, topology_digest, lineage_pointers, timestamp, non_operative, tool_surface_descriptor, created_at) VALUES ('${envelope_id}', 'candidate-${decision_id}', 'nonce-binding-${decision_id}', 'policy-${decision_id}', 'topology-${decision_id}', '[]', '2026-01-01T00:00:00.000Z', 'false', '{}', '2026-01-01T00:00:00.000Z')`])
+  return envelope_id
+}
+
+async function seedAuthority(post, decision_id, dbPath) {
+  const envelope_id = seedEnvelope(dbPath, decision_id)
   const session = await post('/session', { identity_id: `identity-${decision_id}` })
   const continuity = await post('/continuity', { session_id: session.session_id, authority_chain: [decision_id] })
-  await post('/authority', { continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'test', intent: 'deploy_production', scope: { repo: 'example/repo', branch: 'main' }, constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' } })
+  await post('/authority', { continuity_id: continuity.continuity_id, session_id: session.session_id, decision_id, owner: 'test', intent: 'deploy_production', scope: { repo: 'example/repo', branch: 'main' }, constraints: { repo: 'example/repo', branch: 'main', workflow: 'governed-deploy.yml' }, governed_tool_envelope_id: envelope_id, ...epochFields() })
 }
 
 test('compile enforces ACTIVE unexpired authority fail-closed', async () => {
@@ -57,9 +85,14 @@ test('compile enforces ACTIVE unexpired authority fail-closed', async () => {
     applyMigrationChain(dbPath)
     const { post } = await buildRuntime(dbPath)
 
-    const missing = await post('/compile', { decision_id: 'missing-authority', ...TEST_SNAPSHOT })
+    // No authority exists for this decision. /compile now derives the governed_tool_envelope
+    // FROM the authority row (verifyGovernedToolEnvelopeLinkage runs before the authority-missing
+    // check), so with no authority there is no envelope and the runtime fails closed one layer
+    // earlier with governed_tool_envelope_missing. The intent — /compile fails closed (NULL) when
+    // no authority backs the decision — is preserved; only the earliest fail-closed reason moved.
+    const missing = await post('/compile', { decision_id: 'missing-authority', ...TEST_SNAPSHOT, ...epochFields() })
     assert.equal(missing.status, 'NULL')
-    assert.equal(missing.reason, 'authority_missing')
+    assert.equal(missing.reason, 'governed_tool_envelope_missing')
 
     const cases = [
       { status: 'REVOKED', reason: 'authority_revoked' },
@@ -70,26 +103,28 @@ test('compile enforces ACTIVE unexpired authority fail-closed', async () => {
 
     for (const c of cases) {
       const decision = `decision-${c.status || 'ambiguous'}`
-      await seedAuthority(post, decision)
+      await seedAuthority(post, decision, dbPath)
+      // Forcing the authority status must not clear the governed_tool_envelope binding, so the
+      // request still passes the envelope linkage and reaches the authority-status assertion.
       runSqlite([dbPath, `UPDATE authority_registry SET status='${c.status}' WHERE decision_id='${decision}'`])
-      const compiled = await post('/compile', { decision_id: decision, ...TEST_SNAPSHOT })
+      const compiled = await post('/compile', { decision_id: decision, ...TEST_SNAPSHOT, ...epochFields() })
       assert.equal(compiled.status, 'NULL')
       assert.equal(compiled.reason, c.reason)
       assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${decision}'`]).trim(), '0')
     }
 
     const expiredDecision = 'decision-expired'
-    await seedAuthority(post, expiredDecision)
+    await seedAuthority(post, expiredDecision, dbPath)
     runSqlite([dbPath, `UPDATE authority_registry SET expiry='2000-01-01T00:00:00.000Z' WHERE decision_id='${expiredDecision}'`])
-    const expired = await post('/compile', { decision_id: expiredDecision, ...TEST_SNAPSHOT })
+    const expired = await post('/compile', { decision_id: expiredDecision, ...TEST_SNAPSHOT, ...epochFields() })
     assert.equal(expired.status, 'NULL')
     assert.equal(expired.reason, 'authority_expired')
     assert.equal(runSqlite([dbPath, `SELECT COUNT(*) FROM aeo_registry WHERE decision_id='${expiredDecision}'`]).trim(), '0')
 
     const activeDecision = 'decision-active'
-    await seedAuthority(post, activeDecision)
-    const first = await post('/compile', { decision_id: activeDecision, ...TEST_SNAPSHOT })
-    const second = await post('/compile', { decision_id: activeDecision, ...TEST_SNAPSHOT })
+    await seedAuthority(post, activeDecision, dbPath)
+    const first = await post('/compile', { decision_id: activeDecision, ...TEST_SNAPSHOT, ...epochFields() })
+    const second = await post('/compile', { decision_id: activeDecision, ...TEST_SNAPSHOT, ...epochFields() })
     assert.equal(first.status, 'COMPILED')
     assert.equal(second.status, 'COMPILED')
     assert.equal(first.validated_object_hash, second.validated_object_hash)
