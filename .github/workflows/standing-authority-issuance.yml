@@ -16,8 +16,15 @@ name: standing-authority-issuance
 # Bound model: TTL = hard bound; max_merges = async proof-ledger budget.
 # V1 issues NARROW by default (one mutation class / one surface). Widen later.
 #
-# No GMA is required to issue a SA: governance/authorizations/** is exempt from
-# governed-file classification (authorization evidence != governance primitive).
+# TWO-STEP ISSUANCE (GAP-005 Phase 2, gate-both): standing_authority_registry.jsonl
+# is now a governed trust surface (governance_mutation), so the issuance PR ITSELF
+# requires a GMA and cannot self-derive (trust surfaces are hard-denied from Tier 3).
+# To land a Standing Authority on a protected branch:
+#   1. Run THIS workflow on a branch  -> appends the SA to standing_authority_registry.jsonl
+#   2. Run governance-mutation-authorization.yml on the SAME branch
+#                                      -> emits a GMA covering the SA-registry change
+#   3. Open the PR and merge           -> Tier 1 (explicit GMA) authorizes the issuance
+# Both steps are owner workflow_dispatch, so issuance retains owner provenance.
 
 on:
   workflow_dispatch:

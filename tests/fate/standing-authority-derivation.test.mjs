@@ -398,6 +398,30 @@ test('merge-proof evaluates explicit-GMA expiry at merge time, not proof-gen tim
   assert.match(proof, /new Date\(e\.expires_at\) > mergedAt/, 'explicit-GMA expiry must be compared against mergedAt');
 });
 
+test('append-only guard covers the proof budget ledger (P2)', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  // All three append-only surfaces must be in the guard loop.
+  const loop = gate.slice(gate.indexOf('for REGISTRY in'), gate.indexOf('do', gate.indexOf('for REGISTRY in')));
+  assert.match(loop, /gma_registry\.jsonl/);
+  assert.match(loop, /standing_authority_registry\.jsonl/);
+  assert.match(loop, /merge_proof_registry\.jsonl/, 'the SA budget ledger must be append-only protected');
+});
+
+test('authority_id is validated as a single-line safe token in gate and merge-proof (P2)', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  assert.match(gate, /not a single-line safe token/, 'gate must reject unsafe authority_id at admission');
+  assert.match(proof, /not a single-line safe token/, 'merge-proof must guard authority_id before the $GITHUB_ENV write');
+});
+
+test('two-step issuance flow (issue SA, then GMA) is documented', () => {
+  const issuer = readFileSync(join(root, '.github', 'workflows', 'standing-authority-issuance.yml'), 'utf8');
+  assert.match(issuer, /TWO-STEP ISSUANCE/, 'issuance workflow must document the two-step flow');
+  assert.match(issuer, /governance-mutation-authorization\.yml on the SAME branch/, 'must instruct to emit a GMA for the SA-registry change');
+  const spec = JSON.parse(readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'));
+  assert.ok(spec.trust_surface_gating.issuance_flow, 'spec must document the issuance flow');
+});
+
 test('STANDING_AUTHORITY_SPEC documents the bound model and the compressed rule', () => {
   const spec = JSON.parse(
     readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'),

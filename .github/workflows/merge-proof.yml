@@ -454,7 +454,15 @@ jobs:
             proofRegistryText: readFileSync('proof_registry_base.jsonl', 'utf8'), // real ledger reproduces the gate's budgeted choice
           });
 
-          const id = sel.authorized ? sel.authority.authority_id : '';
+          let id = sel.authorized ? sel.authority.authority_id : '';
+          // Defense in depth: authority_id is written into $GITHUB_ENV, so a newline (or other
+          // unsafe char) could inject environment variables for the proof-generation steps.
+          // The gate's appended-record validation already enforces this on admission; re-check
+          // here before writing, and drop the attribution rather than write an unsafe token.
+          if (id && !/^[A-Za-z0-9._\/-]+$/.test(id)) {
+            console.error(`Refusing to attribute: authority_id is not a single-line safe token: ${JSON.stringify(id)}`);
+            id = '';
+          }
           appendFileSync(process.env.GITHUB_ENV, `STANDING_AUTHORITY_ID=${id}\n`);
           console.log(id ? `Attributed to standing authority: ${id}` : `No standing authority attribution (${sel.reason || 'n/a'})`);
           NODE

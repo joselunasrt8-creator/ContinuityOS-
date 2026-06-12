@@ -340,14 +340,18 @@ jobs:
           # Append-only authorization lineage guard.
           #   Issue #1984:     gma_registry.jsonl (per-PR GMA lineage)
           #   GAP-005 Phase 2: standing_authority_registry.jsonl (policy-bound authority lineage)
-          # governance/authorizations/** is exempt from governed-file detection, so
-          # this dedicated guard ensures existing registry entries can never be
-          # modified or removed — the base-branch version must be a byte-exact
-          # PREFIX of the head version (new entries only ever appended at the end).
-          # Without this, registry history could be rewritten to preserve a green merge.
+          #   GAP-005 Phase 2: merge_proof_registry.jsonl (the Standing Authority budget
+          #                    ledger — counted by Tier 3, so it must not be rewritten to
+          #                    remove proof_entry lines and reopen consumed max_merges).
+          # These surfaces are exempt from governed-file detection, so this dedicated guard
+          # ensures existing entries can never be modified or removed — the base-branch
+          # version must be a byte-exact PREFIX of the head version (new entries only ever
+          # appended at the end). Without this, history could be rewritten to preserve a
+          # green merge or to free budget.
           for REGISTRY in \
             governance/authorizations/gma_registry.jsonl \
-            governance/authorizations/standing_authority_registry.jsonl
+            governance/authorizations/standing_authority_registry.jsonl \
+            governance/merge-legitimacy/merge_proof_registry.jsonl
           do
             if ! grep -qxF "$REGISTRY" changed_files.txt 2>/dev/null; then
               echo "$REGISTRY not modified by this PR — append-only check not applicable."
@@ -431,6 +435,11 @@ jobs:
             process.exit(1);
           };
 
+          // authority_id is later written into $GITHUB_ENV by merge-proof (STANDING_AUTHORITY_ID=<id>),
+          // so it must be a single-line safe token — a newline could inject extra environment
+          // variables. Constrain it to the characters the issuer produces (SA-<branch>-<run_id>).
+          const SAFE_ID = /^[A-Za-z0-9._\/-]+$/;
+
           const REQUIRED = ['authority_id', 'authority_hash', 'intent', 'issued_by',
             'source_authority', 'bounds', 'ttl_hours', 'issued_at', 'expires_at',
             'authority_lineage_bound', 'status'];
@@ -443,6 +452,7 @@ jobs:
               for (const f of ['authority_id', 'revoked_by', 'revoked_at']) {
                 if (!rec[f]) fail(`revocation record missing required field: ${f}`);
               }
+              if (!SAFE_ID.test(rec.authority_id)) fail(`revocation authority_id is not a single-line safe token: ${JSON.stringify(rec.authority_id)}`);
               continue;
             }
             if (rec._record_type !== 'standing_authority') {
@@ -452,6 +462,9 @@ jobs:
               if (rec[f] === undefined || rec[f] === null || rec[f] === '') {
                 fail(`appended standing authority missing required field: ${f}`);
               }
+            }
+            if (typeof rec.authority_id !== 'string' || !SAFE_ID.test(rec.authority_id)) {
+              fail(`standing authority authority_id is not a single-line safe token: ${JSON.stringify(rec.authority_id)}`);
             }
             if (rec.source_authority !== 'OWNER_WORKFLOW_DISPATCH') {
               fail(`standing authority source_authority must be OWNER_WORKFLOW_DISPATCH, got: ${rec.source_authority}`);
