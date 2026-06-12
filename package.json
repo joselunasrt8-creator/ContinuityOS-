@@ -32,7 +32,7 @@
   "devDependencies": {
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "wrangler": "^4.93.1"
