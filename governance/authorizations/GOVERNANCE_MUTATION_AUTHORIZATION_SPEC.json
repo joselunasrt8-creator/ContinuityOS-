@@ -32,7 +32,14 @@
   ],
   "exemption_rationale": "Two classes of paths are exempt from governance_mutation classification: (1) GMA artifacts at governance/authorizations/ are authorization evidence, not governance primitives — self-referentially exempt to break bootstrap circularity. (2) merge_proof_registry.jsonl is an append-only proof evidence surface that records merge events after the fact; it does not define governance rules, authority, policy, or validation logic. Evidence persistence != governance self-mutation.",
   "failure_result": "NULL",
-  "enforcement_rule": "governance_mutation or workflow_mutation detected AND no GMA entry in governance/authorizations/gma_registry.jsonl (or, as a transitional fallback, governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json) matching this PR's governed diff -> MERGE_LEGITIMACY_NULL",
+  "enforcement_rule": "governance_mutation or workflow_mutation detected AND no GMA entry in governance/authorizations/gma_registry.jsonl (or, as a transitional fallback, governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json) matching this PR's governed diff AND no valid Standing Authority covering the governed diff (GAP-005 Phase 2 derivation) -> MERGE_LEGITIMACY_NULL",
+  "admission_tiers": {
+    "issue_reference": "GAP-005 Phase 2",
+    "note": "merge-governance-check evaluates authorization in tiers. Tiers 1-2 are explicit per-PR GMAs (one mutation each). Tier 3 derives a scoped authorization from a bounded, owner-issued Standing Authority (a CLASS of mutations) — see governance/authorizations/STANDING_AUTHORITY_SPEC.json. Compressed rule: manual GMA governs one mutation; Standing Authority governs a bounded class of mutations; both must end in proof.",
+    "tier_1": "Explicit per-PR GMA in gma_registry.jsonl, keyed by (branch, governed_files_hash).",
+    "tier_2": "Legacy singleton GOVERNANCE_MUTATION_AUTHORIZATION.json, keyed by governed_files_hash (transitional fallback).",
+    "tier_3": "Standing Authority derivation via runtime/standing-authority.mjs#selectStandingAuthority against governance/authorizations/standing_authority_registry.jsonl, bounded by branch_pattern + mutation_classes + path_globs + TTL (hard) + max_merges (async proof-ledger budget). Each derived merge stamps standing_authority_id into its merge proof."
+  },
   "creation_workflow": ".github/workflows/governance-mutation-authorization.yml",
   "registry_model": {
     "issue_reference": "#1984",
