@@ -33,8 +33,10 @@ See `demo/portability/README.md` for details and
 
 A second installable wedge: a packaged GitHub Action that checks a pull
 request's identity object (`repo`, `pr_number`, `head_sha`, `base_sha`,
-`actor`), hashes it, and returns `VALID` or `NULL` (fail-closed) with a
-proof artifact — designed to be added as a required status check.
+`actor`) plus optional explicit author policy (`author-kind`,
+`require-agent-authored`), hashes it, and returns `VALID` or `NULL`
+(fail-closed) with a proof artifact — designed to be added as a required
+status check.
 
 ```yaml
 - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0
@@ -51,7 +53,8 @@ exploration but is not recommended once a consumer treats the result as
 load-bearing (a required status check).
 
 See `actions/continuity-merge-guard/README.md` for the full wedge
-explanation, proof schema, and v2 roadmap.
+explanation, proof schema, and the `require-agent-authored: 'true'` workflow
+that makes an agent-authored PR lane depend on a protected-branch check.
 
 ### Live external consumer
 

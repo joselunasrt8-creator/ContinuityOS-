@@ -269,7 +269,7 @@ test('mutation classification matrix is structurally sound and replay-safe', () 
   assert.equal(matrix.evidence_only, true)
   assert.equal(matrix.non_authoritative, true)
 
-  const validClassifications = ['AUTHORITATIVE', 'EVIDENCE_ONLY', 'NON_EXECUTABLE']
+  const validClassifications = ['AUTHORITATIVE', 'EVIDENCE_ONLY', 'NON_EXECUTABLE', 'governed_support_surface']
   const requiredFields = ['surface_id', 'classification', 'creates_authority', 'execution_capable', 'governance_bound', 'replay_safe']
 
   for (const surface of matrix.declared_surfaces) {

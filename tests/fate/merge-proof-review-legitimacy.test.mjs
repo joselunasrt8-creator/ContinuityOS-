@@ -9,7 +9,7 @@ test('merge proof resolves PR comparison commits before review legitimacy diff',
   const headFetch = workflow.indexOf('git fetch --no-tags --depth=1 origin "$HEAD_SHA"')
   const baseVerify = workflow.indexOf('git cat-file -e "$BASE_SHA^{commit}"')
   const headVerify = workflow.indexOf('git cat-file -e "$HEAD_SHA^{commit}"')
-  const diagnostic = workflow.indexOf('Unable to resolve PR comparison commits for review legitimacy check')
+  const diagnostic = workflow.indexOf('Unable to resolve commit object required for merge proof generation')
   const diff = workflow.indexOf('git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed_files_proof.txt')
   const classify = workflow.indexOf('RISK_CLASS="$(bash scripts/classify-risk.sh changed_files_proof.txt)"')
 

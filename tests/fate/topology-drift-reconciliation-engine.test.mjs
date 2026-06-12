@@ -110,7 +110,7 @@ test('append-only reconciliation evidence registry is persisted without mutation
 test('drift propagation uses regenerated topology evidence instead of stale append-only ordering', () => {
   const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /ORDER BY reconciliation_hash ASC LIMIT 1/)
-  assert.match(source, /latestTopologyReconciliationEvidence[\s\S]*buildRuntimeTopologyReconciliationEnvelope\(new Date\(0\)\.toISOString\(\)\)/)
+  assert.match(source, /latestTopologyReconciliationEvidence[\s\S]*buildRuntimeTopologyReconciliationEnvelope\(new Date\(0\)\.toISOString\(\), TOPOLOGY_CTX\)/)
   assert.match(source, /regenerated_topology_reconciliation_dominates_stale_registry_evidence/)
 })
 

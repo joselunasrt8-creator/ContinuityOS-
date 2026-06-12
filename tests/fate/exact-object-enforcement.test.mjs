@@ -154,7 +154,7 @@ test('validate_preserves_compiled_hash_path', () => {
 
   assert.match(
     source,
-    /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce \}\)/,
+    /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, \.\.\.\(validateGovernLineage \|\| \{\}\), policy_class:[\s\S]*classification_evidence: \{/,
     'canonical compile→validate path must still return VALID',
   )
 })
@@ -182,7 +182,7 @@ test('validation rejection does not consume invocation_registry', () => {
 test('execute_rejects_uncompiled_hash', () => {
   assert.match(
     source,
-    /const compiled = await env\.DB\.prepare\(`SELECT canonical_aeo,validated_object_hash,continuity_id,status FROM aeo_registry WHERE decision_id=\?1 AND validated_object_hash=\?2 AND status='COMPILED'`\)\.bind\(decision_id,validated_object_hash\)\.first<any>\(\)/,
+    /const compiled = await env\.DB\.prepare\(`SELECT canonical_aeo,validated_object_hash,govern_projection_hash,continuity_id,status FROM aeo_registry WHERE decision_id=\?1 AND validated_object_hash=\?2 AND status='COMPILED'`\)\.bind\(decision_id,validated_object_hash\)\.first<any>\(\)/,
     'execute must re-bind decision_id + validated_object_hash to a COMPILED AEO row before execution',
   )
 
@@ -328,7 +328,7 @@ test('execute snapshot/provenance tree-hash check runs before all execute-side m
 test('valid_validate_execute_path_preserved', () => {
   assert.match(
     source,
-    /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce \}\)/,
+    /return json\(\{ status:"VALID", result:"VALID", session_id, validated_object_hash, invocation_nonce, \.\.\.\(validateGovernLineage \|\| \{\}\), policy_class:[\s\S]*classification_evidence: \{/,
     'validate canonical success path must remain intact',
   )
 

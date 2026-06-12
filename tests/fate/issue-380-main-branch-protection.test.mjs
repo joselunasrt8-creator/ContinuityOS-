@@ -370,9 +370,9 @@ test('issue #380: summary counts match actual path classifications', () => {
 
 // ── 10. consistency with BRANCH_PROTECTION_POLICY.json ────────────────────────
 
-test('issue #380: BRANCH_PROTECTION_POLICY.json is policy_only_non_enforcing and targets main', () => {
+test('issue #380: BRANCH_PROTECTION_POLICY.json is enforcement_activation_recorded and targets main', () => {
   assert.equal(BRANCH_PROTECTION_POLICY.target_branch, 'main', 'BRANCH_PROTECTION_POLICY.json must target main branch')
-  assert.equal(BRANCH_PROTECTION_POLICY.status, 'policy_only_non_enforcing', 'BRANCH_PROTECTION_POLICY.json must declare policy_only_non_enforcing status')
+  assert.equal(BRANCH_PROTECTION_POLICY.status, 'enforcement_activation_recorded', 'BRANCH_PROTECTION_POLICY.json must declare enforcement_activation_recorded status')
 })
 
 test('issue #380: required_status_checks path references BRANCH_PROTECTION_POLICY emitted_check_inventory', () => {
