@@ -121,9 +121,23 @@ npm run shadow-guard:demo
 
 ---
 
+## Dependency Formation Gate
+
+**Current Phase:** Dependency Formation
+
+**Current Wedge:** Shadow Guard Diagnostic
+
+**Current Unknown:** Will an independent operator find the divergence signal useful enough to change behavior?
+
+**Success condition:** An independent operator reports that the divergence signal exposed something actionable that they would likely not have noticed otherwise.
+
+This may be an external repo owner, maintainer from another project, platform engineer, or independent reviewer. Phase B enforcement remains unjustified until this operator-value signal is present.
+
+---
+
 ## Phase B Gate (Future)
 
-Operator review of divergence evidence → decision to enforce → Phase B implementation
+Independent operator review of divergence evidence → decision to enforce → Phase B implementation
 
 **Blocked in Phase A:**
 - Branch protection wiring
@@ -155,11 +169,11 @@ diagnostic artifact (JSON)
   ↓
 divergence registry entry (JSONL)
   ↓
-[operator review] ← Phase A ends here
+[independent operator review] ← Phase A ends here
   ↓
 [Phase B: enforcement decision]
 ```
 
 ---
 
-**Phase A Diagnostic Mode: Operational and Ready for Operator Review**
+**Phase A Diagnostic Mode: Operational and Ready for Independent Operator Review**
