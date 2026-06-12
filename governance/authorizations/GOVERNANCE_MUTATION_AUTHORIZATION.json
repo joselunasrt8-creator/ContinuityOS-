@@ -1,33 +1,28 @@
 {
-  "gma_id": "GMA-claude/policy-bound-gma-go69v3-27389480497",
-  "decision_id": "a9acbf061ff9449812fe33eea50f7ec046fe7e56ac5cb75b9f8b070001dee801",
-  "continuity_id": "6fa865855e119f3bee250eda19c63e17b301ef555388228611ff3d6396293d1d",
-  "session_id": "69f22fa97bbf598eb776bb14e5ffbab92cb14ed1b7643680b34a8a800e62b6f5",
-  "validated_object_hash": "d10de5221cb8648e18c4c811f80bf85eddd92f50c420592f9169231161d2a8f8",
-  "governed_files_hash": "e9df1e1e17ad6328ef3d00b5aafa48ae24820ec71d8aa6c22fa6afe235765425",
+  "gma_id": "GMA-claude/standing-authority-operational-proof-yur14k-27399592517",
+  "decision_id": "f1b21161cf4fa68b498d21d2ad42c74637763e61cdda519e27727be36993a7f9",
+  "continuity_id": "0d8692abfb28dfd73e6c806c7679d165f9e537ad4f10182c4b2c4fdd01500772",
+  "session_id": "35dbb2e4d150f54327150627fa382523fad8066e475ca3f50800f4b8f3548467",
+  "validated_object_hash": "1cf41ffdf44d15ea56a06fda82b229178eb2b21d7c82d41bd81e5a1cf120c65f",
+  "governed_files_hash": "6f25380714eee0cd36f687852a2a6106261a60884494a58ed78ac6cdcb710e38",
   "governed_files": [
-    ".github/workflows/governance-mutation-authorization.yml",
-    ".github/workflows/merge-governance-check.yml",
-    ".github/workflows/merge-proof.yml",
-    ".github/workflows/standing-authority-issuance.yml",
-    "runtime/standing-authority.mjs"
+    "governance/authorizations/standing_authority_registry.jsonl"
   ],
   "mutation_classes": [
-    "governance_mutation",
-    "workflow_mutation"
+    "governance_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Authorize PR #1999 policy-bound GMA bootstrap implementation at head 82b82dd.",
+  "intent": "Re-issue GMA bound to single-file SA-registry change (post main-sync) authorizing Standing Authority SA-claude/standing-authority-operational-proof-yur14k-27399384732 for issue #2002 bootstrap.",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "claude/policy-bound-gma-go69v3",
-  "head_sha": "82b82dd1463cb70cfaf546c73f09dd754b537f84",
-  "workflow_run_id": "27389480497",
-  "created_at": "2026-06-12T01:56:04Z",
-  "expires_at": "2027-06-12T01:56:04Z",
+  "branch": "claude/standing-authority-operational-proof-yur14k",
+  "head_sha": "01c022fecd1d1fd68c561c300e4fcf032571c2a6",
+  "workflow_run_id": "27399592517",
+  "created_at": "2026-06-12T06:47:03Z",
+  "expires_at": "2027-06-12T06:47:03Z",
   "status": "GMA_VALID"
 }
