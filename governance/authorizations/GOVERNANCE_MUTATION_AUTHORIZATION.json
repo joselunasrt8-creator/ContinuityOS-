@@ -1,30 +1,33 @@
 {
-  "gma_id": "GMA-claude/policy-bound-gma-go69v3-27380199513",
-  "decision_id": "ddc3444cb0bba59b0b92c0c962ddc5b5767469e3ad166218d19638ce1525a6da",
-  "continuity_id": "4b15134d9ef87e803615ae22adb55b401f816f43f65a01135a52f29567ca9163",
-  "session_id": "09d02d9d529642734bb1df1659d520f843ca8db1e57b358e6e0b2640fdd6b1ce",
-  "validated_object_hash": "c54c87cca9b7e7d8c510f9fd119283ef58386bf37658e719bd23e19eca1f28f4",
-  "governed_files_hash": "614f4a6e0849dcd24f99cf2f92064a87d5fb2ca1bd4b4eca7b8fda5fe6b43ed0",
+  "gma_id": "GMA-claude/policy-bound-gma-go69v3-27389031228",
+  "decision_id": "13e43e995d81a47545fe2d335309f686162bf8160a1c7467d871b2931c558ad9",
+  "continuity_id": "e557246b210fc35d79efec6bf041150d57408049ac8c8a84ce2a2c0beeb8cf19",
+  "session_id": "036b4ba88ac02e09c9d8146b517c3da234b67f14391f3f48f22295f1e0c6b0a6",
+  "validated_object_hash": "a2e2c5d4ca52dd6442cb65f67f766155fe0e39f09b96b2bd200f59ab1b2ad28e",
+  "governed_files_hash": "07633248d2251da0826adfd92fe07b0a318147abb9cb4b7333d7c772ef1a66bb",
   "governed_files": [
+    ".github/workflows/governance-mutation-authorization.yml",
     ".github/workflows/merge-governance-check.yml",
     ".github/workflows/merge-proof.yml",
-    ".github/workflows/standing-authority-issuance.yml"
+    ".github/workflows/standing-authority-issuance.yml",
+    "runtime/standing-authority.mjs"
   ],
   "mutation_classes": [
+    "governance_mutation",
     "workflow_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Authorize Policy-Bound GMA bootstrap PR #1999 after review fixes. Rebind GMA to current governed diff hash a4b5d12ed60b56872633e4d7575cd387de78e4a2bbc506ce230bfc78dcf63a67.",
+  "intent": "Authorize PR #1999 policy-bound GMA —",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
   "branch": "claude/policy-bound-gma-go69v3",
-  "head_sha": "23c67cd24811fa585fe402579a377f6386e505fd",
-  "workflow_run_id": "27380199513",
-  "created_at": "2026-06-11T22:01:32Z",
-  "expires_at": "2027-06-11T22:01:32Z",
+  "head_sha": "69e960abe0a324b2689c97fcdf9aaf6828651d81",
+  "workflow_run_id": "27389031228",
+  "created_at": "2026-06-12T01:43:16Z",
+  "expires_at": "2027-06-12T01:43:16Z",
   "status": "GMA_VALID"
 }
