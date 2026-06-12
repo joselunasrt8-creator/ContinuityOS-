@@ -1,8 +1,9 @@
 name: 'ContinuityOS Merge Guard'
 description: >
   Smallest-release legitimacy check for a pull request: builds a canonical
-  object-identity payload {repo, pr_number, head_sha, base_sha, actor},
-  hashes it, and emits VALID or NULL (fail-closed) plus a proof artifact.
+  object-identity payload {repo, pr_number, head_sha, base_sha, actor}
+  plus optional agent-authored workflow policy, hashes it, and emits VALID
+  or NULL (fail-closed) plus a proof artifact.
   Designed to be added as a required status check.
 
 inputs:
@@ -21,6 +22,14 @@ inputs:
   actor:
     description: 'PR author / actor login'
     required: true
+  author-kind:
+    description: "Explicit PR author classification: 'agent', 'human', or 'unknown'"
+    required: false
+    default: 'unknown'
+  require-agent-authored:
+    description: "Set to 'true' for an agent-authored PR workflow; non-agent PRs fail closed to NULL"
+    required: false
+    default: 'false'
 
 outputs:
   result:
@@ -35,6 +44,12 @@ outputs:
   proof_url:
     description: 'Path to the uploaded MERGE_GUARD_PROOF.json artifact'
     value: ${{ steps.merge-guard.outputs.proof_url }}
+  author_kind:
+    description: "Normalized author classification: 'agent', 'human', or 'unknown'"
+    value: ${{ steps.merge-guard.outputs.author_kind }}
+  null_reasons:
+    description: 'Comma-separated NULL reason codes, empty when result is VALID'
+    value: ${{ steps.merge-guard.outputs.null_reasons }}
 
 runs:
   using: 'composite'
@@ -48,6 +63,8 @@ runs:
         MERGE_GUARD_HEAD_SHA: ${{ inputs.head-sha }}
         MERGE_GUARD_BASE_SHA: ${{ inputs.base-sha }}
         MERGE_GUARD_ACTOR: ${{ inputs.actor }}
+        MERGE_GUARD_AUTHOR_KIND: ${{ inputs.author-kind }}
+        MERGE_GUARD_REQUIRE_AGENT_AUTHORED: ${{ inputs.require-agent-authored }}
       run: node "${{ github.action_path }}/check.mjs"
 
     - name: Upload merge guard proof

@@ -7,11 +7,12 @@ ContinuityOS dependency wedge:
 PR
  ↓
 canonical identity object {repo, pr_number, head_sha, base_sha, actor}
++ explicit author policy {author_kind, require_agent_authored}
  ↓
 canonicalize → sha256
  ↓
-VALID  (all fields present and non-empty)
-  | NULL (any field missing — fail-closed)
+VALID  (identity complete and policy satisfied)
+  | NULL (missing field, invalid policy input, or policy mismatch — fail-closed)
  ↓
 proof artifact (MERGE_GUARD_PROOF.json)
  ↓
@@ -20,8 +21,8 @@ required status check
 
 ## What this proves (v1)
 
-This proves the PR identity object is **complete, canonicalized, hashed,
-and proof-bound** before merge eligibility:
+This proves the PR identity object and explicit author-policy scope are
+**complete, canonicalized, hashed, and proof-bound** before merge eligibility:
 
 ```
 validated_object == merge_guard_object
@@ -31,7 +32,7 @@ That is the entire claim. v1 does **not** validate:
 
 - the PR diff or changed files
 - review status or approvals
-- whether the author is a human or an agent
+- automatic detection of whether the author is a human or an agent; callers must provide `author-kind` explicitly
 - the final merge commit
 
 Those are deliberately deferred — see [v2](#v2-not-yet-built) below. v1 is
@@ -46,6 +47,8 @@ Each run produces:
 - `proof_id`: `MERGE_GUARD-{pr_number}-{head_sha[:8]}`
 - `proof_hash`: sha256 of the canonical payload
 - `proof_url`: path to the uploaded `MERGE_GUARD_PROOF.json` artifact
+- `author_kind`: normalized `agent`, `human`, or `unknown` author scope
+- `null_reasons`: comma-separated NULL reason codes, empty for VALID
 
 The proof is written to the job's step summary and uploaded as a workflow
 artifact named `MERGE_GUARD_PROOF`, so it is visible directly on the PR
@@ -62,11 +65,18 @@ Example `MERGE_GUARD_PROOF.json`:
     "pr_number": "1970",
     "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
     "base_sha": "0123456789abcdef0123456789abcdef01234567",
-    "actor": "some-contributor"
+    "actor": "some-contributor",
+    "author_kind": "agent",
+    "require_agent_authored": "true"
   },
   "canonical_hash": "...",
   "result": "VALID",
   "missing_fields": [],
+  "invalid_fields": [],
+  "author_kind": "agent",
+  "require_agent_authored": "true",
+  "agent_author_required": true,
+  "null_reasons": [],
   "generated_at": "2026-06-10T00:00:00.000Z",
   "record_type": "MERGE_GUARD_PROOF"
 }
@@ -116,15 +126,68 @@ ContinuityOS Merge Guard: VALID or NULL
 Merge allowed | Merge blocked
 ```
 
+
+### Agent-authored required workflow
+
+For an agent-authored PR lane, make the check load-bearing by setting
+`require-agent-authored: 'true'` and adding the resulting job name as a
+required status check in branch protection. This creates the dependency path
+needed by #2001:
+
+```text
+Agent-authored PR
+ ↓
+ContinuityOS Merge Guard: VALID or NULL
+ ↓
+protected branch required check: pass or fail
+ ↓
+merge eligible or blocked
+ ↓
+MERGE_GUARD_PROOF.json
+```
+
+Minimal workflow slice:
+
+```yaml
+name: continuity-agent-merge-guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  agent-merge-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@main
+        id: merge-guard
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          actor: ${{ github.event.pull_request.user.login }}
+          author-kind: ${{ github.event.pull_request.user.type == 'Bot' && 'agent' || 'human' }}
+          require-agent-authored: 'true'
+```
+
+Required-check name: **`agent-merge-guard`**. A human-authored PR in this
+lane deterministically returns `NULL` with `null_reasons: AGENT_AUTHOR_REQUIRED`;
+an agent-authored PR with a complete identity object returns `VALID`.
+
 ### Version reference
 
-- `@v0.1.0` — pinned, stable validator surface. Recommended for any
-  consumer that treats the Merge Guard result as load-bearing (a required
-  status check), so that a changed result can only come from a changed PR
-  object, never from a changed validator implementation.
-- `@main` — floating reference. Acceptable for exploration/evaluation, but
-  not recommended once a consumer relies on the result for merge
-  eligibility.
+- `@v0.1.0` — pinned, stable identity-only validator surface. Recommended for any
+  consumer that treats the current identity-only Merge Guard result as
+  load-bearing (a required status check), so that a changed result can only
+  come from a changed PR object, never from a changed validator implementation.
+- `@main` — current agent-authored workflow-policy validator surface for
+  consumers evaluating `author-kind` and `require-agent-authored` before a
+  release tag is cut. Do not leave `@main` as a permanent load-bearing ref.
+- `@v0.2.0` — planned pinned tag for the agent-authored workflow-policy
+  validator surface. Use this, once tagged, for load-bearing consumers that
+  need `author-kind` and `require-agent-authored` proof fields.
 
 A `v0.1.1` tag is planned at the current `main` HEAD (the commit that
 fixed this README's stale `mindshift-demo` install path). Relative to
@@ -168,8 +231,7 @@ Deferred to keep v1 minimal and installable in 2 minutes:
   `commit_id == head_sha`.
 - **Diff binding** — bind the proof to the changed files / tree, not just
   the commit identity.
-- **Agent classification** — distinguish agent-authored PRs from
-  human-authored PRs and apply different policy.
+- **Automatic agent classification** — derive agent/human classification from trusted platform evidence instead of requiring callers to pass `author-kind`.
 - **Policy binding** — org-level policy packs and templates.
 - **Merge commit binding** — extend the proof past merge to the resulting
   `merge_commit_sha`, in the spirit of `merge-proof.yml`.

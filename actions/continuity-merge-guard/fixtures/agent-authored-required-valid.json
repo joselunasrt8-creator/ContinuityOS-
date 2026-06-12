@@ -1,0 +1,18 @@
+{
+  "description": "Agent-authored workflow scope satisfied — explicit agent author is VALID",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2001",
+    "head_sha": "b1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "cursor-agent[bot]",
+    "author_kind": "agent",
+    "require_agent_authored": "true"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": [],
+  "expected_null_reasons": [],
+  "expected_author_kind": "agent",
+  "expected_require_agent_authored": "true"
+}
