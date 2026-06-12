@@ -43,6 +43,34 @@ for (const file of readdirSync(fixturesDir).sort()) {
     continue
   }
 
+  if ('expected_invalid_fields' in fixture) {
+    const invalidMatch =
+      JSON.stringify(decision.invalid_fields) === JSON.stringify(fixture.expected_invalid_fields)
+    if (!invalidMatch) {
+      recordFail(file, `expected invalid_fields ${JSON.stringify(fixture.expected_invalid_fields)}, got ${JSON.stringify(decision.invalid_fields)}`)
+      continue
+    }
+  }
+
+  if ('expected_null_reasons' in fixture) {
+    const nullReasonsMatch =
+      JSON.stringify(decision.null_reasons) === JSON.stringify(fixture.expected_null_reasons)
+    if (!nullReasonsMatch) {
+      recordFail(file, `expected null_reasons ${JSON.stringify(fixture.expected_null_reasons)}, got ${JSON.stringify(decision.null_reasons)}`)
+      continue
+    }
+  }
+
+  if (fixture.expected_author_kind && decision.author_kind !== fixture.expected_author_kind) {
+    recordFail(file, `expected author_kind ${fixture.expected_author_kind}, got ${decision.author_kind}`)
+    continue
+  }
+
+  if (fixture.expected_require_agent_authored && decision.require_agent_authored !== fixture.expected_require_agent_authored) {
+    recordFail(file, `expected require_agent_authored ${fixture.expected_require_agent_authored}, got ${decision.require_agent_authored}`)
+    continue
+  }
+
   if (fixture.check_type === 'deterministic_hash') {
     const decisionAgain = evaluate(fixture.input)
     if (decision.canonical_hash !== decisionAgain.canonical_hash) {
