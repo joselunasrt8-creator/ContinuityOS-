@@ -1,0 +1,25 @@
+name: sa-tier3-demo
+# Issue #2002 — Standing Authority Operational Proof.
+# This workflow file is the single in-bounds surface authorized by the narrow
+# Standing Authority SA-claude/standing-authority-operational-proof-yur14k-27399384732
+# (path_globs: .github/workflows/sa-tier3-demo.yml). A PR mutating ONLY this file
+# on a claude/* branch, with NO explicit per-PR GMA, must be admitted by
+# merge-governance-check Tier 3 (standing-authority-derivation).
+#
+# It is intentionally inert (manual dispatch only) so it never auto-runs or
+# affects required status checks.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof-marker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit Tier 3 proof marker
+        run: |
+          echo "Standing Authority operational proof (issue #2002)."
+          echo "This workflow mutation was admitted via Tier 3 standing-authority-derivation,"
+          echo "with no explicit per-PR GMA."

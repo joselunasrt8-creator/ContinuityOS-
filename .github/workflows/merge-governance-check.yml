@@ -74,8 +74,27 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
+              governance/authorizations/standing_authority_registry.jsonl)
+                # GAP-005 Phase 2: the Standing Authority registry grants reusable
+                # capability (not mere evidence), so issuing/revoking an authority is a
+                # governance_mutation requiring a GMA — the owner-dispatch provenance for
+                # the authority layer. (Must precede the governance/authorizations/* exemption.)
+                echo "$file" >> governed_files.txt
+                echo "governance_mutation" >> mutation_classes.txt
+                echo "standing_authority_registry" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
+                ;;
               governance/authorizations/*)
                 # GMA artifacts: authorization evidence, not governance primitives (GAP-005)
+                ;;
+              runtime/standing-authority.mjs)
+                # GAP-005 Phase 2: the Standing Authority derivation verifier is the
+                # admission oracle loaded at merge-check time; editing it must require a
+                # GMA so it cannot be silently widened/disabled outside governance.
+                echo "$file" >> governed_files.txt
+                echo "governance_mutation" >> mutation_classes.txt
+                echo "standing_authority_verifier" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
                 ;;
               governance/merge-legitimacy/merge_proof_registry.jsonl)
                 # Append-only proof evidence surface: records merge proof events after merge.
@@ -318,38 +337,176 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Issue #1984: gma_registry.jsonl is append-only authorization lineage.
-          # governance/authorizations/** is exempt from governed-file detection, so
-          # this dedicated guard ensures existing registry entries can never be
-          # modified or removed — the base-branch version must be a byte-exact
-          # PREFIX of the head version (new entries only ever appended at the end).
-          # Without this, registry history could be rewritten to preserve a green merge.
-          REGISTRY="governance/authorizations/gma_registry.jsonl"
+          # Append-only authorization lineage guard.
+          #   Issue #1984:     gma_registry.jsonl (per-PR GMA lineage)
+          #   GAP-005 Phase 2: standing_authority_registry.jsonl (policy-bound authority lineage)
+          #   GAP-005 Phase 2: merge_proof_registry.jsonl (the Standing Authority budget
+          #                    ledger — counted by Tier 3, so it must not be rewritten to
+          #                    remove proof_entry lines and reopen consumed max_merges).
+          # These surfaces are exempt from governed-file detection, so this dedicated guard
+          # ensures existing entries can never be modified or removed — the base-branch
+          # version must be a byte-exact PREFIX of the head version (new entries only ever
+          # appended at the end). Without this, history could be rewritten to preserve a
+          # green merge or to free budget.
+          for REGISTRY in \
+            governance/authorizations/gma_registry.jsonl \
+            governance/authorizations/standing_authority_registry.jsonl \
+            governance/merge-legitimacy/merge_proof_registry.jsonl
+          do
+            if ! grep -qxF "$REGISTRY" changed_files.txt 2>/dev/null; then
+              echo "$REGISTRY not modified by this PR — append-only check not applicable."
+              continue
+            fi
 
-          if ! grep -qxF "$REGISTRY" changed_files.txt 2>/dev/null; then
-            echo "gma_registry.jsonl not modified by this PR — append-only check not applicable."
-            exit 0
-          fi
+            if ! git cat-file -e "${BASE_SHA}:${REGISTRY}" 2>/dev/null; then
+              echo "$REGISTRY is newly introduced by this PR — all additions, append-only by construction."
+              continue
+            fi
 
-          if ! git cat-file -e "${BASE_SHA}:${REGISTRY}" 2>/dev/null; then
-            echo "gma_registry.jsonl is newly introduced by this PR — all additions, append-only by construction."
-            exit 0
-          fi
+            git show "${BASE_SHA}:${REGISTRY}" > registry_base.jsonl
 
-          git show "${BASE_SHA}:${REGISTRY}" > gma_registry_base.jsonl
-
-          node --input-type=module <<'NODE'
+            REGISTRY_PATH="$REGISTRY" node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
-          const base = readFileSync('gma_registry_base.jsonl');
-          const head = readFileSync('governance/authorizations/gma_registry.jsonl');
+          const registry = process.env.REGISTRY_PATH;
+          const base = readFileSync('registry_base.jsonl');
+          const head = readFileSync(registry);
           if (head.length < base.length || !head.subarray(0, base.length).equals(base)) {
-            console.error('NULL — gma_registry.jsonl modified non-append-only: existing entries changed or removed.');
-            console.error('The base-branch registry must be a byte-exact prefix of the head registry (Issue #1984 append-only policy).');
+            console.error(`NULL — ${registry} modified non-append-only: existing entries changed or removed.`);
+            console.error('The base-branch registry must be a byte-exact prefix of the head registry (append-only policy).');
             console.error('Result: MERGE_LEGITIMACY_NULL');
             process.exit(1);
           }
           const added = head.subarray(base.length).toString('utf8').split('\n').filter(Boolean).length;
-          console.log(`gma_registry.jsonl change is append-only: ${added} new entr${added === 1 ? 'y' : 'ies'} appended.`);
+          console.log(`${registry} change is append-only: ${added} new entr${added === 1 ? 'y' : 'ies'} appended.`);
+          NODE
+          done
+
+      - name: Validate appended standing authority records (GAP-005 Phase 2)
+        if: github.event_name != 'merge_group'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # governance/authorizations/** is exempt from governed-file detection, so a PR
+          # that only appends to standing_authority_registry.jsonl would otherwise be
+          # checked for append-only growth alone — letting a malformed or forged authority
+          # land on the base branch and later authorize governed PRs. Validate the shape
+          # and internal consistency (authority_hash recomputed from bounds) of every newly
+          # appended record. NOTE: cryptographic issuance provenance (signing) is post-V1;
+          # a reviewer must still vet that an appended authority was legitimately issued by
+          # the owner-dispatch workflow (documented in STANDING_AUTHORITY_SPEC.json).
+          SA_REGISTRY="governance/authorizations/standing_authority_registry.jsonl"
+
+          if ! grep -qxF "$SA_REGISTRY" changed_files.txt 2>/dev/null; then
+            echo "standing_authority_registry.jsonl not modified — no SA record validation needed."
+            exit 0
+          fi
+
+          if git cat-file -e "${BASE_SHA}:${SA_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${SA_REGISTRY}" > sa_registry_base_prefix.jsonl
+          else
+            : > sa_registry_base_prefix.jsonl
+          fi
+          # Recompute authority_hash with the BASE verifier (never the PR's module).
+          if git cat-file -e "${BASE_SHA}:runtime/standing-authority.mjs" 2>/dev/null; then
+            git show "${BASE_SHA}:runtime/standing-authority.mjs" > sa_verifier_base.mjs
+          else
+            : > sa_verifier_base.mjs
+          fi
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync } from 'node:fs';
+
+          const base = readFileSync('sa_registry_base_prefix.jsonl', 'utf8');
+          const head = readFileSync('governance/authorizations/standing_authority_registry.jsonl', 'utf8');
+          // Append-only growth is enforced by the prior step (base is a byte-exact prefix),
+          // so the appended records are exactly the head suffix beyond the base length.
+          const appended = head.slice(base.length).split('\n').filter(Boolean);
+
+          let computeAuthorityHash = null;
+          if (existsSync('sa_verifier_base.mjs') && readFileSync('sa_verifier_base.mjs', 'utf8').trim()) {
+            ({ computeAuthorityHash } = await import('./sa_verifier_base.mjs'));
+          }
+
+          const fail = (msg) => {
+            console.error('NULL — ' + msg);
+            console.error('Result: MERGE_LEGITIMACY_NULL (GAP-005 Phase 2)');
+            process.exit(1);
+          };
+
+          // authority_id is later written into $GITHUB_ENV by merge-proof (STANDING_AUTHORITY_ID=<id>),
+          // so it must be a single-line safe token — a newline could inject extra environment
+          // variables. Constrain it to the characters the issuer produces (SA-<branch>-<run_id>).
+          const SAFE_ID = /^[A-Za-z0-9._\/-]+$/;
+
+          const REQUIRED = ['authority_id', 'authority_hash', 'intent', 'issued_by',
+            'source_authority', 'bounds', 'ttl_hours', 'issued_at', 'expires_at',
+            'authority_lineage_bound', 'status'];
+
+          for (const line of appended) {
+            let rec;
+            try { rec = JSON.parse(line); } catch (_) { fail('appended standing authority registry line is not valid JSON.'); }
+
+            if (rec._record_type === 'standing_authority_revocation') {
+              for (const f of ['authority_id', 'revoked_by', 'revoked_at']) {
+                if (!rec[f]) fail(`revocation record missing required field: ${f}`);
+              }
+              if (!SAFE_ID.test(rec.authority_id)) fail(`revocation authority_id is not a single-line safe token: ${JSON.stringify(rec.authority_id)}`);
+              continue;
+            }
+            if (rec._record_type !== 'standing_authority') {
+              fail(`unknown _record_type in standing authority registry: ${rec._record_type}`);
+            }
+            for (const f of REQUIRED) {
+              if (rec[f] === undefined || rec[f] === null || rec[f] === '') {
+                fail(`appended standing authority missing required field: ${f}`);
+              }
+            }
+            if (typeof rec.authority_id !== 'string' || !SAFE_ID.test(rec.authority_id)) {
+              fail(`standing authority authority_id is not a single-line safe token: ${JSON.stringify(rec.authority_id)}`);
+            }
+            if (rec.source_authority !== 'OWNER_WORKFLOW_DISPATCH') {
+              fail(`standing authority source_authority must be OWNER_WORKFLOW_DISPATCH, got: ${rec.source_authority}`);
+            }
+            if (rec.status !== 'STANDING_AUTHORITY_VALID') {
+              fail('appended standing authority status must be STANDING_AUTHORITY_VALID.');
+            }
+            if (rec.authority_lineage_bound !== true) {
+              fail('appended standing authority must declare authority_lineage_bound: true.');
+            }
+            const b = rec.bounds || {};
+            if (!b.branch_pattern
+              || !Array.isArray(b.mutation_classes) || b.mutation_classes.length === 0
+              || !Array.isArray(b.path_globs) || b.path_globs.length === 0
+              || !Number.isInteger(b.max_merges) || b.max_merges < 1) {
+              fail('appended standing authority bounds are malformed (branch_pattern, mutation_classes, path_globs, max_merges).');
+            }
+            if (!(new Date(rec.expires_at) > new Date(rec.issued_at))) {
+              fail('appended standing authority expires_at must be after issued_at.');
+            }
+            // expires_at must equal issued_at + ttl_hours exactly. authority_hash covers
+            // ttl_hours but not expires_at, so without this a record could declare a short
+            // (hashed) TTL yet set expires_at far in the future to extend the hard bound.
+            const expectedExpiry = new Date(rec.issued_at).getTime() + Number(rec.ttl_hours) * 3600 * 1000;
+            if (new Date(rec.expires_at).getTime() !== expectedExpiry) {
+              fail(`appended standing authority expires_at must equal issued_at + ttl_hours (expected ${new Date(expectedExpiry).toISOString()}).`);
+            }
+            if (computeAuthorityHash) {
+              const expected = computeAuthorityHash({
+                branch_pattern: b.branch_pattern,
+                mutation_classes: b.mutation_classes,
+                path_globs: b.path_globs,
+                max_merges: b.max_merges,
+                ttl_hours: rec.ttl_hours,
+                issued_at: rec.issued_at,
+              });
+              if (expected !== rec.authority_hash) {
+                fail(`appended standing authority authority_hash does not match its bounds (expected ${expected}, got ${rec.authority_hash}).`);
+              }
+            }
+          }
+          console.log(`Validated ${appended.length} appended standing authority record(s).`);
           NODE
 
       - name: Validate governance mutation authorization (GAP-005 / Issue #1984)
@@ -357,6 +514,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -390,10 +549,42 @@ jobs:
 
           REGISTRY="governance/authorizations/gma_registry.jsonl"
           SINGLETON="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+          SA_REGISTRY="governance/authorizations/standing_authority_registry.jsonl"
+          PROOF_REGISTRY="governance/merge-legitimacy/merge_proof_registry.jsonl"
 
-          if [ ! -f "$REGISTRY" ] && [ ! -f "$SINGLETON" ]; then
-            echo "NULL — governance/workflow mutation detected but neither GMA registry nor singleton found."
-            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch to append a GMA entry."
+          # P1 (security): Standing Authorities and the budget ledger are read from the
+          # BASE branch only, never the PR checkout. An authority appended within the
+          # same PR must not be able to authorize that PR — it must first land on the
+          # base branch through governed admission. governance/authorizations/** is
+          # exempt from governed-file detection and the append-only guard only proves
+          # entries were appended, so reading head here would let an ordinary PR mint a
+          # reusable broad authority and self-authorize. Base-only derivation closes that.
+          if git cat-file -e "${BASE_SHA}:${SA_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${SA_REGISTRY}" > sa_registry_base.jsonl
+          else
+            : > sa_registry_base.jsonl
+          fi
+          if git cat-file -e "${BASE_SHA}:${PROOF_REGISTRY}" 2>/dev/null; then
+            git show "${BASE_SHA}:${PROOF_REGISTRY}" > proof_registry_base.jsonl
+          else
+            : > proof_registry_base.jsonl
+          fi
+          # P1 (verifier integrity): the derivation module is loaded from BASE, never the
+          # PR checkout — runtime/*.mjs is not a governed path, so the head version could
+          # be rigged to self-authorize. Run the trusted, already-merged verifier.
+          if git cat-file -e "${BASE_SHA}:runtime/standing-authority.mjs" 2>/dev/null; then
+            git show "${BASE_SHA}:runtime/standing-authority.mjs" > sa_verifier_base.mjs
+          else
+            : > sa_verifier_base.mjs
+          fi
+
+          # P2: a repository that has completed the migration to Standing-Authority-only
+          # authorization (no gma_registry, no singleton) must still admit via Tier 3, so
+          # a base-branch standing authority also satisfies this prerequisite.
+          if [ ! -f "$REGISTRY" ] && [ ! -f "$SINGLETON" ] && [ ! -s sa_registry_base.jsonl ]; then
+            echo "NULL — governance/workflow mutation detected but no GMA registry, singleton, or base-branch standing authority found."
+            echo "Run .github/workflows/governance-mutation-authorization.yml on this branch to append a GMA entry,"
+            echo "or land a Standing Authority on the base branch via .github/workflows/standing-authority-issuance.yml."
             echo "Result: MERGE_LEGITIMACY_NULL (GAP-005 / Issue #1984)"
             exit 1
           fi
@@ -480,11 +671,91 @@ jobs:
             } catch (_) { /* malformed singleton ignored — registry is authoritative */ }
           }
 
+          // TIER 3 (Policy-Bound GMA — Standing Authority derivation, GAP-005 Phase 2):
+          // If no explicit GMA matches, evaluate the governed diff against the
+          // BASE-branch standing authority registry (sa_registry_base.jsonl, extracted
+          // from BASE_SHA in the shell preamble — never the PR checkout, so a PR-local
+          // authority cannot authorize its own PR). A valid, in-scope, non-expired,
+          // non-exhausted Standing Authority derives a scoped authorization for a
+          // bounded CLASS of mutations (branch + class + path + TTL + budget), so the
+          // owner authorizes once instead of per PR. The merge proof later stamps
+          // standing_authority_id, consuming the proof-ledger budget. The budget is
+          // counted from the base-branch proof ledger (proof_registry_base.jsonl) so a
+          // PR cannot rewrite the ledger to free budget.
+          // The derivation logic itself is loaded from the BASE branch
+          // (sa_verifier_base.mjs, extracted from BASE_SHA), never the PR checkout:
+          // runtime/*.mjs is not a governed path, so importing the head version would
+          // run the PR's own (possibly rigged) authorization code to decide whether the
+          // PR is authorized. Loading the base verifier closes that TOCTOU.
+          // Guarded by the base registry AND base verifier existing+non-empty, so the
+          // standalone validator extraction test (issue-1984) — which has neither —
+          // never attempts the import.
+          // Fork safety: head.ref is only a branch name, so a base-repo authority for
+          // claude/* would otherwise match a fork branch named claude/foo. A Standing
+          // Authority is for the repository's own automation branches, so derivation is
+          // refused for PRs originating from a different head repository (fork).
+          const isFork = process.env.HEAD_REPO && process.env.BASE_REPO
+            && process.env.HEAD_REPO !== process.env.BASE_REPO;
+          if (!matched && isFork) {
+            console.error(`Standing-authority derivation declined: fork PR (head repo ${process.env.HEAD_REPO} != ${process.env.BASE_REPO}) — explicit GMA required.`);
+          }
+          // HARD DENY: the Standing Authority trust surfaces (the registry and the
+          // verifier) must NEVER be authorized by a Standing Authority — that would let a
+          // broad SA (e.g. governance/** or runtime/**) widen/disable the authority layer
+          // it derives from. Editing either always falls through to an explicit manual GMA.
+          // This is an absolute rule, independent of any SA's path_globs.
+          const TRUST_SURFACES = new Set([
+            'governance/authorizations/standing_authority_registry.jsonl',
+            'runtime/standing-authority.mjs',
+          ]);
+          const touchesTrustSurface = governedFiles.some((f) => TRUST_SURFACES.has(f));
+          if (!matched && touchesTrustSurface) {
+            console.error('Standing-authority derivation declined: PR edits a Standing Authority trust surface (registry or verifier) — explicit GMA required (never SA-derivable).');
+          }
+          if (!matched && !isFork && !touchesTrustSurface && existsSync('sa_registry_base.jsonl') && existsSync('sa_verifier_base.mjs')) {
+            const saRegistryText = readFileSync('sa_registry_base.jsonl', 'utf8');
+            const verifierText = readFileSync('sa_verifier_base.mjs', 'utf8');
+            if (saRegistryText.trim() && verifierText.trim()) {
+              const { selectStandingAuthority } = await import('./sa_verifier_base.mjs');
+              const proofRegistryText = existsSync('proof_registry_base.jsonl')
+                ? readFileSync('proof_registry_base.jsonl', 'utf8') : '';
+              // Path containment applies only to files whose mutation requires GMA
+              // authorization (governance_mutation / workflow_mutation). proof_persistence
+              // (merge_proof_registry.jsonl) and non-gated classes (src/schema/migration/
+              // deployment_config) are excluded so an in-scope PR that also touches such a
+              // file is not falsely declined. (Trust-surface paths can never reach here —
+              // they are hard-denied above.)
+              const isAuthGated = (f) =>
+                f.startsWith('.github/workflows/')
+                || (f.startsWith('governance/')
+                    && !f.startsWith('governance/authorizations/')
+                    && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl');
+              const authFiles = governedFiles.filter(isAuthGated);
+              const sel = selectStandingAuthority({
+                registryText: saRegistryText,
+                headRef,
+                governedFiles: authFiles,
+                detectedClasses,
+                now,
+                proofRegistryText,
+              });
+              if (sel.authorized) {
+                console.log(`GMA_VALID: derived (source: standing-authority-derivation; authority_id=${sel.authority.authority_id})`);
+                console.log(`branch: ${headRef}`);
+                console.log(`bounds: ${JSON.stringify(sel.authority.bounds)}`);
+                console.log('Result: GMA_VALID — governance mutation authorized via Standing Authority (GAP-005 Phase 2, policy-bound).');
+                process.exit(0);
+              }
+              console.error('Standing-authority derivation declined: ' + sel.reason);
+            }
+          }
+
           if (!matched) {
             console.error("NULL — no valid GMA for this PR's governed diff.");
             console.error(`computed governed_files_hash: ${computedHash}`);
             console.error(`branch: ${headRef}`);
-            console.error('Append a GMA via .github/workflows/governance-mutation-authorization.yml on this branch.');
+            console.error('Append a GMA via .github/workflows/governance-mutation-authorization.yml on this branch,');
+            console.error('or authorize a class of mutations via .github/workflows/standing-authority-issuance.yml (policy-bound GMA).');
             console.error('Result: MERGE_LEGITIMACY_NULL (GAP-005 / Issue #1984)');
             process.exit(1);
           }

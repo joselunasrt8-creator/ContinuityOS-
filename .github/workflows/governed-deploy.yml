@@ -2,7 +2,13 @@ name: governed-deploy
 # owner: #1601
 # policy: AGENT_EXECUTION_GOVERNANCE_MODEL
 # policy-path: governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json
-# issue-lineage: #1513 → #1601
+# issue-lineage: #1513 → #1601 → #1989
+#
+# Production environment gate (#1989):
+# The "production" GitHub Environment below MUST be configured with required
+# reviewers in repository settings (Settings > Environments > production).
+# This adds a human approval step between workflow_dispatch and the deploy
+# step, in addition to (not instead of) the canonical legitimacy chain below.
 
 on:
   workflow_dispatch:
@@ -28,6 +34,7 @@ permissions:
 jobs:
   governed-production-deploy:
     runs-on: ubuntu-latest
+    environment: production
 
     env:
       WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}

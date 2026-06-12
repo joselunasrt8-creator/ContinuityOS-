@@ -1,2 +1,3 @@
 governance/authorizations/gma_registry.jsonl            merge=union
+governance/authorizations/standing_authority_registry.jsonl merge=union
 governance/merge-legitimacy/merge_proof_registry.jsonl   merge=union

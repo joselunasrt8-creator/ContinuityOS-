@@ -86,8 +86,21 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
+              governance/authorizations/standing_authority_registry.jsonl)
+                # GAP-005 Phase 2: Standing Authority registry is a governance_mutation
+                # (must precede the governance/authorizations/* exemption). Keep this
+                # classifier byte-for-byte aligned with merge-governance-check.yml so the
+                # governed_files_hash matches.
+                echo "$file" >> gma_governed_files.txt
+                echo "governance_mutation" >> gma_mutation_classes.txt
+                ;;
               governance/authorizations/*)
                 # GMA artifacts are exempt — not governance primitives
+                ;;
+              runtime/standing-authority.mjs)
+                # GAP-005 Phase 2: Standing Authority derivation verifier is governed.
+                echo "$file" >> gma_governed_files.txt
+                echo "governance_mutation" >> gma_mutation_classes.txt
                 ;;
               governance/merge-legitimacy/merge_proof_registry.jsonl)
                 echo "$file" >> gma_governed_files.txt
@@ -254,10 +267,10 @@ jobs:
 
           git commit -m "gma: local-deterministic authorization ${GMA_ID}
 
-governed_files_hash: ${HASH}
-authorized_by: ${{ github.actor }}
-issuance_method: LOCAL_DETERMINISTIC
-canonical_lifecycle_executed: false"
+          governed_files_hash: ${HASH}
+          authorized_by: ${{ github.actor }}
+          issuance_method: LOCAL_DETERMINISTIC
+          canonical_lifecycle_executed: false"
 
           git push origin HEAD:"$WORKFLOW_REF_NAME"
           echo "GMA committed and pushed."

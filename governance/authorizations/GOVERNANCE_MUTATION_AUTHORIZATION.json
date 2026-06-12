@@ -1,12 +1,12 @@
 {
-  "gma_id": "GMA-work-local-20260611-legacy-helper-tombstones-gma",
-  "decision_id": "384b6fa7ce20f3d2356a7a6c93b22875c3159bbb10ce7a2d69f4d7904ccbe9bc",
-  "continuity_id": "b7da108a9b1251a3ac6296680ff066f21e7b3e20ac8eee50e19cefcdf276f4cb",
-  "session_id": "a3a7b4933e1eded1bd5a8d42fd07b7129500f045e1a7616428d1a1bd043dba78",
-  "validated_object_hash": "688ac3a896c08608dfb89a8b81ed56f7e23b1fda30ee0076722923fb4e536f78",
-  "governed_files_hash": "b227a9860ad7e541bb8f5afe3e3e4b78c52fe024727fc4983fdcc68af1099c2e",
+  "gma_id": "GMA-claude/standing-authority-operational-proof-yur14k-27402723808",
+  "decision_id": "251b119a098d78b76189d306df80d714d6feae42838b18dda3e7659985d71ede",
+  "continuity_id": "1ed57c7cc093c3c1007915188cc70fd93417723d332b87262cf114ba676ca26a",
+  "session_id": "7abd283bedde77d769246655266a62ca7eb796bea9aab885854828529eea37f7",
+  "validated_object_hash": "3c10b045b10bcb48cd359565afb34c4c0bc80b3e4007b32877b4760ecb997378",
+  "governed_files_hash": "08bdad7d2c474010245ef6a5c36346780701c57319e0178a26b176ba055b9132",
   "governed_files": [
-    "governance/mindshift-validation-bundle/maps/REPO_EXECUTION_MAP.json"
+    "governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json"
   ],
   "mutation_classes": [
     "governance_mutation"
@@ -14,15 +14,15 @@
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
-  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session \u2192 /continuity \u2192 /authority \u2192 /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Authorize Phase 1 tombstoning of legacy root helpers and active governance inventory reconciliation: registry.js, compile-decision.js, mindshift_bundle_generator.sh, decision.json fixture-only classification, and REPO_EXECUTION_MAP topology visibility update. No Cloudflare deploy or D1 migration governance changes.",
+  "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
+  "intent": "Authorize governance_mutation adding governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json (V1 agent attribution spec for issue #2003, PR #2026)",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "work",
-  "head_sha": "d44edb3d4559e46b81f1e01f60c76d9b0ef3fa6f",
-  "workflow_run_id": "local-20260611-legacy-helper-tombstones-gma",
-  "created_at": "2026-06-11T09:45:00Z",
-  "expires_at": "2027-06-11T09:45:00Z",
+  "branch": "claude/standing-authority-operational-proof-yur14k",
+  "head_sha": "0474ad63496ade5284eb44ae4a5884f1f8d47642",
+  "workflow_run_id": "27402723808",
+  "created_at": "2026-06-12T07:57:10Z",
+  "expires_at": "2027-06-12T07:57:10Z",
   "status": "GMA_VALID"
 }
