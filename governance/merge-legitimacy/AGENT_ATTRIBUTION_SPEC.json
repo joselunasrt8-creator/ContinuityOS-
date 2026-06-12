@@ -1,0 +1,168 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "agent_attribution_spec",
+  "issue_reference": "#2003",
+  "status": "non_operative_governance_artifact",
+  "artifact_class": "attribution_specification",
+  "generated_at": "2026-06-12",
+  "scope": {
+    "purpose": "Define a minimal, explicit, and auditable V1 model for classifying whether a PR is agent-authored, agent-assisted, human-authored, or of unknown attribution, so that the first Merge Guard dependency wedge (a required check for agent-authored PRs on protected branches) has a documented, non-overclaiming basis for deciding when it applies.",
+    "execution_surface": "none",
+    "operational_effect": "none"
+  },
+  "non_operability": {
+    "runtime_mutation": false,
+    "workflow_mutation": false,
+    "deploy_mutation": false,
+    "proof_generation": false,
+    "authority_creation": false,
+    "registry_mutation": false,
+    "enforcement_implementation": false,
+    "merge_operations": false
+  },
+
+  "non_negotiable_separations": [
+    "Attribution != authority. Knowing who or what authored a PR does not grant that PR any merge permission.",
+    "Visibility != legitimacy. Being able to observe an attribution signal does not make the underlying change legitimate.",
+    "Agent-authored classification != merge permission. A PR may be classified AGENT_AUTHORED and still resolve to MERGE_LEGITIMACY_NULL under the existing merge-legitimacy framework.",
+    "Whether UNKNOWN attribution blocks merge is a separate, independently configurable policy decision and is out of scope for this spec."
+  ],
+
+  "attribution_states": {
+    "AGENT_AUTHORED": {
+      "description": "The PR's changes were produced primarily by an autonomous or semi-autonomous coding agent acting under a session/agent identity, with no substantive independent human authorship of the diff content.",
+      "default_posture": "eligible for the agent-authored required-check wedge"
+    },
+    "AGENT_ASSISTED": {
+      "description": "The PR's changes were produced by a human author who used agent tooling (e.g. an IDE assistant, a chat-driven code suggestion) as part of the workflow, but the human remains the accountable author of record.",
+      "default_posture": "treated as HUMAN_AUTHORED for wedge purposes unless policy says otherwise"
+    },
+    "HUMAN_AUTHORED": {
+      "description": "No agent-attribution signal (authoritative or supporting) is present. The PR is treated as authored by its GitHub PR author with no agent involvement claimed.",
+      "default_posture": "not subject to the agent-authored required check"
+    },
+    "UNKNOWN": {
+      "description": "Signals are absent, contradictory, or insufficient to support any of the above classifications with the required confidence.",
+      "default_posture": "documented as UNKNOWN; MUST NOT be silently upgraded to AGENT_AUTHORED or HUMAN_AUTHORED. Whether UNKNOWN blocks merge, requires manual classification, or defaults to HUMAN_AUTHORED-equivalent treatment is a policy choice recorded outside this spec (see policy_binding_note)."
+    }
+  },
+
+  "policy_binding_note": "This spec defines the classification states and the signals that produce them. It does NOT itself bind any merge-blocking behavior. A future policy artifact (e.g. a MERGE_GOVERNANCE_RULES.json entry or a dedicated AGENT_ATTRIBUTION_POLICY.json) is required to declare whether UNKNOWN, AGENT_AUTHORED, or AGENT_ASSISTED PRs trigger the required check, and that artifact is out of scope here.",
+
+  "candidate_signals": [
+    {
+      "signal_id": "github_actor_or_bot_account",
+      "description": "The GitHub actor (github.actor) or bot account that created the PR or pushed its commits.",
+      "tier": "supporting",
+      "rationale": "Indicates the authenticated identity used to perform the GitHub-side action, but a human can drive an agent through their own account, so this alone cannot prove agent authorship of content."
+    },
+    {
+      "signal_id": "pr_author",
+      "description": "The GitHub user or app recorded as the PR author.",
+      "tier": "supporting",
+      "rationale": "Same limitation as github_actor: identifies who opened the PR, not who produced the diff."
+    },
+    {
+      "signal_id": "commit_author_committer",
+      "description": "The author/committer identity on each commit in the PR.",
+      "tier": "supporting",
+      "rationale": "Useful corroboration (e.g. a recognized agent service account as committer) but spoofable by anyone with push access and not sufficient alone."
+    },
+    {
+      "signal_id": "commit_trailer",
+      "description": "A structured commit-message trailer, e.g. `Agent-Authored-By: <agent-id>` or `Co-Authored-By: <agent-id>`, present on one or more commits in the PR.",
+      "tier": "authoritative",
+      "rationale": "An explicit, structured, human-or-agent-asserted declaration co-located with the change it describes. Authoritative for classification purposes, though it is an assertion, not a cryptographic proof (see future_work)."
+    },
+    {
+      "signal_id": "pr_label",
+      "description": "An explicit PR label such as `agent-authored` or `agent-assisted` applied to the PR.",
+      "tier": "authoritative",
+      "rationale": "An explicit, repo-governed declaration. Authoritative when applied by an actor permitted to label PRs; still an assertion rather than cryptographic proof."
+    },
+    {
+      "signal_id": "pr_body_metadata_block",
+      "description": "A structured metadata block in the PR description (e.g. a fenced block declaring `attribution: AGENT_AUTHORED`, `session_id: ...`, `agent_id: ...`).",
+      "tier": "authoritative",
+      "rationale": "Explicit, self-describing, and reviewable in the PR itself. Authoritative for V1, with the same assertion-vs-proof caveat as commit_trailer and pr_label."
+    },
+    {
+      "signal_id": "workflow_dispatch_input",
+      "description": "An input parameter on a workflow_dispatch run that opened or updated the PR, declaring the triggering actor as an agent/session.",
+      "tier": "supporting",
+      "rationale": "Useful when the PR was created via an automated dispatch path, but not all agent-authored PRs are opened this way, and the input is set by whoever triggers the dispatch."
+    },
+    {
+      "signal_id": "branch_naming_convention",
+      "description": "The PR's head branch matches a recognized agent-session naming convention, e.g. `claude/*`, `codex/*`, `cursor/*`.",
+      "tier": "heuristic",
+      "rationale": "Strong correlative signal in practice (these prefixes are conventionally used by agent sessions in this repository) but not self-asserting and not authoritative on its own — a human can create a branch with any name."
+    },
+    {
+      "signal_id": "signed_provenance_artifact",
+      "description": "A cryptographically signed provenance artifact binding the PR/commit to an agent identity (e.g. signed attestation, SLSA-style provenance).",
+      "tier": "future_only",
+      "rationale": "Not available in V1. Would be the only signal tier strong enough to approach proof rather than assertion; deferred to future work."
+    }
+  ],
+
+  "minimum_signal_for_agent_authored": {
+    "rule": "A PR is classified AGENT_AUTHORED if and only if at least one AUTHORITATIVE signal (commit_trailer, pr_label, or pr_body_metadata_block) explicitly declares agent authorship, AND no AUTHORITATIVE signal declares HUMAN_AUTHORED or AGENT_ASSISTED for the same PR.",
+    "supporting_and_heuristic_role": "SUPPORTING and HEURISTIC signals (github_actor_or_bot_account, pr_author, commit_author_committer, workflow_dispatch_input, branch_naming_convention) may corroborate an AUTHORITATIVE signal, or may be recorded as context, but MUST NOT by themselves produce AGENT_AUTHORED. A PR with only branch_naming_convention == claude/* and no authoritative declaration is UNKNOWN, not AGENT_AUTHORED.",
+    "conflict_handling": "If multiple AUTHORITATIVE signals disagree (e.g. a pr_label says agent-authored but a pr_body_metadata_block declares AGENT_ASSISTED), the classification is UNKNOWN and the conflict MUST be recorded in the attribution evidence for manual resolution."
+  },
+
+  "unknown_handling": {
+    "is_default": true,
+    "rationale": "Absent any AUTHORITATIVE signal, the system MUST NOT guess. UNKNOWN is the safe default and is recorded explicitly rather than silently defaulting to HUMAN_AUTHORED, which would overclaim certainty about non-agent involvement.",
+    "merge_effect": "NOT DEFINED BY THIS SPEC. Whether UNKNOWN blocks merge, requires a manual attribution label before merge, or is permitted to merge with UNKNOWN recorded in the proof is a policy decision (see policy_binding_note)."
+  },
+
+  "supported_paths": {
+    "explicit_marker_path": {
+      "name": "PR label or PR body metadata block",
+      "description": "A PR author (human or agent-driven session opening a PR under a human's authenticated account) applies the `agent-authored` (or `agent-assisted`) label, or includes a fenced metadata block in the PR body such as:\n\n```\n<!-- attribution\nattribution: AGENT_AUTHORED\nagent_id: agent:continuityos-session-<id>\nsession_id: <session-id>\n-->\n```\n\nMerge Guard reads this as an AUTHORITATIVE signal per minimum_signal_for_agent_authored.",
+      "status": "supported_in_v1"
+    },
+    "branch_naming_convention_path": {
+      "name": "Branch naming convention",
+      "description": "The PR's head branch matches `claude/*`, `codex/*`, `cursor/*`, or another registered agent-session prefix. This is recorded as a HEURISTIC signal and surfaced in the attribution evidence, but on its own resolves to UNKNOWN (not AGENT_AUTHORED) under minimum_signal_for_agent_authored — it exists to prompt a reviewer or required check to look for an authoritative signal, and to provide corroborating context when one is present.",
+      "status": "supported_in_v1_as_heuristic_only"
+    }
+  },
+
+  "proof_recording": {
+    "description": "When attribution is evaluated for a governed merge, the result is recorded as additional fields alongside (not replacing) the existing merge-legitimacy proof fields defined in MERGE_PROOF_SPEC.json (#1604) and the canonical_payload produced by merge-proof.yml.",
+    "fields": {
+      "attribution_classification": {
+        "type": "string",
+        "enum": ["AGENT_AUTHORED", "AGENT_ASSISTED", "HUMAN_AUTHORED", "UNKNOWN"],
+        "missing_result": "treated as UNKNOWN"
+      },
+      "attribution_signals": {
+        "type": "array",
+        "description": "Ordered list of {signal_id, tier, value} entries for every signal that was evaluated and found present, preserving which signal(s) drove the classification.",
+        "missing_result": "empty array permitted only when attribution_classification == UNKNOWN"
+      },
+      "attribution_evidence_hash": {
+        "type": "string",
+        "format": "sha256_hex",
+        "description": "SHA-256 hash of the canonicalized attribution_signals array, allowing the evidence basis for attribution_classification to be referenced without re-embedding it everywhere.",
+        "missing_result": "NULL"
+      }
+    },
+    "binding_statement": "attribution_classification and its evidence are descriptive metadata on the proof. They do not alter merge_legitimacy_status, reviewed_object_hash, approved_object_hash, merged_object_hash, or standing_authority_id, and their presence or absence has no effect on the exact-object admission chain defined elsewhere. A PR may be MERGE_LEGITIMACY_VALID with attribution_classification: AGENT_AUTHORED, or MERGE_LEGITIMACY_NULL with attribution_classification: HUMAN_AUTHORED — the two axes are independent."
+  },
+
+  "future_work": [
+    "Identity federation across agent vendors/sessions (out of scope for V1).",
+    "Cryptographic agent identity / signed provenance artifacts (signal tier future_only above) — would allow attribution to approach proof rather than assertion.",
+    "Multi-agent lineage (chains of agent sessions handing off work) — V1 records only a single attribution_classification per PR.",
+    "Vendor-specific deep integrations beyond branch-naming heuristics and generic label/trailer/metadata conventions.",
+    "Full cognition lineage (reasoning traces, prompts, intermediate tool calls) as part of attribution evidence.",
+    "A dedicated AGENT_ATTRIBUTION_POLICY.json defining the merge-blocking behavior for each attribution_classification, completing the dependency wedge described in #2003.",
+    "Extending branch_naming_convention to an explicit, repo-maintained registry of recognized agent-session prefixes rather than a hardcoded list."
+  ],
+
+  "closure_statement": "This spec defines the V1 attribution states (AGENT_AUTHORED, AGENT_ASSISTED, HUMAN_AUTHORED, UNKNOWN), classifies the nine candidate signals from #2003 into authoritative / supporting / heuristic / future_only tiers, defines the minimum authoritative-signal requirement for AGENT_AUTHORED, defines UNKNOWN as the safe non-overclaiming default with merge-effect left to policy, defines how attribution is recorded alongside existing merge proofs without affecting merge_legitimacy_status, documents one explicit-marker path (PR label / PR body metadata block) and one branch-naming-convention path, and states that attribution evidence is not authority by itself. Remaining work (policy binding for UNKNOWN/AGENT_AUTHORED merge effects, cryptographic provenance, multi-agent lineage, identity federation) is enumerated in future_work and is explicitly NOT closed by this spec."
+}
