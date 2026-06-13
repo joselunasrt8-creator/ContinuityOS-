@@ -14,6 +14,7 @@ permissions:
   contents: read
   pull-requests: read
   checks: read
+  actions: read
 
 jobs:
   merge-governance-check:
@@ -35,6 +36,11 @@ jobs:
           fetch-depth: 0
 
       - name: Classify merge actor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -45,12 +51,62 @@ jobs:
             PERMITTED=$(jq --arg actor "$ACTOR" \
               '[.permitted_bot_actors[] | select(. == $actor)] | length' \
               governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
-            if [ "$PERMITTED" -eq 0 ]; then
-              echo "NULL — actor $ACTOR is an unrecognized bot not in permitted_bot_actors allowlist."
-              echo "Result: MERGE_LEGITIMACY_NULL"
-              exit 1
+            if [ "$PERMITTED" -ne 0 ]; then
+              ACTOR_CLASSIFICATION="BOT_MERGE_ACTOR"
+            else
+              # Issue #2011 — bot-actor GMA issuance carve-out.
+              # The GMA issuer (governance-mutation-authorization.yml) commits the GMA
+              # artifact as github-actions[bot] and pushes it, so the resulting PR
+              # synchronize event is bot-attributed even though an OWNER authorized it via
+              # workflow_dispatch. Previously this NULLed and a re-run could not clear it,
+              # forcing a manual human-attributed push (Issue #2011, observed on #1999).
+              # Admit a bot actor ONLY when BOTH hold, so arbitrary bot commits still NULL:
+              #   (1) the PR head commit changes only the GMA artifact files
+              #       (no arbitrary code rides in under the bot identity), AND
+              #   (2) an owner-dispatched (non-bot triggering_actor) run of
+              #       governance-mutation-authorization.yml exists on this head branch.
+              # Re-evaluated every run, so a re-run clears once a valid owner dispatch exists.
+              # Defense in depth: the downstream GMA validation still binds (branch +
+              # governed_files_hash) to a GMA_VALID entry, so an artifact-only bot commit
+              # whose diff is not actually authorized is still NULLed there.
+              GMA_SINGLETON="governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json"
+              GMA_REGISTRY="governance/authorizations/gma_registry.jsonl"
+
+              ARTIFACT_ONLY="true"
+              CHANGED="$(git diff --name-only "${HEAD_SHA}^" "${HEAD_SHA}" 2>/dev/null || true)"
+              if [ -z "$CHANGED" ]; then
+                ARTIFACT_ONLY="false"
+              else
+                while IFS= read -r f; do
+                  [ -z "$f" ] && continue
+                  if [ "$f" != "$GMA_SINGLETON" ] && [ "$f" != "$GMA_REGISTRY" ]; then
+                    ARTIFACT_ONLY="false"
+                    break
+                  fi
+                done <<< "$CHANGED"
+              fi
+
+              OWNER_DISPATCH="false"
+              if [ "$ARTIFACT_ONLY" = "true" ]; then
+                OWNER_RUNS=$(gh api --paginate \
+                  "repos/${REPO}/actions/workflows/governance-mutation-authorization.yml/runs?branch=${HEAD_REF}&event=workflow_dispatch&per_page=100" \
+                  --jq '[.workflow_runs[] | select(((.triggering_actor.login // "") | endswith("[bot]")) | not)] | length' 2>/dev/null || echo "0")
+                if [ "${OWNER_RUNS:-0}" -gt 0 ]; then
+                  OWNER_DISPATCH="true"
+                fi
+              fi
+
+              if [ "$ARTIFACT_ONLY" = "true" ] && [ "$OWNER_DISPATCH" = "true" ]; then
+                ACTOR_CLASSIFICATION="BOT_GMA_ISSUANCE"
+                echo "Bot actor $ACTOR admitted as GMA issuance: head commit is a GMA artifact commit linked to an owner-dispatched governance-mutation-authorization run (Issue #2011)."
+              else
+                echo "NULL — actor $ACTOR is an unrecognized bot not in permitted_bot_actors allowlist."
+                echo "GMA-issuance carve-out not satisfied: artifact_only=$ARTIFACT_ONLY owner_dispatched_gma_run=$OWNER_DISPATCH"
+                echo "A bot actor is admitted only for a GMA artifact-only commit linked to an owner-dispatched governance-mutation-authorization run (Issue #2011)."
+                echo "Result: MERGE_LEGITIMACY_NULL"
+                exit 1
+              fi
             fi
-            ACTOR_CLASSIFICATION="BOT_MERGE_ACTOR"
           else
             ACTOR_TYPE="human"
             ACTOR_CLASSIFICATION="HUMAN_MERGE_ACTOR"
@@ -670,11 +726,20 @@ jobs:
           }
 
           // FALLBACK (transitional, Phase 2): legacy singleton, selected by governed_files_hash.
+          // Issue #2010: only a VALID singleton may short-circuit Tier 3. Previously the
+          // singleton set `matched` on governed_files_hash alone, so an EXPIRED (or otherwise
+          // invalid) singleton claimed the match, suppressed Tier 3 (guarded by `!matched`),
+          // and then failed checkEntry — NULLing a PR that a valid Standing Authority would
+          // have authorized. Apply the same temporal/status gates as the registry path before
+          // accepting the singleton, so an invalid singleton falls through to Tier 3.
           const SINGLETON = 'governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json';
           if (!matched && existsSync(SINGLETON)) {
             try {
               const gma = JSON.parse(readFileSync(SINGLETON, 'utf8'));
-              if (gma.governed_files_hash === computedHash) {
+              if (gma.governed_files_hash === computedHash
+                  && gma.status === 'GMA_VALID'
+                  && gma.authority_lineage_bound === true
+                  && new Date(gma.expires_at) > now) {
                 matched = gma;
                 source = 'singleton-fallback';
               }
