@@ -1,0 +1,1079 @@
+====================
+.github/workflows/conformance.yml
+name: conformance-pack-v1
+# owner: #1616
+# policy: GOVERNANCE_REQUIREMENTS
+# policy-path: GOVERNANCE_REQUIREMENTS.json
+# issue-lineage: #1616 → #1601
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'conformance/pack-v1/**'
+      - 'scripts/run-conformance.sh'
+      - '.github/workflows/conformance.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'conformance/pack-v1/**'
+      - 'scripts/run-conformance.sh'
+      - '.github/workflows/conformance.yml'
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: Run conformance pack-v1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run conformance harness
+        id: harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          node conformance/pack-v1/harness.mjs
+
+      - name: Verify evidence artifact written
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f conformance/pack-v1/conformance-pack-v1-evidence.json ]]; then
+            echo "Evidence artifact missing — conformance fails closed."
+            exit 1
+          fi
+          echo "Evidence artifact present."
+          cat conformance/pack-v1/conformance-pack-v1-evidence.json | python3 -m json.tool --no-indent > /dev/null
+          echo "Evidence JSON valid."
+
+      - name: Check evidence status
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS=$(python3 -c "
+          import json, sys
+          with open('conformance/pack-v1/conformance-pack-v1-evidence.json') as f:
+            d = json.load(f)
+          print(d.get('status', 'UNKNOWN'))
+          sys.exit(0 if d.get('status') == 'PACK_V1_CONFORMANCE_COMPLETE' else 1)
+          ")
+          echo "Evidence status: $STATUS"
+
+      - name: Verify governance boundaries preserved
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c "
+          import json, sys
+          with open('conformance/pack-v1/conformance-pack-v1-evidence.json') as f:
+====================
+.github/workflows/constitutional-integrity.yml
+name: constitutional-integrity
+# owner: #1616
+# policy: CONSTITUTIONAL_GOVERNANCE_RULES
+# policy-path: runtime/constitutional_governance_rules.json
+# issue-lineage: #1616 → #1601
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  constitutional-integrity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect constitutional drift
+        id: constitutional_drift
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CONSTITUTIONAL_PATHS=(
+            "governance/"
+            "src/runtime/validate.ts"
+            "src/runtime/execute.ts"
+            "src/runtime/canonicalize.ts"
+            "src/runtime/authority.ts"
+            "src/runtime/continuity.ts"
+          )
+
+          git diff --name-only origin/main...HEAD > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt
+
+          CONSTITUTIONAL_DRIFT=false
+
+          while read -r file; do
+            for path in "${CONSTITUTIONAL_PATHS[@]}"; do
+              if [[ "$file" == "$path"* ]] || [[ "$file" == "$path" ]]; then
+                CONSTITUTIONAL_DRIFT=true
+              fi
+            done
+          done < changed_files.txt
+
+          echo "constitutional_drift=$CONSTITUTIONAL_DRIFT" >> "$GITHUB_OUTPUT"
+          DRIFT_REPLAY_ID="$(printf '%s' "${{ github.repository }}|${{ github.workflow }}|${{ github.run_id }}|${{ github.run_attempt }}|${{ github.sha }}|${{ github.ref }}" | sha256sum | awk '{print $1}')"
+          echo "drift_replay_id=$DRIFT_REPLAY_ID" >> "$GITHUB_OUTPUT"
+
+          if [[ "$CONSTITUTIONAL_DRIFT" == "true" ]]; then
+            echo "Constitutional drift detected."
+          else
+            echo "No constitutional drift detected."
+          fi
+
+      - name: Classify governance impact
+        id: pr_classification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PR_CLASS="PR-0_NON_GOVERNED"
+
+          if grep -E "^governance/|^src/runtime/(validate|execute|canonicalize|authority|continuity)\.ts$" changed_files.txt; then
+            PR_CLASS="PR-2_CONSTITUTIONAL"
+          fi
+
+          if grep -E "workflow|deploy|wrangler|cloudflare|federation|sovereignty" changed_files.txt; then
+            PR_CLASS="PR-3_SOVEREIGNTY"
+          fi
+
+====================
+.github/workflows/continuity-merge-guard.yml
+name: continuity-merge-guard
+# ContinuityOS Merge Guard — v1 smallest-release dependency wedge.
+# See actions/continuity-merge-guard/README.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  merge-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./actions/continuity-merge-guard
+        id: merge-guard
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          actor: ${{ github.event.pull_request.user.login }}
+====================
+.github/workflows/demo-freshness.yml
+name: demo-freshness
+# owner: #1955
+# policy: README "Try the Governed Demo" / "Agent runtime integration: LangChain"
+# issue-lineage: #1952 -> #1953 -> #1954 -> #1955
+#
+# Converts installability from a recorded claim (RECORDED_DEMO.md) into a
+# standing gate: every PR to main must reproduce, from a clean checkout,
+# the exact install + demo path documented in README.md.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  demo-freshness:
+    name: Fresh-clone install + demo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run demo
+        run: npm run demo | tee demo-portability.log
+
+      - name: npm run demo:langchain
+        run: npm run demo:langchain | tee demo-langchain.log
+
+      - name: Verify VALID and NULL outcomes observed
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in demo-portability.log demo-langchain.log; do
+            grep -qE '"(status|result)": "EXECUTED"' "$f" || { echo "$f: missing EXECUTED outcome"; exit 1; }
+            grep -q '"result": "NULL"' "$f" || { echo "$f: missing NULL result"; exit 1; }
+          done
+          echo "VALID (EXECUTED) and NULL outcomes observed in both demos."
+
+      - name: Upload demo logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-freshness-logs
+          path: |
+            demo-portability.log
+            demo-langchain.log
+          retention-days: 90
+====================
+.github/workflows/governance-mutation-authorization.yml
+name: governance-mutation-authorization
+# owner: #1831
+# policy: GAP-005 — Governance Self-Mutation Containment (V1 local-deterministic model)
+# policy-path: governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION_SPEC.json
+# gap-reference: GAP-005
+#
+# V1 CONTAINMENT MODEL:
+# Governance mutations require owner workflow_dispatch + governed_files_hash binding.
+# No external Worker call. No PREFLIGHT. Purely repo-side and deterministic.
+#
+# External canonical lifecycle issuance (/session → /continuity → /authority → /compile)
+# is SEQUENCED for post-V1 once WORKER_URL / API_KEY authorization is restored.
+#
+# What this produces:
+#   governed_files_hash  — sha256-bound to exact governed file contents (repo-verifiable)
+#   mutation_classes     — declared, CI-verified
+#   owner dispatch       — explicit, auditable (github.actor + workflow_dispatch event)
+#   append-only proof    — GMA artifact committed to branch
+#
+# What this does NOT produce:
+#   canonical runtime lifecycle execution proof
+#   /execute → /proof lineage
+#   decision_id / continuity_id from external runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base branch to diff governed files against (default: main)'
+        required: false
+        default: 'main'
+      intent:
+        description: 'Brief description of the governance mutation being authorized'
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  create-governance-mutation-authorization:
+    if: ${{ !startsWith(github.ref_name, 'proof-registry/') }}
+    runs-on: ubuntu-latest
+
+    env:
+      BASE_REF: ${{ inputs.base_ref || 'main' }}
+      MUTATION_INTENT: ${{ inputs.intent }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+      GITHUB_ACTOR: ${{ github.actor }}
+
+    steps:
+      - name: HARD FAIL — Guard against non-dispatch invocation
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit workflow_dispatch invocation allowed"
+            exit 1
+          fi
+
+          if [ -z "${MUTATION_INTENT:-}" ]; then
+            echo "NULL — intent input is required"
+            exit 1
+          fi
+
+          echo "Dispatch authorized by ${{ github.actor }} on ${{ github.ref_name }}"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute governed files and hash
+        run: |
+          set -euo pipefail
+
+          git fetch origin "$BASE_REF" --depth=1
+====================
+.github/workflows/governed-deploy.yml
+name: governed-deploy
+# owner: #1601
+# policy: AGENT_EXECUTION_GOVERNANCE_MODEL
+# policy-path: governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json
+# issue-lineage: #1513 → #1601 → #1989
+#
+# Production environment gate (#1989):
+# The "production" GitHub Environment below MUST be configured with required
+# reviewers in repository settings (Settings > Environments > production).
+# This adds a human approval step between workflow_dispatch and the deploy
+# step, in addition to (not instead of) the canonical legitimacy chain below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      decision_id:
+        required: true
+        type: string
+      validated_object_hash:
+        required: true
+        type: string
+      invocation_nonce:
+        required: true
+        type: string
+
+concurrency:
+  group: governed-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  governed-production-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      DECISION_ID: ${{ github.event.inputs.decision_id }}
+      VALIDATED_OBJECT_HASH: ${{ github.event.inputs.validated_object_hash }}
+      INVOCATION_NONCE: ${{ github.event.inputs.invocation_nonce }}
+      DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: HARD FAIL — Missing critical inputs or secrets
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit invocation allowed"
+            exit 1
+          fi
+
+          for var in DECISION_ID VALIDATED_OBJECT_HASH INVOCATION_NONCE WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          case "$CALLER_WORKFLOW_REF" in
+====================
+.github/workflows/governed-release.yml
+name: governed-release
+# owner: #1601
+# policy: AGENT_EXECUTION_GOVERNANCE_MODEL
+# policy-path: governance/runtime/AGENT_EXECUTION_GOVERNANCE_MODEL.json
+# issue-lineage: #1513 → #1601
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (must match vX.Y.Z)'
+        required: true
+        type: string
+      source_commit_sha:
+        description: 'Exact 40-character commit SHA to release from (must be reachable from main)'
+        required: true
+        type: string
+      pr_number:
+        description: 'Merged PR number that introduced this commit to main'
+        required: true
+        type: string
+      release_notes:
+        description: 'Release notes content (must include tag, commit SHA, PR number, and provenance/artifact hash reference)'
+        required: true
+        type: string
+      break_glass_justification:
+        description: 'If non-empty, this release is classified BREAK_GLASS. Documents admin override reason. BREAK_GLASS releases are recorded but cannot be classified CANONICAL_RELEASE_CANDIDATE.'
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: governed-release-${{ github.event.inputs.release_tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  governed-release-verification:
+    runs-on: ubuntu-latest
+
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+      SOURCE_COMMIT_SHA: ${{ github.event.inputs.source_commit_sha }}
+      PR_NUMBER: ${{ github.event.inputs.pr_number }}
+      RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+      BREAK_GLASS_JUSTIFICATION: ${{ github.event.inputs.break_glass_justification }}
+
+    steps:
+      - name: HARD FAIL — reject non-dispatch invocation and missing inputs
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — governed-release must be invoked via explicit workflow_dispatch only"
+            exit 1
+          fi
+
+          for var in RELEASE_TAG SOURCE_COMMIT_SHA PR_NUMBER; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required input: $var"
+              exit 1
+            fi
+          done
+
+          if ! echo "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]'; then
+            echo "NULL — release_tag_format_invalid: $RELEASE_TAG must match vX.Y.Z"
+            exit 1
+          fi
+
+          if ! echo "$SOURCE_COMMIT_SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "NULL — source_commit_sha_invalid: must be a 40-character lowercase hex SHA"
+            exit 1
+          fi
+
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+====================
+.github/workflows/merge-governance-check.yml
+name: merge-governance-check
+# owner: #1604
+# policy: MERGE_GOVERNANCE_RULES
+# policy-path: governance/runtime/MERGE_GOVERNANCE_RULES.json
+# issue-lineage: #1666 → #1604
+
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  merge-governance-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Reject merge queue attempts
+        if: github.event_name == 'merge_group'
+        run: |
+          echo "NULL — merge_group event detected."
+          echo "Merge queue is DISABLED_FOR_GOVERNED_BRANCHES per CI-003 and MERGE_GOVERNANCE_RULES.json merge_queue_policy."
+          echo "Merge queue may produce a combined SHA not covered by the original PREO/SCO candidate."
+          echo "Result: MERGE_LEGITIMACY_NULL"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify merge actor
+        run: |
+          set -euo pipefail
+
+          ACTOR="${{ github.actor }}"
+
+          if [[ "$ACTOR" == *"[bot]"* ]]; then
+            ACTOR_TYPE="bot"
+            PERMITTED=$(jq --arg actor "$ACTOR" \
+              '[.permitted_bot_actors[] | select(. == $actor)] | length' \
+              governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+            if [ "$PERMITTED" -eq 0 ]; then
+              echo "NULL — actor $ACTOR is an unrecognized bot not in permitted_bot_actors allowlist."
+              echo "Result: MERGE_LEGITIMACY_NULL"
+              exit 1
+            fi
+            ACTOR_CLASSIFICATION="BOT_MERGE_ACTOR"
+          else
+            ACTOR_TYPE="human"
+            ACTOR_CLASSIFICATION="HUMAN_MERGE_ACTOR"
+          fi
+
+          echo "ACTOR_CLASSIFICATION=$ACTOR_CLASSIFICATION" >> "$GITHUB_ENV"
+          echo "actor_type=$ACTOR_TYPE actor=$ACTOR classification=$ACTOR_CLASSIFICATION"
+
+      - name: Detect changed files and governed paths
+        if: github.event_name != 'merge_group'
+        run: |
+          set -euo pipefail
+
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > changed_files.txt
+
+          : > governed_files.txt
+          : > mutation_classes.txt
+          : > target_surfaces.txt
+
+          GOVERNED_PATH_DETECTED="false"
+
+          while IFS= read -r file; do
+            case "$file" in
+              governance/authorizations/standing_authority_registry.jsonl)
+                # GAP-005 Phase 2: the Standing Authority registry grants reusable
+                # capability (not mere evidence), so issuing/revoking an authority is a
+                # governance_mutation requiring a GMA — the owner-dispatch provenance for
+====================
+.github/workflows/merge-proof.yml
+name: merge-proof
+# owner: #1667
+# policy: MERGE_PROOF_SPEC
+# policy-path: governance/merge-legitimacy/MERGE_PROOF_SPEC.json
+# issue-lineage: #1667 → #1604
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  generate-merge-proof:
+    if: >
+      github.event.pull_request.merged == true &&
+      !startsWith(github.event.pull_request.head.ref, 'proof-registry/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Compute reviewer legitimacy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          REPO="${{ github.repository }}"
+
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+          git fetch --no-tags --depth=1 origin "$HEAD_SHA" || true
+          git fetch --no-tags --depth=1 origin "$MERGE_SHA" || true
+
+          missing_base=false
+          missing_head=false
+          missing_merge=false
+          git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || missing_base=true
+          git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null || missing_head=true
+          git cat-file -e "$MERGE_SHA^{commit}" 2>/dev/null || missing_merge=true
+
+          if [ "$missing_base" = "true" ] || [ "$missing_head" = "true" ] || [ "$missing_merge" = "true" ]; then
+            echo "Unable to resolve commit object required for merge proof generation" >&2
+            echo "BASE_SHA=$BASE_SHA" >&2
+            echo "HEAD_SHA=$HEAD_SHA" >&2
+            echo "MERGE_SHA=${MERGE_SHA:-}" >&2
+            exit 1
+          fi
+
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed_files_proof.txt
+          RISK_CLASS="$(bash scripts/classify-risk.sh changed_files_proof.txt)"
+
+          gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" > pr_reviews.json
+
+          REVIEW_STATUS="UNVERIFIED"
+          REVIEWER_LOGIN=""
+          REVIEW_SUBMITTED_AT=""
+          REVIEWED_HEAD_SHA=""
+          STALE_REVIEW="false"
+          AUTHORITY_ROLE_REQUIRED=""
+          AUTHORITY_ROLE_VALID="false"
+          REVIEW_AUTHORITY_RESULT="false"
+          FAILURE_REASONS="[]"
+          CHANGED_P3_FILES_JSON='[]'
+          REVIEWER_SCOPE_PATHS_JSON='[]'
+          SCOPE_COVERAGE_VALID="true"
+
+====================
+.github/workflows/preo-candidate.yml
+name: preo-candidate
+# owner: #1670
+# policy: PREO_REQUIREMENTS
+# policy-path: governance/runtime/PREO_REQUIREMENTS.json
+# issue-lineage: #1670 → #1604
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  generate-preo-candidate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate reviewer legitimacy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          REPO="${{ github.repository }}"
+
+          # Detect risk class for P3 authority check
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > pr_changed_files_tmp.txt
+          QUICK_RISK_CLASS="$(bash scripts/classify-risk.sh pr_changed_files_tmp.txt)"
+
+          # Fetch PR reviews
+          gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" > pr_reviews_tmp.json
+
+          REVIEW_STATUS="UNVERIFIED"
+          REVIEWER_LOGIN=""
+          REVIEW_SUBMITTED_AT=""
+          REVIEWED_HEAD_SHA=""
+          STALE_REVIEW="false"
+          AUTHORITY_ROLE_REQUIRED=""
+          AUTHORITY_ROLE_VALID="false"
+          REVIEW_AUTHORITY_RESULT="false"
+          FAILURE_REASONS="[]"
+          CHANGED_P3_FILES_JSON='[]'
+          REVIEWER_SCOPE_PATHS_JSON='[]'
+          SCOPE_COVERAGE_VALID="true"
+
+          # A3: require APPROVED review where commit_id == current head SHA (object identity, not timestamp)
+          APPROVED_ON_HEAD=$(jq -c \
+            --arg author "$PR_AUTHOR" \
+            --arg head_sha "$HEAD_SHA" \
+            '[.[] | select(.state == "APPROVED" and .user.login != $author and .commit_id == $head_sha)] | last' \
+            pr_reviews_tmp.json)
+
+          if [ "$APPROVED_ON_HEAD" != "null" ] && [ -n "$APPROVED_ON_HEAD" ]; then
+            REVIEWER_LOGIN=$(echo "$APPROVED_ON_HEAD" | jq -r '.user.login')
+            REVIEW_SUBMITTED_AT=$(echo "$APPROVED_ON_HEAD" | jq -r '.submitted_at')
+            REVIEWED_HEAD_SHA=$(echo "$APPROVED_ON_HEAD" | jq -r '.commit_id')
+
+            if [ "$QUICK_RISK_CLASS" = "P3" ]; then
+              AUTHORITY_ROLE_REQUIRED="sovereignty_review"
+              HAS_AUTHORITY=$(jq --arg reviewer "$REVIEWER_LOGIN" \
+                '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | length > 0' \
+                governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+              if [ "$HAS_AUTHORITY" = "true" ]; then
+                # AC5: path-scope coverage — every changed P3 file must match a reviewer scope_path
+                REVIEWER_SCOPE_PATHS_JSON=$(jq -c --arg reviewer "$REVIEWER_LOGIN" \
+                  '(.authority_roles.sovereignty_review // []) | map(select(.login == $reviewer)) | .[0].scope_paths // []' \
+                  governance/merge-legitimacy/MERGE_ACTOR_REGISTRY.json)
+====================
+.github/workflows/prepare-governed-deploy.yml
+name: prepare-governed-deploy
+# owner: #1616
+# policy: DEPLOY_POLICY
+# policy-path: runtime/governance/DEPLOY_POLICY.json
+# issue-lineage: #1616 → #1601
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare-governed-deploy-inputs:
+    runs-on: ubuntu-latest
+
+    env:
+      WORKER_URL: ${{ secrets.MINDSHIFT_WORKER_URL }}
+      API_KEY: ${{ secrets.MINDSHIFT_API_KEY }}
+      DEPLOY_ENVIRONMENT: production
+      DEPLOY_INTENT: deploy_production
+      DEPLOY_WORKFLOW: governed-deploy.yml
+      PREPARE_WORKFLOW: prepare-governed-deploy.yml
+      DEPLOY_REPO: ${{ github.repository }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: HARD FAIL — Missing critical secrets
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit invocation allowed"
+            exit 1
+          fi
+
+          for var in WORKER_URL API_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "NULL — Missing required variable: $var"
+              exit 1
+            fi
+          done
+
+          CLEAN_WORKER_URL="${WORKER_URL%/}"
+          if [ -z "$CLEAN_WORKER_URL" ]; then
+            echo "NULL — Invalid WORKER_URL"
+            exit 1
+          fi
+
+          case "$CALLER_WORKFLOW_REF" in
+            */.github/workflows/$PREPARE_WORKFLOW@*) ;;
+            *)
+              echo "NULL — Workflow dispatch must enter through prepare-governed-deploy.yml"
+              exit 1
+              ;;
+          esac
+
+          if [ "$DEPLOY_ENVIRONMENT" != "production" ] || [ "$DEPLOY_INTENT" != "deploy_production" ] || [ "$DEPLOY_WORKFLOW" != "governed-deploy.yml" ]; then
+            echo "NULL — Canonical authority binding mismatch"
+            exit 1
+          fi
+
+          if [ "$DEPLOY_BRANCH" != "$WORKFLOW_REF_NAME" ]; then
+            echo "NULL — Branch/ref_name mismatch"
+            exit 1
+          fi
+
+          PREPARE_REPLAY_ID="$(printf '%s' "${GITHUB_REPOSITORY}|${PREPARE_WORKFLOW}|${WORKFLOW_RUN_ID}|${WORKFLOW_RUN_ATTEMPT}|${WORKFLOW_SHA}|${WORKFLOW_REF}" | sha256sum | awk '{print $1}')"
+          echo "PREPARE_REPLAY_ID=$PREPARE_REPLAY_ID" >> "$GITHUB_ENV"
+          echo "CLEAN_WORKER_URL=$CLEAN_WORKER_URL" >> "$GITHUB_ENV"
+
+      - name: SESSION — Create active deploy session
+        run: |
+====================
+.github/workflows/runtime-tests.yml
+name: runtime-tests
+# owner: highest-leverage-plan
+# policy: the runtime conformance suite (`npm test`) is load-bearing, not advisory.
+#
+# Before this gate, no workflow ran `node --test` over tests/**, so the runtime
+# could (and did) silently drift away from its own conformance suite. This
+# converts "the tests pass" from an unverified claim into a standing required
+# check: every PR to main must reproduce a green suite from a clean checkout.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  runtime-tests:
+    name: Runtime conformance suite (npm test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Ensure sqlite3 CLI is present
+        # tests/registry-lineage-migrations.test.mjs shells out to the sqlite3
+        # binary to apply migrations/*.sql against a real schema. ubuntu-latest
+        # ships it, but install explicitly so the gate never silently skips.
+        run: |
+          set -euo pipefail
+          if ! command -v sqlite3 >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y sqlite3
+          fi
+          sqlite3 --version
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test
+        run: npm test
+====================
+.github/workflows/sa-tier3-demo.yml
+name: sa-tier3-demo
+# Issue #2002 — Standing Authority Operational Proof.
+# This workflow file is the single in-bounds surface authorized by the narrow
+# Standing Authority SA-claude/standing-authority-operational-proof-yur14k-27399384732
+# (path_globs: .github/workflows/sa-tier3-demo.yml). A PR mutating ONLY this file
+# on a claude/* branch, with NO explicit per-PR GMA, must be admitted by
+# merge-governance-check Tier 3 (standing-authority-derivation).
+#
+# It is intentionally inert (manual dispatch only) so it never auto-runs or
+# affects required status checks.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof-marker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit Tier 3 proof marker
+        run: |
+          echo "Standing Authority operational proof (issue #2002)."
+          echo "This workflow mutation was admitted via Tier 3 standing-authority-derivation,"
+          echo "with no explicit per-PR GMA."
+====================
+.github/workflows/sco-candidate.yml
+name: sco-candidate
+# owner: #1604
+# policy: SCO_REQUIREMENTS
+# policy-path: governance/runtime/SCO_REQUIREMENTS.json
+# issue-lineage: #1604
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  generate-sco-candidate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate SCO candidate
+        run: |
+          set -euo pipefail
+
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > changed_files.txt
+
+          : > governed_files.txt
+          : > mutation_classes.txt
+          : > target_surfaces.txt
+
+          REQUIRES_SCO="false"
+          RISK_CLASS="P0"
+
+          while IFS= read -r file; do
+            case "$file" in
+              governance/*)
+                echo "$file" >> governed_files.txt
+                echo "governance_mutation" >> mutation_classes.txt
+                echo "governance_runtime" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+              .github/workflows/*)
+                echo "$file" >> governed_files.txt
+                echo "workflow_mutation" >> mutation_classes.txt
+                echo "source_control_governance" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P3"
+                ;;
+              src/*)
+                echo "$file" >> governed_files.txt
+                echo "runtime_mutation" >> mutation_classes.txt
+                echo "runtime_boundary" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P3"
+                ;;
+              schema.sql)
+                echo "$file" >> governed_files.txt
+                echo "schema_mutation" >> mutation_classes.txt
+                echo "database_schema" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+              migrations/*)
+                echo "$file" >> governed_files.txt
+                echo "migration_mutation" >> mutation_classes.txt
+                echo "database_migration" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+                RISK_CLASS="P2"
+                ;;
+              wrangler.toml)
+                echo "$file" >> governed_files.txt
+                echo "deployment_config_mutation" >> mutation_classes.txt
+                echo "deployment_configuration" >> target_surfaces.txt
+                REQUIRES_SCO="true"
+====================
+.github/workflows/standing-authority-issuance.yml
+name: standing-authority-issuance
+# owner: #1831
+# policy: GAP-005 — Policy-Bound GMA (Standing Authority, GMA Phase 2)
+# policy-path: governance/authorizations/STANDING_AUTHORITY_SPEC.json
+# gap-reference: GAP-005
+#
+# Issues a Standing Authority (SA): a bounded, owner-issued authority from which
+# scoped governance-mutation authorizations are DERIVED automatically at merge-check
+# time (Tier 3 of merge-governance-check.yml), instead of a manual per-PR GMA.
+#
+# One issuance -> many bounded derivations. The compressed rule:
+#   Manual GMA governs one mutation.
+#   Standing Authority governs a bounded class of mutations.
+#   Both must end in proof.
+#
+# Bound model: TTL = hard bound; max_merges = async proof-ledger budget.
+# V1 issues NARROW by default (one mutation class / one surface). Widen later.
+#
+# TWO-STEP ISSUANCE (GAP-005 Phase 2, gate-both): standing_authority_registry.jsonl
+# is now a governed trust surface (governance_mutation), so the issuance PR ITSELF
+# requires a GMA and cannot self-derive (trust surfaces are hard-denied from Tier 3).
+# To land a Standing Authority on a protected branch:
+#   1. Run THIS workflow on a branch  -> appends the SA to standing_authority_registry.jsonl
+#   2. Run governance-mutation-authorization.yml on the SAME branch
+#                                      -> emits a GMA covering the SA-registry change
+#   3. Open the PR and merge           -> Tier 1 (explicit GMA) authorizes the issuance
+# Both steps are owner workflow_dispatch, so issuance retains owner provenance.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_pattern:
+        description: 'Branch glob the authority applies to (e.g. claude/*)'
+        required: true
+        default: 'claude/*'
+      mutation_classes:
+        description: 'Comma-separated allowed mutation classes (e.g. workflow_mutation)'
+        required: true
+        default: 'workflow_mutation'
+      path_globs:
+        description: 'Comma-separated allowed path globs (e.g. .github/workflows/**)'
+        required: true
+        default: '.github/workflows/**'
+      ttl_hours:
+        description: 'Time-to-live in hours (hard bound)'
+        required: false
+        default: '24'
+      max_merges:
+        description: 'Async proof-ledger budget — max governed merges under this authority'
+        required: false
+        default: '2'
+      intent:
+        description: 'Human-readable description of the bounded authority'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  issue-standing-authority:
+    if: ${{ !startsWith(github.ref_name, 'proof-registry/') }}
+    runs-on: ubuntu-latest
+
+    env:
+      BRANCH_PATTERN: ${{ inputs.branch_pattern }}
+      MUTATION_CLASSES: ${{ inputs.mutation_classes }}
+      PATH_GLOBS: ${{ inputs.path_globs }}
+      TTL_HOURS: ${{ inputs.ttl_hours || '24' }}
+      MAX_MERGES: ${{ inputs.max_merges || '2' }}
+      AUTHORITY_INTENT: ${{ inputs.intent }}
+      WORKFLOW_RUN_ID: ${{ github.run_id }}
+      WORKFLOW_REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: HARD FAIL — Guard against non-dispatch invocation
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "NULL — Only explicit workflow_dispatch invocation allowed"
