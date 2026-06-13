@@ -709,14 +709,20 @@ jobs:
           if (!matched && isFork) {
             console.error(`Standing-authority derivation declined: fork PR (head repo ${process.env.HEAD_REPO} != ${process.env.BASE_REPO}) — explicit GMA required.`);
           }
-          // HARD DENY: the Standing Authority trust surfaces (the registry and the
-          // verifier) must NEVER be authorized by a Standing Authority — that would let a
-          // broad SA (e.g. governance/** or runtime/**) widen/disable the authority layer
-          // it derives from. Editing either always falls through to an explicit manual GMA.
-          // This is an absolute rule, independent of any SA's path_globs.
+          // HARD DENY: the Standing Authority trust surfaces must NEVER be authorized by a
+          // Standing Authority — that would let a broad SA (e.g. governance/**, runtime/**,
+          // or .github/workflows/**) widen/disable the authority layer it derives from.
+          // Editing any of them always falls through to an explicit manual GMA. This is an
+          // absolute rule, independent of any SA's path_globs. Covers (1) the SA registry,
+          // (2) the derivation verifier, plus the two authority-minting issuer workflows:
+          // (3) governance-mutation-authorization.yml (mints explicit GMAs) and
+          // (4) standing-authority-issuance.yml (issues Standing Authorities) — a
+          // workflow-scoped SA must not edit the machinery that grants authority (issue #2008).
           const TRUST_SURFACES = new Set([
             'governance/authorizations/standing_authority_registry.jsonl',
             'runtime/standing-authority.mjs',
+            '.github/workflows/governance-mutation-authorization.yml',
+            '.github/workflows/standing-authority-issuance.yml',
           ]);
           const touchesTrustSurface = governedFiles.some((f) => TRUST_SURFACES.has(f));
           if (!matched && touchesTrustSurface) {
