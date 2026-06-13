@@ -393,6 +393,27 @@ test('trust surfaces are hard-denied from SA derivation in gate and merge-proof 
   assert.match(gate, /!touchesTrustSurface && existsSync\('sa_registry_base\.jsonl'\)/, 'Tier 3 must not run when a trust surface is touched');
 });
 
+test('issuer workflows are hard-denied trust surfaces in BOTH classifiers (issue #2008)', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  // Both authority-minting issuer workflows must appear inside each file's TRUST_SURFACES set,
+  // so a workflow-scoped Standing Authority can never SA-derive an edit to the machinery that
+  // grants authority — it must fall through to an explicit manual GMA.
+  for (const wf of [gate, proof]) {
+    const start = wf.indexOf('TRUST_SURFACES = new Set([');
+    const end = wf.indexOf('])', start);
+    assert.ok(start !== -1 && end !== -1, 'TRUST_SURFACES set must be present');
+    const set = wf.slice(start, end);
+    assert.match(set, /\.github\/workflows\/governance-mutation-authorization\.yml/, 'GMA issuer workflow must be a hard-denied trust surface');
+    assert.match(set, /\.github\/workflows\/standing-authority-issuance\.yml/, 'SA issuer workflow must be a hard-denied trust surface');
+  }
+  // The spec must document the issuer workflows as trust surfaces.
+  const spec = JSON.parse(readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'));
+  const gating = JSON.stringify(spec.trust_surface_gating);
+  assert.match(gating, /governance-mutation-authorization\.yml/, 'spec must document the GMA issuer as a trust surface');
+  assert.match(gating, /standing-authority-issuance\.yml/, 'spec must document the SA issuer as a trust surface');
+});
+
 test('merge-proof evaluates explicit-GMA expiry at merge time, not proof-gen time (P2)', () => {
   const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
   assert.match(proof, /new Date\(e\.expires_at\) > mergedAt/, 'explicit-GMA expiry must be compared against mergedAt');
