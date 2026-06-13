@@ -203,7 +203,7 @@ test('/authority succeeds only after schema bootstrap with active session and co
     }
   }
 
-  const response = await worker.fetch(post('/authority', { session_id: 'session-1', continuity_id: 'continuity-1', decision_id: 'decision-1' }), env)
+  const response = await worker.fetch(post('/authority', { session_id: 'session-1', continuity_id: 'continuity-1', decision_id: 'decision-1', governed_tool_envelope_id: 'gte-session-1', topology_epoch: 0, epoch_lineage_parent: 'epoch-root', epoch_nonce: 'epoch-nonce-session-1', topology_visibility_state: 'VISIBLE' }), env)
   const payload = await response.json()
 
   assert.equal(response.status, 200)
@@ -227,7 +227,7 @@ test('/authority fails closed when continuity ancestry is orphaned', async () =>
     }
   }
   const env = { API_KEY: 'test-key', DB: { prepare(sql) { return { bind(v){ this.v=v; return this }, run(){ return Promise.resolve({meta:{changes:1}}) }, all(){ if (sql.includes('FROM session_registry')) return Promise.resolve({ results: [{ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' }] }); return Promise.resolve({results:[]}) }, first(){ if (sql.includes('FROM continuity_registry')) return Promise.resolve(continuityRows[this.v] || null); if (sql.includes('FROM session_registry')) return Promise.resolve({ session_id: 'session-1', continuity_status: 'ACTIVE', identity_id: 'identity-1', expires_at: '2999-01-01T00:00:00.000Z' }); return Promise.resolve(null) } } } } }
-  const response = await worker.fetch(post('/authority', { session_id: 'session-1', continuity_id: 'continuity-child', decision_id: 'decision-1' }), env)
+  const response = await worker.fetch(post('/authority', { session_id: 'session-1', continuity_id: 'continuity-child', decision_id: 'decision-1', governed_tool_envelope_id: 'gte-session-1' }), env)
   const payload = await response.json()
   assert.equal(payload.status, 'NULL')
   assert.equal(payload.reason, 'invalid_continuity')

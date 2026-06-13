@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+const observabilityAdapterSource = readFileSync(new URL('../../src/lib/runtime-observability-adapter.ts', import.meta.url), 'utf8')
 
 test('runtime persists observability events with legitimacy references', () => {
   assert.match(
@@ -12,7 +13,7 @@ test('runtime persists observability events with legitimacy references', () => {
   )
 
   assert.match(
-    source,
+    observabilityAdapterSource,
     /async function emitTelemetry[\s\S]*INSERT INTO observability_registry[\s\S]*event_id,event_type,decision_id,authority_id,execution_id,proof_id,severity,payload,created_at/,
     'emitTelemetry must persist observability events with legitimacy references',
   )
@@ -26,7 +27,7 @@ test('runtime persists drift events with required drift classification', () => {
   )
 
   assert.match(
-    source,
+    observabilityAdapterSource,
     /async function recordDrift[\s\S]*INSERT INTO drift_registry[\s\S]*drift_id,drift_class,severity,decision_id,execution_id,payload,detected_by,resolution_status,created_at/,
     'recordDrift must persist drift events with required classifications',
   )

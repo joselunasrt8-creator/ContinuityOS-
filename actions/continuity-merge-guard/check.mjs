@@ -4,10 +4,10 @@
 //
 // Smallest-release legitimacy check for a pull request:
 //
-//   canonical payload {repo, pr_number, head_sha, base_sha, actor}
+//   canonical payload {repo, pr_number, head_sha, base_sha, actor, author_kind, require_agent_authored}
 //     -> canonicalize -> sha256
-//     -> VALID  (all fields present and non-empty)
-//        | NULL (any field missing or empty, fail-closed)
+//     -> VALID  (identity complete, policy satisfied)
+//        | NULL (missing identity, invalid policy input, or policy mismatch; fail-closed)
 //     -> proof artifact (MERGE_GUARD_PROOF.json)
 //
 // Self-contained: no external npm dependencies. canonicalize/sha256Hex are
@@ -104,9 +104,28 @@ export function sha256Hex(input) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Decision logic — the only check in v1: object-identity completeness.
+// Decision logic — v1 identity completeness plus an optional agent-authored
+// workflow policy. The policy is intentionally explicit: callers must supply
+// both the author classification and whether this workflow requires agent
+// authorship. There is no hidden GitHub API lookup or inferred authority.
 // ─────────────────────────────────────────────────────────────────────────────
 const REQUIRED_FIELDS = ['repo', 'pr_number', 'head_sha', 'base_sha', 'actor']
+const AUTHOR_KINDS = ['agent', 'human', 'unknown']
+const REQUIRE_AGENT_VALUES = ['true', 'false']
+
+function normalizeString(v) {
+  return typeof v === 'string' ? v.trim() : ''
+}
+
+function normalizeAuthorKind(v) {
+  const authorKind = normalizeString(v).toLowerCase() || 'unknown'
+  return authorKind
+}
+
+function normalizeRequireAgentAuthored(v) {
+  const required = normalizeString(v).toLowerCase() || 'false'
+  return required
+}
 
 export function evaluate(input) {
   const missing_fields = REQUIRED_FIELDS.filter(f => {
@@ -114,13 +133,31 @@ export function evaluate(input) {
     return v === undefined || v === null || v === ''
   })
 
+  const author_kind = normalizeAuthorKind(input.author_kind)
+  const require_agent_authored = normalizeRequireAgentAuthored(input.require_agent_authored)
+
+  const invalid_fields = []
+  if (!AUTHOR_KINDS.includes(author_kind)) invalid_fields.push('author_kind')
+  if (!REQUIRE_AGENT_VALUES.includes(require_agent_authored)) invalid_fields.push('require_agent_authored')
+
+  const null_reasons = []
+  if (missing_fields.length > 0) null_reasons.push('MISSING_REQUIRED_FIELD')
+  if (invalid_fields.length > 0) null_reasons.push('INVALID_POLICY_FIELD')
+
+  const agent_author_required = require_agent_authored === 'true'
+  if (agent_author_required && author_kind !== 'agent') {
+    null_reasons.push('AGENT_AUTHOR_REQUIRED')
+  }
+
   const canonical_payload = REQUIRED_FIELDS.reduce((o, f) => {
     o[f] = input[f] ?? null
     return o
   }, {})
+  canonical_payload.author_kind = author_kind
+  canonical_payload.require_agent_authored = require_agent_authored
 
   const canonical_hash = sha256Hex(canonicalize(canonical_payload))
-  const result = missing_fields.length === 0 ? 'VALID' : 'NULL'
+  const result = null_reasons.length === 0 ? 'VALID' : 'NULL'
 
   const head_sha = input.head_sha ?? ''
   const proof_id = `MERGE_GUARD-${input.pr_number ?? 'unknown'}-${head_sha.slice(0, 8) || 'unknown'}`
@@ -132,6 +169,11 @@ export function evaluate(input) {
     canonical_hash,
     result,
     missing_fields,
+    invalid_fields,
+    author_kind,
+    require_agent_authored,
+    agent_author_required,
+    null_reasons,
     record_type: 'MERGE_GUARD_PROOF',
   }
 }
@@ -147,6 +189,8 @@ function main() {
     head_sha: process.env.MERGE_GUARD_HEAD_SHA || '',
     base_sha: process.env.MERGE_GUARD_BASE_SHA || '',
     actor: process.env.MERGE_GUARD_ACTOR || '',
+    author_kind: process.env.MERGE_GUARD_AUTHOR_KIND || '',
+    require_agent_authored: process.env.MERGE_GUARD_REQUIRE_AGENT_AUTHORED || '',
   }
 
   const decision = evaluate(input)
@@ -159,6 +203,11 @@ function main() {
     canonical_hash: decision.canonical_hash,
     result: decision.result,
     missing_fields: decision.missing_fields,
+    invalid_fields: decision.invalid_fields,
+    author_kind: decision.author_kind,
+    require_agent_authored: decision.require_agent_authored,
+    agent_author_required: decision.agent_author_required,
+    null_reasons: decision.null_reasons,
     generated_at,
     record_type: decision.record_type,
   }
@@ -169,8 +218,16 @@ function main() {
   console.log(`ContinuityOS Merge Guard — result=${decision.result}`)
   console.log(`proof_id=${decision.proof_id}`)
   console.log(`canonical_hash=${decision.canonical_hash}`)
+  console.log(`author_kind=${decision.author_kind}`)
+  console.log(`require_agent_authored=${decision.require_agent_authored}`)
   if (decision.missing_fields.length > 0) {
     console.log(`missing_fields=${decision.missing_fields.join(',')}`)
+  }
+  if (decision.invalid_fields.length > 0) {
+    console.log(`invalid_fields=${decision.invalid_fields.join(',')}`)
+  }
+  if (decision.null_reasons.length > 0) {
+    console.log(`null_reasons=${decision.null_reasons.join(',')}`)
   }
 
   const githubOutput = process.env.GITHUB_OUTPUT
@@ -179,6 +236,8 @@ function main() {
     appendFileSync(githubOutput, `proof_id=${decision.proof_id}\n`)
     appendFileSync(githubOutput, `proof_hash=${decision.canonical_hash}\n`)
     appendFileSync(githubOutput, `proof_url=${proofPath}\n`)
+    appendFileSync(githubOutput, `author_kind=${decision.author_kind}\n`)
+    appendFileSync(githubOutput, `null_reasons=${decision.null_reasons.join(',')}\n`)
   }
 
   const githubStepSummary = process.env.GITHUB_STEP_SUMMARY
@@ -189,6 +248,9 @@ function main() {
       `result: \`${decision.result}\``,
       `proof_id: \`${decision.proof_id}\``,
       `proof_hash: \`${decision.canonical_hash}\``,
+      `author_kind: \`${decision.author_kind}\``,
+      `require_agent_authored: \`${decision.require_agent_authored}\``,
+      `null_reasons: \`${decision.null_reasons.join(',') || 'none'}\``,
       '',
       '```json',
       JSON.stringify(proof, null, 2),
@@ -199,7 +261,7 @@ function main() {
   }
 
   if (decision.result !== 'VALID') {
-    console.error(`NULL — missing required field(s): ${decision.missing_fields.join(', ')}`)
+    console.error(`NULL — ${decision.null_reasons.join(', ') || 'policy_not_satisfied'}`)
     process.exitCode = 1
   }
 }

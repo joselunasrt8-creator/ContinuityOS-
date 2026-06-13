@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
 const source = readFileSync(new URL('../../src/index.ts', import.meta.url), 'utf8')
+const discoveryAdapterSource = readFileSync(new URL('../../src/lib/runtime-discovery-adapter.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../../migrations/0040_governance_consensus_infrastructure.sql', import.meta.url), 'utf8')
 const spec = JSON.parse(readFileSync(new URL('../../governance/consensus/GOVERNANCE_CONSENSUS_SPEC.json', import.meta.url), 'utf8'))
 
@@ -75,7 +76,7 @@ test('new registries are append-only and non-authoritative', () => {
 })
 
 test('consensus drift taxonomy is canonical and deterministic', () => {
-  for (const driftClass of spec.drift_classes) assert.ok(source.includes(driftClass), `${driftClass} missing from source`)
+  for (const driftClass of spec.drift_classes) assert.ok(discoveryAdapterSource.includes(driftClass), `${driftClass} missing from source`)
   assert.equal(hashCanonical(spec.drift_classes), hashCanonical([...spec.drift_classes]))
 })
 

@@ -329,10 +329,20 @@ describe('Slice B — aeo.json schema conformance', () => {
     assert.equal(aeo.finality.registry_required, true);
   });
 
-  it('tests/fixtures/valid-aeo.json has exactly the required 5 fields', () => {
+  it('tests/fixtures/valid-aeo.json is a structurally complete fate-harness AEO', () => {
+    // valid-aeo.json is the shared lifecycle fixture loaded by
+    // tests/fate/fate-attack-helpers.mjs (fixtures.aeo). Its canonical role is
+    // the full fate-harness AEO object, not the 5-field deploy AEO — the 5-field
+    // conformant example is tests/fixtures/cicd-aeo-conformant.json (checked
+    // below). It must carry every key the fate harness requires, tagged AEO.
     const aeo = JSON.parse(readFileSync(resolve(ROOT, 'tests/fixtures/valid-aeo.json'), 'utf8'));
     const keys = Object.keys(aeo).sort();
-    assert.deepEqual(keys, ['finality', 'intent', 'scope', 'target', 'validation'], 'must have exactly 5 required fields');
+    assert.deepEqual(
+      keys,
+      ['aeo_id', 'authority_id', 'continuity_id', 'decision_id', 'finality', 'intent', 'nonce', 'object_type', 'runtime_id', 'scope', 'session_id', 'target', 'validation'],
+      'must carry the full fate-harness AEO field set',
+    );
+    assert.equal(aeo.object_type, 'AEO');
     assert.equal(aeo.validation.require_active_authority, true);
     assert.equal(aeo.validation.require_exact_object_hash, true);
     assert.equal(aeo.validation.require_session_continuity, true);

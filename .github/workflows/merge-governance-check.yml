@@ -105,6 +105,16 @@ jobs:
                 echo "proof_evidence_surface" >> target_surfaces.txt
                 GOVERNED_PATH_DETECTED="true"
                 ;;
+              governance/operational-risk/*.md)
+                # Evidence-only operational-risk audit artifacts map external blockers and
+                # required proof without mutating governance rules, authority, workflows,
+                # runtime execution, or proof persistence. Keep them SCO-visible but do not
+                # require GMA because no governance primitive changes.
+                echo "$file" >> governed_files.txt
+                echo "operational_risk_evidence" >> mutation_classes.txt
+                echo "operational_risk_evidence_surface" >> target_surfaces.txt
+                GOVERNED_PATH_DETECTED="true"
+                ;;
               governance/*)
                 echo "$file" >> governed_files.txt
                 echo "governance_mutation" >> mutation_classes.txt
@@ -729,6 +739,7 @@ jobs:
                 f.startsWith('.github/workflows/')
                 || (f.startsWith('governance/')
                     && !f.startsWith('governance/authorizations/')
+                    && !/^governance\/operational-risk\/[^/]+\.md$/.test(f)
                     && f !== 'governance/merge-legitimacy/merge_proof_registry.jsonl');
               const authFiles = governedFiles.filter(isAuthGated);
               const sel = selectStandingAuthority({

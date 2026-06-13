@@ -1,0 +1,53 @@
+name: runtime-tests
+# owner: highest-leverage-plan
+# policy: the runtime conformance suite (`npm test`) is load-bearing, not advisory.
+#
+# Before this gate, no workflow ran `node --test` over tests/**, so the runtime
+# could (and did) silently drift away from its own conformance suite. This
+# converts "the tests pass" from an unverified claim into a standing required
+# check: every PR to main must reproduce a green suite from a clean checkout.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  runtime-tests:
+    name: Runtime conformance suite (npm test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Ensure sqlite3 CLI is present
+        # tests/registry-lineage-migrations.test.mjs shells out to the sqlite3
+        # binary to apply migrations/*.sql against a real schema. ubuntu-latest
+        # ships it, but install explicitly so the gate never silently skips.
+        run: |
+          set -euo pipefail
+          if ! command -v sqlite3 >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y sqlite3
+          fi
+          sqlite3 --version
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test
+        run: npm test
