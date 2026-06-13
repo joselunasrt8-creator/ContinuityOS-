@@ -1,0 +1,33 @@
+{
+  "object_type": "DependencyFormationSpineEvidence",
+  "issue": "#2013",
+  "mode": "evidence_only",
+  "creates_authority": false,
+  "creates_proof": false,
+  "visibility_implies_legitimacy": false,
+  "closure_status": "PARTIAL",
+  "dependency_claim": "ContinuityOS Merge Guard records outside-runtime load-bearing dependency evidence for a repository that pins the packaged action and makes VALID/NULL a required merge check.",
+  "provider_author_can_self_satisfy": "unknown",
+  "independence_status": "outside_owner_or_outside_controlled_dependency_not_established",
+  "remaining_closure_gap": "Issue #2013 remains open pending outside-owner or outside-controlled dependency proof.",
+  "evidence_semantics": "registry_may_record_evidence_but_must_not_imply_issue_closure",
+  "evidence": {
+    "load_bearing_state": "LOAD_BEARING_ACTIVE",
+    "required_merge_check": {
+      "observed": true,
+      "check_name": "VALID/NULL"
+    },
+    "proof_evidence": {
+      "valid_proof_observed": true,
+      "null_proof_observed": true
+    },
+    "packaged_action_pin": {
+      "observed": true,
+      "version": "v0.1.0"
+    },
+    "external_consumer_registration": {
+      "observed": true,
+      "semantics": "evidence_only"
+    }
+  }
+}

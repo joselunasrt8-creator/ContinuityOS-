@@ -83,6 +83,36 @@
       "source_path": "cli/sdk/index.mjs",
       "canonical_chain_stages": ["/compile", "/validate", "/execute"],
       "notes": "SDK surface; compile/validate/execute/proofLineage/reconcile primitives exported"
+    },
+    {
+      "surface_id": "continuityos_merge_guard_dependency_evidence_2013",
+      "integration_type": "proof_bound_workflow",
+      "description": "ContinuityOS Merge Guard records outside-runtime load-bearing dependency evidence for a repository that pins the packaged action and makes VALID/NULL a required merge check.",
+      "validator_bound": true,
+      "replay_safe": true,
+      "proof_generating": false,
+      "topology_visible": true,
+      "reconciliation_capable": false,
+      "closure_status": "PARTIAL",
+      "dependency_class": "workflow_dependency",
+      "source_path": "evidence/dependency-formation/DEPENDENCY_FORMATION_SPINE_2013.json",
+      "evidence_mode": "evidence_only",
+      "creates_authority": false,
+      "creates_proof": false,
+      "visibility_implies_legitimacy": false,
+      "provider_author_can_self_satisfy": "unknown",
+      "independence_status": "outside_owner_or_outside_controlled_dependency_not_established",
+      "remaining_closure_gap": "Issue #2013 remains open pending outside-owner or outside-controlled dependency proof.",
+      "evidence_preserved": [
+        "LOAD_BEARING_ACTIVE",
+        "required_merge_check",
+        "VALID_proof_evidence",
+        "NULL_proof_evidence",
+        "pinned_v0.1.0",
+        "external_consumer_registration",
+        "evidence_only_semantics"
+      ],
+      "notes": "Registry records evidence only; it does not imply issue closure or outside-owner independence."
     }
   ]
 }
