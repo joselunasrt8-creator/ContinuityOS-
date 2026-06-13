@@ -429,9 +429,13 @@ jobs:
 
           // HARD DENY (matches the gate): the Standing Authority trust surfaces are never
           // SA-derivable, so a PR touching them is never attributed to / charged against a SA.
+          // Includes the two authority-minting issuer workflows (governance-mutation-authorization.yml,
+          // standing-authority-issuance.yml) so a workflow-scoped SA cannot widen the authority layer (issue #2008).
           const TRUST_SURFACES = new Set([
             'governance/authorizations/standing_authority_registry.jsonl',
             'runtime/standing-authority.mjs',
+            '.github/workflows/governance-mutation-authorization.yml',
+            '.github/workflows/standing-authority-issuance.yml',
           ]);
           const touchesTrustSurface = governedFiles.some((f) => TRUST_SURFACES.has(f));
 
