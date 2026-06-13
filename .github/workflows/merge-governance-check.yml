@@ -726,11 +726,20 @@ jobs:
           }
 
           // FALLBACK (transitional, Phase 2): legacy singleton, selected by governed_files_hash.
+          // Issue #2010: only a VALID singleton may short-circuit Tier 3. Previously the
+          // singleton set `matched` on governed_files_hash alone, so an EXPIRED (or otherwise
+          // invalid) singleton claimed the match, suppressed Tier 3 (guarded by `!matched`),
+          // and then failed checkEntry — NULLing a PR that a valid Standing Authority would
+          // have authorized. Apply the same temporal/status gates as the registry path before
+          // accepting the singleton, so an invalid singleton falls through to Tier 3.
           const SINGLETON = 'governance/authorizations/GOVERNANCE_MUTATION_AUTHORIZATION.json';
           if (!matched && existsSync(SINGLETON)) {
             try {
               const gma = JSON.parse(readFileSync(SINGLETON, 'utf8'));
-              if (gma.governed_files_hash === computedHash) {
+              if (gma.governed_files_hash === computedHash
+                  && gma.status === 'GMA_VALID'
+                  && gma.authority_lineage_bound === true
+                  && new Date(gma.expires_at) > now) {
                 matched = gma;
                 source = 'singleton-fallback';
               }
