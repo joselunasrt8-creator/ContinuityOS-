@@ -83,6 +83,32 @@
       "source_path": "cli/sdk/index.mjs",
       "canonical_chain_stages": ["/compile", "/validate", "/execute"],
       "notes": "SDK surface; compile/validate/execute/proofLineage/reconcile primitives exported"
+    },
+    {
+      "surface_id": "continuityos_sandbox_merge_guard_required_check",
+      "integration_type": "proof_bound_workflow",
+      "description": "External continuityos-sandbox repository pins ContinuityOS Merge Guard and makes the merge-guard job a required status check on main.",
+      "validator_bound": true,
+      "replay_safe": true,
+      "proof_generating": true,
+      "topology_visible": true,
+      "reconciliation_capable": false,
+      "closure_status": "CLOSED",
+      "dependency_class": "governance_dependency",
+      "external_dependency": true,
+      "consumer_repo": "joselunasrt8-creator/continuityos-sandbox",
+      "provider_action_path": "actions/continuity-merge-guard",
+      "provider_action_ref": "v0.1.0",
+      "required_status_check": "merge-guard",
+      "dependency_state": "LOAD_BEARING_ACTIVE",
+      "source_path": "evidence/dependency-formation/DEPENDENCY_FORMATION_SPINE_2013.json",
+      "canonical_chain_stages": ["/validate", "/proof"],
+      "evidence_paths": [
+        "LOAD_BEARING_READINESS.md",
+        "NULL_ENFORCEMENT_PROOF.md",
+        "EXTERNAL_DEPENDENCY_PROOF.md"
+      ],
+      "notes": "Issue #2013 dependency-formation spine: external protected-branch merge eligibility depends on Merge Guard VALID/NULL proof. Registry is observability-only and does not create authority."
     }
   ]
 }

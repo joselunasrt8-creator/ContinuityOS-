@@ -63,8 +63,13 @@ installs Merge Guard at `@v0.1.0` and has made `merge-guard` a **required**
 status check on its `main` branch — `LOAD-BEARING_ACTIVE`. Real PRs in
 that repo have exercised both outcomes: a `VALID` result allows merge, and
 a `NULL` result reports `failure` and leaves the PR `blocked`. See that
-repo's `LOAD_BEARING_READINESS.md` and `NULL_ENFORCEMENT_PROOF.md` for the
-evidence.
+repo's `LOAD_BEARING_READINESS.md`, `NULL_ENFORCEMENT_PROOF.md`, and
+`EXTERNAL_DEPENDENCY_PROOF.md` for the load-bearing setup, NULL-path
+blocking evidence, and external dependency proof. This repo records the
+bounded #2013 dependency-formation spine at
+`evidence/dependency-formation/DEPENDENCY_FORMATION_SPINE_2013.json` and in
+`runtime/adoption/external_surface_registry.json` without creating authority
+or changing branch protection.
 
 ---
 

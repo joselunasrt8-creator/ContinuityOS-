@@ -1,0 +1,61 @@
+{
+  "object_type": "DependencyFormationSpine",
+  "issue_id": 2013,
+  "generated_at": "2026-06-13T00:00:00.000Z",
+  "mode": "evidence_only",
+  "creates_authority": false,
+  "mutates_runtime_state": false,
+  "visibility_implies_legitimacy": false,
+  "claim": "ContinuityOS Merge Guard has formed an external workflow dependency when a repository outside this runtime pins the packaged action and makes its VALID/NULL result a required merge check.",
+  "provider_surface": {
+    "repo": "joselunasrt8-creator/ContinuityOS-",
+    "path": "actions/continuity-merge-guard",
+    "release_ref": "v0.1.0",
+    "result_domain": ["VALID", "NULL"],
+    "proof_artifact": "MERGE_GUARD_PROOF.json"
+  },
+  "external_consumer": {
+    "repo": "joselunasrt8-creator/continuityos-sandbox",
+    "branch": "main",
+    "required_status_check": "merge-guard",
+    "dependency_state": "LOAD_BEARING_ACTIVE",
+    "consumer_relation": "external_repository",
+    "provider_author_can_self_satisfy": false
+  },
+  "dependency_spine": [
+    "external PR identity object",
+    "pinned Merge Guard action @v0.1.0",
+    "canonicalize + sha256",
+    "VALID | NULL decision",
+    "MERGE_GUARD_PROOF.json artifact",
+    "protected branch required check",
+    "merge eligible | merge blocked"
+  ],
+  "evidence_requirements": {
+    "pinned_action_ref": true,
+    "required_check_configured": true,
+    "valid_path_observed": true,
+    "null_path_observed": true,
+    "proof_artifact_observed": true,
+    "external_consumer_not_runtime_repo": true
+  },
+  "external_evidence_paths": [
+    "LOAD_BEARING_READINESS.md",
+    "NULL_ENFORCEMENT_PROOF.md",
+    "EXTERNAL_DEPENDENCY_PROOF.md"
+  ],
+  "preserved_invariants": {
+    "validated_object_equals_executed_object": "Merge Guard v1 validates and executes the same canonical PR identity object inside the check process; it does not mutate repository state.",
+    "fail_closed": "Missing identity fields, invalid policy fields, and required agent-author mismatches return NULL.",
+    "no_hidden_authority": "The evidence record is observability-only and cannot create authority, alter branch protection, or change validation outcomes.",
+    "replay_safe": "The decision hash is derived from canonical payload fields and is deterministic for the same input. generated_at is excluded from the canonical payload."
+  },
+  "reconciliation": {
+    "registry_surface_id": "continuityos_sandbox_merge_guard_required_check",
+    "related_issue_ids": [2001, 2006],
+    "remaining_gaps": [
+      "external branch-protection settings must remain externally observable; this repo records evidence but cannot enforce that configuration",
+      "agent author classification remains explicit caller input until a future trusted classifier surface is introduced"
+    ]
+  }
+}
