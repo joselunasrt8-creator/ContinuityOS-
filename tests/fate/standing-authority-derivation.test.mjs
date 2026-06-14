@@ -317,6 +317,31 @@ test('merge-governance-check validates appended standing authority records (P1: 
   assert.match(wf, /authority_hash does not match its bounds/, 'authority_hash must be recomputed and checked');
 });
 
+test('appended standing_authority records fail closed when the base verifier is missing (issue #2009)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const start = wf.indexOf('Validate appended standing authority records');
+  assert.ok(start !== -1, 'the SA record validation step must exist');
+  const end = wf.indexOf('Validate governance mutation authorization', start);
+  assert.ok(end !== -1, 'GMA validation step must follow SA record validation');
+  const block = wf.slice(start, end);
+
+  assert.match(block, /if \(!computeAuthorityHash\)/, 'a missing base verifier must be checked explicitly');
+  // The fail-closed check must run for every appended standing_authority record,
+  // before the hash recomputation, not be gated behind `if (computeAuthorityHash)`.
+  assert.doesNotMatch(block, /if \(computeAuthorityHash\) \{/, 'authority_hash recomputation must no longer be conditional/best-effort');
+
+  const checkIdx = block.indexOf('if (!computeAuthorityHash)');
+  const recordTypeIdx = block.indexOf("rec._record_type !== 'standing_authority'");
+  const requiredLoopIdx = block.indexOf('for (const f of REQUIRED)');
+  assert.ok(recordTypeIdx !== -1 && checkIdx !== -1 && requiredLoopIdx !== -1);
+  assert.ok(recordTypeIdx < checkIdx && checkIdx < requiredLoopIdx,
+    'the missing-verifier fail-closed check must run for standing_authority records before field validation');
+
+  const spec = JSON.parse(readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'));
+  assert.match(spec.derivation_rule.base_verifier_required_for_appended_records, /MERGE_LEGITIMACY_NULL/);
+  assert.match(spec.derivation_rule.base_verifier_required_for_appended_records, /#2009/);
+});
+
 test('merge-governance-check restricts SA path containment to GMA-gated files (P2: no false NULL on mixed PRs)', () => {
   const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
   assert.match(wf, /const authFiles = governedFiles\.filter/, 'path containment must use only governance/workflow files');

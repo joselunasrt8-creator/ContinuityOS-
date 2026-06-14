@@ -524,6 +524,14 @@ jobs:
             if (rec._record_type !== 'standing_authority') {
               fail(`unknown _record_type in standing authority registry: ${rec._record_type}`);
             }
+            // Fail closed (issue #2009): without a trusted BASE-branch verifier,
+            // authority_hash cannot be recomputed, so an appended standing_authority
+            // record could carry a forged hash and later be trusted by selectStandingAuthority.
+            // The verifier must be bootstrapped on the base branch (in a prior, separately
+            // reviewed PR) before any standing_authority record can be appended.
+            if (!computeAuthorityHash) {
+              fail('base branch is missing runtime/standing-authority.mjs (or it does not export computeAuthorityHash) — cannot validate authority_hash for an appended standing_authority record. Bootstrap the verifier on the base branch in a prior PR before appending standing_authority records.');
+            }
             for (const f of REQUIRED) {
               if (rec[f] === undefined || rec[f] === null || rec[f] === '') {
                 fail(`appended standing authority missing required field: ${f}`);
@@ -558,18 +566,16 @@ jobs:
             if (new Date(rec.expires_at).getTime() !== expectedExpiry) {
               fail(`appended standing authority expires_at must equal issued_at + ttl_hours (expected ${new Date(expectedExpiry).toISOString()}).`);
             }
-            if (computeAuthorityHash) {
-              const expected = computeAuthorityHash({
-                branch_pattern: b.branch_pattern,
-                mutation_classes: b.mutation_classes,
-                path_globs: b.path_globs,
-                max_merges: b.max_merges,
-                ttl_hours: rec.ttl_hours,
-                issued_at: rec.issued_at,
-              });
-              if (expected !== rec.authority_hash) {
-                fail(`appended standing authority authority_hash does not match its bounds (expected ${expected}, got ${rec.authority_hash}).`);
-              }
+            const expected = computeAuthorityHash({
+              branch_pattern: b.branch_pattern,
+              mutation_classes: b.mutation_classes,
+              path_globs: b.path_globs,
+              max_merges: b.max_merges,
+              ttl_hours: rec.ttl_hours,
+              issued_at: rec.issued_at,
+            });
+            if (expected !== rec.authority_hash) {
+              fail(`appended standing authority authority_hash does not match its bounds (expected ${expected}, got ${rec.authority_hash}).`);
             }
           }
           console.log(`Validated ${appended.length} appended standing authority record(s).`);
