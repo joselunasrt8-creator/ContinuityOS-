@@ -254,8 +254,23 @@
       "net_change": "none to required_status_checks; this is an evidence/policy closure that ratifies the #2066 classification and authorizes the informational-scan moves at the settings layer."
     },
     "live_branch_protection_reconciliation": {
-      "status": "OWNER_VERIFICATION_REQUIRED",
-      "note": "The authoritative required-check list lives in GitHub branch-protection settings (owner-visible, server-side). This record is the normative classification target; aligning the live required-check list (e.g., de-requiring Fresh-clone install + demo and the CodeQL family) is a repository-administrator settings action — audited here, but not file-committable."
+      "status": "RECONCILED",
+      "reconciled_date": "2026-06-14",
+      "verified_by": "repository_administrator",
+      "note": "Live GitHub branch-protection on main verified to match the ratified required-check topology. The live required status checks equal the four LOAD_BEARING_REQUIRED checks exactly (no informational scans on the required-status-checks surface). CodeQL was retained as code-scanning merge protection at a risk-based threshold (Security alerts: High or higher; Alerts: Errors) rather than removed — a refinement of the de-require step that satisfies the #2062 acceptance criteria: informational scan latency/completion no longer blocks ordinary PRs, and a red merge state corresponds to a real High+/Error finding rather than scan latency.",
+      "observed_live_required_status_checks": [
+        "generate-preo-candidate",
+        "generate-sco-candidate",
+        "constitutional-integrity",
+        "merge-governance-check"
+      ],
+      "observed_live_code_scanning": {
+        "tool": "CodeQL",
+        "security_alert_threshold": "High or higher",
+        "alert_threshold": "Errors"
+      },
+      "prior_status": "OWNER_VERIFICATION_REQUIRED",
+      "prior_note": "The authoritative required-check list lives in GitHub branch-protection settings (owner-visible, server-side). This record is the normative classification target; aligning the live required-check list (e.g., de-requiring Fresh-clone install + demo and the CodeQL family) is a repository-administrator settings action — audited here, but not file-committable."
     },
     "preserved_invariants": [
       "No required-check semantics changed by this record.",
