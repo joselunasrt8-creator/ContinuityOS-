@@ -14,6 +14,7 @@
     "require_status_checks": true,
     "required_status_checks": [
       "merge-governance-check",
+      "merge-guard",
       "generate-preo-candidate",
       "generate-sco-candidate",
       "constitutional-integrity"
@@ -36,6 +37,7 @@
     "PREO_VALID generated for exact head_sha",
     "SCO_CANDIDATE generated when governed paths changed",
     "merge-governance-check passing",
+    "merge-guard passing",
     "generate-preo-candidate passing",
     "generate-sco-candidate passing",
     "required status checks passing",
@@ -59,7 +61,7 @@
   "enforcement_classification": {
     "current": "partial",
     "target": "branch_protected_enforcement",
-    "partial_status_note": "Ruleset is active and 'Require a pull request' is enforced. 'Require status checks to pass' is enabled but no checks are wired in yet — GitHub check search returns no results until the workflow jobs run at least once on a PR targeting main. Required checks must be added manually by typing exact job names: merge-governance-check, generate-preo-candidate, generate-sco-candidate."
+    "partial_status_note": "Ruleset is active and 'Require a pull request' is enforced. 'Require status checks to pass' is enabled but no checks are wired in yet — GitHub check search returns no results until the workflow jobs run at least once on a PR targeting main. Required checks must be added manually by typing exact job names: merge-governance-check, merge-guard, generate-preo-candidate, generate-sco-candidate, constitutional-integrity."
   },
   "enforcement_activation": {
     "activation_status": "ACTIVATION_RECORDED",
@@ -70,6 +72,7 @@
     "activation_note": "Branch protection policy enforcement activation recorded per CI-001 (#1666). Required controls must be applied by the repository administrator via GitHub branch protection settings for the main branch, matching this document exactly. This record confirms the policy intent and required configuration.",
     "required_checks_at_activation": [
       "merge-governance-check",
+      "merge-guard",
       "generate-preo-candidate",
       "generate-sco-candidate"
     ],
@@ -93,6 +96,14 @@
       "job_name": "merge-governance-check",
       "emitted_check_run_name": "merge-governance-check",
       "required_check": "merge-governance-check",
+      "trigger": "pull_request"
+    },
+    {
+      "workflow_file": ".github/workflows/continuity-merge-guard.yml",
+      "workflow_name": "continuity-merge-guard",
+      "job_name": "merge-guard",
+      "emitted_check_run_name": "merge-guard",
+      "required_check": "merge-guard",
       "trigger": "pull_request"
     },
     {

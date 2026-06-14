@@ -457,7 +457,7 @@ The following gaps are explicitly identified as unresolved at the time this docu
 | required_approving_review_count | 1 | Not enforced |
 | dismiss_stale_reviews | true | Not enforced |
 | require_status_checks | true | Not enforced |
-| required_status_checks | [merge-governance-check, generate-preo-candidate, generate-sco-candidate] | Not enforced |
+| required_status_checks | [merge-governance-check, merge-guard, generate-preo-candidate, generate-sco-candidate, constitutional-integrity] | Not enforced |
 | require_branch_up_to_date_before_merge | true | Not enforced |
 | restrict_direct_push_to_main | true | Not enforced |
 | allow_force_pushes | false | Not enforced |

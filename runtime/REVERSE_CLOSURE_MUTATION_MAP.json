@@ -42,7 +42,7 @@
       "execution_capable": false,
       "creates_legitimacy": false,
       "residual_gap": "Direct push to main bypasses PREO/SCO governance checks and CODEOWNERS review. Branch protection policy defined but not enforced at GitHub settings level.",
-      "closure_action": "Enable GitHub branch protection for main: require PRs, require CODEOWNERS review, require status checks (merge-governance-check, generate-preo-candidate, generate-sco-candidate), block force pushes, block direct pushes.",
+      "closure_action": "Enable GitHub branch protection for main: require PRs, require CODEOWNERS review, require status checks (merge-governance-check, merge-guard, generate-preo-candidate, generate-sco-candidate, constitutional-integrity), block force pushes, block direct pushes.",
       "linked_issue": "#380"
     },
     {

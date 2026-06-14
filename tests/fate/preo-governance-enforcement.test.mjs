@@ -119,6 +119,25 @@ test('missing emitted branch protection check invalidates PREO and nulls merge l
   assert.equal(outcome.evidence_hash, null);
 });
 
+
+test('branch protection policy keeps Merge Guard as a protected-branch required check', () => {
+  const policyChecks = branchProtection.required_controls.required_status_checks;
+  const mergeGuardInventory = branchProtection.emitted_check_inventory.find(
+    (entry) => entry.required_check === 'merge-guard',
+  );
+
+  assert.ok(policyChecks.includes('merge-guard'));
+  assert.deepEqual(mergeGuardInventory, {
+    workflow_file: '.github/workflows/continuity-merge-guard.yml',
+    workflow_name: 'continuity-merge-guard',
+    job_name: 'merge-guard',
+    emitted_check_run_name: 'merge-guard',
+    required_check: 'merge-guard',
+    trigger: 'pull_request',
+  });
+  assert.ok(emittedCheckNames().has('merge-guard'));
+});
+
 test('valid emitted-check parity permits only gated merge eligibility, not a bypass', () => {
   const outcome = validatePreoCandidate({ preo: exactHeadPreo });
 

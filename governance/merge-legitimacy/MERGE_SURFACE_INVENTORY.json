@@ -35,7 +35,7 @@
       "governance_controls": [
         "PREO_CANDIDATE generated per merge-governance-check workflow",
         "SCO_CANDIDATE generated for governed-path mutations",
-        "Required status checks: merge-governance-check, generate-preo-candidate, generate-sco-candidate",
+        "Required status checks: merge-governance-check, merge-guard, generate-preo-candidate, generate-sco-candidate, constitutional-integrity",
         "Minimum 1 approving review required",
         "Stale review dismissal enabled",
         "Branch must be up-to-date before merge",

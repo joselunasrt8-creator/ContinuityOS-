@@ -381,9 +381,10 @@ test('issue #380: required_status_checks path references BRANCH_PROTECTION_POLIC
   const policyChecks = BRANCH_PROTECTION_POLICY.required_controls.required_status_checks
   assert.ok(Array.isArray(policyChecks), 'BRANCH_PROTECTION_POLICY must have required_status_checks array')
   assert.ok(policyChecks.includes('merge-governance-check'), 'BRANCH_PROTECTION_POLICY must require merge-governance-check')
+  assert.ok(policyChecks.includes('merge-guard'), 'BRANCH_PROTECTION_POLICY must require merge-guard')
   assert.ok(policyChecks.includes('generate-preo-candidate'), 'BRANCH_PROTECTION_POLICY must require generate-preo-candidate')
   assert.ok(policyChecks.includes('generate-sco-candidate'), 'BRANCH_PROTECTION_POLICY must require generate-sco-candidate')
-  assert.match(statusChecks.current_gate, /merge-governance-check|generate-preo-candidate|generate-sco-candidate/, 'required_status_checks gate must reference emitted check names')
+  assert.match(statusChecks.current_gate, /merge-governance-check|merge-guard|generate-preo-candidate|generate-sco-candidate/, 'required_status_checks gate must reference emitted check names')
 })
 
 test('issue #380: admin_bypass classification is consistent with BRANCH_PROTECTION_POLICY admin_bypass_policy', () => {

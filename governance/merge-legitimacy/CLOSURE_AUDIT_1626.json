@@ -52,7 +52,7 @@
     {
       "criterion": "Merge eligibility requires exact reviewed object match",
       "status": "MET",
-      "evidence": "Active ruleset requires merge-governance-check, generate-preo-candidate, generate-sco-candidate, and constitutional-integrity with strict_required_status_checks_policy."
+      "evidence": "Active ruleset requires merge-governance-check, merge-guard, generate-preo-candidate, generate-sco-candidate, and constitutional-integrity with strict_required_status_checks_policy."
     },
     {
       "criterion": "Merge proof links to PR number, head SHA, merge commit SHA, reviewer state, and PREO hash",
@@ -138,7 +138,7 @@
         ".github/workflows/merge-governance-check.yml",
         "governance/runtime/BRANCH_PROTECTION_POLICY.json"
       ],
-      "note": "Active GitHub ruleset requires PREO/SCO/governance checks: generate-preo-candidate, generate-sco-candidate, constitutional-integrity, merge-governance-check."
+      "note": "Active GitHub ruleset requires PREO/SCO/Merge Guard/governance checks: generate-preo-candidate, generate-sco-candidate, constitutional-integrity, merge-governance-check, merge-guard."
     },
     {
       "criterion": "Merge authorization",

@@ -178,7 +178,7 @@
       "required_checks_passed": {
         "type": "array",
         "items": "string",
-        "description": "List of required check names that passed (merge-governance-check, generate-preo-candidate, generate-sco-candidate)",
+        "description": "List of required check names that passed (merge-governance-check, merge-guard, generate-preo-candidate, generate-sco-candidate, constitutional-integrity)",
         "missing_result": "NULL"
       }
     },
