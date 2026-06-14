@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "issue_reference": "#2062",
+  "lineage": ["#2066", "#2079"],
+  "record_type": "topology_reconciliation_note",
+  "purpose": "Minimal in-scope governance-topology evidence note used to exercise Tier-3 Standing Authority derivation (SA-claude/2062-sa-issuance-27502201460) without a per-PR GMA. Additive only; changes no required-check configuration and no execution semantics.",
+  "authority_under_test": "SA-claude/2062-sa-issuance-27502201460",
+  "derivation_expectation": "claude/* branch + governance_mutation confined to governance/topology/** derives authorization at merge-governance-check Tier 3; merge-proof stamps standing_authority_id and consumes one budget unit (1/3).",
+  "semantics_unchanged": true,
+  "required_set_changed": false,
+  "fail_closed_preserved": true,
+  "reconciliation_status": "EVIDENCE_NOTE_ONLY",
+  "last_reviewed": "2026-06-14"
+}
