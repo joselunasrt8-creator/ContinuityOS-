@@ -155,5 +155,115 @@
     "pr_creation_token_scope": "PR creation only for registry PR list/create operations; it must not grant or be used for direct main mutation.",
     "missing_pr_creation_token": "NULL — registry PR creation token missing",
     "governance_note": "proof generated does not equal proof persisted. Persistence must enter through the same governed PR admission path as every other main mutation."
+  },
+  "required_check_topology_classification": {
+    "issue_reference": "#2062",
+    "lineage": ["#2066", "#2079"],
+    "audit_artifact": "governance/operational-risk/REQUIRED_CHECK_TOPOLOGY_AUDIT_2066.md",
+    "core_determination": "Blocking checks must protect legitimacy, not create legitimacy noise.",
+    "purpose": "Ratify, as normative branch-protection policy, the per-check classification mapped in the #2066 audit. This record changes no required-check configuration and no execution semantics; it makes the blocking-vs-informational classification authoritative and records the before/after required-check surface for #2062.",
+    "semantics_unchanged": true,
+    "required_set_changed": false,
+    "fail_closed_preserved": true,
+    "classification_model": [
+      "LOAD_BEARING_REQUIRED",
+      "INFORMATIONAL_NON_BLOCKING",
+      "SCHEDULED_OR_MANUAL",
+      "SPECIALIZED_OR_PATH_SCOPED",
+      "POST_MERGE"
+    ],
+    "checks": [
+      {
+        "check": "merge-governance-check",
+        "class": "LOAD_BEARING_REQUIRED",
+        "blocking": true,
+        "rationale": "Central admission gate (Tier-1/2/3 GMA + Standing Authority derivation, append-only registry guards, trust-surface hard-deny). Non-negotiable."
+      },
+      {
+        "check": "generate-preo-candidate",
+        "class": "LOAD_BEARING_REQUIRED",
+        "blocking": true,
+        "rationale": "Pre-execution-object candidate generation; protects execution-eligibility derivation."
+      },
+      {
+        "check": "generate-sco-candidate",
+        "class": "LOAD_BEARING_REQUIRED",
+        "blocking": true,
+        "rationale": "State-continuity-object candidate generation; protects continuity lineage."
+      },
+      {
+        "check": "constitutional-integrity",
+        "class": "LOAD_BEARING_REQUIRED",
+        "blocking": true,
+        "path_scoping_candidate": true,
+        "rationale": "Protects constitutional-document integrity. Keep required; evaluate path-scoping to constitutional/governance document changes (deferred), do not de-require."
+      },
+      {
+        "check": "merge-guard",
+        "class": "LOAD_BEARING_REQUIRED",
+        "blocking_recommended": true,
+        "rationale": "Continuity-merge-guard: merge-time continuity invariant guard. Fast and merge-critical; kept (or promoted to) required."
+      },
+      {
+        "check": "Runtime conformance suite (npm test)",
+        "class": "LOAD_BEARING_REQUIRED",
+        "blocking": true,
+        "pending_dependency": "#2079 zero-gap rename (npm test -> npm run test:full in runtime-tests.yml) not yet landed",
+        "rationale": "Executes the full FATE suite (runtime + governance + SA/GMA + proof lineage). Remains LOAD_BEARING_REQUIRED until #2079 lands the zero-gap rename; the required check is renamed, never deleted, so full coverage gates every merge throughout."
+      },
+      {
+        "check": "Fresh-clone install + demo",
+        "class": "INFORMATIONAL_NON_BLOCKING",
+        "blocking_recommended": false,
+        "rationale": "Installability/demo signal, not merge-legitimacy. A demo/install flake must not red-gate a governed PR. Keeps running on every PR and push as a visible signal."
+      },
+      {
+        "check": "CodeQL / Analyze (actions) / Analyze (rust)",
+        "class": "INFORMATIONAL_NON_BLOCKING",
+        "blocking_recommended": false,
+        "rationale": "GitHub code-scanning emits a neutral signal, not a legitimacy verdict. Treating scan latency/alerts as merge-risk is exactly the legitimacy noise #2062 targets; alerts still surface in the Security tab."
+      },
+      {
+        "check": "conformance-pack-v1",
+        "class": "SPECIALIZED_OR_PATH_SCOPED",
+        "blocking_recommended": "only when in-scope paths change",
+        "rationale": "Path-scoped to conformance/pack-v1/**, scripts/run-conformance.sh, and its own workflow. Correctly does not run on unrelated PRs."
+      },
+      {
+        "check": "merge-proof",
+        "class": "POST_MERGE",
+        "blocking": false,
+        "rationale": "Runs on PR close to write the merge proof and stamp Standing Authority budget. Load-bearing for proof/budget integrity but executes after merge; must NEVER be added as a pre-merge required check (deadlock)."
+      },
+      {
+        "check": "governance-mutation-authorization | standing-authority-issuance | governed-deploy | prepare-governed-deploy | governed-release | sa-tier3-demo",
+        "class": "SCHEDULED_OR_MANUAL",
+        "blocking": false,
+        "rationale": "workflow_dispatch-only bounded mutation/operational surfaces. Never PR checks; not eligible to be required."
+      }
+    ],
+    "before_after_required_surface": {
+      "documented_required_status_checks": [
+        "merge-governance-check",
+        "generate-preo-candidate",
+        "generate-sco-candidate",
+        "constitutional-integrity"
+      ],
+      "before_note": "Documented required-check set prior to this record (see required_controls.required_status_checks). Several informational scans (Fresh-clone install + demo, CodeQL family) and merge-time guards were observed gating PRs at the GitHub branch-protection layer, producing legitimacy noise from scan latency and stale topology.",
+      "after_note": "Documented required-check set is UNCHANGED by this record. The classification above is now the normative target the live branch-protection required-check list must reconcile against: LOAD_BEARING_REQUIRED checks stay blocking; INFORMATIONAL_NON_BLOCKING checks (Fresh-clone install + demo, CodeQL family) are authorized to move to non-blocking; POST_MERGE and SCHEDULED_OR_MANUAL surfaces must never be required.",
+      "net_change": "none to required_status_checks; this is an evidence/policy closure that ratifies the #2066 classification and authorizes the informational-scan moves at the settings layer."
+    },
+    "live_branch_protection_reconciliation": {
+      "status": "OWNER_VERIFICATION_REQUIRED",
+      "note": "The authoritative required-check list lives in GitHub branch-protection settings (owner-visible, server-side). This record is the normative classification target; aligning the live required-check list (e.g., de-requiring Fresh-clone install + demo and the CodeQL family) is a repository-administrator settings action — audited here, but not file-committable."
+    },
+    "preserved_invariants": [
+      "No required-check semantics changed by this record.",
+      "Fail-closed behavior preserved for authority, proof, replay, continuity, and merge eligibility.",
+      "The LOAD_BEARING_REQUIRED set is the floor; reduction must not drop below it.",
+      "npm test (full runtime + governance coverage) remains LOAD_BEARING_REQUIRED until the #2079 zero-gap rename lands.",
+      "merge-proof must never be added as a pre-merge required check.",
+      "Scan latency is not a runtime-correctness failure and must not be treated as one."
+    ]
   }
 }
