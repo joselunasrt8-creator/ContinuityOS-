@@ -317,6 +317,31 @@ test('merge-governance-check validates appended standing authority records (P1: 
   assert.match(wf, /authority_hash does not match its bounds/, 'authority_hash must be recomputed and checked');
 });
 
+test('appended standing_authority records fail closed when the base verifier is missing (issue #2009)', () => {
+  const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const start = wf.indexOf('Validate appended standing authority records');
+  assert.ok(start !== -1, 'the SA record validation step must exist');
+  const end = wf.indexOf('Validate governance mutation authorization', start);
+  assert.ok(end !== -1, 'GMA validation step must follow SA record validation');
+  const block = wf.slice(start, end);
+
+  assert.match(block, /if \(!computeAuthorityHash\)/, 'a missing base verifier must be checked explicitly');
+  // The fail-closed check must run for every appended standing_authority record,
+  // before the hash recomputation, not be gated behind `if (computeAuthorityHash)`.
+  assert.doesNotMatch(block, /if \(computeAuthorityHash\) \{/, 'authority_hash recomputation must no longer be conditional/best-effort');
+
+  const checkIdx = block.indexOf('if (!computeAuthorityHash)');
+  const recordTypeIdx = block.indexOf("rec._record_type !== 'standing_authority'");
+  const requiredLoopIdx = block.indexOf('for (const f of REQUIRED)');
+  assert.ok(recordTypeIdx !== -1 && checkIdx !== -1 && requiredLoopIdx !== -1);
+  assert.ok(recordTypeIdx < checkIdx && checkIdx < requiredLoopIdx,
+    'the missing-verifier fail-closed check must run for standing_authority records before field validation');
+
+  const spec = JSON.parse(readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'));
+  assert.match(spec.derivation_rule.base_verifier_required_for_appended_records, /MERGE_LEGITIMACY_NULL/);
+  assert.match(spec.derivation_rule.base_verifier_required_for_appended_records, /#2009/);
+});
+
 test('merge-governance-check restricts SA path containment to GMA-gated files (P2: no false NULL on mixed PRs)', () => {
   const wf = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
   assert.match(wf, /const authFiles = governedFiles\.filter/, 'path containment must use only governance/workflow files');
@@ -391,6 +416,27 @@ test('trust surfaces are hard-denied from SA derivation in gate and merge-proof 
   }
   // The gate must gate Tier 3 derivation on NOT touching a trust surface.
   assert.match(gate, /!touchesTrustSurface && existsSync\('sa_registry_base\.jsonl'\)/, 'Tier 3 must not run when a trust surface is touched');
+});
+
+test('issuer workflows are hard-denied trust surfaces in BOTH classifiers (issue #2008)', () => {
+  const gate = readFileSync(join(root, '.github', 'workflows', 'merge-governance-check.yml'), 'utf8');
+  const proof = readFileSync(join(root, '.github', 'workflows', 'merge-proof.yml'), 'utf8');
+  // Both authority-minting issuer workflows must appear inside each file's TRUST_SURFACES set,
+  // so a workflow-scoped Standing Authority can never SA-derive an edit to the machinery that
+  // grants authority — it must fall through to an explicit manual GMA.
+  for (const wf of [gate, proof]) {
+    const start = wf.indexOf('TRUST_SURFACES = new Set([');
+    const end = wf.indexOf('])', start);
+    assert.ok(start !== -1 && end !== -1, 'TRUST_SURFACES set must be present');
+    const set = wf.slice(start, end);
+    assert.match(set, /\.github\/workflows\/governance-mutation-authorization\.yml/, 'GMA issuer workflow must be a hard-denied trust surface');
+    assert.match(set, /\.github\/workflows\/standing-authority-issuance\.yml/, 'SA issuer workflow must be a hard-denied trust surface');
+  }
+  // The spec must document the issuer workflows as trust surfaces.
+  const spec = JSON.parse(readFileSync(join(root, 'governance', 'authorizations', 'STANDING_AUTHORITY_SPEC.json'), 'utf8'));
+  const gating = JSON.stringify(spec.trust_surface_gating);
+  assert.match(gating, /governance-mutation-authorization\.yml/, 'spec must document the GMA issuer as a trust surface');
+  assert.match(gating, /standing-authority-issuance\.yml/, 'spec must document the SA issuer as a trust surface');
 });
 
 test('merge-proof evaluates explicit-GMA expiry at merge time, not proof-gen time (P2)', () => {
