@@ -173,6 +173,32 @@ Expected validation areas include:
 - bypass prevention
 - fail-closed behavior
 
+## Test tiers (issue #2079)
+
+The suite is reachable through tiered npm scripts so small edits get fast local
+feedback while full legitimacy coverage stays available for merge/release
+readiness:
+
+| Command | Scope | Use for |
+|---|---|---|
+| `npm run test:smoke` | Curated fast subset (CLI surface + core legitimacy / authority / SA-derivation / governance-bundle smoke) | Local edit feedback — runs in well under a second |
+| `npm test` / `npm run test:full` | Entire suite (`node --import tsx --test`) | Full merge/release readiness — the load-bearing CI gate |
+
+Notes:
+
+- `npm test` and `npm run test:full` are identical and run the complete suite.
+  The CI required check (`Runtime conformance suite (npm test)`) runs this full
+  suite, so full runtime + governance coverage gates every merge — these tiers
+  are additive convenience and remove no coverage (issue #2079; see
+  `governance/operational-risk/REQUIRED_CHECK_TOPOLOGY_AUDIT_2066.md`).
+- Need a narrower slice? Run the governance suite directly with
+  `node --import tsx --test tests/fate/*.test.mjs`, or the runtime suite with
+  `node --import tsx --test tests/*.test.mjs`. These are intentionally not
+  exposed as npm scripts: every package script is itself a governance-classified
+  mutation surface (it must be declared in
+  `runtime/unauthorized_mutation_surface_inventory.json`), so the script surface
+  is kept minimal. The full run remains the authoritative gate.
+
 ---
 
 # Governance
