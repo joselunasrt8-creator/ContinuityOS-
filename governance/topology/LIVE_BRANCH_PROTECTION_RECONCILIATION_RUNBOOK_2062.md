@@ -3,9 +3,11 @@
 - **Issue:** #2062 (Reduce failed-check disturbance from long-running workflow scans)
 - **Lineage:** #2066 (required-check topology), #2079 (runtime suite rename), #2095 (classification ratification)
 - **Record type:** `owner_reconciliation_runbook`
-- **Status:** `OWNER_VERIFICATION_REQUIRED` — the steps below are a repository-administrator settings
-  action and are **not file-committable**. This document is the executable description of that action;
-  it changes no required-check configuration and no execution semantics on its own.
+- **Status:** `RECONCILED` (verified 2026-06-14) — the repository-administrator settings actions below have
+  been applied to live `main` branch protection. Live required status checks == the four
+  LOAD_BEARING_REQUIRED checks; CodeQL retained as code-scanning merge protection at a risk threshold
+  (Security alerts: High or higher; Alerts: Errors). `BRANCH_PROTECTION_POLICY.json#live_branch_protection_reconciliation.status`
+  is now `RECONCILED`.
 - **Last reviewed:** 2026-06-14
 
 ## Why this exists
@@ -66,9 +68,23 @@ from the ratified classification:
 - Update `governance/runtime/BRANCH_PROTECTION_POLICY.json#live_branch_protection_reconciliation.status`
   from `OWNER_VERIFICATION_REQUIRED` to `RECONCILED` (with date) once the live surface matches.
 
+## Reconciliation verified (2026-06-14)
+
+Owner confirmed the live `main` branch protection:
+
+- **Required status checks (live):** `generate-preo-candidate`, `generate-sco-candidate`,
+  `constitutional-integrity`, `merge-governance-check` — exactly the four LOAD_BEARING_REQUIRED checks.
+- **Code scanning merge protection (live):** CodeQL, Security alerts: High or higher; Alerts: Errors.
+
+The owner implemented step 2 as a **refinement**: CodeQL is retained as merge protection but tuned to a
+risk threshold (High+/Errors) rather than removed. This satisfies the same two acceptance criteria —
+informational scan latency no longer blocks ordinary PRs, and a red merge state corresponds to a real
+High+/Error finding. The policy flag `live_branch_protection_reconciliation.status` is now `RECONCILED`.
+
 ## Invariants
 
 - `semantics_unchanged`: true — this runbook changes no enforcement logic.
 - `required_set_changed`: false — committing this file changes no required-check configuration.
 - `fail_closed_preserved`: true — the target state retains all four LOAD_BEARING_REQUIRED checks.
-- `reconciliation_status`: `RUNBOOK_ONLY` until the owner executes the steps and flips the policy flag.
+- `reconciliation_status`: `RECONCILED` (2026-06-14) — owner executed the steps; the live required-check
+  surface matches the ratified topology and the policy flag is flipped.
