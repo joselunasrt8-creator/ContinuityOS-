@@ -673,11 +673,31 @@ jobs:
             echo "Governance invariant: proof generated ≠ proof persisted. Direct persistence to main is NULL and non-retryable; this branch must be admitted through the same governed path as every other main mutation."
           } > registry_pr_body.md
 
-          GH_TOKEN="$MERGE_PROOF_PR_TOKEN" gh pr create \
+          NEW_PR_URL=$(GH_TOKEN="$MERGE_PROOF_PR_TOKEN" gh pr create \
             --base main \
             --head "$BRANCH_NAME" \
             --title "$PR_TITLE" \
-            --body-file registry_pr_body.md
+            --body-file registry_pr_body.md)
+          echo "Opened proof-registry PR: ${NEW_PR_URL:-<none>}"
+
+          # Persistence-latency reduction (#2084). The binding constraint identified in
+          # #2084 is human merge cadence: this branch is already cut fresh from origin/main
+          # above, so it is current at creation — it only goes stale (freshness drift) while
+          # it SITS waiting for a manual merge, by which time main has advanced and the
+          # tail append to merge_proof_registry.jsonl collides. Enabling auto-merge drives
+          # that wait toward zero. Auto-merge merges ONLY after every REQUIRED governed
+          # check passes (merge-governance-check tier admission, runtime conformance,
+          # constitutional-integrity, etc.): no check is bypassed, no review is
+          # auto-approved, and append-only proof lineage / integrity is unchanged. NOTE:
+          # a GitHub `concurrency:` group is deliberately NOT used to serialize — with
+          # cancel-in-progress:false it still cancels previously-pending runs, which would
+          # silently drop queued proof generations (a #2084 Non-Goal). If auto-merge is
+          # disabled at the repository level this is non-fatal: the PR falls back to manual
+          # merge exactly as before.
+          if [ -n "${NEW_PR_URL:-}" ]; then
+            GH_TOKEN="$MERGE_PROOF_PR_TOKEN" gh pr merge --auto --merge "$NEW_PR_URL" \
+              || echo "auto-merge not enabled; proof-registry PR will require manual merge: $NEW_PR_URL"
+          fi
 
       - name: Upload merge proof artifact
         if: always()
