@@ -173,6 +173,31 @@ Expected validation areas include:
 - bypass prevention
 - fail-closed behavior
 
+## Test tiers (issue #2079)
+
+The suite is reachable through explicit, tiered npm scripts so small edits get
+fast local feedback while full legitimacy coverage stays available for
+merge/release readiness:
+
+| Command | Scope | Use for |
+|---|---|---|
+| `npm run test:smoke` | Curated fast subset (CLI surface + core legitimacy / authority / SA-derivation / governance-bundle smoke) | Local edit feedback — runs in well under a second |
+| `npm run test:runtime` | `tests/` root + reconciliation + conformance | Runtime legitimacy validation |
+| `npm run test:governance` | `tests/fate/**` (GMA / merge / proof / authority / continuity) | Governance validation |
+| `npm test` / `npm run test:full` | Entire suite (`node --import tsx --test`) | Full merge/release readiness — the load-bearing CI gate |
+
+Notes:
+
+- `npm test` and `npm run test:full` are identical and run the complete suite.
+  The CI required check (`Runtime conformance suite (npm test)`) runs this full
+  suite, so full runtime + governance coverage gates every merge — these tiers
+  are additive convenience, they remove no coverage (issue #2079, additive
+  phase; see `governance/operational-risk/REQUIRED_CHECK_TOPOLOGY_AUDIT_2066.md`).
+- `test:runtime` / `test:governance` are partitions for targeted feedback. The
+  suite is not yet strictly run-order-isolated, so a tier run can surface a
+  slightly different pass/fail count than the full run; the full run
+  (`npm test` / `test:full`) remains the authoritative gate.
+
 ---
 
 # Governance
