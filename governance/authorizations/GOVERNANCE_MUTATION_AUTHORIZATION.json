@@ -1,12 +1,12 @@
 {
-  "gma_id": "GMA-claude/restore-standing-authority-27472463762",
-  "decision_id": "a996655301f8d5e2af94e3666642d055a4facbce400796268b9758ad35cbdb01",
-  "continuity_id": "8244601d05c0156e0cb61fc7c211a5810b612d14ffaa19a6e51adf52f7e84571",
-  "session_id": "982fca0f746934173c5f78dc51c55b1db4977b982971deb213970bf79699b12e",
-  "validated_object_hash": "86de9ae4a29ee7694cdfc120ffcb50e312a15480c06c678a1ab5af52d8ff1c7b",
-  "governed_files_hash": "74c66a0f7185438ca2a09c9428b832fb82c0930d55837889824a51cbef15ac1f",
+  "gma_id": "GMA-claude/2062-required-check-topology-closure-27500622088",
+  "decision_id": "60dabfaf8e34c387307402e0aae2ada849ce917712716eef72705498a939f609",
+  "continuity_id": "cd53e298bfe3b27db05d6c3448fc5093f4b23f671bf3bc9f0f53b9677dffa435",
+  "session_id": "15cbb0a2b18c5eb01c1a961f89edbbf351936a3ee5e16779f1a6f94a3a6ec6f8",
+  "validated_object_hash": "8f440287ac6677b11bc7e5d9612e2c0398379c451ce409751b0968ef898b8bf9",
+  "governed_files_hash": "6c41ebf1d9a2707d8ef312b63cf7b21af462f1320c0ee7fd1c17bc2e35715146",
   "governed_files": [
-    "governance/authorizations/standing_authority_registry.jsonl"
+    "governance/runtime/BRANCH_PROTECTION_POLICY.json"
   ],
   "mutation_classes": [
     "governance_mutation"
@@ -15,14 +15,14 @@
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Authorize issuance of Standing Authority SA-claude/restore-standing-authority-27472447145 (append to standing_authority_registry.jsonl, a hard-denied trust surface requiring explicit GMA). Restores Tier 3 throughput for #2011/#2010.",
+  "intent": "Ratify #2066 required-check topology classification into branch-protection policy (#2062)",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "claude/restore-standing-authority",
-  "head_sha": "cad219024e79bb8bd7c3901b6e2675828368873c",
-  "workflow_run_id": "27472463762",
-  "created_at": "2026-06-13T16:30:19Z",
-  "expires_at": "2027-06-13T16:30:19Z",
+  "branch": "claude/2062-required-check-topology-closure",
+  "head_sha": "f7b877a49a90ea7397a310b71caa999c6afa03d5",
+  "workflow_run_id": "27500622088",
+  "created_at": "2026-06-14T13:39:17Z",
+  "expires_at": "2027-06-14T13:39:17Z",
   "status": "GMA_VALID"
 }
