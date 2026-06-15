@@ -106,6 +106,13 @@ jobs:
                 echo "$file" >> gma_governed_files.txt
                 echo "proof_persistence" >> gma_mutation_classes.txt
                 ;;
+              governance/operational-risk/*.md)
+                # Evidence-only operational-risk audit artifacts (GAP-005 parity).
+                # Keep this classifier byte-for-byte aligned with merge-governance-check.yml
+                # and merge-proof.yml so governed_files_hash and mutation_classes match.
+                echo "$file" >> gma_governed_files.txt
+                echo "operational_risk_evidence" >> gma_mutation_classes.txt
+                ;;
               governance/*)
                 echo "$file" >> gma_governed_files.txt
                 echo "governance_mutation" >> gma_mutation_classes.txt
