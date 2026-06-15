@@ -107,7 +107,8 @@ check → VALID/NULL → proof artifact → merge-eligibility signal.**
 
 ## 10. Bounded relationship to ContinuityOS
 
-Merge Guard is the smallest installable wedge of the broader ContinuityOS
-governance model. Installing it does not require adopting any other part of
-ContinuityOS — it is a standalone GitHub Action with one required check and
-one proof artifact.
+Merge Guard is published from the ContinuityOS repository, but it is a
+standalone GitHub Action with one required check and one proof artifact.
+Installing Merge Guard does not require adopting, running, or trusting any
+other part of ContinuityOS, and this document makes no claims about
+ContinuityOS beyond Merge Guard itself.
