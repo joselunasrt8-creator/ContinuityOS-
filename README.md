@@ -66,6 +66,13 @@ a `NULL` result reports `failure` and leaves the PR `blocked`. See that
 repo's `LOAD_BEARING_READINESS.md` and `NULL_ENFORCEMENT_PROOF.md` for the
 evidence.
 
+Because `continuityos-sandbox` shares an owner with this repo, the above is
+demonstration evidence, not independent dependency evidence. Evidence from an
+independent operator, if and when it exists, will be recorded under
+`governance/runtime/external-dependency-evidence/` (see
+`docs/product/MERGE_GUARD_POSITIONING.md` and
+`docs/product/PILOT_PERSONA.md` for the pitch and target operator).
+
 ---
 
 # Recorded Demo Evidence

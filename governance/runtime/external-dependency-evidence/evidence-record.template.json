@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "document": "EXTERNAL_MERGE_GUARD_DEPENDENCY_EVIDENCE_RECORD",
+  "operator_id": "short self-chosen identifier for the reporting operator",
+  "repository_reference": "the operator's repo (org/name), or a redacted reference if the operator prefers not to disclose it",
+  "report_date": "YYYY-MM-DD",
+  "install_evidence": {
+    "uses_reference": "e.g. joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0",
+    "pinned_version": "e.g. v0.1.0",
+    "required_check_name": "merge-guard | agent-merge-guard"
+  },
+  "branch_protection_evidence": "description or reference confirming the check above is configured as a required status check on the operator's protected branch",
+  "valid_path_evidence": {
+    "pr_reference": "PR URL or redacted reference showing a VALID result",
+    "proof_artifact_reference": "MERGE_GUARD_PROOF.json artifact name/hash for that run",
+    "outcome": "mergeable"
+  },
+  "null_path_evidence": {
+    "pr_reference": "PR URL or redacted reference showing a NULL result",
+    "proof_artifact_reference": "MERGE_GUARD_PROOF.json artifact name/hash for that run",
+    "outcome": "blocked"
+  },
+  "operator_statement": "in the operator's own words: what becomes worse in their workflow if Merge Guard is removed (or 'not applicable' if not yet at stage 6)",
+  "resulting_classification": "DEPENDENCY_FORMATION_PREP | DEPENDENCY_FORMATION_ACTIVE | DEPENDENCY_CONDITIONAL | DEPENDENCY_CONFIRMED | DEPENDENCY_REJECTED",
+  "notes": "any caveats, scope limitations, or follow-up actions"
+}
