@@ -491,10 +491,13 @@ jobs:
             echo "MERGE_GUARD_ATTR_EVIDENCE_HASH="
           } >> "$GITHUB_ENV"
 
-          RUN_ID=$(gh api "repos/$REPO/actions/workflows/continuity-merge-guard.yml/runs" \
-            --field head_sha="$HEAD_SHA" \
-            --field status=completed \
-            --field per_page=1 \
+          # --method GET is required: `gh api` with -f/--field params defaults to POST,
+          # which the list-runs endpoint rejects. Forcing GET sends them as query params.
+          RUN_ID=$(gh api --method GET \
+            "repos/$REPO/actions/workflows/continuity-merge-guard.yml/runs" \
+            -f head_sha="$HEAD_SHA" \
+            -f status=completed \
+            -f per_page=1 \
             --jq '.workflow_runs[0].id // empty' 2>/dev/null || true)
 
           if [ -z "${RUN_ID:-}" ]; then
@@ -516,7 +519,8 @@ jobs:
             || { echo "Artifact download failed — sidecar null"; exit 0; }
 
           mkdir -p merge_guard_proof_dir
-          unzip -q merge_guard_proof.zip -d merge_guard_proof_dir/
+          unzip -q merge_guard_proof.zip -d merge_guard_proof_dir/ \
+            || { echo "Artifact unzip failed — sidecar null"; exit 0; }
 
           PROOF_FILE=$(find merge_guard_proof_dir -name 'MERGE_GUARD_PROOF.json' | head -1)
           if [ -z "${PROOF_FILE:-}" ]; then
