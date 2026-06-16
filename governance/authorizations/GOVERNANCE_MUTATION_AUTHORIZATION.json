@@ -1,28 +1,30 @@
 {
-  "gma_id": "GMA-claude/mutation-classifier-parity-f1cw7a-27518117696",
-  "decision_id": "7a9b715c43dcb3e05095efbb39c16823d76b52e6dfc9ab7b3790326ac7ffd11e",
-  "continuity_id": "227f9749601763c33a495c7dc9d9e2763a406b206b47f579bfe068e608c4cd99",
-  "session_id": "e35cf9a9a808e17e1ce28f12b34ee3e3086a9b848d4d80671c57a6e1769dcdaa",
-  "validated_object_hash": "672803937b152e082df39bc688283facf4afca651dabd1bef61fe474fd37af39",
-  "governed_files_hash": "d275018028cfb82ca6b62937db3d566e631daeefbb1c44def9931eb2a170c41d",
+  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27606781961",
+  "decision_id": "e63133a86526018b6d804ff38de883fe152eb6afac8b40e40870c971363afad6",
+  "continuity_id": "0b73b7c3324835a8c1c3cfb9a68b612bd820cad10e80bdf71276c916ca57da16",
+  "session_id": "17e266021be2a932889f2c344732693abb4875875f8904e170a64e8ad64c31c1",
+  "validated_object_hash": "371d5d7f250ff2124d6baebe4c95d443893950907f19e1f8bad8c7fdb06a3ec6",
+  "governed_files_hash": "55074437abbbd4f5ef13851b209dc32b6bbceb71116e0c081fd58ff75437051f",
   "governed_files": [
-    ".github/workflows/governance-mutation-authorization.yml"
+    ".github/workflows/continuity-merge-guard.yml",
+    "governance/merge-legitimacy/AGENT_ATTRIBUTION_PHASE1_NOTES.md"
   ],
   "mutation_classes": [
+    "governance_mutation",
     "workflow_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "PR #2109: add governance/operational-risk/*.md -> operational_risk_evidence classification case to governance-mutation-authorization.yml, restoring parity with merge-governance-check.yml and merge-proof.yml (fixes #2088).",
+  "intent": "Authorize Phase 1 Agent Identity attribution — workflow wiring in continuity-merge-guard.yml + AGENT_ATTRIBUTION_PHASE1_NOTES.md",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "claude/mutation-classifier-parity-f1cw7a",
-  "head_sha": "9eaf4b1760ba85b84247ac510bd40cd603fda08f",
-  "workflow_run_id": "27518117696",
-  "created_at": "2026-06-15T01:07:40Z",
-  "expires_at": "2027-06-15T01:07:40Z",
+  "branch": "claude/continuityos-workflow-topology-1rcgfa",
+  "head_sha": "cf3480f4d9ecdb48f9edce2abe93c4171ac37cbc",
+  "workflow_run_id": "27606781961",
+  "created_at": "2026-06-16T09:07:20Z",
+  "expires_at": "2027-06-16T09:07:20Z",
   "status": "GMA_VALID"
 }
