@@ -1,30 +1,28 @@
 {
-  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27608958812",
-  "decision_id": "e8b6af5a85aeaf3ac7312c2f07ebb4a150801f7316b394bc9dbb194c2f617a5f",
-  "continuity_id": "75e7ffcb940584ceb44b483271cbed93a85ff8d9066382ddc93e37958200397f",
-  "session_id": "d10f7a5bd24d1c76eab2b63570e8b746cd6267d4963d84b1797e897293e1066e",
-  "validated_object_hash": "0016df0c8373511745ba622477605c024d9bb54b4d9f96a554a3c0f903ae0a9f",
-  "governed_files_hash": "1b6e8006643e0a6d0972dd73b98276a19559484fb0e1a51c0b21b655b9d5334b",
+  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27620629191",
+  "decision_id": "3f6d1493d41a297ae0f40fc5a6203058e814a4c98a05cb19683750a9a810ab97",
+  "continuity_id": "162e783c7fce9fe6e03c91f78932fcd61b2c0bcc80a663e71824c9d4d6400509",
+  "session_id": "f6f2ce4f2c14fcc9bbad3c5dd896968ac16746261a382836b65df0cc7a52c235",
+  "validated_object_hash": "d1274360af676cf73a875eb2173f19d2c06d6d7889a144e540edfafea6b836c6",
+  "governed_files_hash": "0844f2a1c487358c773ab31657aa6f89e0046e21b9c814a93ae54597535b0cd9",
   "governed_files": [
-    ".github/workflows/merge-proof.yml",
-    "governance/merge-legitimacy/AGENT_ATTRIBUTION_POLICY.json"
+    ".github/workflows/merge-proof.yml"
   ],
   "mutation_classes": [
-    "governance_mutation",
     "workflow_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Phase-1 attribution policy binding + durable proof lineage: authorize governance_mutation (AGENT_ATTRIBUTION_POLICY.json) and workflow_mutation (merge-proof.yml actor_attribution sidecar). No canonical_payload/canonical_hash change. ",
+  "intent": "Fix merge-proof attribution sidecar fetch (force GET on gh api run lookup; guard unzip). Restores Phase-1 durable proof lineage; non-blocking, canonical_hash unchanged",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
   "branch": "claude/continuityos-workflow-topology-1rcgfa",
-  "head_sha": "dcf8d587599bb590a1500a2828188af04dc238b9",
-  "workflow_run_id": "27608958812",
-  "created_at": "2026-06-16T09:47:02Z",
-  "expires_at": "2027-06-16T09:47:02Z",
+  "head_sha": "d80173f13557e475962a92f4e645281d3620e10b",
+  "workflow_run_id": "27620629191",
+  "created_at": "2026-06-16T13:22:06Z",
+  "expires_at": "2027-06-16T13:22:06Z",
   "status": "GMA_VALID"
 }
