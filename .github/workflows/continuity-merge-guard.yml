@@ -25,3 +25,10 @@ jobs:
           head-sha: ${{ github.event.pull_request.head.sha }}
           base-sha: ${{ github.event.pull_request.base.sha }}
           actor: ${{ github.event.pull_request.user.login }}
+          # Agent Identity (Phase 1) — descriptive attribution signals.
+          # These do not change merge execution semantics; missing signals are
+          # non-blocking, conflicting authoritative signals fail closed.
+          pr-author: ${{ github.event.pull_request.user.login }}
+          head-ref: ${{ github.event.pull_request.head.ref }}
+          pr-body: ${{ github.event.pull_request.body }}
+          pr-labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
