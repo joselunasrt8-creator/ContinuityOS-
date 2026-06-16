@@ -70,6 +70,24 @@ closed (`ATTRIBUTION_AMBIGUOUS` → `NULL`). See
 `governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json` and
 `AGENT_ATTRIBUTION_PHASE1_NOTES.md`.
 
+**Commit-trailer signal (authoritative).** The bundled
+`.github/workflows/continuity-merge-guard.yml` harvests commit trailers from the
+PR's `base..head` commit range and feeds them as the `commit-trailers` input.
+Two keys are recognized (case-insensitive), co-located with the change they
+describe:
+
+```
+Agent-Authored-By: <agent-id>     → AGENT_AUTHORED
+Agent-Assisted-By: <agent-id>     → AGENT_ASSISTED
+```
+
+This is the most durable place to declare authorship. Like a label or a PR-body
+block it is an *assertion*, not cryptographic proof, and it is not authority —
+classifying a PR `AGENT_AUTHORED` grants it no merge permission. `Co-Authored-By`
+is deliberately **not** treated as an agent signal (humans use it routinely). A
+trailer that contradicts an authoritative label/body declaration is a conflict
+and fails closed to `NULL`.
+
 Example `MERGE_GUARD_PROOF.json`:
 
 ```json

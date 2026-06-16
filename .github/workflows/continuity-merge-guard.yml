@@ -16,6 +16,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the PR commit range (base..head) is readable for
+          # commit-trailer harvesting below.
+          fetch-depth: 0
+
+      - name: Harvest commit trailers
+        id: trailers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # Best-effort: ensure the base commit is present; never block on it.
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+          # Extract only trailer lines (unfolded) from non-merge commits in the PR
+          # range, keep just the recognized authoritative agent trailers, dedupe.
+          # Attacker-controllable text — written to GITHUB_OUTPUT via heredoc to
+          # avoid output/env injection. Non-blocking: empty on any failure.
+          TRAILERS="$(git log "${BASE_SHA}..${HEAD_SHA}" --no-merges \
+            --pretty=format:'%(trailers:only=true,unfold=true)' 2>/dev/null \
+            | grep -iE '^(Agent-Authored-By|Agent-Assisted-By)[[:space:]]*:' | sort -u || true)"
+          {
+            echo "value<<TRAILERS_EOF"
+            echo "$TRAILERS"
+            echo "TRAILERS_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: ./actions/continuity-merge-guard
         id: merge-guard
@@ -32,3 +58,4 @@ jobs:
           head-ref: ${{ github.event.pull_request.head.ref }}
           pr-body: ${{ github.event.pull_request.body }}
           pr-labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          commit-trailers: ${{ steps.trailers.outputs.value }}
