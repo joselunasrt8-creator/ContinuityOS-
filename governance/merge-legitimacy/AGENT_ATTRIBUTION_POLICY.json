@@ -65,9 +65,11 @@
     "reconciliation": "AGENT_ATTRIBUTION_SPEC.json remains non_operative as a specification artifact. This policy artifact is the operative binding the spec deferred via policy_binding_note. The spec's classification states and signal tiers are unchanged; this artifact binds the merge-effect for each status as required.",
     "future_work_closed": "AGENT_ATTRIBUTION_SPEC.json future_work item 'A dedicated AGENT_ATTRIBUTION_POLICY.json defining the merge-blocking behavior for each attribution_classification, completing the dependency wedge described in #2003' is closed by this artifact."
   },
+  "implemented_extensions": [
+    "Commit-trailer harvesting is wired in CI: continuity-merge-guard.yml extracts Agent-Authored-By / Agent-Assisted-By trailers from the PR's base..head commit range and feeds them to the classifier as the authoritative commit_trailer signal (MERGE_GUARD_COMMIT_TRAILERS). Conservative key set only; Co-Authored-By is intentionally not treated as an agent signal."
+  ],
   "future_extensions": [
     "Phase 2: Require an explicit attribution label before merge for AGENT_AUTHORED PRs in protected agent lanes (implementing the agent-authored required-check wedge described in AGENT_ATTRIBUTION_SPEC.json).",
-    "Phase 3: Extend identity_ambiguous handling to include a manual resolution path rather than a hard NULL, for cases where the conflict is an accidental duplicate signal.",
-    "Commit-trailer authoritative signal enforcement once commit-trailer harvesting is wired in CI (currently the MERGE_GUARD_COMMIT_TRAILERS env input is unfed in continuity-merge-guard.yml)."
+    "Phase 3: Extend identity_ambiguous handling to include a manual resolution path rather than a hard NULL, for cases where the conflict is an accidental duplicate signal."
   ]
 }
