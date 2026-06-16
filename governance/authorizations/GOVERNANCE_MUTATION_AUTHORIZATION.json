@@ -1,28 +1,30 @@
 {
-  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27621823619",
-  "decision_id": "3b13f9135c97417a682deb74392b587892d02be70bf062ba4d4a845cb48cd8cb",
-  "continuity_id": "c377b90d1c38710831794b1bfe34e932764d392991300c26289980c9d5eaef46",
-  "session_id": "5f8fd54724c7e3d08becec6843ab24ecf931a7d4fb554871a59ff32cbdc5707c",
-  "validated_object_hash": "91e6f47bce84cc376bc068de6cc34a006ccc2f50d42bda55398cc7bfed5ab39b",
-  "governed_files_hash": "ff89e77360a6077ae9a581adc241afd8faaa9a5745bba402cecbc75382c70063",
+  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27625285484",
+  "decision_id": "4ca6278791b17150475ab13f050b6797e41c57ca881869ecd71b3bb79940f584",
+  "continuity_id": "376026f5e7e4d1d7c013efb2607665b9bf801cb558913ad35519bcbafbd0f6b5",
+  "session_id": "9d00c8fe772e96846976a1a0bb1911bd717605f6e5afce841616b01cd3214b28",
+  "validated_object_hash": "c58d880398e576d1aa873a746a3c1cf8e18e36a15be1e928906aa88c58f245d5",
+  "governed_files_hash": "bd1fccfb4731a060033bb6adfc9f4547fd9523083468bea3c80b81829e089b14",
   "governed_files": [
-    ".github/workflows/merge-proof.yml"
+    ".github/workflows/continuity-merge-guard.yml",
+    "governance/merge-legitimacy/AGENT_ATTRIBUTION_POLICY.json"
   ],
   "mutation_classes": [
+    "governance_mutation",
     "workflow_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Fix merge-guard artifact download in merge-proof sidecar (gh run download for blob-redirect auth; add actions:read). Restores Phase-1 durable proof lineage; non-blocking, canonical_hash unchanged.",
+  "intent": "Harvest Agent-Authored-By/Agent-Assisted-By commit trailers into Merge Guard attribution (continuity-merge-guard.yml) and mark commit-trailer harvesting implemented in AGENT_ATTRIBUTION_POLICY.json. Conservative key set, harvest-only; non-blocking; canonical_hash unchanged. ",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
   "branch": "claude/continuityos-workflow-topology-1rcgfa",
-  "head_sha": "f47972f4c5aa08b8c3450d54c404e78b9d55d46c",
-  "workflow_run_id": "27621823619",
-  "created_at": "2026-06-16T13:41:29Z",
-  "expires_at": "2027-06-16T13:41:29Z",
+  "head_sha": "57a0676e841de7811c279ded2a905dff01d4b708",
+  "workflow_run_id": "27625285484",
+  "created_at": "2026-06-16T14:35:07Z",
+  "expires_at": "2027-06-16T14:35:07Z",
   "status": "GMA_VALID"
 }
