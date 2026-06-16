@@ -71,6 +71,36 @@ for (const file of readdirSync(fixturesDir).sort()) {
     continue
   }
 
+  // Agent Identity (Phase 1) — every decision must carry a well-formed
+  // attribution object recorded for the proof.
+  const attr = decision.actor_attribution
+  const ATTR_KEYS = ['actor_kind', 'actor_id', 'operator_id', 'attribution_source', 'confidence', 'evidence']
+  const attrShapeOk = attr && typeof attr === 'object' &&
+    ATTR_KEYS.every(k => k in attr) && Array.isArray(attr.evidence)
+  if (!attrShapeOk) {
+    recordFail(file, `missing/malformed actor_attribution object`)
+    continue
+  }
+  if (!/^[0-9a-f]{64}$/.test(decision.attribution_evidence_hash || '')) {
+    recordFail(file, `attribution_evidence_hash is not a sha256 hex: ${decision.attribution_evidence_hash}`)
+    continue
+  }
+
+  if (fixture.expected_attribution_status && decision.attribution_status !== fixture.expected_attribution_status) {
+    recordFail(file, `expected attribution_status ${fixture.expected_attribution_status}, got ${decision.attribution_status}`)
+    continue
+  }
+
+  if (fixture.expected_actor_kind && attr.actor_kind !== fixture.expected_actor_kind) {
+    recordFail(file, `expected actor_kind ${fixture.expected_actor_kind}, got ${attr.actor_kind}`)
+    continue
+  }
+
+  if (fixture.expected_attribution_classification && decision.attribution_classification !== fixture.expected_attribution_classification) {
+    recordFail(file, `expected attribution_classification ${fixture.expected_attribution_classification}, got ${decision.attribution_classification}`)
+    continue
+  }
+
   if (fixture.check_type === 'deterministic_hash') {
     const decisionAgain = evaluate(fixture.input)
     if (decision.canonical_hash !== decisionAgain.canonical_hash) {

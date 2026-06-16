@@ -1,0 +1,18 @@
+{
+  "description": "Agent PR with explicit agent-authored label — attributed agent, identity_present, VALID",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "3002",
+    "head_sha": "f1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "operator-human",
+    "head_ref": "claude/feature-x",
+    "pr_labels": "needs-review,agent-authored"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": [],
+  "expected_null_reasons": [],
+  "expected_attribution_status": "identity_present",
+  "expected_attribution_classification": "AGENT_AUTHORED",
+  "expected_actor_kind": "agent"
+}

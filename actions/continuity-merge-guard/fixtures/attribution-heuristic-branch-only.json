@@ -1,0 +1,17 @@
+{
+  "description": "Agent-session branch prefix only, no authoritative declaration — resolves to UNKNOWN/identity_missing per spec, non-blocking",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "3007",
+    "head_sha": "e2b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "github-user",
+    "head_ref": "claude/some-session"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": [],
+  "expected_null_reasons": [],
+  "expected_attribution_status": "identity_missing",
+  "expected_attribution_classification": "UNKNOWN",
+  "expected_actor_kind": "unknown"
+}

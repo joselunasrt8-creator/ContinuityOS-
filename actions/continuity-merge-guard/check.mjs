@@ -10,98 +10,21 @@
 //        | NULL (missing identity, invalid policy input, or policy mismatch; fail-closed)
 //     -> proof artifact (MERGE_GUARD_PROOF.json)
 //
-// Self-contained: no external npm dependencies. canonicalize/sha256Hex are
-// inlined from conformance/pack-v1/harness.mjs (same algorithm, proven
-// deterministic) so this directory can be copied to any repo unmodified.
+// A descriptive Agent Identity attribution object (Phase 1) is computed
+// alongside the decision and recorded in the proof WITHOUT entering the
+// canonical object-identity payload — attribution is metadata, not identity,
+// so the canonical_hash is unchanged and backward-compatible. See
+// attribution.mjs and governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json.
+//
+// Self-contained: no external npm dependencies. canonicalize/sha256Hex live in
+// canonical.mjs (same algorithm as conformance/pack-v1/harness.mjs, proven
+// deterministic); the whole directory is copyable to any repo unmodified.
 
 import { writeFileSync, appendFileSync } from 'node:fs'
+import { canonicalize, sha256Hex } from './canonical.mjs'
+import { classifyAttribution } from './attribution.mjs'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inline canonicalization (identical to conformance/pack-v1/harness.mjs)
-// ─────────────────────────────────────────────────────────────────────────────
-function isObj(v) {
-  return v !== null && typeof v === 'object' && !Array.isArray(v)
-}
-
-function normalize(v) {
-  if (v === undefined) return null
-  if (v === null || typeof v === 'string' || typeof v === 'boolean') return v
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null
-  if (Array.isArray(v)) return v.map(normalize)
-  if (isObj(v)) {
-    return Object.keys(v).sort().reduce((o, k) => {
-      o[k] = normalize(v[k])
-      return o
-    }, {})
-  }
-  return null
-}
-
-export function canonicalize(v) {
-  const n = normalize(v)
-  if (Array.isArray(n)) return `[${n.map(canonicalize).join(',')}]`
-  if (isObj(n)) {
-    return `{${Object.keys(n).sort().map(k => `${JSON.stringify(k)}:${canonicalize(n[k])}`).join(',')}}`
-  }
-  return JSON.stringify(n)
-}
-
-function rightRotate(v, a) {
-  return (v >>> a) | (v << (32 - a))
-}
-
-export function sha256Hex(input) {
-  const bytes = new TextEncoder().encode(input)
-  const bl = bytes.length * 8
-  const pl = (((bytes.length + 9 + 63) >> 6) << 6)
-  const padded = new Uint8Array(pl)
-  padded.set(bytes)
-  padded[bytes.length] = 0x80
-  const view = new DataView(padded.buffer)
-  view.setUint32(pl - 8, Math.floor(bl / 0x100000000))
-  view.setUint32(pl - 4, bl >>> 0)
-
-  const k = [
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-  ]
-  const h = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-  ]
-  const w = new Array(64)
-
-  for (let off = 0; off < padded.length; off += 64) {
-    for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + i * 4)
-    for (let i = 16; i < 64; i++) {
-      const s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3)
-      const s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10)
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0
-    }
-    let [a, b, c, d, e, f, g, hh] = h
-    for (let i = 0; i < 64; i++) {
-      const s1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)
-      const ch = (e & f) ^ (~e & g)
-      const t1 = (hh + s1 + ch + k[i] + w[i]) >>> 0
-      const s0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)
-      const maj = (a & b) ^ (a & c) ^ (b & c)
-      const t2 = (s0 + maj) >>> 0
-      hh = g; g = f; f = e; e = (d + t1) >>> 0
-      d = c; c = b; b = a; a = (t1 + t2) >>> 0
-    }
-    h[0] = (h[0] + a) >>> 0; h[1] = (h[1] + b) >>> 0
-    h[2] = (h[2] + c) >>> 0; h[3] = (h[3] + d) >>> 0
-    h[4] = (h[4] + e) >>> 0; h[5] = (h[5] + f) >>> 0
-    h[6] = (h[6] + g) >>> 0; h[7] = (h[7] + hh) >>> 0
-  }
-  return h.map(word => word.toString(16).padStart(8, '0')).join('')
-}
+export { canonicalize, sha256Hex }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Decision logic — v1 identity completeness plus an optional agent-authored
@@ -149,6 +72,26 @@ export function evaluate(input) {
     null_reasons.push('AGENT_AUTHOR_REQUIRED')
   }
 
+  // Agent Identity (Phase 1): descriptive attribution, computed from available
+  // PR/workflow metadata. Gate policy:
+  //   identity_present   -> continue
+  //   identity_missing   -> non-blocking (ordinary human PRs are NOT blocked)
+  //   identity_ambiguous -> NULL (conflicting attribution could create false legitimacy)
+  const attribution = classifyAttribution({
+    actor: input.actor,
+    pr_author: input.pr_author ?? input.actor,
+    head_ref: input.head_ref,
+    pr_body: input.pr_body,
+    pr_labels: input.pr_labels,
+    commit_trailers: input.commit_trailers,
+    operator_id: input.operator_id,
+  })
+  if (attribution.attribution_status === 'identity_ambiguous') {
+    null_reasons.push('ATTRIBUTION_AMBIGUOUS')
+  }
+
+  // Canonical object-identity payload is intentionally UNCHANGED — attribution
+  // is recorded separately and never alters the identity hash.
   const canonical_payload = REQUIRED_FIELDS.reduce((o, f) => {
     o[f] = input[f] ?? null
     return o
@@ -174,6 +117,10 @@ export function evaluate(input) {
     require_agent_authored,
     agent_author_required,
     null_reasons,
+    actor_attribution: attribution.actor_attribution,
+    attribution_classification: attribution.attribution_classification,
+    attribution_status: attribution.attribution_status,
+    attribution_evidence_hash: attribution.attribution_evidence_hash,
     record_type: 'MERGE_GUARD_PROOF',
   }
 }
@@ -191,6 +138,12 @@ function main() {
     actor: process.env.MERGE_GUARD_ACTOR || '',
     author_kind: process.env.MERGE_GUARD_AUTHOR_KIND || '',
     require_agent_authored: process.env.MERGE_GUARD_REQUIRE_AGENT_AUTHORED || '',
+    pr_author: process.env.MERGE_GUARD_PR_AUTHOR || '',
+    head_ref: process.env.MERGE_GUARD_HEAD_REF || '',
+    pr_body: process.env.MERGE_GUARD_PR_BODY || '',
+    pr_labels: process.env.MERGE_GUARD_PR_LABELS || '',
+    commit_trailers: process.env.MERGE_GUARD_COMMIT_TRAILERS || '',
+    operator_id: process.env.MERGE_GUARD_OPERATOR_ID || '',
   }
 
   const decision = evaluate(input)
@@ -208,6 +161,10 @@ function main() {
     require_agent_authored: decision.require_agent_authored,
     agent_author_required: decision.agent_author_required,
     null_reasons: decision.null_reasons,
+    actor_attribution: decision.actor_attribution,
+    attribution_classification: decision.attribution_classification,
+    attribution_status: decision.attribution_status,
+    attribution_evidence_hash: decision.attribution_evidence_hash,
     generated_at,
     record_type: decision.record_type,
   }
@@ -220,6 +177,9 @@ function main() {
   console.log(`canonical_hash=${decision.canonical_hash}`)
   console.log(`author_kind=${decision.author_kind}`)
   console.log(`require_agent_authored=${decision.require_agent_authored}`)
+  console.log(`attribution_status=${decision.attribution_status}`)
+  console.log(`attribution_classification=${decision.attribution_classification}`)
+  console.log(`actor_kind=${decision.actor_attribution.actor_kind}`)
   if (decision.missing_fields.length > 0) {
     console.log(`missing_fields=${decision.missing_fields.join(',')}`)
   }
@@ -238,6 +198,10 @@ function main() {
     appendFileSync(githubOutput, `proof_url=${proofPath}\n`)
     appendFileSync(githubOutput, `author_kind=${decision.author_kind}\n`)
     appendFileSync(githubOutput, `null_reasons=${decision.null_reasons.join(',')}\n`)
+    appendFileSync(githubOutput, `attribution_status=${decision.attribution_status}\n`)
+    appendFileSync(githubOutput, `attribution_classification=${decision.attribution_classification}\n`)
+    appendFileSync(githubOutput, `actor_kind=${decision.actor_attribution.actor_kind}\n`)
+    appendFileSync(githubOutput, `attribution_evidence_hash=${decision.attribution_evidence_hash}\n`)
   }
 
   const githubStepSummary = process.env.GITHUB_STEP_SUMMARY
@@ -250,6 +214,9 @@ function main() {
       `proof_hash: \`${decision.canonical_hash}\``,
       `author_kind: \`${decision.author_kind}\``,
       `require_agent_authored: \`${decision.require_agent_authored}\``,
+      `attribution_status: \`${decision.attribution_status}\``,
+      `attribution_classification: \`${decision.attribution_classification}\``,
+      `actor_kind: \`${decision.actor_attribution.actor_kind}\``,
       `null_reasons: \`${decision.null_reasons.join(',') || 'none'}\``,
       '',
       '```json',

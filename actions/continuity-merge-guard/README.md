@@ -49,10 +49,26 @@ Each run produces:
 - `proof_url`: path to the uploaded `MERGE_GUARD_PROOF.json` artifact
 - `author_kind`: normalized `agent`, `human`, or `unknown` author scope
 - `null_reasons`: comma-separated NULL reason codes, empty for VALID
+- `attribution_status`: `identity_present`, `identity_missing`, or `identity_ambiguous`
+- `attribution_classification`: `AGENT_AUTHORED`, `AGENT_ASSISTED`, `HUMAN_AUTHORED`, or `UNKNOWN`
+- `actor_kind`: normalized actor kind `human` / `agent` / `bot` / `unknown`
+- `attribution_evidence_hash`: sha256 of the canonicalized attribution evidence
 
 The proof is written to the job's step summary and uploaded as a workflow
 artifact named `MERGE_GUARD_PROOF`, so it is visible directly on the PR
 check run — the proof is the product.
+
+### Agent Identity (Phase 1)
+
+The Merge Guard also records a descriptive **actor attribution** object, derived
+from optional PR/workflow metadata (`pr-body`, `pr-labels`, `head-ref`,
+`commit-trailers`, ...). Attribution is metadata, not authority: it never enters
+the canonical identity payload (so `proof_hash` is unchanged and backward
+compatible), and it does not alter merge execution semantics. Missing
+attribution is non-blocking; only *conflicting* authoritative signals fail
+closed (`ATTRIBUTION_AMBIGUOUS` → `NULL`). See
+`governance/merge-legitimacy/AGENT_ATTRIBUTION_SPEC.json` and
+`AGENT_ATTRIBUTION_PHASE1_NOTES.md`.
 
 Example `MERGE_GUARD_PROOF.json`:
 
