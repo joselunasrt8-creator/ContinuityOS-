@@ -1,13 +1,13 @@
 {
-  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27606781961",
-  "decision_id": "e63133a86526018b6d804ff38de883fe152eb6afac8b40e40870c971363afad6",
-  "continuity_id": "0b73b7c3324835a8c1c3cfb9a68b612bd820cad10e80bdf71276c916ca57da16",
-  "session_id": "17e266021be2a932889f2c344732693abb4875875f8904e170a64e8ad64c31c1",
-  "validated_object_hash": "371d5d7f250ff2124d6baebe4c95d443893950907f19e1f8bad8c7fdb06a3ec6",
-  "governed_files_hash": "55074437abbbd4f5ef13851b209dc32b6bbceb71116e0c081fd58ff75437051f",
+  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27608958812",
+  "decision_id": "e8b6af5a85aeaf3ac7312c2f07ebb4a150801f7316b394bc9dbb194c2f617a5f",
+  "continuity_id": "75e7ffcb940584ceb44b483271cbed93a85ff8d9066382ddc93e37958200397f",
+  "session_id": "d10f7a5bd24d1c76eab2b63570e8b746cd6267d4963d84b1797e897293e1066e",
+  "validated_object_hash": "0016df0c8373511745ba622477605c024d9bb54b4d9f96a554a3c0f903ae0a9f",
+  "governed_files_hash": "1b6e8006643e0a6d0972dd73b98276a19559484fb0e1a51c0b21b655b9d5334b",
   "governed_files": [
-    ".github/workflows/continuity-merge-guard.yml",
-    "governance/merge-legitimacy/AGENT_ATTRIBUTION_PHASE1_NOTES.md"
+    ".github/workflows/merge-proof.yml",
+    "governance/merge-legitimacy/AGENT_ATTRIBUTION_POLICY.json"
   ],
   "mutation_classes": [
     "governance_mutation",
@@ -17,14 +17,14 @@
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Authorize Phase 1 Agent Identity attribution — workflow wiring in continuity-merge-guard.yml + AGENT_ATTRIBUTION_PHASE1_NOTES.md",
+  "intent": "Phase-1 attribution policy binding + durable proof lineage: authorize governance_mutation (AGENT_ATTRIBUTION_POLICY.json) and workflow_mutation (merge-proof.yml actor_attribution sidecar). No canonical_payload/canonical_hash change. ",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
   "branch": "claude/continuityos-workflow-topology-1rcgfa",
-  "head_sha": "cf3480f4d9ecdb48f9edce2abe93c4171ac37cbc",
-  "workflow_run_id": "27606781961",
-  "created_at": "2026-06-16T09:07:20Z",
-  "expires_at": "2027-06-16T09:07:20Z",
+  "head_sha": "dcf8d587599bb590a1500a2828188af04dc238b9",
+  "workflow_run_id": "27608958812",
+  "created_at": "2026-06-16T09:47:02Z",
+  "expires_at": "2027-06-16T09:47:02Z",
   "status": "GMA_VALID"
 }
