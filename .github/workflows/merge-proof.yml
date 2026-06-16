@@ -473,6 +473,67 @@ jobs:
           console.log(id ? `Attributed to standing authority: ${id}` : `No standing authority attribution (${sel.reason || 'n/a'})`);
           NODE
 
+      - name: Fetch merge-guard attribution sidecar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          REPO="${{ github.repository }}"
+
+          # Defaults: sidecar null until proven available. All failures below are non-blocking.
+          {
+            echo "MERGE_GUARD_ATTR_AVAILABLE=false"
+            echo "MERGE_GUARD_PROOF_ID="
+            echo "MERGE_GUARD_ATTR_CLASSIFICATION=UNKNOWN"
+            echo "MERGE_GUARD_ATTR_STATUS=identity_missing"
+            echo "MERGE_GUARD_ACTOR_KIND=unknown"
+            echo "MERGE_GUARD_ATTR_EVIDENCE_HASH="
+          } >> "$GITHUB_ENV"
+
+          RUN_ID=$(gh api "repos/$REPO/actions/workflows/continuity-merge-guard.yml/runs" \
+            --field head_sha="$HEAD_SHA" \
+            --field status=completed \
+            --field per_page=1 \
+            --jq '.workflow_runs[0].id // empty' 2>/dev/null || true)
+
+          if [ -z "${RUN_ID:-}" ]; then
+            echo "No completed merge-guard run found for head SHA $HEAD_SHA — sidecar null"
+            exit 0
+          fi
+
+          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "MERGE_GUARD_PROOF") | .id' 2>/dev/null \
+            | head -1 || true)
+
+          if [ -z "${ARTIFACT_ID:-}" ]; then
+            echo "MERGE_GUARD_PROOF artifact not found in run $RUN_ID — sidecar null"
+            exit 0
+          fi
+
+          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" \
+            --output merge_guard_proof.zip 2>/dev/null \
+            || { echo "Artifact download failed — sidecar null"; exit 0; }
+
+          mkdir -p merge_guard_proof_dir
+          unzip -q merge_guard_proof.zip -d merge_guard_proof_dir/
+
+          PROOF_FILE=$(find merge_guard_proof_dir -name 'MERGE_GUARD_PROOF.json' | head -1)
+          if [ -z "${PROOF_FILE:-}" ]; then
+            echo "MERGE_GUARD_PROOF.json not in artifact — sidecar null"
+            exit 0
+          fi
+
+          {
+            echo "MERGE_GUARD_ATTR_AVAILABLE=true"
+            echo "MERGE_GUARD_PROOF_ID=$(jq -r '.proof_id // ""' "$PROOF_FILE")"
+            echo "MERGE_GUARD_ATTR_CLASSIFICATION=$(jq -r '.attribution_classification // "UNKNOWN"' "$PROOF_FILE")"
+            echo "MERGE_GUARD_ATTR_STATUS=$(jq -r '.attribution_status // "identity_missing"' "$PROOF_FILE")"
+            echo "MERGE_GUARD_ACTOR_KIND=$(jq -r '.actor_attribution.actor_kind // "unknown"' "$PROOF_FILE")"
+            echo "MERGE_GUARD_ATTR_EVIDENCE_HASH=$(jq -r '.attribution_evidence_hash // ""' "$PROOF_FILE")"
+          } >> "$GITHUB_ENV"
+          echo "Attribution sidecar available from merge-guard run $RUN_ID"
+
       - name: Generate merge proof
         run: |
           set -euo pipefail
@@ -556,6 +617,21 @@ jobs:
 
           CANONICAL_HASH=$(sha256sum CANONICAL_PAYLOAD.json | cut -d' ' -f1)
 
+          # Build actor attribution sidecar (non-canonical — never enters canonical_payload or
+          # canonical_hash; recorded alongside proof per AGENT_ATTRIBUTION_POLICY.json Phase 1).
+          if [ "${MERGE_GUARD_ATTR_AVAILABLE:-false}" = "true" ]; then
+            ACTOR_ATTRIBUTION_SIDECAR=$(jq -n \
+              --arg source "MERGE_GUARD_PROOF" \
+              --arg merge_guard_proof_id "${MERGE_GUARD_PROOF_ID:-}" \
+              --arg attribution_classification "${MERGE_GUARD_ATTR_CLASSIFICATION:-UNKNOWN}" \
+              --arg attribution_status "${MERGE_GUARD_ATTR_STATUS:-identity_missing}" \
+              --arg actor_kind "${MERGE_GUARD_ACTOR_KIND:-unknown}" \
+              --arg attribution_evidence_hash "${MERGE_GUARD_ATTR_EVIDENCE_HASH:-}" \
+              '{source: $source, merge_guard_proof_id: $merge_guard_proof_id, attribution_classification: $attribution_classification, attribution_status: $attribution_status, actor_kind: $actor_kind, attribution_evidence_hash: $attribution_evidence_hash}')
+          else
+            ACTOR_ATTRIBUTION_SIDECAR="null"
+          fi
+
           jq -n \
             --arg proof_id "$PROOF_ID" \
             --arg repo "${{ github.repository }}" \
@@ -565,11 +641,13 @@ jobs:
             --arg workflow_run_id "${{ github.run_id }}" \
             --arg workflow_attempt "${{ github.run_attempt }}" \
             --arg invocation_nonce "$NONCE" \
+            --argjson actor_attribution_sidecar "$ACTOR_ATTRIBUTION_SIDECAR" \
             '{
               proof_id: $proof_id,
               repo: $repo,
               canonical_payload: $canonical_payload,
               canonical_hash: $canonical_hash,
+              actor_attribution_sidecar: $actor_attribution_sidecar,
               runtime_metadata: {
                 generated_at: $generated_at,
                 workflow_run_id: $workflow_run_id,
@@ -631,6 +709,13 @@ jobs:
           # this proof entry consumes one unit of the authority's max_merges budget.
           SA_ID=$(jq -r '.canonical_payload.standing_authority_id // ""' MERGE_PROOF.json)
 
+          # Attribution classification from sidecar — included in registry entry when available
+          # so the append-only ledger carries actor attribution lineage alongside proof hashes.
+          ATTR_CLASS_REGISTRY=""
+          if [ "${MERGE_GUARD_ATTR_AVAILABLE:-false}" = "true" ]; then
+            ATTR_CLASS_REGISTRY="${MERGE_GUARD_ATTR_CLASSIFICATION:-}"
+          fi
+
           ENTRY=$(jq -cn \
             --arg proof_id "$PROOF_ID" \
             --arg proof_hash "$PROOF_HASH" \
@@ -639,6 +724,7 @@ jobs:
             --arg merged_at "$MERGED_AT" \
             --arg appended_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg standing_authority_id "$SA_ID" \
+            --arg attribution_classification "$ATTR_CLASS_REGISTRY" \
             '{
               _record_type: "proof_entry",
               proof_id: $proof_id,
@@ -648,7 +734,8 @@ jobs:
               merged_at: $merged_at,
               appended_at: $appended_at
             }
-            + (if $standing_authority_id == "" then {} else {standing_authority_id: $standing_authority_id} end)')
+            + (if $standing_authority_id == "" then {} else {standing_authority_id: $standing_authority_id} end)
+            + (if $attribution_classification == "" then {} else {attribution_classification: $attribution_classification} end)')
 
           echo "$ENTRY" >> "$REGISTRY_PATH"
 
