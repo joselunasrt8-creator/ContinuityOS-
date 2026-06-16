@@ -222,6 +222,16 @@ an agent-authored PR with a complete identity object returns `VALID`.
 - `@v0.2.0` — planned pinned tag for the agent-authored workflow-policy
   validator surface. Use this, once tagged, for load-bearing consumers that
   need `author-kind` and `require-agent-authored` proof fields.
+- `@v0.3.0` — planned pinned tag for the **Agent Identity attribution surface**:
+  the action emits `attribution_status`, `attribution_classification`,
+  `actor_kind`, and `attribution_evidence_hash` (driven by the authoritative
+  `pr-labels` / `pr-body` / `commit-trailers` signals). Use this, once tagged,
+  for consumers that make the attribution classification load-bearing — e.g. an
+  agent-lane gate that requires `AGENT_AUTHORED`. The attribution outputs are
+  metadata, not authority: they never alter `result` or `canonical_hash`, so a
+  `@v0.1.0` consumer that only reads `result` is unaffected by moving to
+  `@v0.3.0`. `continuityos-sandbox` pins this tag for its
+  `agent-attribution-gate` (see that repo's `ATTRIBUTION_DEPENDENCY_PROOF.md`).
 
 A `v0.1.1` tag is planned at the current `main` HEAD (the commit that
 fixed this README's stale `mindshift-demo` install path). Relative to
