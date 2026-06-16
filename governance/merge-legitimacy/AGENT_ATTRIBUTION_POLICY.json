@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "agent_attribution_policy",
+  "spec_reference": "AGENT_ATTRIBUTION_SPEC.json",
+  "policy_binding_for": "policy_binding_note in AGENT_ATTRIBUTION_SPEC.json",
+  "issue_reference": "#2003",
+  "status": "operative_governance_artifact",
+  "phase": "phase_1",
+  "generated_at": "2026-06-16",
+  "scope": {
+    "purpose": "Declare the Phase-1 merge gate policy for each attribution status. Fulfills the policy_binding_note deferred by AGENT_ATTRIBUTION_SPEC.json. Operative on the CI/Merge Guard plane only — no effect on deployment runtime, standing authority, review legitimacy, or canonical_hash.",
+    "execution_surface": "ci_merge_guard",
+    "operational_effect": "attribution_gate_policy"
+  },
+  "gate_policy": {
+    "identity_present": {
+      "attribution_status": "identity_present",
+      "condition": "≥1 authoritative signal (pr_label, pr_body_metadata_block, commit_trailer) is present and non-conflicting, OR a confirmed bot actor account is observed",
+      "merge_effect": "non_blocking",
+      "description": "Attribution recorded in MERGE_GUARD_PROOF.json. Merge is not blocked by attribution alone. The classification (AGENT_AUTHORED, HUMAN_AUTHORED, AGENT_ASSISTED) is descriptive metadata only.",
+      "null_reasons_added": []
+    },
+    "identity_missing": {
+      "attribution_status": "identity_missing",
+      "condition": "No authoritative attribution signal is present; only heuristic signals (e.g. branch naming convention) or no signals at all",
+      "merge_effect": "non_blocking",
+      "description": "UNKNOWN recorded in proof. Ordinary human PRs with no attribution signals MUST NOT be blocked. UNKNOWN is the safe non-overclaiming default per AGENT_ATTRIBUTION_SPEC.json § unknown_handling.",
+      "null_reasons_added": []
+    },
+    "identity_ambiguous": {
+      "attribution_status": "identity_ambiguous",
+      "condition": "Conflicting authoritative signals on the same PR (e.g. pr_label declares agent-authored while pr_body_metadata_block declares HUMAN_AUTHORED)",
+      "merge_effect": "null_blocking",
+      "description": "Conflicting authoritative signals could create false legitimacy by allowing the wrong classification to govern merge eligibility. Fail closed: ATTRIBUTION_AMBIGUOUS is added to null_reasons and the Merge Guard returns NULL.",
+      "null_reasons_added": ["ATTRIBUTION_AMBIGUOUS"]
+    }
+  },
+  "classification_merge_effects": {
+    "AGENT_AUTHORED": {
+      "phase_1_merge_effect": "non_blocking",
+      "description": "Recorded as AGENT_AUTHORED in proof. Eligible for the agent-authored required-check wedge when require-agent-authored: 'true' is set on the workflow. Does not independently block or unblock merge — attribution is not authority."
+    },
+    "AGENT_ASSISTED": {
+      "phase_1_merge_effect": "non_blocking",
+      "description": "Treated as HUMAN_AUTHORED for merge eligibility in Phase 1. Not subject to the agent-authored required check unless policy is explicitly extended."
+    },
+    "HUMAN_AUTHORED": {
+      "phase_1_merge_effect": "non_blocking",
+      "description": "Not subject to the agent-authored required check. Recorded in proof."
+    },
+    "UNKNOWN": {
+      "phase_1_merge_effect": "non_blocking",
+      "description": "No authoritative signal. Non-blocking in Phase 1 per the identity_missing gate policy. Equivalent to HUMAN_AUTHORED for merge eligibility; recorded as UNKNOWN in proof."
+    }
+  },
+  "non_negotiable_separations": [
+    "This policy does not alter canonical_payload or canonical_hash in MERGE_GUARD_PROOF.json. Attribution is metadata recorded alongside, never inside, the canonical object-identity hash.",
+    "Attribution classification does not grant merge authority. AGENT_AUTHORED does not bypass review legitimacy, standing authority derivation, or exact-object admission.",
+    "This policy operates on the CI/Merge Guard plane only. No effect on the deployment runtime (/execute route, governed-deploy.yml), standing authority registry, or merge_proof_registry.jsonl canonical_payload.",
+    "The gate policy is applied in check.mjs (evaluate() function). This artifact documents the policy binding; it is not itself executable."
+  ],
+  "implementation_reference": "actions/continuity-merge-guard/check.mjs — evaluate() function, attribution gate block (Phase 1 comment)",
+  "spec_notes": {
+    "AGENT_ATTRIBUTION_SPEC_status": "non_operative_governance_artifact",
+    "reconciliation": "AGENT_ATTRIBUTION_SPEC.json remains non_operative as a specification artifact. This policy artifact is the operative binding the spec deferred via policy_binding_note. The spec's classification states and signal tiers are unchanged; this artifact binds the merge-effect for each status as required.",
+    "future_work_closed": "AGENT_ATTRIBUTION_SPEC.json future_work item 'A dedicated AGENT_ATTRIBUTION_POLICY.json defining the merge-blocking behavior for each attribution_classification, completing the dependency wedge described in #2003' is closed by this artifact."
+  },
+  "future_extensions": [
+    "Phase 2: Require an explicit attribution label before merge for AGENT_AUTHORED PRs in protected agent lanes (implementing the agent-authored required-check wedge described in AGENT_ATTRIBUTION_SPEC.json).",
+    "Phase 3: Extend identity_ambiguous handling to include a manual resolution path rather than a hard NULL, for cases where the conflict is an accidental duplicate signal.",
+    "Commit-trailer authoritative signal enforcement once commit-trailer harvesting is wired in CI (currently the MERGE_GUARD_COMMIT_TRAILERS env input is unfed in continuity-merge-guard.yml)."
+  ]
+}
