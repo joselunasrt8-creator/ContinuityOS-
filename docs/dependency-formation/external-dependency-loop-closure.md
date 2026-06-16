@@ -8,13 +8,31 @@ eligibility depends on ContinuityOS, and an agent-authored PR has exercised
 that dependency.
 
 ```text
-External agent → PR in continuityos-sandbox
+External agent (Claude)
+→ PR #18 in continuityos-sandbox
 → merge-guard (ContinuityOS@v0.1.0) required check
-→ VALID → mergeable + proof artifact
+→ VALID → mergeable + MERGE_GUARD_PROOF artifact
 → NULL → blocked (GitHub required check = failure)
 
 Remove ContinuityOS → agent PR merges without identity validation
 ```
+
+### Classification: `EXTERNAL_DEPENDENCY_LOOP_CLOSED`
+
+---
+
+## Observed proof (Loop 11)
+
+| Field | Value |
+|-------|-------|
+| Sandbox PR | https://github.com/joselunasrt8-creator/continuityos-sandbox/pull/18 |
+| PR author | agent (Claude) |
+| Check run | https://github.com/joselunasrt8-creator/continuityos-sandbox/actions/runs/27588430806 |
+| Conclusion | `success` (merge-guard result: VALID) |
+| Artifact | `MERGE_GUARD_PROOF` (ID `7655437395`) |
+| Artifact digest | `sha256:7ad62cd503093d70ea6ab0a357b8c70874856a60f1dffcb3f1ebff0a29379be7` |
+| Timestamp | `2026-06-16T01:44:26Z` |
+| Head SHA | `a968a4385009c02e31e61f09e54935dfe297a412` |
 
 ---
 
@@ -45,6 +63,7 @@ Evidence in `continuityos-sandbox`:
 - `LOAD_BEARING_READINESS.md` — classification: `LOAD-BEARING_ACTIVE`
 - `VALIDATION.md` — VALID run evidence with `MERGE_GUARD_PROOF.json` artifact
 - `EXTERNAL_DEPENDENCY_PROOF.md` — Loop 6, classification: `EXTERNAL_DEPENDENCY_CONFIRMED`
+- `DEPENDENCY_FORMATION_CLOSURE.md` — Loop 11, PR #18, run `27588430806`
 
 ### NULL path (enforcement proven)
 
@@ -54,14 +73,14 @@ Evidence in `continuityos-sandbox`:
   - GitHub reported the PR as `blocked`
   - Merge was not possible while required check was in failure state
 
-### Agent-authored path (Loop 11)
+### Agent-authored path (Loop 11 — this document's proof)
 
-Evidence in `continuityos-sandbox`:
-- `DEPENDENCY_FORMATION_CLOSURE.md` — created by an AI agent (Claude)
-  - Agent performed all GitHub operations: branch create, commit, PR open
-  - PR runs through `merge-guard` as a required check
-  - `VALID` result proves agent-authored PRs depend on ContinuityOS
-  - Counterfactual documented: removal degrades the workflow materially
+An AI agent (Claude) created PR #18 in `continuityos-sandbox`:
+- Agent performed all GitHub operations: branch create, commit, PR open
+- `continuity-merge-guard` ran as required check (run `27588430806`)
+- Result: `conclusion: success` → `MERGE_GUARD_PROOF` artifact uploaded
+- PR is mergeable
+- Counterfactual documented: removal degrades the workflow materially
 
 ### Operator retention signal
 
@@ -97,14 +116,16 @@ Removal degrades the workflow. The dependency is load-bearing.
 
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
-| Identify the repo/workflow | CLOSED | `continuityos-sandbox`, protected `main` branch |
-| PR classified as agent-authored | CLOSED | `DEPENDENCY_FORMATION_CLOSURE.md`, Loop 11 PR |
-| ContinuityOS check runs on PR | CLOSED | `merge-guard` required check on every `main` PR |
-| VALID path shows merge eligibility | CLOSED | `LOAD_BEARING_READINESS.md`, `VALIDATION.md` |
+| Identify the repo/workflow | CLOSED | `continuityos-sandbox`, PR #18 |
+| PR classified as agent-authored | CLOSED | Agent (Claude) performed all GitHub ops |
+| ContinuityOS check runs on PR | CLOSED | Run `27588430806`, `conclusion: success` |
+| VALID path shows merge eligibility | CLOSED | `MERGE_GUARD_PROOF` artifact `7655437395` |
 | NULL path shows merge blockage | CLOSED | `NULL_ENFORCEMENT_PROOF.md` (PR #9) |
-| Proof artifact captured and linked | CLOSED | `MERGE_GUARD_PROOF.json` on each CI run |
-| Dependency-proof report | CLOSED | `EXTERNAL_DEPENDENCY_PROOF.md` + this document |
+| Proof artifact captured and linked | CLOSED | Artifact `7655437395`, digest documented |
+| Dependency-proof report | CLOSED | `DEPENDENCY_FORMATION_CLOSURE.md` + this doc |
 | ContinuityOS removal degrades workflow | CLOSED | Counterfactual above; documented in closure doc |
+
+**All Issue #2001 acceptance criteria: CLOSED.**
 
 ---
 
@@ -143,7 +164,7 @@ agent-authored PRs — depends on ContinuityOS.
 
 ## Related documents
 
-- `continuityos-sandbox/DEPENDENCY_FORMATION_CLOSURE.md` — agent-authored Loop 11 PR document
+- `continuityos-sandbox/DEPENDENCY_FORMATION_CLOSURE.md` — agent-authored Loop 11 closure
 - `continuityos-sandbox/EXTERNAL_DEPENDENCY_PROOF.md` — Loop 6 closure
 - `continuityos-sandbox/NULL_ENFORCEMENT_PROOF.md` — NULL path proof
 - `continuityos-sandbox/LOAD_BEARING_READINESS.md` — required-check readiness
