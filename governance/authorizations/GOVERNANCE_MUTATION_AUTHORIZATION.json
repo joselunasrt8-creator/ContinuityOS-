@@ -1,10 +1,10 @@
 {
-  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27620629191",
-  "decision_id": "3f6d1493d41a297ae0f40fc5a6203058e814a4c98a05cb19683750a9a810ab97",
-  "continuity_id": "162e783c7fce9fe6e03c91f78932fcd61b2c0bcc80a663e71824c9d4d6400509",
-  "session_id": "f6f2ce4f2c14fcc9bbad3c5dd896968ac16746261a382836b65df0cc7a52c235",
-  "validated_object_hash": "d1274360af676cf73a875eb2173f19d2c06d6d7889a144e540edfafea6b836c6",
-  "governed_files_hash": "0844f2a1c487358c773ab31657aa6f89e0046e21b9c814a93ae54597535b0cd9",
+  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27621823619",
+  "decision_id": "3b13f9135c97417a682deb74392b587892d02be70bf062ba4d4a845cb48cd8cb",
+  "continuity_id": "c377b90d1c38710831794b1bfe34e932764d392991300c26289980c9d5eaef46",
+  "session_id": "5f8fd54724c7e3d08becec6843ab24ecf931a7d4fb554871a59ff32cbdc5707c",
+  "validated_object_hash": "91e6f47bce84cc376bc068de6cc34a006ccc2f50d42bda55398cc7bfed5ab39b",
+  "governed_files_hash": "ff89e77360a6077ae9a581adc241afd8faaa9a5745bba402cecbc75382c70063",
   "governed_files": [
     ".github/workflows/merge-proof.yml"
   ],
@@ -15,14 +15,14 @@
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Fix merge-proof attribution sidecar fetch (force GET on gh api run lookup; guard unzip). Restores Phase-1 durable proof lineage; non-blocking, canonical_hash unchanged",
+  "intent": "Fix merge-guard artifact download in merge-proof sidecar (gh run download for blob-redirect auth; add actions:read). Restores Phase-1 durable proof lineage; non-blocking, canonical_hash unchanged.",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
   "branch": "claude/continuityos-workflow-topology-1rcgfa",
-  "head_sha": "d80173f13557e475962a92f4e645281d3620e10b",
-  "workflow_run_id": "27620629191",
-  "created_at": "2026-06-16T13:22:06Z",
-  "expires_at": "2027-06-16T13:22:06Z",
+  "head_sha": "f47972f4c5aa08b8c3450d54c404e78b9d55d46c",
+  "workflow_run_id": "27621823619",
+  "created_at": "2026-06-16T13:41:29Z",
+  "expires_at": "2027-06-16T13:41:29Z",
   "status": "GMA_VALID"
 }

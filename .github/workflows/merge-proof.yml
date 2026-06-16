@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  actions: read
 
 jobs:
   generate-merge-proof:
@@ -505,22 +506,14 @@ jobs:
             exit 0
           fi
 
-          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
-            --jq '.artifacts[] | select(.name == "MERGE_GUARD_PROOF") | .id' 2>/dev/null \
-            | head -1 || true)
-
-          if [ -z "${ARTIFACT_ID:-}" ]; then
-            echo "MERGE_GUARD_PROOF artifact not found in run $RUN_ID — sidecar null"
-            exit 0
-          fi
-
-          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" \
-            --output merge_guard_proof.zip 2>/dev/null \
-            || { echo "Artifact download failed — sidecar null"; exit 0; }
-
-          mkdir -p merge_guard_proof_dir
-          unzip -q merge_guard_proof.zip -d merge_guard_proof_dir/ \
-            || { echo "Artifact unzip failed — sidecar null"; exit 0; }
+          # Use `gh run download`, not `gh api .../artifacts/<id>/zip`: the zip endpoint
+          # 302-redirects to blob storage and `gh api` re-sends the Authorization header to
+          # the storage URL, which rejects it (the REST list calls above work because they
+          # return JSON directly). `gh run download` handles the redirect and extracts in
+          # place. Non-blocking: any failure leaves the sidecar null.
+          rm -rf merge_guard_proof_dir && mkdir -p merge_guard_proof_dir
+          gh run download "$RUN_ID" -R "$REPO" -n MERGE_GUARD_PROOF -D merge_guard_proof_dir 2>/dev/null \
+            || { echo "Artifact download failed for run $RUN_ID — sidecar null"; exit 0; }
 
           PROOF_FILE=$(find merge_guard_proof_dir -name 'MERGE_GUARD_PROOF.json' | head -1)
           if [ -z "${PROOF_FILE:-}" ]; then
