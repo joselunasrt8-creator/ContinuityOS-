@@ -1779,7 +1779,12 @@ function authorized(req: Request, env: Env): boolean {
   const encoder = new TextEncoder()
   const a = encoder.encode(provided)
   const b = encoder.encode(env.API_KEY)
-  return crypto.subtle.timingSafeEqual(a, b)
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof (crypto.subtle as any).timingSafeEqual === "function") {
+    return (crypto.subtle as any).timingSafeEqual(a, b)
+  }
+  let mismatch = 0
+  for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i]
+  return mismatch === 0
 }
 function hasDb(env: unknown): env is Env { return Boolean((env as any)?.DB && typeof (env as any).DB.prepare === "function") }
 function isPlainRecord(v: unknown): v is Record<string, unknown> {
