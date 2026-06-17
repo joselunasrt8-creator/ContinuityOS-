@@ -1772,20 +1772,7 @@ async function body(req: Request): Promise<any> {
     return await req.json()
   } catch { return {} }
 }
-function authorized(req: Request, env: Env): boolean {
-  if (typeof env.API_KEY !== "string" || env.API_KEY.length === 0) return false
-  const provided = req.headers.get("X-API-Key") || ""
-  if (provided.length !== env.API_KEY.length) return false
-  const encoder = new TextEncoder()
-  const a = encoder.encode(provided)
-  const b = encoder.encode(env.API_KEY)
-  if (typeof crypto !== "undefined" && crypto.subtle && typeof (crypto.subtle as any).timingSafeEqual === "function") {
-    return (crypto.subtle as any).timingSafeEqual(a, b)
-  }
-  let mismatch = 0
-  for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i]
-  return mismatch === 0
-}
+function authorized(req: Request, env: Env): boolean { return typeof env.API_KEY === "string" && env.API_KEY.length > 0 && req.headers.get("X-API-Key") === env.API_KEY }
 function hasDb(env: unknown): env is Env { return Boolean((env as any)?.DB && typeof (env as any).DB.prepare === "function") }
 function isPlainRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
