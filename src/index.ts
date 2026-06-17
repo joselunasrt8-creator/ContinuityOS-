@@ -1765,8 +1765,22 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
 }
 
-async function body(req: Request): Promise<any> { try { return await req.json() } catch { return {} } }
-function authorized(req: Request, env: Env): boolean { return typeof env.API_KEY === "string" && env.API_KEY.length > 0 && req.headers.get("X-API-Key") === env.API_KEY }
+async function body(req: Request): Promise<any> {
+  try {
+    const contentLength = Number(req.headers.get("content-length") || "0")
+    if (contentLength > 10_485_760) return {}
+    return await req.json()
+  } catch { return {} }
+}
+function authorized(req: Request, env: Env): boolean {
+  if (typeof env.API_KEY !== "string" || env.API_KEY.length === 0) return false
+  const provided = req.headers.get("X-API-Key") || ""
+  if (provided.length !== env.API_KEY.length) return false
+  const encoder = new TextEncoder()
+  const a = encoder.encode(provided)
+  const b = encoder.encode(env.API_KEY)
+  return crypto.subtle.timingSafeEqual(a, b)
+}
 function hasDb(env: unknown): env is Env { return Boolean((env as any)?.DB && typeof (env as any).DB.prepare === "function") }
 function isPlainRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -1818,6 +1832,7 @@ function toCanonicalAeo(input: unknown): CanonicalAEO | null {
 async function sha256Hex(input: string): Promise<string> { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("") }
 
 function base64ToBytes(value: string): Uint8Array | null {
+  if (value.length > 1_048_576) return null
   try {
     const binary = atob(value)
     return Uint8Array.from(binary, (char) => char.charCodeAt(0))

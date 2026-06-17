@@ -8,8 +8,11 @@ const uri =
 const username =
   process.env.NEO4J_USERNAME || "neo4j"
 
-const password =
-  process.env.NEO4J_PASSWORD || "password"
+const password = process.env.NEO4J_PASSWORD
+if (!password) {
+  console.error("NEO4J_PASSWORD environment variable is required")
+  process.exit(1)
+}
 
 const driver = neo4j.driver(
   uri,
