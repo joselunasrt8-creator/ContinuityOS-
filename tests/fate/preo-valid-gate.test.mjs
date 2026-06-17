@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -12,25 +11,7 @@ const evidenceSnapshotSpec = JSON.parse(
   readFileSync(join(root, 'governance', 'preo', 'EVIDENCE_SNAPSHOT_SPEC.json'), 'utf8'),
 );
 
-// ---------------------------------------------------------------------------
-// Canonical hash — determinism assertion depends on stable ordering
-// ---------------------------------------------------------------------------
-
-function sortCanonical(value) {
-  if (Array.isArray(value)) return value.map(sortCanonical);
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => [k, sortCanonical(v)]),
-    );
-  }
-  return value;
-}
-
-function canonicalHash(value) {
-  return createHash('sha256').update(`${JSON.stringify(sortCanonical(value))}\n`).digest('hex');
-}
+import { sortCanonical, canonicalHash } from '../helpers/canonical-test-hash.mjs';
 
 // ---------------------------------------------------------------------------
 // PREO_CANDIDATE → PREO_VALID | PREO_INVALID transition
