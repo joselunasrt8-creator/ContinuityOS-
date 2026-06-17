@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { canonicalize, hashCanonical } from '../canonical.js';
+import { isPlainObject, validateNameArray } from '../lib/validation-helpers.mjs';
 import { validateRiskClass } from '../lib/capability-risk-classification.js';
 
 export const SKILL_SURFACES_REGISTRY_VERSION = 'SKILL_SURFACES_REGISTRY_V1';
@@ -12,40 +13,9 @@ const SURFACE_TYPES = new Set([
   'other'
 ]);
 
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
+export const canonicalizeSkillSurfacesRegistry = canonicalize;
 
-function validateNameArray(value, field, errors, { minItems = 0 } = {}) {
-  if (!Array.isArray(value)) {
-    errors.push(`${field}: expected array`);
-    return;
-  }
-
-  if (value.length < minItems) errors.push(`${field}: requires at least ${minItems} item(s)`);
-  if (new Set(value).size !== value.length) errors.push(`${field}: duplicate values are not allowed`);
-
-  for (const item of value) {
-    if (typeof item !== 'string' || !NAME_PATTERN.test(item)) {
-      errors.push(`${field}: invalid name ${JSON.stringify(item)}`);
-    }
-  }
-}
-
-export function canonicalizeSkillSurfacesRegistry(value) {
-  if (Array.isArray(value)) return `[${value.map((entry) => canonicalizeSkillSurfacesRegistry(entry)).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalizeSkillSurfacesRegistry(value[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-export function hashSkillSurfacesRegistry(value) {
-  return createHash('sha256').update(canonicalizeSkillSurfacesRegistry(value)).digest('hex');
-}
+export const hashSkillSurfacesRegistry = hashCanonical;
 
 export function validateSkillSurfaceEntry(entry) {
   const errors = [];

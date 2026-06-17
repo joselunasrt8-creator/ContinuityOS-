@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -26,25 +25,7 @@ function emittedCheckNames() {
   );
 }
 
-function canonicalHash(value) {
-  return createHash('sha256').update(`${JSON.stringify(sortCanonical(value))}\n`).digest('hex');
-}
-
-function sortCanonical(value) {
-  if (Array.isArray(value)) {
-    return value.map(sortCanonical);
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, sortCanonical(nested)]),
-    );
-  }
-
-  return value;
-}
+import { sortCanonical, canonicalHash } from '../helpers/canonical-test-hash.mjs';
 
 function validatePreoCandidate({ preo, policy = branchProtection }) {
   const missingFields = preoRequirements.required_fields.filter((field) => !Object.hasOwn(preo, field));
