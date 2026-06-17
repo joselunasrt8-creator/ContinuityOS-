@@ -282,7 +282,8 @@ export function classifyPolicyFinality(reconciliationEvidence) {
       policy_reconciliation_result:
         reconciliationEvidence.policy_reconciliation_result ?? POLICY_RECONCILIATION_RESULTS.NULL,
     })
-  } catch (_) {
+  } catch (error) {
+    console.error('NULL — policy_finality_hash_computation_failed:', error?.message || error)
     return buildFinality(
       POLICY_FINALITY_RESULTS.NULL,
       [POLICY_FINALITY_CLASSES.POLICY_FINALITY_BOUNDARY_VIOLATION],

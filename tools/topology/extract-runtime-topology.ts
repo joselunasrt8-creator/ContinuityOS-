@@ -146,6 +146,7 @@ try {
   }
 } catch (err) {
   console.error("Runtime discovery failed:", err);
+  process.exitCode = 1;
 }
 
 const topologyJson = JSON.stringify(

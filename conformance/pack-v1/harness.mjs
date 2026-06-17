@@ -546,8 +546,9 @@ try {
     results,
   }
   writeFileSync(evidencePath, JSON.stringify(evidence, null, 2))
-} catch (_) {
+} catch (err) {
   // evidence file write is best-effort; harness result stands on stdout
+  console.warn('[harness] evidence file write failed:', err.message)
 }
 
 console.log()

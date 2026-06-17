@@ -75,7 +75,8 @@ export function parseRegistry(registryText) {
     let rec;
     try {
       rec = JSON.parse(trimmed);
-    } catch (_) {
+    } catch (err) {
+      console.warn('[parseRegistry] skipping malformed line:', err.message);
       continue;
     }
     if (rec && rec._record_type === 'standing_authority') {
@@ -107,7 +108,8 @@ export function countConsumedBudget(proofRegistryText, authorityId) {
     let rec;
     try {
       rec = JSON.parse(trimmed);
-    } catch (_) {
+    } catch (err) {
+      console.warn('[countConsumedBudget] skipping malformed line:', err.message);
       continue;
     }
     if (rec

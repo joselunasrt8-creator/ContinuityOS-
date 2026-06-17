@@ -56,6 +56,7 @@ async function loadGraph() {
       "constitutional graph materialization failure",
       error
     )
+    process.exitCode = 1
   } finally {
     await session.close()
     await driver.close()

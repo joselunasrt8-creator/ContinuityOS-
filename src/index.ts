@@ -788,7 +788,8 @@ async function handleAgentToolGatewayCompile(env: Env, request: Request): Promis
 
     await env.DB.prepare(`INSERT INTO aeo_registry (aeo_id,authority_id,decision_id,canonical_aeo,validated_object_hash,status,created_at) VALUES (?1,?2,?3,?4,?5,'COMPILED',?6)`).bind(crypto.randomUUID(), String(authority.authority_id || ""), authority_decision_id, canonical_aeo, validated_object_hash, new Date().toISOString()).run()
     return json({ status: "COMPILED", result: "OK", route: AGENT_TOOL_GATEWAY_COMPILE_ROUTE, decision_id: authority_decision_id, authority_id: String(authority.authority_id || ""), atao_id, validated_object_hash, canonical_aeo: canonicalAeo, executes: false, proof_created: false })
-  } catch {
+  } catch (error) {
+    console.error("[handleAgentToolGatewayCompile] compile exception:", error)
     return gatewayCompileNull("compile_exception")
   }
 }
@@ -1765,7 +1766,7 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } })
 }
 
-async function body(req: Request): Promise<any> { try { return await req.json() } catch { return {} } }
+async function body(req: Request): Promise<any> { try { return await req.json() } catch { console.error("[body] JSON parse failed for", req.url); return {} } }
 function authorized(req: Request, env: Env): boolean { return typeof env.API_KEY === "string" && env.API_KEY.length > 0 && req.headers.get("X-API-Key") === env.API_KEY }
 function hasDb(env: unknown): env is Env { return Boolean((env as any)?.DB && typeof (env as any).DB.prepare === "function") }
 function isPlainRecord(v: unknown): v is Record<string, unknown> {
@@ -3612,7 +3613,7 @@ async function delegatedObservabilityEnvelope(env: Env, url: URL): Promise<Deleg
   for (const row of Array.isArray(rows?.results) ? rows.results : []) {
     if (String(row.object_type) !== "DelegatedAuthorityObject") continue
     let parsed: any = null
-    try { parsed = JSON.parse(String(row.canonical_delegation_object || "{}")) } catch {}
+    try { parsed = JSON.parse(String(row.canonical_delegation_object || "{}")) } catch { drift.add("delegated_exact_object_drift") }
     const object = parsed && isPlainRecord(parsed) ? parsed as DelegatedAuthorityObject : null
     if (!object) drift.add("delegated_exact_object_drift")
     else chain.push({ ...object, exact_object_hash: String(row.exact_object_hash || "") })
@@ -6233,7 +6234,8 @@ async function enforceRecursiveGovernanceBoundary(env: Env, envelope: Governance
     const lock = await issueRuntimeGovernanceLock(env, proof, envelope, created_at)
     await consumeRecursiveGovernanceReplay(env, proof, lock, created_at)
     return Object.freeze({ status: "GOVERNANCE_VALIDATED" as const, envelope, decision, proof, lock, replay_blocked: false })
-  } catch {
+  } catch (error) {
+    console.error("[enforceRecursiveGovernanceBoundary] governance lock issuance failed:", error)
     return Object.freeze({ status: "NULL" as const, envelope, decision: Object.freeze({ ...decision, governance_decision: "NULL" as const, mutation_authorized: false }), proof, lock: null, replay_blocked: true })
   }
 }
@@ -7089,7 +7091,7 @@ async function fetchCrossRegistryState(env: Env): Promise<Record<string, Record<
     try {
       const result = await env.DB.prepare(`SELECT * FROM ${registry} LIMIT 1000`).all<Record<string, unknown>>()
       state[registry] = sortCrossRegistryRecords(result.results || [])
-    } catch { state[registry] = [] }
+    } catch (error) { console.error(`[fetchCrossRegistryState] failed to read ${registry}:`, error); state[registry] = [] }
   }
   return state
 }
@@ -7140,8 +7142,9 @@ export default {
           return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, reason: admission.replay_blocked ? "recursive_governance_replay" : "recursive_governance_boundary_denied", activation_allowed: false, admission, runtime_ready: false })
         }
         return json({ status: admission.status, route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, reason: "recursive_governance_boundary_enforced", activation_allowed: true, admission, lock: admission.lock, runtime_ready: true })
-      } catch {
-        return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, reason: "recursive_governance_admission_unavailable", activation_allowed: false, runtime_ready: false })
+      } catch (error) {
+        console.error(`[${RECURSIVE_GOVERNANCE_ADMISSION_ROUTE}] admission failed:`, error)
+        return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ADMISSION_ROUTE, reason: "recursive_governance_admission_unavailable", activation_allowed: false, runtime_ready: false }, 500)
       }
     }
     if (RECURSIVE_GOVERNANCE_CONTAINMENT_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...recursiveGovernanceContainmentStatusFlags() }, 405)
@@ -7155,7 +7158,8 @@ export default {
         if (url.pathname === RECURSIVE_GOVERNANCE_CONTAINMENT_TOPOLOGY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", governance_topology_hash: observation.governance_topology_hash, execution_boundary_topology: observation.containment_object.execution_boundary_topology, governance_lineage_hash: observation.governance_lineage_hash, governance_continuity: observation.containment_object.governance_continuity, ...recursiveGovernanceContainmentStatusFlags() })
         if (url.pathname === RECURSIVE_GOVERNANCE_CONTAINMENT_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", governance_equivalence_hash: observation.governance_equivalence_hash, governance_semantic_hash: observation.governance_semantic_hash, governance_topology_hash: observation.governance_topology_hash, governance_lineage_hash: observation.governance_lineage_hash, semantic_divergence_classes: observation.semantic_divergence_classes, ...recursiveGovernanceContainmentStatusFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", observation, governance_equivalence_hash: observation.governance_equivalence_hash, governance_semantic_hash: observation.governance_semantic_hash, governance_topology_hash: observation.governance_topology_hash, governance_lineage_hash: observation.governance_lineage_hash, semantic_divergence_classes: observation.semantic_divergence_classes, recursive_containment_status: observation.recursive_containment_status, governance_mutation_class: observation.governance_mutation_class, ...recursiveGovernanceContainmentStatusFlags() })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] recursive governance containment failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "recursive_governance_containment_unavailable", semantic_divergence_classes: ["RECURSIVE_CONTAINMENT_REQUIRED"], recursive_containment_status: "RECURSIVE_CONTAINMENT_REQUIRED", ...recursiveGovernanceContainmentStatusFlags() }, 500)
       }
     }
@@ -7170,8 +7174,9 @@ export default {
         if (!hasDb(env)) return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ROUTE, reason: "database_unavailable", envelope, decision, proof, checkpoint, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false })
         await appendRecursiveGovernanceEvidence(env, proof, envelope, decision, generated_at)
         return json({ status: decision.governance_decision, route: RECURSIVE_GOVERNANCE_ROUTE, reason: "observability_only", envelope, decision, proof, checkpoint, drift_classes, recursive_governance_invariant: "system_mutation_requires_legitimacy", exact_object_verified: decision.exact_object_verified, canonical_path_preserved: decision.canonical_path_preserved, mutation_authorized: decision.mutation_authorized, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false, append_only: true })
-      } catch {
-        return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ROUTE, reason: "recursive_governance_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false })
+      } catch (error) {
+        console.error(`[${RECURSIVE_GOVERNANCE_ROUTE}] recursive governance failed:`, error)
+        return json({ status: "NULL", route: RECURSIVE_GOVERNANCE_ROUTE, reason: "recursive_governance_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, replay_consumed: false, authority_created: false, execution_started: false }, 500)
       }
     }
     if (url.pathname === "/reconcile" && request.method === "GET") return json({ status: "NULL", route: "/reconcile", reason: "observability_only" })
@@ -7179,8 +7184,9 @@ export default {
       try {
         const schedule = await deterministicReconciliationSchedule(env)
         return json({ ...schedule, route: "/reconcile/schedule", reason: "observability_only" })
-      } catch {
-        return json({ status: "NULL", route: "/reconcile/schedule", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/reconcile/schedule] reconciliation failed:", error)
+        return json({ status: "NULL", route: "/reconcile/schedule", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/reconcile/report" && request.method === "GET") {
@@ -7191,8 +7197,9 @@ export default {
         const summary = await reconciliationSummaryObject(result, new Date().toISOString())
         const portable = await portableReconciliationEnvelope(summary as unknown as Record<string, unknown>)
         return json({ status: result.result, route: "/reconcile/report", reason: "observability_only", report, summary, portable, evidence_only: true, replay_neutral: true, read_only: true, mutation_capable: false, authority_created: false, execution_started: false, proof_created: false, authority_consumed: false, canonical_lifecycle_mutated: false })
-      } catch {
-        return json({ status: "NULL", route: "/reconcile/report", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/reconcile/report] reconciliation failed:", error)
+        return json({ status: "NULL", route: "/reconcile/report", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/reconcile/drift" && request.method === "GET") {
@@ -7201,8 +7208,9 @@ export default {
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
         const summary = await reconciliationSummaryObject(result, new Date().toISOString())
         return json({ status: result.result, route: "/reconcile/drift", reason: "observability_only", reconciliation_id: summary.reconciliation_id, drift: result.drift_classifications })
-      } catch {
-        return json({ status: "NULL", route: "/reconcile/drift", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/reconcile/drift] reconciliation failed:", error)
+        return json({ status: "NULL", route: "/reconcile/drift", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/federation/reconcile" && request.method === "GET") {
@@ -7218,8 +7226,9 @@ export default {
         const witness = await reconciliationWitnessEnvelope(bundle, checkpoint, classifyRemoteRuntime(String(bundle?.runtime_id || LOCAL_FEDERATION_RUNTIME_ID)))
         const drift = await federatedDriftClassificationsAfterPortableBundleResolution(result, bundle)
         return json({ status: reconciliationStatusAfterPortableBundleResolution(result, bundle), route: "/federation/reconcile", reason: "observability_only", authority_boundary: "portable_evidence_not_portable_authority", local_validation_required: true, remote_execution_legitimacy: false, replay_neutral: true, bundle, checkpoint, witness, verification, drift })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/federation/reconcile] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/federation/reconcile/report" && request.method === "GET") {
@@ -7233,8 +7242,9 @@ export default {
         const bundle = await portableLegitimacyBundleFromResult(result, emitted_at)
         const drift = await federatedDriftClassificationsAfterPortableBundleResolution(result, bundle)
         return json({ status: reconciliationStatusAfterPortableBundleResolution(result, bundle), route: "/federation/reconcile/report", reason: "observability_only", report, summary, deterministic_snapshot: snapshot, portable_legitimacy_bundle: bundle, drift, federation_boundary: "portable_evidence_not_portable_authority", evidence_only: true, replay_neutral: true, read_only: true, mutation_capable: false, authority_created: false, execution_started: false, proof_created: false, authority_consumed: false, canonical_lifecycle_mutated: false })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/report", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/federation/reconcile/report] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/report", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/federation/reconcile/drift" && request.method === "GET") {
@@ -7243,8 +7253,9 @@ export default {
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
         const federated_drift_taxonomy: DriftClass[] = ["federated_checkpoint_drift", "federated_merkle_drift", "federated_bundle_drift", "federated_attestation_drift", "federated_reconciliation_drift", "federated_runtime_divergence_drift", "federated_replay_drift", "federated_preo_drift", "federated_continuity_drift", "federated_exact_object_drift", "federated_identifier_resolution_drift"]
         return json({ status: result.result, route: "/federation/reconcile/drift", reason: "observability_only", drift: result.drift_classifications, federated_drift_taxonomy, repairs: false, legitimacy_inference: false })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/drift", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/federation/reconcile/drift] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/drift", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/federation/reconcile/revocation" && request.method === "GET") {
@@ -7261,8 +7272,9 @@ export default {
         const drift = verification?.drift_class ? [...result.drift_classifications.map((entry) => entry.drift_class), verification.drift_class] : result.drift_classifications.map((entry) => entry.drift_class)
         const trust = await classifyFederatedTrust({ ...(generated.evidence || {}), verification_status: verification?.result === "NULL" ? (verification.drift_class === "federated_revocation_replay_drift" ? "REPLAY_DETECTED" : "LINEAGE_MISMATCH") : "VERIFIED", drift_class: verification?.drift_class || "" }, observed_at)
         return json({ status: verification?.result === "NULL" ? "NULL" : result.result, route: "/federation/reconcile/revocation", reason: "observability_only", federation_boundary: "portable_evidence_not_portable_authority", remote_authority_inherited: false, remote_execution_legitimacy: false, remote_authority_denied: trust.remote_authority_denied, evidence_only: trust.evidence_only, replay_state_consumed: false, replay_neutral: true, read_only: true, mutation_capable: false, federated_trust_envelope: trust.envelope, revocation_evidence: generated, verification, drift, normalized_federation_response: true })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/revocation", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/federation/reconcile/revocation] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/revocation", reason: "reconciliation_unavailable" }, 500)
       }
     }
     if (url.pathname === "/federation/reconcile/topology" && request.method === "GET") {
@@ -7278,8 +7290,9 @@ export default {
           await recordDrift(env, { drift_class, severity: drift_class === "replay_resurrection_attempt" ? "CRITICAL" : "HIGH", decision_id: anchor.decision_id, payload: { route: "/federation/reconcile/topology", lineage_root: topology.lineage_root, remote_authority_denied: true, evidence_only: true }, detected_by: "revocation_topology_observability" })
         }
         return json({ status: "REVOCATION_TOPOLOGY_OBSERVED", route: "/federation/reconcile/topology", reason: "observability_only", topology, federated_trust_envelope: trust.envelope, observability_envelope, append_only: true, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/topology", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true })
+      } catch (error) {
+        console.error("[/federation/reconcile/topology] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/topology", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true }, 500)
       }
     }
     if (url.pathname === "/federation/reconcile/checkpoint" && request.method === "GET") {
@@ -7288,8 +7301,9 @@ export default {
         const result = await deterministicRecursiveReconciliationTraversal(env, anchor)
         const checkpoint = await deterministicReconciliationCheckpoint(result, new Date().toISOString())
         return json({ status: result.result, route: "/federation/reconcile/checkpoint", reason: "observability_only", append_only: true, rollback_overwrite: false, replay_neutral: true, checkpoint })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/checkpoint", reason: "reconciliation_unavailable" })
+      } catch (error) {
+        console.error("[/federation/reconcile/checkpoint] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/checkpoint", reason: "reconciliation_unavailable" }, 500)
       }
     }
 
@@ -7309,8 +7323,9 @@ export default {
         const reconciliation_envelope = await buildFederatedReconciliationEnvelope(checkpoint, checkpoint_comparison_summary, consensus, topology_drift_summary, remote_envelopes, generated_at)
         const governance_compression_envelope = await deriveGovernanceCompression(reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, checkpoint, remote_envelopes, generated_at)
         return json({ status: "GOVERNANCE_COMPRESSION_OBSERVED", route: "/federation/reconcile/compression", reason: "observability_only", governance_compression_envelope, federated_governance_summary: governance_compression_envelope.summary, compressed_drift_summary: governance_compression_envelope.compressed_drift_summary, compressed_replay_summary: governance_compression_envelope.compressed_replay_summary, compressed_topology_summary: governance_compression_envelope.compressed_topology_summary, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/compression", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      } catch (error) {
+        console.error("[/federation/reconcile/compression] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/compression", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }, 500)
       }
     }
 
@@ -7329,8 +7344,9 @@ export default {
         const topology_drift_summary = await classifyTopologyDrift(checkpoint, remote_envelopes)
         const reconciliation_envelope = await buildFederatedReconciliationEnvelope(checkpoint, checkpoint_comparison_summary, consensus, topology_drift_summary, remote_envelopes, generated_at)
         return json({ status: consensus.consensus_status, route: "/federation/reconcile/distributed", reason: "observability_only", reconciliation_envelope, checkpoint_comparison_summary, topology_drift_summary, replay_indicators: reconciliation_envelope.replay_indicators, remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, append_only: true })
-      } catch {
-        return json({ status: "NULL", route: "/federation/reconcile/distributed", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      } catch (error) {
+        console.error("[/federation/reconcile/distributed] federation reconciliation failed:", error)
+        return json({ status: "NULL", route: "/federation/reconcile/distributed", reason: "reconciliation_unavailable", remote_authority_denied: true, evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }, 500)
       }
     }
 
@@ -7348,8 +7364,9 @@ export default {
         const equivalence = await verifyFederatedSovereigntyEquivalence(sovereignty_envelope, remoteEnvelope || sovereignty_envelope)
         await appendFederatedSovereigntyConsensusObservation(env, sovereignty_envelope, equivalence)
         return json({ status: equivalence.verification_status, route: "/federation/sovereignty/checkpoint", reason: "observability_only", sovereignty_envelope, equivalence, sovereignty_hash: sovereignty_envelope.sovereignty_hash, equivalence_hash: equivalence.equivalence_hash, drift_summary: equivalence.drift_summary, replay_indicators: equivalence.replay_indicators, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_authority_inherited: false, remote_execution_legitimacy: false, local_governance_mutated: false, local_validation_required: true, append_only: true })
-      } catch {
-        return json({ status: "NULL", route: "/federation/sovereignty/checkpoint", reason: "sovereignty_checkpoint_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      } catch (error) {
+        console.error("[/federation/sovereignty/checkpoint] sovereignty checkpoint failed:", error)
+        return json({ status: "NULL", route: "/federation/sovereignty/checkpoint", reason: "sovereignty_checkpoint_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true }, 500)
       }
     }
 
@@ -7364,8 +7381,9 @@ export default {
         const federation_compatibility_envelope = await buildFederationCompatibilityEnvelope(result, remoteEnvelope, generated_at)
         await appendFederationConformanceObservation(env, federation_compatibility_envelope)
         return json({ status: federation_compatibility_envelope.conformance_result.conformance_status, route: "/federation/conformance", reason: "observability_only", federation_compatibility_envelope, runtime_semantic_fingerprint: federation_compatibility_envelope.runtime_semantic_fingerprint, conformance_checkpoint: federation_compatibility_envelope.conformance_checkpoint, conformance_result: federation_compatibility_envelope.conformance_result, drift_classes: federation_compatibility_envelope.conformance_result.drift_classes, semantic_mismatches: federation_compatibility_envelope.conformance_result.semantic_mismatches, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, remote_execution_legitimacy: false, remote_authority_inherited: false, local_validation_required: true, replay_consumed: false, append_only: true })
-      } catch {
-        return json({ status: "NULL", route: "/federation/conformance", reason: "conformance_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      } catch (error) {
+        console.error("[/federation/conformance] federation conformance failed:", error)
+        return json({ status: "NULL", route: "/federation/conformance", reason: "conformance_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true }, 500)
       }
     }
     if (url.pathname === INSTALL_BASE_METRICS_ROUTE && request.method !== "GET") return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false }, 405)
@@ -7374,8 +7392,9 @@ export default {
         if (!hasDb(env)) return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false })
         const metrics = await installBaseGovernanceMetrics(env)
         return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "observability_only", metrics, authority_issuance_influenced: false, validator_decisions_influenced: false, execution_eligibility_influenced: false, proof_legitimacy_influenced: false })
-      } catch {
-        return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false })
+      } catch (error) {
+        console.error(`[${INSTALL_BASE_METRICS_ROUTE}] metrics query failed:`, error)
+        return json({ status: "NULL", route: INSTALL_BASE_METRICS_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, proof_created: false }, 500)
       }
     }
     if (url.pathname === TELEMETRY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, creates_authority: false, validates_objects: false, executes_actions: false, creates_proof: false, mutates_registries: false, repairs_failures: false, turns_failed_executions_valid: false }, 405)
@@ -7395,8 +7414,9 @@ export default {
           execution_surface_count: telemetryCounts.get("execution_surface_observed") || 0,
         }
         return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "observability_only", metrics, creates_authority: false, validates_objects: false, executes_actions: false, creates_proof: false, mutates_registries: false, repairs_failures: false, turns_failed_executions_valid: false, read_only: true, evidence_only: true, non_authoritative: true })
-      } catch {
-        return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false })
+      } catch (error) {
+        console.error(`[${TELEMETRY_ROUTE}] telemetry query failed:`, error)
+        return json({ status: "NULL", route: TELEMETRY_ROUTE, reason: "database_unavailable", evidence_only: true, read_only: true, mutation_capable: false }, 500)
       }
     }
 
@@ -7413,8 +7433,9 @@ export default {
         if (url.pathname === GOVERNANCE_OBSERVABILITY_WORKFLOW_DRIFT_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", workflow_integrity_drift_trends: evidence.workflow_integrity_drift_trends, classification: evidence.classification })
         if (url.pathname === GOVERNANCE_OBSERVABILITY_RECONCILIATION_FAILURE_ROUTE) return json({ status: "NULL", route: url.pathname, reason: "observability_only", reconciliation_failure_trends: evidence.reconciliation_failure_trends, classification: evidence.classification })
         return json({ status: "NULL", route: url.pathname, reason: "observability_only", ...evidence })
-      } catch {
-        return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", evidence_only: true, read_only: true, get_only: true, mutation_capable: false, non_authoritative: true, creates_authority: false })
+      } catch (error) {
+        console.error(`[${url.pathname}] governance observability query failed:`, error)
+        return json({ status: "NULL", route: url.pathname, reason: "database_unavailable", evidence_only: true, read_only: true, get_only: true, mutation_capable: false, non_authoritative: true, creates_authority: false }, 500)
       }
     }
 
@@ -7436,8 +7457,9 @@ export default {
         const replay_indicators = Array.from(new Set([...distributed_legitimacy_envelope.replay_indicators, ...checkpoint_envelope.replay_indicators])).sort()
         const interoperability_status: InteroperabilityStatus = drift_indicators.length > 0 || !projection || !compatibility.compatible ? "INTEROPERABILITY_QUARANTINED" : "INTEROPERABILITY_EVIDENCE_OBSERVED"
         return json({ status: interoperability_status, route: "/federation/interoperability/checkpoint", reason: "observability_only", interoperability_status, distributed_legitimacy_envelope, checkpoint_envelope, lineage_envelope, drift_indicators, replay_indicators, evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true, local_validation_required: true, remote_execution_legitimacy: false, remote_authority_inherited: false, append_only: false })
-      } catch {
-        return json({ status: "NULL", route: "/federation/interoperability/checkpoint", reason: "reconciliation_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      } catch (error) {
+        console.error("[/federation/interoperability/checkpoint] interoperability checkpoint failed:", error)
+        return json({ status: "NULL", route: "/federation/interoperability/checkpoint", reason: "reconciliation_unavailable", evidence_only: true, remote_authority_denied: true, read_only: true, mutation_capable: false, replay_neutral: true }, 500)
       }
     }
     if (DRIFT_PROPAGATION_ROUTES.includes(url.pathname as any) && request.method !== "GET") return json({ status: "NULL", route: url.pathname, reason: "get_only", ...DRIFT_PROPAGATION_FLAGS }, 405)
@@ -7453,7 +7475,8 @@ export default {
         if (url.pathname === RECONCILIATION_PROPAGATION_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_PROPAGATION_ROUTE, reason: "observability_only", propagation: envelope.propagation_object, propagation_hash: envelope.propagation_hash, drift_classes: envelope.drift_classes, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
         if (url.pathname === RECONCILIATION_TOPOLOGY_DELTA_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_TOPOLOGY_DELTA_ROUTE, reason: "observability_only", topology_delta: envelope.topology_delta, topology_hash: envelope.topology_hash, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
         return json({ status: envelope.status, route: RECONCILIATION_VERDICT_ROUTE, reason: "observability_only", verdict: envelope.verdict_object, merge_impact: envelope.merge_impact, verdict_hash: envelope.verdict_hash, propagation_hash: envelope.propagation_hash, append_only: true, ...DRIFT_PROPAGATION_FLAGS })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] drift propagation failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "drift_propagation_unavailable", drift_classes: ["DOWNSTREAM_LEGITIMACY_NULL"], ...DRIFT_PROPAGATION_FLAGS }, 500)
       }
     }
@@ -7471,7 +7494,8 @@ export default {
         if (url.pathname === RECONCILIATION_CONTAINMENT_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_CONTAINMENT_ROUTE, reason: "observability_only", containment_boundary: envelope.containment_boundary, verdict: envelope.verdict_object, containment_hash: envelope.containment_hash, boundary_hash: envelope.boundary_hash, containment_classes: envelope.containment_classes, append_only: true, ...QUARANTINE_CONTAINMENT_FLAGS })
         if (url.pathname === RECONCILIATION_ISOLATION_ROUTE) return json({ status: envelope.status, route: RECONCILIATION_ISOLATION_ROUTE, reason: "observability_only", isolation_graph: envelope.isolation_graph, containment_hash: envelope.containment_hash, lineage_hash: envelope.lineage_hash, containment_classes: envelope.containment_classes, append_only: true, ...QUARANTINE_CONTAINMENT_FLAGS })
         return json({ status: envelope.status, route: RECONCILIATION_FEDERATION_BOUNDARY_ROUTE, reason: "observability_only", federated_containment: envelope.federated_containment, federation_hash: envelope.federation_hash, boundary_hash: envelope.boundary_hash, containment_classes: envelope.containment_classes, append_only: true, ...QUARANTINE_CONTAINMENT_FLAGS })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] quarantine containment failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "quarantine_containment_unavailable", containment_classes: ["CONTAINMENT_BOUNDARY_OVERFLOW"], ...QUARANTINE_CONTAINMENT_FLAGS }, 500)
       }
     }
@@ -7489,8 +7513,9 @@ export default {
         if (url.pathname === RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_EQUIVALENCE_ROUTE, reason: "observability_only", reconciliation_equivalence_state: closure.reconciliation_equivalence_state, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
         if (url.pathname === RECONCILIATION_CLOSURE_DRIFT_ROUTE) return json({ status, route: RECONCILIATION_CLOSURE_DRIFT_ROUTE, reason: "observability_only", drift_classes: closure.drift_classes, closure_divergence_classification: closure.drift_classes, closure_hash: closure.closure_hash, append_only: true, ...reconciliationClosureFlags() })
         return json({ status, route: RECONCILIATION_CLOSURE_ROUTE, reason: "observability_only", closure, closure_hash: closure.closure_hash, deterministic_reconciliation_anchor: closure.deterministic_reconciliation_anchor, recursive_checkpoint_identity: closure.recursive_checkpoint_identity, reconciliation_equivalence_state: closure.reconciliation_equivalence_state, drift_classes: closure.drift_classes, append_only: true, ...reconciliationClosureFlags() })
-      } catch {
-        return json({ status: "NULL", route: url.pathname, reason: "reconciliation_closure_unavailable", drift_classes: ["reconciliation_closure_failure"], ...reconciliationClosureFlags() })
+      } catch (error) {
+        console.error(`[${url.pathname}] reconciliation closure failed:`, error)
+        return json({ status: "NULL", route: url.pathname, reason: "reconciliation_closure_unavailable", drift_classes: ["reconciliation_closure_failure"], ...reconciliationClosureFlags() }, 500)
       }
     }
 
@@ -7505,8 +7530,9 @@ export default {
         if (url.pathname === GRAPH_CHECKPOINT_ROUTE) return json({ status: graphStatus, route: GRAPH_CHECKPOINT_ROUTE, reason: "observability_only", checkpoint: { checkpoint_id: checkpoint.checkpoint_id, graph_checkpoint_hash: checkpoint.graph_checkpoint_hash, graph_coherence_hash: checkpoint.graph_coherence_hash, node_count: checkpoint.nodes.length, edge_count: checkpoint.edges.length, orphan_count: checkpoint.orphans.length, cross_registry_replay_continuity: checkpoint.cross_registry_replay_continuity, traversal_depth_limit: checkpoint.traversal_depth_limit, generated_at: checkpoint.generated_at }, drift_classes: checkpoint.drift_classes, ...legitimacyGraphStatusFlags(), append_only: true })
         if (url.pathname === GRAPH_ORPHANS_ROUTE) return json({ status: checkpoint.orphans.length > 0 ? "GRAPH_ORPHANS_DETECTED" : "GRAPH_ORPHANS_CLEAR", route: GRAPH_ORPHANS_ROUTE, reason: "observability_only", orphans: checkpoint.orphans, orphan_count: checkpoint.orphans.length, graph_checkpoint_hash: checkpoint.graph_checkpoint_hash, drift_classes: checkpoint.drift_classes, ...legitimacyGraphStatusFlags(), append_only: true })
         return json({ status: graphStatus, route: GRAPH_VERIFY_ROUTE, reason: "observability_only", checkpoint, graph_checkpoint_hash: checkpoint.graph_checkpoint_hash, graph_coherence_hash: checkpoint.graph_coherence_hash, drift_classes: checkpoint.drift_classes, orphan_count: checkpoint.orphans.length, cross_registry_replay_continuity: checkpoint.cross_registry_replay_continuity, ...legitimacyGraphStatusFlags(), append_only: true })
-      } catch {
-        return json({ status: "NULL", route: url.pathname, reason: "graph_verification_unavailable", ...legitimacyGraphStatusFlags() })
+      } catch (error) {
+        console.error(`[${url.pathname}] graph verification failed:`, error)
+        return json({ status: "NULL", route: url.pathname, reason: "graph_verification_unavailable", ...legitimacyGraphStatusFlags() }, 500)
       }
     }
 
@@ -7518,8 +7544,9 @@ export default {
         const envelope = await buildRuntimeEvolutionConsensusEnvelope(runtimeEvolutionConsensusInputFromUrl(url))
         await appendRuntimeEvolutionConsensusObservation(env, envelope)
         return json({ status: envelope.consensus_result, route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "observability_only", envelope, drift_classes: envelope.drift_classes, consensus_result: envelope.consensus_result, canonical_hash: envelope.consensus_object.canonical_hash, replay_neutral: true, evidence_only: true, read_only: true, mutation_capable: false, execution_authority: false, remote_authority_inherited: false, runtime_mutated: false, governance_state_altered: false, append_only: true })
-      } catch {
-        return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "consensus_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true })
+      } catch (error) {
+        console.error(`[${RUNTIME_EVOLUTION_CONSENSUS_ROUTE}] consensus query failed:`, error)
+        return json({ status: "NULL", route: RUNTIME_EVOLUTION_CONSENSUS_ROUTE, reason: "consensus_unavailable", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true }, 500)
       }
     }
     if (url.pathname === EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE && request.method !== "GET") return json({ status: "NULL", route: EXTERNAL_AUTHORITY_OBSERVABILITY_ROUTE, reason: "get_only", evidence_only: true, read_only: true, mutation_capable: false, replay_neutral: true, authoritative: false }, 405)
@@ -7538,8 +7565,9 @@ export default {
         if (url.pathname === "/fate/checkpoint") return json({ status, route: url.pathname, reason: "observability_only", checkpoint: envelope.runtime_stress_checkpoint, governance_replay_checkpoint: envelope.governance_replay_checkpoint, continuous_fate_id: envelope.continuous_fate_id, stress_window_id: envelope.stress_window_id, immutable_stress_checkpoint_persistence: true, ...continuousFateFlags() })
         if (url.pathname === "/fate/topology") return json({ status, route: url.pathname, reason: "observability_only", topology_stability_hash: envelope.topology_stability_hash, sovereignty_escape_probes: envelope.sovereignty_escape_probes, topology_drift_verification: true, hidden_route_emergence: false, ...continuousFateFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", envelope, continuous_fate_id: envelope.continuous_fate_id, stress_window_id: envelope.stress_window_id, deterministic_stress_hash: envelope.deterministic_stress_hash, topology_stability_hash: envelope.topology_stability_hash, drift_survivability_state: envelope.drift_survivability_state, replay_mutation_vector_hash: envelope.replay_mutation_vector_hash, governance_replay_checkpoint: envelope.governance_replay_checkpoint, runtime_stress_depth: envelope.runtime_stress_depth, ...continuousFateFlags() })
-      } catch {
-        return json({ status: "NULL", route: url.pathname, reason: "continuous_fate_unavailable", ...continuousFateFlags() })
+      } catch (error) {
+        console.error(`[${url.pathname}] continuous fate failed:`, error)
+        return json({ status: "NULL", route: url.pathname, reason: "continuous_fate_unavailable", ...continuousFateFlags() }, 500)
       }
     }
 
@@ -7554,8 +7582,9 @@ export default {
         if (url.pathname === DELEGATION_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: envelope.drift_classes, drift_taxonomy: ["delegated_lineage_drift","delegated_scope_expansion","orphaned_delegated_execution","delegated_replay_resurrection","delegated_revocation_failure","delegated_exact_object_drift","delegation_root_divergence","delegated_authority_fragmentation","recursive_delegation_instability"], evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, replay_consumed: false })
         if (url.pathname === DELEGATION_REPLAY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", replay: envelope.replay, replay_consumed: false, evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false })
         return json({ status, route: url.pathname, reason: "observability_only", envelope, checkpoint_hash: envelope.checkpoint_hash, evidence_only: true, replay_neutral: true, append_only: true, authoritative: false, mutation_capable: false, replay_consumed: false })
-      } catch {
-        return json({ status: "NULL", route: url.pathname, reason: "delegation_observability_unavailable", evidence_only: true, replay_neutral: true, mutation_capable: false, replay_consumed: false })
+      } catch (error) {
+        console.error(`[${url.pathname}] delegation observability failed:`, error)
+        return json({ status: "NULL", route: url.pathname, reason: "delegation_observability_unavailable", evidence_only: true, replay_neutral: true, mutation_capable: false, replay_consumed: false }, 500)
       }
     }
 
@@ -7572,7 +7601,8 @@ export default {
         if (url.pathname === RUNTIME_CONTAINMENT_DRIFT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", drift_classes: envelope.drift_classes, drift_taxonomy: ["hidden_execution_surface_detected", "undeclared_mutation_surface_detected", "runtime_route_containment_drift", "deployment_surface_hash_drift", "workflow_dispatch_escape_detected", "adapter_authority_escape_detected", "proofless_execution_surface_detected", "canonical_route_boundary_drift", "observability_route_execution_upgrade", "sovereignty_containment_failure"], fail_closed: envelope.drift_classes.length > 0, append_only: true, ...containmentFlags() })
         if (url.pathname === RUNTIME_CONTAINMENT_CHECKPOINT_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", checkpoint: envelope.checkpoint, containment_hash: envelope.containment_hash, runtime_sovereignty_hash: envelope.runtime_sovereignty_hash, append_only: true, ...containmentFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_hash: envelope.containment_hash, runtime_sovereignty_hash: envelope.runtime_sovereignty_hash, append_only: true, ...containmentFlags() })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] sovereignty containment failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "sovereignty_containment_unavailable", drift_classes: ["sovereignty_containment_failure"], ...containmentFlags() }, 500)
       }
     }
@@ -7589,7 +7619,8 @@ export default {
         if (url.pathname === ROOT_AUTHORITY_BOUNDARY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", boundary: envelope.boundary, containment_identity: envelope.containment_identity, merge_legitimacy: envelope.boundary.merge_legitimacy, ...rootAuthorityFlags() })
         if (url.pathname === ROOT_AUTHORITY_TOPOLOGY_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", topology_hash: envelope.topology_hash, containment_identity: envelope.containment_identity, inventory: envelope.inventory, ...rootAuthorityFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", envelope, containment_status: envelope.containment_status, declared_root_surfaces: envelope.declared_root_surfaces, undeclared_root_surfaces: envelope.undeclared_root_surfaces, drift_classes: envelope.drift_classes, containment_identity: envelope.containment_identity, topology_hash: envelope.topology_hash, ...rootAuthorityFlags() })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] root authority observability failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "root_authority_observability_unavailable", drift_classes: ["ROOT_AUTHORITY_BOUNDARY_OVERFLOW", "ROOT_AUTHORITY_BYPASS_RISK", "ROOT_AUTHORITY_CONTAINMENT_REQUIRED"], ...rootAuthorityFlags() }, 500)
       }
     }
@@ -7607,7 +7638,8 @@ export default {
         if (url.pathname === CROSS_REGISTRY_RECONCILE_EQUIVALENCE_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", equivalence: snapshot.equivalence, continuity_proof: snapshot.continuity_proof, reconciliation_equivalence_hash: snapshot.reconciliation_equivalence_hash, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
         if (url.pathname === CROSS_REGISTRY_RECONCILE_ORPHANS_ROUTE) return json({ status, route: url.pathname, reason: "observability_only", orphaned_records: snapshot.orphaned_records, unresolved_edges: snapshot.unresolved_edges, containment_status: snapshot.containment_status, legitimacy_status: snapshot.legitimacy_status, ...crossRegistryRouteFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", reconciliation: snapshot, append_only: true, ...crossRegistryRouteFlags() })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] cross-registry reconciliation failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "cross_registry_reconciliation_unavailable", containment_status: "RECONCILIATION_REQUIRED", legitimacy_status: "NULL", ...crossRegistryRouteFlags() }, 500)
       }
     }
@@ -7626,7 +7658,8 @@ export default {
         if (url.pathname === CONFORMANCE_EQUIVALENCE_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", checkpoint_equivalence_hash: envelope.conformance.checkpoint_equivalence_hash, semantic_envelope: envelope.semantic_envelope, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
         if (url.pathname === CONFORMANCE_CHECKPOINT_ROUTE) return json({ status: String(envelope.conformance.conformance_status || "NULL") === "CONFORMANT" ? "CONFORMANCE_EVIDENCE_OBSERVED" : "NULL", route: url.pathname, reason: "observability_only", checkpoint: envelope.portable_checkpoint, checkpoint_hash: envelope.observer.observed_checkpoint_hash, drift_classes: envelope.observer.drift_classes, legitimacy_status: envelope.observer.legitimacy_status, append_only: true, ...consensusRouteFlags() })
         return json({ status, route: url.pathname, reason: "observability_only", observer: envelope.observer, quorum: envelope.quorum, checkpoint: envelope.portable_checkpoint, append_only: true, ...consensusRouteFlags() })
-      } catch {
+      } catch (error) {
+        console.error(`[${url.pathname}] governance consensus failed:`, error)
         return json({ status: "NULL", route: url.pathname, reason: "governance_consensus_unavailable", drift_classes: ["GOVERNANCE_CONSENSUS_FRAGMENTATION"], legitimacy_status: null, ...consensusRouteFlags() }, 500)
       }
     }
@@ -7801,7 +7834,7 @@ export default {
       if (isExpired(expires_at)) return json({ status: "NULL", reason: "invalid_session_expiry" }, 400)
       const session = { session_id: crypto.randomUUID(), identity_id, owner: "human-origin", trust_tier: "T0", continuity_status: "ACTIVE", created_at: new Date().toISOString(), expires_at }
       await env.DB.prepare(`INSERT INTO session_registry (session_id,identity_id,owner,trust_tier,continuity_status,created_at,expires_at) VALUES (?1,?2,?3,?4,?5,?6,?7)`).bind(session.session_id,session.identity_id,session.owner,session.trust_tier,session.continuity_status,session.created_at,session.expires_at).run()
-      try { await emitTelemetry(env, { event_type: "SESSION_CREATED", severity: "INFO", payload: { route: "/session", session_id: session.session_id, identity_id: session.identity_id, continuity_status: "ACTIVE" } }) } catch {}
+      try { await emitTelemetry(env, { event_type: "SESSION_CREATED", severity: "INFO", payload: { route: "/session", session_id: session.session_id, identity_id: session.identity_id, continuity_status: "ACTIVE" } }) } catch (error) { console.error("[/session] telemetry emission failed:", error) }
       return json({ status: "SESSION_ACTIVE", session_id: session.session_id, identity_id: session.identity_id, created_at: session.created_at, expires_at: session.expires_at })
     }
 
@@ -8075,7 +8108,7 @@ export default {
           route: "/compile",
           error: String(error?.message || error || "unknown_error"),
           reason: "compile_exception"
-        })
+        }, 500)
       }
     }
 
@@ -8165,7 +8198,7 @@ export default {
         result = "NULL"
         reason = "envelope_persist_failed"
       }
-      try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true, atao_id: ataoCapture?.atao.atao_id || null, atao_hash: ataoCapture?.atao_hash || null } }) } catch {}
+      try { await emitTelemetry(env, { event_type: result === "VALID_CANDIDATE" ? "VALIDATION_GRANTED" : "VALIDATION_REJECTED", severity: result === "VALID_CANDIDATE" ? "INFO" : "WARN", payload: { route: "/govern", candidate_hash, nonce, timestamp, result, reason: reason || null, non_operative: true, atao_id: ataoCapture?.atao.atao_id || null, atao_hash: ataoCapture?.atao_hash || null } }) } catch (error) { console.error("[/govern] telemetry emission failed:", error) }
       return json({ status: result, reason: reason || (result === "VALID_CANDIDATE" ? "valid_candidate" : "malformed_candidate"), envelope_id, envelope_hash, nonce_domain, atao_id: ataoCapture?.atao.atao_id || null, atao_hash: ataoCapture?.atao_hash || null, evidence: { candidate_hash, nonce, nonce_domain, timestamp, result, ...(ataoCapture ? { atao_id: ataoCapture.atao.atao_id, atao_hash: ataoCapture.atao_hash } : {}), ...(reason ? { reason } : {}) } }, 200)
     }
 
@@ -8354,7 +8387,8 @@ export default {
             AND EXISTS (SELECT 1 FROM validation_registry v WHERE v.decision_id=?3 AND v.validated_object_hash=?4 AND v.invocation_nonce=?5 AND v.session_id=?2 AND v.continuity_id=?7 AND v.status='VALID' AND v.result='VALID')
             AND EXISTS (SELECT 1 FROM invocation_registry i WHERE i.decision_id=?3 AND i.validated_object_hash=?4 AND i.invocation_nonce=?5 AND i.continuity_id=?7 AND i.status='RESERVED')`).bind(execution_id, authority.session_id, decision_id, validated_object_hash, invocation_nonce, new Date().toISOString(), String(authority.continuity_id || ""), provenance.repository, provenance.branch, provenance.pull_request_id, provenance.merge_commit_sha, provenance.source_tree_hash, provenance.workflow_run_id, provenance.workflow_sha, String(validation.workflow_integrity_hash || ""), String(authority.delegated_authority_id || ""), String(authority.delegated_replay_chain_hash || ""), String(authority.delegation_lineage_hash || ""), String(authority.delegation_root_hash || ""), parent_validation_hash, executionLineageOriginHash).run()
         if ((executionWrite.meta?.changes || 0) !== 1) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"revoked_continuity" }, { event_type: "VALIDATION_REJECTED", decision_id, authority_id: String(authority.authority_id || ""), severity: "CRITICAL", payload: { route: "/execute", continuity_id: authority.continuity_id || null, indicator: "execution_blocked_by_revocation_closure_barrier" }, drift_class: "execution_drift" })
-      } catch {
+      } catch (error) {
+        console.error("[/execute] execution write failed:", error)
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"replayed_provenance" }, { event_type: "REPLAY_BLOCKED", decision_id, authority_id: String(authority.authority_id || ""), execution_id, severity: "HIGH", payload: { route: "/execute", workflow_run_id: provenance.workflow_run_id, indicator: "duplicate_workflow_run" }, drift_class: "replay_drift" })
       }
       await env.DB.prepare(`UPDATE invocation_registry SET status='EXECUTED' WHERE decision_id=?1 AND validated_object_hash=?2 AND invocation_nonce=?3`).bind(decision_id,validated_object_hash,invocation_nonce).run()
@@ -8427,7 +8461,8 @@ export default {
         session = proofReads[1]?.results?.[0] || null
         authority = proofReads[2]?.results?.[0] || null
         validation = proofReads[3]?.results?.[0] || null
-      } catch {
+      } catch (error) {
+        console.error("[/proof] proof batch read failed:", error)
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_read_failed" }, { event_type: "VALIDATION_REJECTED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash }, drift_class: "proof_drift" })
       }
       if (!execution) {
@@ -8579,7 +8614,8 @@ export default {
         proofInserted = proofBoundary[0]?.meta?.changes || 0
         authorityConsumed = proofBoundary[1]?.meta?.changes || 0
         if (proofInserted === 0) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
-      } catch {
+      } catch (error) {
+        console.error("[/proof] proof batch write failed:", error)
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
       }
       const outboxQueued = proofBoundary[2]?.meta?.changes || 0
@@ -8593,7 +8629,8 @@ export default {
     }
 
     return json({ status: "NULL", reason: "not_found" }, 404)
-    } catch {
+    } catch (error) {
+      console.error("[worker] unhandled runtime exception:", error)
       return json({ status: "NULL", reason: "runtime_exception" }, 500)
     }
   }

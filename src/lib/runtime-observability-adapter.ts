@@ -29,7 +29,9 @@ export async function emitBootstrapDiagnostic(env: Env, event_type: BootstrapDia
         canonicalize({ event_type, replay_neutral: true, append_only: true, evidence_only: true, authoritative: false }),
         event_type
       ).run()
-  } catch {}
+  } catch (error) {
+    console.error("[emitBootstrapDiagnostic] failed to emit:", event_type, error)
+  }
 }
 
 export async function emitTelemetry(env: Env, event: {
