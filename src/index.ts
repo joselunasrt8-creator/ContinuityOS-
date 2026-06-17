@@ -8614,8 +8614,7 @@ export default {
         proofInserted = proofBoundary[0]?.meta?.changes || 0
         authorityConsumed = proofBoundary[1]?.meta?.changes || 0
         if (proofInserted === 0) return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
-      } catch (error) {
-        console.error("[/proof] proof batch write failed:", error)
+      } catch {
         return rejectWithTelemetry(env, { status:"NULL", result:"INVALID", reason:"proof_replay" }, { event_type: "REPLAY_BLOCKED", decision_id, execution_id, proof_id, severity: "HIGH", payload: { route: "/proof", validated_object_hash, indicator: "duplicate_proof_or_transaction_conflict" }, drift_class: "replay_drift" })
       }
       const outboxQueued = proofBoundary[2]?.meta?.changes || 0
