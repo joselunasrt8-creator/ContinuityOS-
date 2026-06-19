@@ -66,6 +66,15 @@ a `NULL` result reports `failure` and leaves the PR `blocked`. See that
 repo's `LOAD_BEARING_READINESS.md` and `NULL_ENFORCEMENT_PROOF.md` for the
 evidence.
 
+### Narrower wedge: Agent Attribution Gate
+
+A self-serve install for repos that specifically want to gate **AI-generated**
+PRs: on an agent-lane branch (`claude/*`, `codex/*`, `cursor/*`, `devin/*`,
+`copilot/*`), the PR must be authoritatively attributed `AGENT_AUTHORED` or the
+check fails closed — ordinary human PRs are never touched. Copy-paste workflow,
+exact required-check name, and a 5-minute walkthrough:
+[`actions/continuity-merge-guard/ADOPT_AGENT_ATTRIBUTION_GATE.md`](actions/continuity-merge-guard/ADOPT_AGENT_ATTRIBUTION_GATE.md).
+
 ---
 
 # Recorded Demo Evidence
