@@ -26,3 +26,10 @@ __pycache__/
 !graph/ingest_governance_graph.ts
 .env.neo4j
 .aider*
+
+# Generated artifacts (regenerable; untracked to reduce surface area)
+# worker-configuration.d.ts -> `npm run cf-typegen` (wrangler types)
+worker-configuration.d.ts
+# graph/topology-viewer.html -> `npm run graph:view`
+graph/topology-viewer.html
+# graph/runtime-topology.sample.json already covered by `graph/*.json` (-> `npm run graph:runtime`)
