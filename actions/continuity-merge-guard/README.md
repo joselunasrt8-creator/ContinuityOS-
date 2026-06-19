@@ -210,6 +210,28 @@ Required-check name: **`agent-merge-guard`**. A human-authored PR in this
 lane deterministically returns `NULL` with `null_reasons: AGENT_AUTHOR_REQUIRED`;
 an agent-authored PR with a complete identity object returns `VALID`.
 
+## Agent Attribution Gate — Install (5 minutes)
+
+The **agent-attribution-gate** is the narrower, self-serve adoption wedge:
+`merge-guard` checks general PR identity legitimacy for *every* PR, while the
+attribution gate enforces **authorship on agent lanes only** and leaves human PRs
+untouched. On an agent lane (`claude/*`, `codex/*`, `cursor/*`, `devin/*`,
+`copilot/*`), a PR must be authoritatively attributed `AGENT_AUTHORED` or the check
+fails closed.
+
+1. Copy [`examples/continuity-agent-attribution-gate.yml`](./examples/continuity-agent-attribution-gate.yml)
+   into your repo's `.github/workflows/` (pinned to `@v0.3.0`, the Agent Identity
+   attribution surface).
+2. In repo settings → Branches → branch protection rule for `main`, add the
+   required status check named **exactly** `agent-attribution-gate` (the job name;
+   not `continuity-agent-attribution-gate / agent-attribution-gate`).
+3. Attribute agent PRs with any one authoritative signal: an `Agent-Authored-By:`
+   commit trailer (most durable), an `agent-authored` PR label, or a PR-body
+   attribution block.
+
+Full step-by-step walkthrough, expected pass/blocked/neutral outcomes, lane
+customization, and verification: [`ADOPT_AGENT_ATTRIBUTION_GATE.md`](./ADOPT_AGENT_ATTRIBUTION_GATE.md).
+
 ### Version reference
 
 - `@v0.1.0` — pinned, stable identity-only validator surface. Recommended for any

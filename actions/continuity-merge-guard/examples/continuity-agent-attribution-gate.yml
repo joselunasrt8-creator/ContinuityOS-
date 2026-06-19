@@ -1,0 +1,106 @@
+name: continuity-agent-attribution-gate
+# Agent-lane attribution enforcement — copy this file into your own repo's
+# .github/workflows/ to adopt the ContinuityOS attribution gate.
+#
+# What it does: on an agent lane (claude/**, codex/**, ...), a PR must be
+# authoritatively attributed AGENT_AUTHORED or this check fails (fail-closed).
+# Non-agent PRs pass neutrally, so ordinary human PRs are never blocked for
+# missing attribution.
+#
+# Enforcement lives HERE, in your repo. The published action
+# (continuity-merge-guard@v0.3.0) stays non-blocking and only EMITS the
+# attribution classification; this workflow chooses to depend on it. Remove the
+# action and this gate loses its only signal -> the agent lane can no longer
+# distinguish AGENT_AUTHORED from UNKNOWN.
+#
+# Make it load-bearing: add the required status check named exactly
+# `agent-attribution-gate` (the job id below) in branch protection.
+# Customize for your repo: adjust the `branches:` list and the agent-lane
+# prefixes in the `case` statement below.
+# Full walkthrough: ADOPT_AGENT_ATTRIBUTION_GATE.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  agent-attribution-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Harvest commit trailers
+        id: trailers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+          # Only trailer lines (unfolded) from non-merge commits in the PR range,
+          # keep the recognized authoritative agent trailers, dedupe. Untrusted
+          # text -> heredoc into GITHUB_OUTPUT. Non-blocking: empty on any failure.
+          TRAILERS="$(git log "${BASE_SHA}..${HEAD_SHA}" --no-merges \
+            --pretty=format:'%(trailers:only=true,unfold=true)' 2>/dev/null \
+            | grep -iE '^(Agent-Authored-By|Agent-Assisted-By)[[:space:]]*:' | sort -u || true)"
+          {
+            echo "value<<TRAILERS_EOF"
+            echo "$TRAILERS"
+            echo "TRAILERS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0
+        id: merge-guard
+        continue-on-error: true
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          actor: ${{ github.event.pull_request.user.login }}
+          pr-author: ${{ github.event.pull_request.user.login }}
+          head-ref: ${{ github.event.pull_request.head.ref }}
+          pr-body: ${{ github.event.pull_request.body }}
+          pr-labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          commit-trailers: ${{ steps.trailers.outputs.value }}
+
+      - name: Enforce AGENT_AUTHORED on the agent lane
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          CLASSIFICATION: ${{ steps.merge-guard.outputs.attribution_classification }}
+          STATUS: ${{ steps.merge-guard.outputs.attribution_status }}
+        run: |
+          set -euo pipefail
+          # Agent lane = recognized agent-session branch prefixes. Scoping the gate
+          # this way keeps non-agent (human) PRs unaffected.
+          case "$HEAD_REF" in
+            claude/*|codex/*|cursor/*|devin/*|copilot/*) AGENT_LANE=true ;;
+            *) AGENT_LANE=false ;;
+          esac
+          echo "head_ref=$HEAD_REF"
+          echo "agent_lane=$AGENT_LANE"
+          echo "attribution_classification=${CLASSIFICATION:-<none>}"
+          echo "attribution_status=${STATUS:-<none>}"
+
+          if [ "$AGENT_LANE" != "true" ]; then
+            echo "Non-agent lane - attribution gate passes neutrally (human PRs are never blocked)."
+            exit 0
+          fi
+
+          if [ "$CLASSIFICATION" = "AGENT_AUTHORED" ]; then
+            echo "VALID - agent-lane PR is authoritatively attributed AGENT_AUTHORED."
+            exit 0
+          fi
+
+          {
+            echo "NULL - agent-lane PR is not authoritatively attributed AGENT_AUTHORED (got: ${CLASSIFICATION:-<none>})."
+            echo "Add an authoritative signal: an 'Agent-Authored-By:' commit trailer, an 'agent-authored' PR label, or a PR-body attribution block."
+          } >&2
+          exit 1

@@ -1,0 +1,194 @@
+# Adopt the Agent Attribution Gate (5 minutes)
+
+A self-serve install for the ContinuityOS **agent-attribution-gate**: a single
+required status check that makes AI-generated pull requests declare their
+authorship before they can merge — while leaving ordinary human PRs untouched.
+
+## What it does
+
+On an **agent lane** (a PR whose head branch is `claude/*`, `codex/*`, `cursor/*`,
+`devin/*`, or `copilot/*`), the PR must be **authoritatively attributed
+`AGENT_AUTHORED`** or this check fails closed and blocks the merge. On any other
+branch the check passes neutrally, so human PRs are never blocked for missing
+attribution.
+
+The enforcement lives in *your* workflow. The published action
+[`continuity-merge-guard@v0.3.0`](./README.md) stays non-blocking and only *emits*
+the attribution classification from authoritative signals (commit trailer, PR
+label, or PR-body block). Your workflow chooses to depend on that signal — that
+dependency is the point.
+
+> Not the same as `merge-guard`. `merge-guard` is a general PR-identity legitimacy
+> check for **every** PR. `agent-attribution-gate` is narrower: it enforces
+> **authorship on agent lanes only**. Adopt either or both.
+
+## Step 1 — Add the workflow
+
+Copy [`examples/continuity-agent-attribution-gate.yml`](./examples/continuity-agent-attribution-gate.yml)
+into your repository at `.github/workflows/continuity-agent-attribution-gate.yml`.
+The full file is inlined here so this guide is self-contained:
+
+```yaml
+name: continuity-agent-attribution-gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  agent-attribution-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Harvest commit trailers
+        id: trailers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+          TRAILERS="$(git log "${BASE_SHA}..${HEAD_SHA}" --no-merges \
+            --pretty=format:'%(trailers:only=true,unfold=true)' 2>/dev/null \
+            | grep -iE '^(Agent-Authored-By|Agent-Assisted-By)[[:space:]]*:' | sort -u || true)"
+          {
+            echo "value<<TRAILERS_EOF"
+            echo "$TRAILERS"
+            echo "TRAILERS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0
+        id: merge-guard
+        continue-on-error: true
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          actor: ${{ github.event.pull_request.user.login }}
+          pr-author: ${{ github.event.pull_request.user.login }}
+          head-ref: ${{ github.event.pull_request.head.ref }}
+          pr-body: ${{ github.event.pull_request.body }}
+          pr-labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          commit-trailers: ${{ steps.trailers.outputs.value }}
+
+      - name: Enforce AGENT_AUTHORED on the agent lane
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          CLASSIFICATION: ${{ steps.merge-guard.outputs.attribution_classification }}
+          STATUS: ${{ steps.merge-guard.outputs.attribution_status }}
+        run: |
+          set -euo pipefail
+          case "$HEAD_REF" in
+            claude/*|codex/*|cursor/*|devin/*|copilot/*) AGENT_LANE=true ;;
+            *) AGENT_LANE=false ;;
+          esac
+          if [ "$AGENT_LANE" != "true" ]; then
+            echo "Non-agent lane - attribution gate passes neutrally."
+            exit 0
+          fi
+          if [ "$CLASSIFICATION" = "AGENT_AUTHORED" ]; then
+            echo "VALID - agent-lane PR is authoritatively attributed AGENT_AUTHORED."
+            exit 0
+          fi
+          {
+            echo "NULL - agent-lane PR is not attributed AGENT_AUTHORED (got: ${CLASSIFICATION:-<none>})."
+            echo "Add an 'Agent-Authored-By:' commit trailer, an 'agent-authored' PR label, or a PR-body attribution block."
+          } >&2
+          exit 1
+```
+
+## Step 2 — Make it required
+
+In **Settings → Branches → branch protection rule for `main`**:
+
+1. Enable **Require status checks to pass before merging**.
+2. Add the required status check named **exactly** `agent-attribution-gate`.
+
+That name is the **job id**, which is the exact check-run name GitHub reports. The
+workflow file name shows as grouping context in the UI but is not part of the
+required-check name — select `agent-attribution-gate`, not
+`continuity-agent-attribution-gate / agent-attribution-gate`.
+
+Once required, the gate becomes part of the operational definition of "mergeable"
+for that branch: an agent-lane PR cannot merge unless it is attributed
+`AGENT_AUTHORED`.
+
+## Step 3 — Attribute agent PRs
+
+`AGENT_AUTHORED` requires **at least one authoritative signal** and no conflicting
+authoritative signal. Any one of these is sufficient, listed most-durable first:
+
+1. **Commit trailer (recommended, most durable).** Add to the agent's commits —
+   it travels with the change and is harvested automatically by the workflow:
+
+   ```
+   Agent-Authored-By: <agent-id>
+   ```
+
+   (`Agent-Assisted-By:` classifies as `AGENT_ASSISTED`, which does **not** satisfy
+   the gate. `Co-Authored-By:` is deliberately **not** an agent signal — humans use
+   it routinely.)
+
+2. **PR label.** Add the `agent-authored` label to the PR.
+
+3. **PR-body attribution block.** Include a fenced attribution block in the PR
+   description.
+
+Conflicting authoritative signals (e.g. a trailer and a label that disagree) fail
+closed to `UNKNOWN` — by design.
+
+## Expected outcomes
+
+| PR head branch | Authoritative agent signal? | Classification | Gate result |
+|---|---|---|---|
+| `claude/*` (agent lane) | yes (`Agent-Authored-By:` / label / body) | `AGENT_AUTHORED` | ✅ pass |
+| `claude/*` (agent lane) | none | `UNKNOWN` | ❌ blocked |
+| `claude/*` (agent lane) | conflicting signals | `UNKNOWN` | ❌ blocked |
+| `feature/*` (human lane) | — | any | ✅ neutral pass |
+
+## Customize the agent lane
+
+Edit the `case` line to match the branch prefixes your agents use:
+
+```bash
+case "$HEAD_REF" in
+  claude/*|codex/*|cursor/*|devin/*|copilot/*|bot/*) AGENT_LANE=true ;;
+  *) AGENT_LANE=false ;;
+esac
+```
+
+## Version pinning
+
+The snippet pins `@v0.3.0`. Pin a release tag so a changed result can only come
+from a changed PR, never from a changed validator implementation. The attribution
+outputs are metadata, not authority: they never alter `result` or `canonical_hash`,
+so a consumer that previously read only `result` is unaffected by moving to
+`@v0.3.0`. Do **not** leave `@main` as a permanent load-bearing reference. See the
+[Version reference](./README.md#version-reference) in the action README.
+
+## Break-glass
+
+If the gate is ever wrong or unavailable in an emergency, a repository admin can
+temporarily merge via GitHub's existing branch-protection override. Treat this as a
+governed, logged exception rather than a silent bypass — for a documented pattern
+see `continuityos-sandbox`'s `BREAK_GLASS.md`.
+
+## Verify it works
+
+1. Open a PR from a `claude/*` branch **without** any agent signal → the
+   `agent-attribution-gate` check fails and the PR is blocked.
+2. Add an `Agent-Authored-By:` trailer to a commit (or the `agent-authored` label)
+   and push → the check re-runs and passes; the PR becomes mergeable.
+3. Open a PR from a normal `feature/*` branch → the check passes neutrally.
+
+That pass / blocked / neutral triple is the proof that the gate is load-bearing in
+your repo.
