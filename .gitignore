@@ -25,3 +25,4 @@ __pycache__/
 !graph/output/runtime_edges.json
 !graph/ingest_governance_graph.ts
 .env.neo4j
+.aider*
