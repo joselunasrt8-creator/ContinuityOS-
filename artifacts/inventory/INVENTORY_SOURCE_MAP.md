@@ -1,3 +1,10 @@
+---
+archived: 2026-06-19
+former_path: /INVENTORY_SOURCE_MAP.md
+status: archived; non-authoritative; observational evidence only
+relocation: Repository surface reduction; see artifacts/inventory/INDEX.md
+---
+
 # INVENTORY_SOURCE_MAP
 
 **Artifact type:** `OBSERVATIONAL_ARTIFACT`

@@ -1,3 +1,10 @@
+---
+archived: 2026-06-19
+former_path: /LIGHTWEIGHT_REDUCTION_ASSESSMENT.md
+status: archived; non-authoritative; observational evidence only
+relocation: Repository surface reduction; see artifacts/inventory/INDEX.md
+---
+
 # Issue #1609 — Lightweight Reduction Assessment
 
 **Artifact type:** `OBSERVATIONAL_ARTIFACT`

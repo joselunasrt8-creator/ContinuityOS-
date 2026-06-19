@@ -1,3 +1,10 @@
+---
+archived: 2026-06-19
+former_path: /DRIFT_ANALYSIS.md
+status: archived; non-authoritative; observational evidence only
+relocation: Repository surface reduction; see artifacts/inventory/INDEX.md
+---
+
 # Issue #1609 — Drift Analysis
 
 **Artifact type:** `OBSERVATIONAL_ARTIFACT`

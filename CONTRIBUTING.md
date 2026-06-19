@@ -199,6 +199,23 @@ Notes:
   `runtime/unauthorized_mutation_surface_inventory.json`), so the script surface
   is kept minimal. The full run remains the authoritative gate.
 
+## Generated artifacts
+
+Some large, regenerable artifacts are not tracked in git (see `.gitignore` and
+`archive/DELETION_REPORT_2026-06-19.md`). After a fresh clone, run
+`npm install`, then regenerate as needed:
+
+| Artifact | Regenerate with |
+|---|---|
+| `worker-configuration.d.ts` (required by `tsconfig.json` for typecheck / `wrangler dev`) | `npx wrangler types` |
+| `graph/topology-viewer.html` | `npm run graph:view` |
+| `graph/runtime-topology.sample.json` | `npm run graph:runtime` |
+
+(`worker-configuration.d.ts` uses `npx wrangler types` directly rather than a
+dedicated npm script, because every `package.json` script is a
+governance-classified surface; a one-off local typegen command does not warrant
+one.)
+
 ---
 
 # Governance

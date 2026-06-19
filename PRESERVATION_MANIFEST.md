@@ -147,6 +147,19 @@ Baseline: 1068 tests passing
 - `docs/neo4j/*.md` (5 files) — neo4j speculative docs
 - `docs/install-base/README.md`, `docs/install-base/governed-github-deploy-readiness.md` — install-base artifacts
 
+### Relocated 2026-06-19 (root → `artifacts/inventory/`, indexed, history preserved)
+Observational/assessment documents with no runtime, test, workflow, or script
+reader. See `artifacts/inventory/INDEX.md` and
+`archive/DELETION_REPORT_2026-06-19.md`.
+- `ARTIFACT_INVENTORY.md`, `INVENTORY_SOURCE_MAP.md`, `DRIFT_ANALYSIS.md`
+- `LIGHTWEIGHT_CLOSURE_RECOMMENDATIONS.md`, `REPOSITORY_REDUCTION_ASSESSMENT.md`, `LIGHTWEIGHT_REDUCTION_ASSESSMENT.md`
+- `AGENT_BYPASS_INVENTORY.json`, `PHASE3_EXECUTION_SURFACE_INVENTORY.json`
+
+### Untracked 2026-06-19 (regenerable; kept on disk, added to `.gitignore`)
+- `worker-configuration.d.ts` — `npx wrangler types`
+- `graph/topology-viewer.html` — `npm run graph:view`
+- `graph/runtime-topology.sample.json` — `npm run graph:runtime`
+
 ---
 
 ## Preserved Invariants

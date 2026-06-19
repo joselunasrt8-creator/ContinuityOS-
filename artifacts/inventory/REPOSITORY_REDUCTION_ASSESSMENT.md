@@ -1,3 +1,10 @@
+---
+archived: 2026-06-19
+former_path: /REPOSITORY_REDUCTION_ASSESSMENT.md
+status: archived; non-authoritative; observational evidence only
+relocation: Repository surface reduction; see artifacts/inventory/INDEX.md
+---
+
 # Repository Reduction Assessment
 
 ## Invariant
