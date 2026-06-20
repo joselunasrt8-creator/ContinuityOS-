@@ -25,7 +25,11 @@ mindshift lineage <subcommand> [options]
 
 Subcommands:
   verify       <registry.jsonl> [--lineage-key <key>]
-               Verify the append-only chain integrity (fail-closed).
+               Verify the append-only chain integrity (fail-closed). Reports
+               tamper/fork/gap/duplicate and malformed-line detection.
+  head         <registry.jsonl> --lineage-key <key>
+               Show the current inherited eligibility carry (the chain head a
+               next run must inherit), or GENESIS for an empty lineage.
   eligibility  <registry.jsonl> <current.json> [--now <iso>]
                Classify a candidate run against the registry head.
                current.json: { lineage_key, continuity_id, parent_continuity_id,
@@ -51,8 +55,52 @@ export async function run(args) {
     const registry = requireArg(args, 1, "registry.jsonl")
     const lineageKey = flag(args, "--lineage-key")
     const res = verifyRegistryChain(registry, lineageKey)
-    printJson({ object_type: "ExecutionLineageVerification", mode: "observability_only", registry, lineage_key: lineageKey ?? null, ...res })
+    printJson({
+      object_type: "ExecutionLineageVerification",
+      mode: "observability_only",
+      registry,
+      lineage_key: lineageKey ?? null,
+      ok: res.result === "VALID",
+      ...res,
+    })
     if (res.result !== "VALID") process.exitCode = 1
+    return
+  }
+
+  if (sub === "head") {
+    const registry = requireArg(args, 1, "registry.jsonl")
+    const lineageKey = flag(args, "--lineage-key")
+    if (!lineageKey) {
+      printError(`lineage head requires --lineage-key <key>\n\n${USAGE}`)
+      return
+    }
+    // Verify the chain first — a head read off a broken chain is meaningless.
+    const chain = verifyRegistryChain(registry, lineageKey)
+    if (chain.result !== "VALID") {
+      printJson({
+        object_type: "ExecutionLineageHead",
+        mode: "observability_only",
+        registry,
+        lineage_key: lineageKey ?? null,
+        ok: false,
+        head: null,
+        chain_result: chain.result,
+        null_reasons: chain.null_reasons,
+      })
+      process.exitCode = 1
+      return
+    }
+    const head = headCarry(registry, lineageKey)
+    printJson({
+      object_type: "ExecutionLineageHead",
+      mode: "observability_only",
+      registry,
+      lineage_key: lineageKey ?? null,
+      ok: true,
+      head_link_hash: chain.head_link_hash,
+      length: chain.length,
+      head: head ?? "GENESIS",
+    })
     return
   }
 

@@ -135,12 +135,14 @@ export type AdapterNullReason =
   | "EVIDENCE_ADAPTER_SPECIFIC_NULL"  // evidence.adapter_specific was null or not a plain record
   | "NULL_CONTINUITY_CONTEXT"         // AEO declared a lineage but no continuity context was supplied
   | "EXECUTION_NOT_ELIGIBLE"          // continuity gate returned NULL — run does not inherit the lineage head
+  | "STORED_CHAIN_INVALID"            // persisted lineage chain is tampered/malformed — refuse to execute on it
 
 export type AdapterNullResult = {
   readonly execution_result: "NULL"
   readonly null_reason: AdapterNullReason
   readonly creates_authority: false
-  // Present only for EXECUTION_NOT_ELIGIBLE — the gate's fail-closed reasons, for diagnosis.
+  // Present for EXECUTION_NOT_ELIGIBLE (gate reasons) or STORED_CHAIN_INVALID
+  // (chain-verification reasons) — the fail-closed detail, for diagnosis.
   readonly lineage_null_reasons?: readonly string[]
 }
 

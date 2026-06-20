@@ -1,14 +1,14 @@
 {
   "pack": "pack-v1",
   "stage": 3,
-  "run_at": "2026-06-20T09:20:19.786Z",
+  "run_at": "2026-06-20T20:43:35.517Z",
   "non_operative": true,
   "authority_created": false,
   "deployment_performed": false,
   "runtime_mutation_capable": false,
   "production_proof_emitted": false,
-  "total": 29,
-  "pass": 29,
+  "total": 31,
+  "pass": 31,
   "fail": 0,
   "status": "PACK_V1_CONFORMANCE_COMPLETE",
   "results": [
@@ -113,6 +113,11 @@
       "message": "tampered prior link — NULL"
     },
     {
+      "vector_id": "LINEAGE-06",
+      "status": "PASS",
+      "message": "tampered hash-bound revocation field (status/revoked_at) — NULL"
+    },
+    {
       "vector_id": "ELIG-01",
       "status": "PASS",
       "message": "inherits prior executed object + continuity head — ELIGIBLE"
@@ -154,6 +159,11 @@
     },
     {
       "vector_id": "ELIG-09",
+      "status": "PASS",
+      "message": "current run asserts executed != validated — NULL"
+    },
+    {
+      "vector_id": "ELIG-10",
       "status": "PASS",
       "message": "gate defaults NULL, creates no authority, narrows only"
     }

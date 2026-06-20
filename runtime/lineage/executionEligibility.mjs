@@ -45,6 +45,7 @@ export const GENESIS_EXECUTION_STATE = Object.freeze({
 
 export const ELIGIBILITY_NULL_REASONS = Object.freeze([
   'UNVALIDATED_CURRENT',
+  'CURRENT_INVARIANT_BROKEN',
   'PRIOR_INVARIANT_BROKEN',
   'UNINHERITED_EXECUTED_STATE',
   'BROKEN_CONTINUITY',
@@ -95,6 +96,14 @@ export function classifyExecutionEligibility(prior, current, options = {}) {
 
   // No valid object -> nothing happens.
   if (!str(cur.validated_object_hash)) null_reasons.push('UNVALIDATED_CURRENT')
+
+  // The CURRENT run must itself hold validated == executed. The carry that this
+  // run will persist becomes the next run's inheritance base, so an asserted
+  // executed object that diverges from the validated object would seed a broken
+  // base. Enforced (not assumed) whenever the run asserts an executed object.
+  if (str(cur.executed_object_hash) && str(cur.executed_object_hash) !== str(cur.validated_object_hash)) {
+    null_reasons.push('CURRENT_INVARIANT_BROKEN')
+  }
 
   // The prior run must itself have held validated == executed, or its state is
   // not a legitimate base to inherit.

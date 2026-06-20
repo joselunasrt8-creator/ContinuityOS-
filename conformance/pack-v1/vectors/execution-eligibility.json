@@ -13,6 +13,7 @@
     { "vector_id": "ELIG-06", "check_type": "execution_eligibility", "scenario": "expired", "expected": "NULL", "expected_reason": "EXPIRED_LINEAGE", "message": "prior lineage expired — NULL" },
     { "vector_id": "ELIG-07", "check_type": "execution_eligibility", "scenario": "replayed", "expected": "NULL", "expected_reason": "REPLAYED_NONCE", "message": "consumed nonce — NULL" },
     { "vector_id": "ELIG-08", "check_type": "execution_eligibility", "scenario": "unvalidated", "expected": "NULL", "expected_reason": "UNVALIDATED_CURRENT", "message": "no validated object — NULL" },
-    { "vector_id": "ELIG-09", "check_type": "primitive_gate_narrows_only", "message": "gate defaults NULL, creates no authority, narrows only" }
+    { "vector_id": "ELIG-09", "check_type": "execution_eligibility", "scenario": "current_invariant", "expected": "NULL", "expected_reason": "CURRENT_INVARIANT_BROKEN", "message": "current run asserts executed != validated — NULL" },
+    { "vector_id": "ELIG-10", "check_type": "primitive_gate_narrows_only", "message": "gate defaults NULL, creates no authority, narrows only" }
   ]
 }

@@ -147,7 +147,7 @@ test('all declared NULL reasons are reachable through the gate', () => {
   // Trip everything at once; the union must cover the declared reason set.
   const allBroken = classifyExecutionEligibility(
     priorCarry({ executed_object_hash: 'mm', revoked_at: 'x', expires_at: '2000-01-01T00:00:00Z' }),
-    { lineage_key: KEY, validated_object_hash: '', parent_executed_object_hash: 'no', parent_continuity_id: 'no', nonce: 'used' },
+    { lineage_key: KEY, validated_object_hash: '', executed_object_hash: 'divergent', parent_executed_object_hash: 'no', parent_continuity_id: 'no', nonce: 'used' },
     { now: '2026-06-20T00:00:00Z', consumed_nonces: ['used'] },
   )
   for (const reason of ELIGIBILITY_NULL_REASONS) {

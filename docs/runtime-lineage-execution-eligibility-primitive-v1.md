@@ -134,3 +134,33 @@ intentionally out of scope for v1.
 - `node conformance/pack-v1/harness.mjs` — `LINEAGE_INHERITANCE_PRESERVED`,
   `EXECUTION_ELIGIBILITY_CONTINUITY_PRESERVED`, `PRIMITIVE_GATE_NARROWS_ONLY`,
   `PACK_V1_CONFORMANCE_COMPLETE`.
+
+## Hardening (post-#2186 review)
+
+The primitive **narrows eligibility**; this hardening **protects the eligibility evidence** so
+eligibility can never be reconstructed from corrupted state. Each item is a fail-closed boundary:
+
+- **Malformed registry lines fail closed.** `readEntries` is strict: an unparseable line — or a
+  chain-shaped line missing its link identity — is `MALFORMED_REGISTRY_LINE`, never silently
+  skipped (silent skipping could hide a dropped/tampered link). Pure markers (`registry_init`) are
+  still allowed. `verifyRegistryChain` reports it as `NULL`; `admitRun` refuses to append.
+- **Stored chain verified before append.** `admitRun` and `executeGovernedRun` re-verify the full
+  persisted chain (`STORED_CHAIN_INVALID`) before trusting the head, executing, or appending —
+  nothing is ever appended on top of a broken chain.
+- **Replay + revocation/expiry are hash-bound.** `nonce, status, expires_at, revoked_at` now enter
+  `link_hash`. Tampering any of them on a persisted link breaks the recompute
+  (`MUTATED_PRIOR_LINK`) instead of silently restoring eligibility (un-revoking, un-expiring, or
+  swapping a consumed nonce).
+- **Post-gate execution race closed.** A per-registry advisory lock (`registryLock.mjs`, reentrant
+  in-process) wraps the **whole** critical section `read head → gate → execute → append`, so the
+  executor side effect stays inside the protected region; concurrent runs on a lineage cannot both
+  execute against the same head. Fail-closed if the lock cannot be acquired.
+- **Current-run invariant enforced (not assumed).** A run asserting `executed_object_hash !=
+  validated_object_hash` is `CURRENT_INVARIANT_BROKEN` → `NULL`, so a divergent carry can never
+  enter the registry as a future inheritance base.
+- **Verification ergonomics.** `mindshift lineage head` prints the inherited carry (or `GENESIS`);
+  `mindshift lineage verify` surfaces tamper/fork/gap/duplicate **and** malformed-line detection.
+
+Hardening verification: `tests/fate/lineage-hardening.test.mjs` (tamper each hash-bound field →
+`MUTATED_PRIOR_LINK`; malformed-line fail-closed; stored-chain-before-append; current-invariant;
+lock reentrancy/exclusion/stale-reclaim) and conformance vectors `LINEAGE-06`, `ELIG-09`.
