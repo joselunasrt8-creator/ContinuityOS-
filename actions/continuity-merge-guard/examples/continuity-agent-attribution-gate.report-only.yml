@@ -28,6 +28,11 @@ permissions:
   contents: read
 
 jobs:
+  # UPGRADE: when enforcing, rename this job id to `agent-attribution-gate` so it
+  # matches the required status-check name in ADOPT_AGENT_ATTRIBUTION_GATE.md
+  # Step 2. The job id IS the check-run name GitHub reports; if you require
+  # `agent-attribution-gate` while this stays `...-report-only`, the required
+  # check never appears and every PR is blocked.
   agent-attribution-gate-report-only:
     runs-on: ubuntu-latest
     steps:
@@ -68,9 +73,12 @@ jobs:
           commit-trailers: ${{ steps.trailers.outputs.value }}
 
       - name: Report what the gate WOULD do (never blocks)
-        # UPGRADE: when you're ready to enforce, delete this step and paste in the
+        # UPGRADE: to enforce, make exactly two changes: (1) rename the job id
+        # above from `agent-attribution-gate-report-only` to
+        # `agent-attribution-gate`, and (2) delete this step and paste in the
         # "Enforce AGENT_AUTHORED on the agent lane" step from
-        # examples/continuity-agent-attribution-gate.yml. That is the only change.
+        # examples/continuity-agent-attribution-gate.yml. Then add the required
+        # check `agent-attribution-gate` in branch protection (ADOPT Step 2).
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           CLASSIFICATION: ${{ steps.merge-guard.outputs.attribution_classification }}
