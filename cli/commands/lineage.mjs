@@ -110,6 +110,25 @@ export async function run(args) {
     const now = flag(args, "--now")
     const current = readJsonFile(currentPath)
     const lineageKey = current.lineage_key
+    // Fail closed on a tampered/malformed registry with the documented NULL JSON,
+    // rather than letting strict reads throw an uncaught exception (consistent with
+    // the verify/head paths). A decision off a broken chain is meaningless.
+    const chain = verifyRegistryChain(registry, lineageKey)
+    if (chain.result !== "VALID") {
+      printJson({
+        object_type: "ExecutionEligibilityDecision",
+        mode: "observability_only",
+        registry,
+        lineage_key: lineageKey ?? null,
+        inherited_from: null,
+        eligibility: "NULL",
+        null_reasons: ["STORED_CHAIN_INVALID", ...chain.null_reasons],
+        creates_authority: false,
+        widens_eligibility: false,
+      })
+      process.exitCode = 1
+      return
+    }
     const prior = headCarry(registry, lineageKey)
     const decision = classifyExecutionEligibility(prior, current, {
       now,

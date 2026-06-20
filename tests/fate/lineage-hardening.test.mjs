@@ -13,9 +13,9 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { writeFileSync, readFileSync, mkdtempSync, openSync, closeSync, utimesSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { writeFileSync, readFileSync, mkdtempSync, openSync, closeSync, writeSync, existsSync } from 'node:fs'
+import { tmpdir, hostname } from 'node:os'
+import { join, dirname, basename } from 'node:path'
 
 import { GENESIS_EXECUTION_STATE } from '../../runtime/lineage/executionEligibility.mjs'
 import {
@@ -24,7 +24,7 @@ import {
   verifyRegistryChain,
   MalformedRegistryError,
 } from '../../runtime/lineage/proofChainRegistry.mjs'
-import { classifyExecutionEligibility } from '../../runtime/lineage/executionEligibility.mjs'
+import { classifyExecutionEligibility, eligibilityCarry } from '../../runtime/lineage/executionEligibility.mjs'
 import { withRegistryLock, isLockHeld } from '../../runtime/lineage/registryLock.mjs'
 
 const KEY = 'owner/repo@main'
@@ -191,6 +191,39 @@ test('current-invariant: a divergent carry can never be admitted into the regist
   assert.equal(readEntries(registry, KEY).length, 2)
 })
 
+test('current-invariant: a BLANK executed hash never persists a divergent carry', () => {
+  // executed_object_hash:"" with a non-blank validated hash must not seed a carry
+  // whose validated != executed (eligibilityCarry coerces blank -> validated).
+  const carry = eligibilityCarry({
+    continuity_id: 'c2', parent_continuity_id: 'c1',
+    validated_object_hash: 'obj2', executed_object_hash: '', nonce: 'n2',
+  })
+  assert.equal(carry.executed_object_hash, 'obj2')
+  assert.equal(carry.validated_object_hash, carry.executed_object_hash)
+})
+
+// ── #4 — non-lineage proof_entry records are skipped, not flagged malformed ───────
+
+test('proof-registry: a proof_entry log without link_hash verifies VALID (records skipped)', () => {
+  // Mirror governance/merge-legitimacy/merge_proof_registry.jsonl: proof_entry
+  // records that carry NO link_hash. These are not lineage links and must be
+  // skipped — never MALFORMED_REGISTRY_LINE.
+  const dir = mkdtempSync(join(tmpdir(), 'proof-reg-'))
+  const registry = join(dir, 'merge_proof_registry.jsonl')
+  writeFileSync(
+    registry,
+    [
+      JSON.stringify({ _record_type: 'registry_init', registry_version: '1.0', artifact_id: 'merge_proof_registry' }),
+      JSON.stringify({ _record_type: 'proof_entry', proof_id: 'PROOF-1712', proof_hash: 'a'.repeat(64), pr_number: 1712 }),
+      JSON.stringify({ _record_type: 'proof_entry', proof_id: 'PROOF-1713', proof_hash: 'b'.repeat(64), pr_number: 1713 }),
+    ].join('\n') + '\n',
+  )
+  const res = verifyRegistryChain(registry, undefined)
+  assert.equal(res.result, 'VALID')
+  assert.equal(res.null_reasons.length, 0)
+  assert.equal(readEntries(registry, undefined).length, 0) // no lineage links present
+})
+
 // ── P1.4 — per-registry advisory lock (race protection) ──────────────────────────
 
 test('lock: withRegistryLock is reentrant within a process and releases cleanly', () => {
@@ -211,27 +244,50 @@ test('lock: withRegistryLock is reentrant within a process and releases cleanly'
   assert.equal(existsSync(lockPath), false) // lockfile removed on release
 })
 
-test('lock: a held lock excludes another acquirer (fail-closed timeout)', () => {
+test('lock: a LIVE held lock is never stolen — second acquirer fails closed (timeout)', () => {
   const registry = freshRegistry()
   const lockPath = registry + '.lock'
-  const fd = openSync(lockPath, 'wx') // simulate a live holder in another process
+  // A live holder: our own pid, written as the lockfile identity. Even though it is
+  // "old", it must NOT be reclaimed by age — only a provably-dead holder is.
+  const fd = openSync(lockPath, 'wx')
+  writeSync(fd, JSON.stringify({ pid: process.pid, host: hostname(), at: '2000-01-01T00:00:00Z' }))
+  closeSync(fd)
   try {
     assert.throws(
-      () => withRegistryLock(registry, () => 'never', { timeoutMs: 80, staleMs: 60_000 }),
+      () => withRegistryLock(registry, () => 'never', { timeoutMs: 80 }),
       (err) => err.code === 'REGISTRY_LOCK_TIMEOUT',
     )
+    assert.equal(existsSync(lockPath), true) // the live lock survived
   } finally {
-    closeSync(fd)
+    closeSync(openSync(lockPath, 'r')) // (no-op open to assert it still exists)
   }
 })
 
-test('lock: an abandoned (stale) lock is reclaimed', () => {
+test('lock: only a PROVABLY DEAD holder is reclaimed (not age)', () => {
   const registry = freshRegistry()
   const lockPath = registry + '.lock'
-  closeSync(openSync(lockPath, 'wx'))
-  const past = new Date(Date.now() - 120_000)
-  utimesSync(lockPath, past, past) // age it beyond staleMs
+  // A holder PID that does not exist on this host → provably dead → reclaimable.
+  const fd = openSync(lockPath, 'wx')
+  writeSync(fd, JSON.stringify({ pid: 2147483646, host: hostname(), at: '2000-01-01T00:00:00Z' }))
+  closeSync(fd)
 
-  const out = withRegistryLock(registry, () => 'reclaimed', { timeoutMs: 500, staleMs: 1_000 })
+  const out = withRegistryLock(registry, () => 'reclaimed', { timeoutMs: 500 })
   assert.equal(out, 'reclaimed')
+})
+
+test('lock: different path spellings of the same registry share ONE lock (canonicalized)', () => {
+  const registry = freshRegistry()
+  const weird = join(dirname(registry), '.', basename(registry)) // same file, "/./"
+  let observedSame = false
+  withRegistryLock(registry, () => {
+    observedSame = isLockHeld(weird) // a different spelling sees the same held lock
+  })
+  assert.equal(observedSame, true)
+  assert.equal(isLockHeld(registry), false)
+})
+
+test('lock: an async fn is refused (sync-only critical section) and the lock is released', () => {
+  const registry = freshRegistry()
+  assert.throws(() => withRegistryLock(registry, async () => 1), /synchronous/)
+  assert.equal(isLockHeld(registry), false) // released despite the refusal
 })

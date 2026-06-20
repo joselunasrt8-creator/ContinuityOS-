@@ -45,11 +45,13 @@ function str(v) {
   return typeof v === 'string' ? v : v === undefined || v === null ? '' : String(v)
 }
 
-// Does a parsed object look like it was MEANT to be a chain link? (recognized
-// entry type, or any line_hash present). Pure non-chain markers — e.g. the
-// registry_init header — are not chain-shaped and are legitimately skipped.
+// Does a parsed object look like it was MEANT to be a lineage link? A record is a
+// link iff it carries a link_hash, OR it is the lineage registry's own record type
+// (execution_lineage_entry), which must always be a full link. A `proof_entry`
+// WITHOUT a link_hash is a merge-proof record (governance/.../merge_proof_registry
+// .jsonl), not a lineage link — it is legitimately skipped, never malformed.
 function isChainShaped(o) {
-  return ENTRY_TYPES.has(o._record_type) || o.link_hash !== undefined
+  return str(o.link_hash) !== '' || o._record_type === 'execution_lineage_entry'
 }
 
 // Validate a chain-shaped entry carries its full link identity, else it is

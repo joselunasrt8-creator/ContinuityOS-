@@ -150,8 +150,11 @@ export function eligibilityCarry(current) {
     continuity_id: str(cur.continuity_id),
     parent_continuity_id: str(cur.parent_continuity_id),
     validated_object_hash: str(cur.validated_object_hash),
-    // validated == executed (the invariant the run must have held to be here)
-    executed_object_hash: str(cur.executed_object_hash ?? cur.validated_object_hash),
+    // validated == executed (the invariant the run must have held to be here). A
+    // BLANK executed hash is coerced to the validated hash (|| not ??) so a carry
+    // with validated != executed can never be persisted as the next run's base — a
+    // non-blank divergent executed is rejected earlier by CURRENT_INVARIANT_BROKEN.
+    executed_object_hash: str(cur.executed_object_hash) || str(cur.validated_object_hash),
     proof_hash: str(cur.proof_hash),
     status: str(cur.status || 'ACTIVE'),
     expires_at: str(cur.expires_at),
