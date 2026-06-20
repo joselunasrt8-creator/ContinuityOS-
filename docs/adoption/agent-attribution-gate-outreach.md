@@ -37,12 +37,18 @@ Skip for now (they'll say it's already covered, or there's no pain yet):
 Only after the pain lands: *what it is* is one required status check that enforces
 authorship on agent lanes and leaves human PRs completely untouched.
 
-## The ask (small, native, reversible)
+## The ask (small, native, reversible — and risk-free to start)
 
-One required status check on the protected branch. On an agent-lane branch, a PR
-must carry an authoritative `AGENT_AUTHORED` signal (a commit trailer, a label, or
-a PR-body block) or it cannot merge. Human PRs pass neutrally. No GitHub App, no
-secrets, no new platform. Removing it is a one-click branch-protection change.
+Lead with the **trial**, not the required check. The first ask is a *non-blocking*
+report-only workflow: it classifies the maintainer's own real agent-lane PRs and
+reports what the gate *would* do, but it **can never block a merge** and doesn't
+even need to be a required check. Zero merge risk, installed in 5 minutes. They
+watch it work on their real PRs, then — only if the verdicts look right — upgrade
+to the required check with a one-line change. That upgrade, made *after* seeing it
+work, is the dependency we're trying to form. No GitHub App, no secrets, no new
+platform; removing it is a one-click branch-protection change.
+
+Trial path: `ADOPT_AGENT_ATTRIBUTION_GATE.md` → "Stage 0 — Trial (non-blocking)".
 
 ## Ready-to-send message (copy / paste, then trim)
 
@@ -52,13 +58,16 @@ secrets, no new platform. Removing it is a one-click branch-protection change.
 > on GitHub *requires* an agent-lane PR to state that it was agent-authored before
 > it can merge; you find out after the fact, if at all.
 >
-> There's a tiny, native fix: one required status check. On agent-lane branches
-> (`claude/*`, `codex/*`, …) a PR must be attributed `AGENT_AUTHORED` — via a commit
-> trailer, a label, or a PR-body block — or it's blocked. Ordinary human PRs are
-> never touched. No GitHub App, no secrets, ~5 minutes, and it's a one-click revert
-> if you don't like it.
+> There's a tiny, native fix, and you can try it with **zero merge risk**: drop in
+> one report-only workflow. On agent-lane branches (`claude/*`, `codex/*`, …) it
+> tells you whether a PR declared it was `AGENT_AUTHORED` — via a commit trailer, a
+> label, or a PR-body block — and reports what it *would* block. It never actually
+> blocks anything during the trial, and ordinary human PRs are never touched. No
+> GitHub App, no secrets, ~5 minutes. Watch it on your real PRs for a few days; if
+> it's right, one line upgrades it to a required check. One-click revert anytime.
 >
-> 5-minute install: <link to ADOPT_AGENT_ATTRIBUTION_GATE.md>
+> 5-minute trial install: <link to ADOPT_AGENT_ATTRIBUTION_GATE.md> (start at
+> "Stage 0 — Trial")
 >
 > If you try it, I'd love to know one thing afterward: would your merge path be
 > worse without it? That's the only feedback I'm after.
@@ -78,6 +87,13 @@ demo. Ask for exactly three things:
 A "yes" to #3 from an independent maintainer is the single data point that
 converts ContinuityOS from same-owner demonstrated dependency into genuine
 **external** dependency formation.
+
+If they start with the trial, the report-only job summaries already give you #1 and
+#2 as **would-block (NULL)** and **would-pass (VALID)** verdicts on their real PRs.
+The decisive event is then the **upgrade**: a maintainer who, after watching the
+trial, chooses to make the check *required* has chosen to make it load-bearing on
+their own evidence. That upgrade — plus the one-sentence retention answer — is the
+boundary crossing this whole kit exists to produce.
 
 ## Proof to show if they want evidence first
 

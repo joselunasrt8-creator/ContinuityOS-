@@ -22,6 +22,41 @@ dependency is the point.
 > check for **every** PR. `agent-attribution-gate` is narrower: it enforces
 > **authorship on agent lanes only**. Adopt either or both.
 
+## Recommended path: trial first, then require
+
+Making a check required on a protected branch is a trust decision. You don't have
+to make it on faith. Adopt in two stages:
+
+- **Stage 0 — Trial (non-blocking, zero merge risk).** Install the report-only
+  variant. It computes exactly what the enforcing gate *would* do and writes
+  `VALID` / `NULL` / neutral to each PR's job summary — but it **always passes**,
+  so it can never block a merge and does **not** need to be a required check.
+  Watch it classify your own real agent-lane PRs for a few days.
+- **Stage 1 — Require.** Once the verdicts look right on your real PRs, upgrade to
+  the enforcing gate and make it a required status check. Now an agent-lane PR
+  cannot merge unless it is attributed `AGENT_AUTHORED`.
+
+Stage 0 is one file and one upgrade line away from Stage 1 — see
+[Stage 0 below](#stage-0--trial-non-blocking-zero-merge-risk). If you already
+trust the behavior, skip to Step 1.
+
+## Stage 0 — Trial (non-blocking, zero merge risk)
+
+Copy [`examples/continuity-agent-attribution-gate.report-only.yml`](./examples/continuity-agent-attribution-gate.report-only.yml)
+into your repository at `.github/workflows/continuity-agent-attribution-gate.report-only.yml`.
+It uses the same `continuity-merge-guard@v0.3.0` signal as the enforcing gate, but
+its final step only *reports* the verdict and always exits 0. Open or re-push a
+`claude/*` PR and read the **report-only (trial)** block in the check's job
+summary: it tells you whether the enforcing gate would have passed or blocked,
+without touching your merge button.
+
+When the trial verdicts match your intent, **upgrade**: the report-only file's
+last step carries an `UPGRADE:` note — replace that one step with the enforcing
+step from [`examples/continuity-agent-attribution-gate.yml`](./examples/continuity-agent-attribution-gate.yml)
+(reproduced as Step 1 below), rename the job to `agent-attribution-gate`, then do
+Step 2. That upgrade — choosing to make it load-bearing *after* watching it work —
+is the dependency.
+
 ## Step 1 — Add the workflow
 
 Copy [`examples/continuity-agent-attribution-gate.yml`](./examples/continuity-agent-attribution-gate.yml)
@@ -33,7 +68,11 @@ name: continuity-agent-attribution-gate
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # labeled/unlabeled/edited re-run the gate when a maintainer adds the
+    # `agent-authored` label or edits the PR-body attribution block to fix a
+    # blocked PR — otherwise that fix would not be re-evaluated until an
+    # unrelated push.
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
     branches:
       - main
 
