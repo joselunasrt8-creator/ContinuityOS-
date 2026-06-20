@@ -32,6 +32,7 @@ import { run as proof } from "./commands/proof.mjs"
 import { run as topology } from "./commands/topology.mjs"
 import { run as reconcile } from "./commands/reconcile.mjs"
 import { run as adoption } from "./commands/adoption.mjs"
+import { run as lineage } from "./commands/lineage.mjs"
 
 const COMMANDS = {
   authority,
@@ -42,6 +43,7 @@ const COMMANDS = {
   topology,
   reconcile,
   adoption,
+  lineage,
 }
 
 const USAGE = `
@@ -56,6 +58,7 @@ Commands:
   topology    Inspect topology state (observability-only)
   reconcile   Detect legitimacy drift across lifecycle phases
   adoption    Track external execution surface adoption (observability-only)
+  lineage     Verify execution-lineage chains / classify run eligibility (observability-only)
 
 Core invariant: validated_object == executed_object
 

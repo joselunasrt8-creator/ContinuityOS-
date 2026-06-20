@@ -160,6 +160,154 @@ function assertSuiteHeader(suite) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Continuity Proof Chain — inline mirror of runtime/lineage/continuityProofChain.mjs
+// Verifies verified proof-state inheritance across runs, fail-closed on break.
+// Self-contained: uses the inlined canonicalize/sha256Hex above (no runtime dep).
+// ─────────────────────────────────────────────────────────────────────────────
+const LINEAGE_GENESIS = sha256Hex(canonicalize({ genesis: true, chain: 'CONTINUITY_PROOF_CHAIN' }))
+const LINEAGE_FIELDS = ['lineage_key', 'sequence_number', 'parent_link_hash', 'continuity_id', 'parent_continuity_id', 'validated_object_hash', 'executed_object_hash', 'proof_hash', 'timestamp']
+
+function lineageLinkHash(link) {
+  const pre = {}
+  for (const f of LINEAGE_FIELDS) {
+    pre[f] = f === 'sequence_number' ? Number(link.sequence_number) : String(link[f] ?? '')
+  }
+  return sha256Hex(canonicalize(pre))
+}
+
+function lineageLink(input, head) {
+  const core = {
+    lineage_key: String(input.lineage_key ?? ''),
+    sequence_number: head ? Number(head.sequence_number) + 1 : 0,
+    parent_link_hash: head ? head.link_hash : LINEAGE_GENESIS,
+    continuity_id: String(input.continuity_id ?? ''),
+    parent_continuity_id: String(input.parent_continuity_id ?? ''),
+    validated_object_hash: String(input.validated_object_hash ?? ''),
+    executed_object_hash: String(input.executed_object_hash ?? ''),
+    proof_hash: String(input.proof_hash ?? ''),
+    timestamp: String(input.timestamp ?? ''),
+  }
+  return { ...core, link_hash: lineageLinkHash(core) }
+}
+
+function lineageVerifyChain(records) {
+  if (records.length === 0) return { result: 'VALID', reasons: [] }
+  const key = String(records[0].lineage_key)
+  const seenHash = new Set()
+  const seenSeq = new Set()
+  let head = null
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i]
+    const reasons = []
+    if (String(r.lineage_key) !== key) reasons.push('LINEAGE_KEY_MISMATCH')
+    if (lineageLinkHash(r) !== String(r.link_hash)) reasons.push('MUTATED_PRIOR_LINK')
+    const expParent = head ? head.link_hash : LINEAGE_GENESIS
+    if (!r.parent_link_hash) reasons.push('MISSING_PARENT')
+    else if (String(r.parent_link_hash) !== expParent) reasons.push('PARENT_MISMATCH')
+    const expSeq = head ? Number(head.sequence_number) + 1 : 0
+    const seq = Number(r.sequence_number)
+    if (seenSeq.has(seq)) reasons.push('DUPLICATE_SEQUENCE')
+    else if (!Number.isInteger(seq) || seq > expSeq) reasons.push('SEQUENCE_GAP')
+    else if (seq < expSeq) reasons.push('DUPLICATE_SEQUENCE')
+    if (seenHash.has(String(r.link_hash))) reasons.push('DUPLICATE_LINK_HASH')
+    if (reasons.length > 0) return { result: 'NULL', reasons, broken_at: i }
+    seenHash.add(String(r.link_hash))
+    seenSeq.add(seq)
+    head = r
+  }
+  return { result: 'VALID', reasons: [], head_link_hash: head.link_hash }
+}
+
+function lineageScenario(name) {
+  const base = (n) => ({ lineage_key: 'pack/repo@main', continuity_id: `c${n}`, parent_continuity_id: n === 0 ? '' : `c${n - 1}`, validated_object_hash: `v${n}`, executed_object_hash: `v${n}`, proof_hash: `p${n}`, timestamp: `t${n}` })
+  const build = (n) => {
+    const chain = []
+    let head = null
+    for (let i = 0; i < n; i++) {
+      const link = lineageLink(base(i), head)
+      chain.push(link)
+      head = link
+    }
+    return chain
+  }
+  switch (name) {
+    case 'valid_chain': return build(3)
+    case 'forked_parent': {
+      const chain = build(2)
+      chain.push(lineageLink(base(2), { sequence_number: 1, link_hash: 'f'.repeat(64) }))
+      return chain
+    }
+    case 'sequence_gap': {
+      const chain = build(2)
+      const bad = { ...lineageLink(base(2), chain[1]), sequence_number: 9 }
+      bad.link_hash = lineageLinkHash(bad)
+      chain.push(bad)
+      return chain
+    }
+    case 'duplicate_link': {
+      const chain = build(2)
+      chain.push(chain[1])
+      return chain
+    }
+    case 'mutated_prior': {
+      const chain = build(3)
+      chain[1] = { ...chain[1], executed_object_hash: 'tampered' }
+      return chain
+    }
+    default: return build(1)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Execution-Eligibility Gate — inline mirror of runtime/lineage/executionEligibility.mjs
+// A run is ELIGIBLE only by inheriting the prior run's executed object + continuity
+// head. Narrows only; NULL-default; creates no authority.
+// ─────────────────────────────────────────────────────────────────────────────
+const ELIG_GENESIS_OBJECT = sha256Hex(canonicalize({ genesis: true, lineage: 'EXECUTION_ELIGIBILITY' }))
+const ELIG_GENESIS = { continuity_id: '', parent_continuity_id: '', validated_object_hash: ELIG_GENESIS_OBJECT, executed_object_hash: ELIG_GENESIS_OBJECT, proof_hash: '', status: 'ACTIVE', expires_at: '', revoked_at: '' }
+const ELIG_S = (v) => (v == null ? '' : String(v))
+
+function eligExpired(exp, nowMs) {
+  const raw = ELIG_S(exp)
+  if (!raw) return false
+  const t = Date.parse(raw)
+  return Number.isNaN(t) ? false : t < nowMs
+}
+
+function eligClassify(prior, current, opts = {}) {
+  const p = prior == null ? ELIG_GENESIS : prior
+  const nowMs = opts.now ? Date.parse(String(opts.now)) : Date.now()
+  const consumed = new Set(Array.isArray(opts.consumed_nonces) ? opts.consumed_nonces.map(String) : [])
+  const cur = current && typeof current === 'object' ? current : {}
+  const reasons = []
+  if (!ELIG_S(cur.validated_object_hash)) reasons.push('UNVALIDATED_CURRENT')
+  if (ELIG_S(p.validated_object_hash) !== ELIG_S(p.executed_object_hash)) reasons.push('PRIOR_INVARIANT_BROKEN')
+  if (ELIG_S(cur.parent_executed_object_hash) !== ELIG_S(p.executed_object_hash)) reasons.push('UNINHERITED_EXECUTED_STATE')
+  if (ELIG_S(cur.parent_continuity_id) !== ELIG_S(p.continuity_id)) reasons.push('BROKEN_CONTINUITY')
+  if (ELIG_S(p.revoked_at) || ELIG_S(p.status || 'ACTIVE') !== 'ACTIVE') reasons.push('REVOKED_LINEAGE')
+  if (eligExpired(p.expires_at, nowMs)) reasons.push('EXPIRED_LINEAGE')
+  if (ELIG_S(cur.nonce) && consumed.has(ELIG_S(cur.nonce))) reasons.push('REPLAYED_NONCE')
+  return { eligibility: reasons.length === 0 ? 'ELIGIBLE' : 'NULL', reasons, creates_authority: false, widens_eligibility: false }
+}
+
+function eligScenario(name) {
+  const prior = { continuity_id: 'c1', validated_object_hash: 'obj1', executed_object_hash: 'obj1', proof_hash: 'p1', status: 'ACTIVE', expires_at: '2099-01-01T00:00:00Z', revoked_at: '' }
+  const current = { lineage_key: 'pack/repo@main', continuity_id: 'c2', parent_continuity_id: 'c1', parent_executed_object_hash: 'obj1', validated_object_hash: 'obj2', executed_object_hash: 'obj2', nonce: 'n2' }
+  const now = '2026-06-20T00:00:00Z'
+  switch (name) {
+    case 'inherit': return { prior, current, opts: { now } }
+    case 'genesis_root': return { prior: null, current: { lineage_key: 'pack/repo@main', continuity_id: 'c0', parent_continuity_id: '', parent_executed_object_hash: ELIG_GENESIS_OBJECT, validated_object_hash: 'obj0', executed_object_hash: 'obj0', nonce: 'n0' }, opts: { now } }
+    case 'uninherited': return { prior, current: { ...current, parent_executed_object_hash: 'other' }, opts: { now } }
+    case 'broken_continuity': return { prior, current: { ...current, parent_continuity_id: 'cX' }, opts: { now } }
+    case 'revoked': return { prior: { ...prior, revoked_at: '2026-01-01T00:00:00Z' }, current, opts: { now } }
+    case 'expired': return { prior: { ...prior, expires_at: '2000-01-01T00:00:00Z' }, current, opts: { now } }
+    case 'replayed': return { prior, current, opts: { now, consumed_nonces: ['n2'] } }
+    case 'unvalidated': return { prior, current: { ...current, validated_object_hash: '' }, opts: { now } }
+    default: return { prior, current, opts: { now } }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Check implementations
 // Each check verifies one invariant. All checks are read-only and evidence-only.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -442,6 +590,59 @@ function runCheck(vector) {
         break
       }
 
+      case 'proof_lineage_inheritance': {
+        const records = lineageScenario(vector.scenario)
+        const res = lineageVerifyChain(records)
+        if (res.result !== vector.expected) {
+          recordFail(vector_id, `expected ${vector.expected}, got ${res.result} (${res.reasons.join(',') || 'none'})`)
+          break
+        }
+        if (vector.expected === 'NULL' && vector.expected_reason && !res.reasons.includes(vector.expected_reason)) {
+          recordFail(vector_id, `expected reason ${vector.expected_reason}, got ${res.reasons.join(',')}`)
+          break
+        }
+        recordPass(vector_id, vector.message ?? `${vector.scenario} → ${res.result}`)
+        break
+      }
+
+      case 'execution_eligibility': {
+        const { prior, current, opts } = eligScenario(vector.scenario)
+        const res = eligClassify(prior, current, opts)
+        if (res.creates_authority !== false || res.widens_eligibility !== false) {
+          recordFail(vector_id, `gate must not create authority or widen eligibility`)
+          break
+        }
+        if (res.eligibility !== vector.expected) {
+          recordFail(vector_id, `expected ${vector.expected}, got ${res.eligibility} (${res.reasons.join(',') || 'none'})`)
+          break
+        }
+        if (vector.expected === 'NULL' && vector.expected_reason && !res.reasons.includes(vector.expected_reason)) {
+          recordFail(vector_id, `expected reason ${vector.expected_reason}, got ${res.reasons.join(',')}`)
+          break
+        }
+        recordPass(vector_id, vector.message ?? `${vector.scenario} → ${res.eligibility}`)
+        break
+      }
+
+      case 'primitive_gate_narrows_only': {
+        // Default is NULL (empty current), the gate creates no authority, and no
+        // single broken predicate ever yields ELIGIBLE (narrows only).
+        const def = eligClassify(eligScenario('inherit').prior, {})
+        const base = eligScenario('inherit')
+        const breakers = ['uninherited', 'broken_continuity', 'revoked', 'expired', 'replayed', 'unvalidated']
+        const allNarrow = breakers.every((s) => {
+          const { prior, current, opts } = eligScenario(s)
+          return eligClassify(prior, current, opts).eligibility === 'NULL'
+        })
+        const baseEligible = eligClassify(base.prior, base.current, base.opts).eligibility === 'ELIGIBLE'
+        if (def.eligibility === 'NULL' && def.creates_authority === false && allNarrow && baseEligible) {
+          recordPass(vector_id, vector.message ?? 'gate defaults NULL, creates no authority, narrows only')
+        } else {
+          recordFail(vector_id, `primitive-gate property violated (default=${def.eligibility}, narrows=${allNarrow}, baseEligible=${baseEligible})`)
+        }
+        break
+      }
+
       default:
         recordFail(vector_id, `unknown check_type: "${check_type}"`)
     }
@@ -496,6 +697,8 @@ try {
   runSuite('replay.json',      'REPLAY')
   runSuite('proof.json',       'PROOF')
   runSuite('convergence.json', 'CONVERGENCE')
+  runSuite('lineage.json',     'LINEAGE')
+  runSuite('execution-eligibility.json', 'EXECUTION_ELIGIBILITY')
 } catch (err) {
   console.error(`\nHARNESS_ERROR: ${err.message}`)
   process.exitCode = 1
@@ -513,6 +716,9 @@ if (failCount === 0) {
   console.log('REPLAY_CONSUMPTION_PRESERVED')
   console.log('PROOF_APPEND_ONLY_CONFIRMED')
   console.log('CONVERGENCE_CLASSIFICATION_CORRECT')
+  console.log('LINEAGE_INHERITANCE_PRESERVED')
+  console.log('EXECUTION_ELIGIBILITY_CONTINUITY_PRESERVED')
+  console.log('PRIMITIVE_GATE_NARROWS_ONLY')
   console.log('PACK_V1_CONFORMANCE_COMPLETE')
 } else {
   console.error(`CONFORMANCE_FAILURES: ${failCount}`)

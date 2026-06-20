@@ -1,0 +1,18 @@
+{
+  "suite_id": "EXECUTION_ELIGIBILITY",
+  "non_operative": true,
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "description": "Execution-eligibility continuity gate: a run is ELIGIBLE only by inheriting the prior run's executed object + continuity head (validated(N-1) -> executed(N) -> proof(N)); fail-closed otherwise. Narrows only; NULL-default; creates no authority.",
+  "vectors": [
+    { "vector_id": "ELIG-01", "check_type": "execution_eligibility", "scenario": "inherit", "expected": "ELIGIBLE", "message": "inherits prior executed object + continuity head — ELIGIBLE" },
+    { "vector_id": "ELIG-02", "check_type": "execution_eligibility", "scenario": "genesis_root", "expected": "ELIGIBLE", "message": "genesis root inherits GENESIS_EXECUTION_STATE — ELIGIBLE" },
+    { "vector_id": "ELIG-03", "check_type": "execution_eligibility", "scenario": "uninherited", "expected": "NULL", "expected_reason": "UNINHERITED_EXECUTED_STATE", "message": "does not inherit prior executed object — NULL" },
+    { "vector_id": "ELIG-04", "check_type": "execution_eligibility", "scenario": "broken_continuity", "expected": "NULL", "expected_reason": "BROKEN_CONTINUITY", "message": "does not inherit continuity head — NULL" },
+    { "vector_id": "ELIG-05", "check_type": "execution_eligibility", "scenario": "revoked", "expected": "NULL", "expected_reason": "REVOKED_LINEAGE", "message": "prior lineage revoked — NULL" },
+    { "vector_id": "ELIG-06", "check_type": "execution_eligibility", "scenario": "expired", "expected": "NULL", "expected_reason": "EXPIRED_LINEAGE", "message": "prior lineage expired — NULL" },
+    { "vector_id": "ELIG-07", "check_type": "execution_eligibility", "scenario": "replayed", "expected": "NULL", "expected_reason": "REPLAYED_NONCE", "message": "consumed nonce — NULL" },
+    { "vector_id": "ELIG-08", "check_type": "execution_eligibility", "scenario": "unvalidated", "expected": "NULL", "expected_reason": "UNVALIDATED_CURRENT", "message": "no validated object — NULL" },
+    { "vector_id": "ELIG-09", "check_type": "primitive_gate_narrows_only", "message": "gate defaults NULL, creates no authority, narrows only" }
+  ]
+}
