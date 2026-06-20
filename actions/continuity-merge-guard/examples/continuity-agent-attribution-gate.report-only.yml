@@ -7,7 +7,8 @@ name: continuity-agent-attribution-gate (report-only)
 # decision. This file lets you make it on evidence instead of faith. Install it,
 # watch it classify your real agent-lane PRs for a few days, then upgrade to the
 # blocking gate (examples/continuity-agent-attribution-gate.yml) when you're
-# ready. The only change to upgrade is the final step (see UPGRADE note below).
+# ready. Upgrading takes two small changes — rename the job id and swap the
+# final step — both spelled out in the UPGRADE notes below.
 #
 # What it does: on an agent lane (claude/**, codex/**, ...), it computes whether
 # the PR is authoritatively attributed AGENT_AUTHORED and writes VALID / NULL /
