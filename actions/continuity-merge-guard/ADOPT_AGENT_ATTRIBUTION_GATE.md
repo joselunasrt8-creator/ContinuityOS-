@@ -68,7 +68,11 @@ name: continuity-agent-attribution-gate
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # labeled/unlabeled/edited re-run the gate when a maintainer adds the
+    # `agent-authored` label or edits the PR-body attribution block to fix a
+    # blocked PR — otherwise that fix would not be re-evaluated until an
+    # unrelated push.
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
     branches:
       - main
 

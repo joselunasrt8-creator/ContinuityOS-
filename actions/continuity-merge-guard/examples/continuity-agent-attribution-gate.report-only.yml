@@ -20,7 +20,10 @@ name: continuity-agent-attribution-gate (report-only)
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # Include labeled/unlabeled/edited so a maintainer who responds to a NULL by
+    # adding the `agent-authored` label or editing the PR-body attribution block
+    # gets a fresh re-evaluation — those are authoritative inputs to this check.
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
     branches:
       - main
 
