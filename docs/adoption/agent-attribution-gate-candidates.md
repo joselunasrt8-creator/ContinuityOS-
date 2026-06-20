@@ -92,17 +92,24 @@ step-5 retention proof the audit asks for.
 > **Verification pending — Protected `main` column.** The three rows above are
 > scored from live signals (agent-lane PRs, pain issues, repo size/activity) but
 > the rubric's **Protected `main` / required-checks** signal is **not yet
-> verified** for any of them. Before contacting a candidate, confirm it with the
-> probe documented above:
+> verified** for any of them. Before contacting a candidate, run the probe script
+> that implements the full `owner/repo → protection → required checks → fit →
+> OUTREACH | HOLD` flow:
 >
 > ```bash
-> gh api "repos/<owner>/<repo>/branches/main/protection/required_status_checks" \
->   --jq '.contexts' 2>/dev/null || echo "no required checks (or no access)"
+> # one or more repos
+> ./verify-candidate.sh s243a/UnifyWeaver cacheplane/angular-agent-framework
+> # or drive it off this table
+> ./verify-candidate.sh --from-table
 > ```
 >
+> See [`verify-candidate.sh`](./verify-candidate.sh) (read-only; needs `gh` + `jq`).
 > A repo with **no** required checks is still a valid target — the gate becomes
-> its *first* required check. A repo that already enforces required checks scores
-> the full +2. Record the result in the row and only then finalize the score.
+> its *first* required check (`+1`). A repo that already enforces required checks
+> scores the full `+2`. If you lack admin on the target you'll get
+> `NO_ACCESS → HOLD` — that's expected for an unaffiliated repo and means the
+> protected-`main` question gets raised in the outreach itself. Record the result
+> in the row and only then finalize the score.
 
 - **Contacted** — repo-level (open an issue/discussion) is preferred over personal
   email; keep it public and low-pressure.
