@@ -85,7 +85,24 @@ step-5 retention proof the audit asks for.
 | Candidate (owner/repo) | Score /10 | Pain | Contacted (date / channel) | Installed? | Blocked agent PR | Passed agent PR | Retention answer (1 sentence) |
 |---|---|---|---|---|---|---|---|
 | _example/your-repo_ | 8 | issue #123 | 2026-06-20 / issue | yes | #45 | #46 | "yes — without it we'd merge unlabeled agent PRs blind" |
-|  |  |  |  |  |  |  |  |
+| s243a/UnifyWeaver | 8 | open agent PR titled "own-PR workflow on main" — maintainer is hand-rolling agent-lane-on-`main` governance | — | — | — | — | — |
+| cacheplane/angular-agent-framework | 7 | builds an agent SDK; carries an external `claude/*` PR (author ≠ owner) | — | — | — | — | — |
+| casscoulston/thriving-teams | 7 | open issue "README AI statement — model attribution for Copilot" | — | — | — | — | — |
+
+> **Verification pending — Protected `main` column.** The three rows above are
+> scored from live signals (agent-lane PRs, pain issues, repo size/activity) but
+> the rubric's **Protected `main` / required-checks** signal is **not yet
+> verified** for any of them. Before contacting a candidate, confirm it with the
+> probe documented above:
+>
+> ```bash
+> gh api "repos/<owner>/<repo>/branches/main/protection/required_status_checks" \
+>   --jq '.contexts' 2>/dev/null || echo "no required checks (or no access)"
+> ```
+>
+> A repo with **no** required checks is still a valid target — the gate becomes
+> its *first* required check. A repo that already enforces required checks scores
+> the full +2. Record the result in the row and only then finalize the score.
 
 - **Contacted** — repo-level (open an issue/discussion) is preferred over personal
   email; keep it public and low-pressure.
