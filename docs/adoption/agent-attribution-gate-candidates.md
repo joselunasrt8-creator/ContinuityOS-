@@ -82,23 +82,50 @@ One row per candidate. Fill the score columns from the rubric; fill the evidence
 columns as outreach progresses. The three evidence columns are exactly the
 step-5 retention proof the audit asks for.
 
-| Candidate (owner/repo) | Score /10 | Pain | Contacted (date / channel) | Installed? | Blocked agent PR | Passed agent PR | Retention answer (1 sentence) |
+Rows below were verified on **2026-06-20** via read-only GitHub search (agent-lane
+PR volume, author association, explicit pain issues/PRs, repo size). The
+`Contacted / Installed / Blocked / Passed / Retention` columns are **deliberately
+empty** — they are human-outreach outcomes and are not filled until a real
+maintainer responds. Do not fabricate them.
+
+**Primary (qualified — contact these first):**
+
+| Candidate (owner/repo) | Score /10 | Pain (verified signal) | Contacted | Installed? | Blocked agent PR | Passed agent PR | Retention answer |
 |---|---|---|---|---|---|---|---|
 | _example/your-repo_ | 8 | issue #123 | 2026-06-20 / issue | yes | #45 | #46 | "yes — without it we'd merge unlabeled agent PRs blind" |
-| s243a/UnifyWeaver | 8 | open agent PR titled "own-PR workflow on main" — maintainer is hand-rolling agent-lane-on-`main` governance | — | — | — | — | — |
-| cacheplane/angular-agent-framework | 7 | builds an agent SDK; carries an external `claude/*` PR (author ≠ owner) | — | — | — | — | — |
-| casscoulston/thriving-teams | 7 | open issue "README AI statement — model attribution for Copilot" | — | — | — | — | — |
+| casscoulston/thriving-teams | 8 | **Strongest felt-pain.** Issue #12 "AI statement"; PR [#16](https://github.com/casscoulston/thriving-teams/pull/16) reworks AI-authorship disclosure to Nature/ICMJE/COPE wording and *removes a wrong model attribution*. Receives Claude **and** Copilot PRs from an **external collaborator** (`ricardotwumasi`, not the owner). Native GH Actions CI (`r-lint.yml`). 1★, solo academic owner → move-fast. | — | — | — | — | — |
+| s243a/UnifyWeaver | 8 | **Best mechanism-fit.** ~3,280 PRs, pervasive `claude/*` agent lanes; solo maintainer hand-rolling agent-lane-on-`main` governance ("own-PR workflow on main"). 5★ → move-fast. | — | — | — | — | — |
+| cacheplane/angular-agent-framework | 6 | ~720 PRs all "Generated with Claude Code", but **single-maintainer self-authored** (`blove`) → lower *external*-attribution pain. 99★ established Angular agent SDK → move-fast = mid. | — | — | — | — | — |
 
-> **Verification pending — Protected `main` column.** The three rows above are
-> scored from live signals (agent-lane PRs, pain issues, repo size/activity) but
-> the rubric's **Protected `main` / required-checks** signal is **not yet
-> verified** for any of them. Before contacting a candidate, run the probe script
-> that implements the full `owner/repo → protection → required checks → fit →
-> OUTREACH | HOLD` flow:
+**Secondary (discovered 2026-06-20; only agent-PR signal confirmed — qualify before contacting):**
+
+| Candidate (owner/repo) | Score /10 | Pain (verified signal) | Contacted | Installed? | Blocked agent PR | Passed agent PR | Retention answer |
+|---|---|---|---|---|---|---|---|
+| tallyfy/documentation | ~5 (unqualified) | Receives **external** CONTRIBUTOR Claude-Code PRs (`amitkoth`, PR #94). Company/org → move-fast + pain unverified. | — | — | — | — | — |
+| legioncodeinc/honeycomb | ~5 (unqualified) | **External** CONTRIBUTOR Claude-Code agent PRs (PR #31). Org; size / protection / explicit pain unverified. | — | — | — | — | — |
+
+> **Discovery finding (2026-06-20).** Agent-authored PRs are now ubiquitous —
+> ~163,700 open PRs carry "Generated with Claude Code" — but the **overwhelming
+> majority are owner self-authored**. The gate's specific pain (forcing *external /
+> agent* PRs to declare authorship before merge) is concentrated in the rarer
+> repos already wrestling with attribution. That is why the verified primaries
+> above (especially `thriving-teams`, the clearest attribution-pain case, and
+> `UnifyWeaver`, the clearest mechanism-fit) outrank generic high-volume agent
+> repos. Keyword discovery for "AI attribution" issues returned mostly digest/spam
+> noise plus large policy-heavy repos (e.g. `stdlib-js/stdlib` #9347) that the
+> disqualifiers exclude.
+
+> **Verification still pending — Protected `main` column.** The `Protected main /
+> required-checks` rubric signal is **not yet verified** for any row: this
+> session's GitHub access is scoped to the ContinuityOS repos, so direct
+> branch-protection reads on candidate repos returned `NO_ACCESS` (and the public
+> API was egress-blocked). Per the rubric this is expected and **outreach
+> proceeds** — the draft's protected-branch question verifies in-thread. To verify
+> independently before contact, run the probe script:
 >
 > ```bash
 > # one or more repos
-> ./verify-candidate.sh s243a/UnifyWeaver cacheplane/angular-agent-framework
+> ./verify-candidate.sh casscoulston/thriving-teams s243a/UnifyWeaver
 > # or drive it off this table
 > ./verify-candidate.sh --from-table
 > ```
