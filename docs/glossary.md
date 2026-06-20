@@ -10,6 +10,30 @@ It does not create authority, validate objects, execute actions, generate proof,
 
 ---
 
+## Brand Hierarchy
+
+These entries are definitional brand terms, not operative objects. They name the
+three layers of the ecosystem and carry no authority or execution semantics.
+
+### Continufy
+Company / parent brand. The owning entity above the research and product layers.
+Introduced additively by the 2026-06-20 branding audit; does not rename or replace
+MindShift or ContinuityOS.
+
+### MindShift
+Research & cognition canon. The research umbrella from which the runtime is
+derived. Also the canonical schema namespace (`https://mindshift.local/...`) and
+governance vocabulary. Not repository identity.
+
+### ContinuityOS
+Trusted action platform / product. The runtime substrate that operationalizes the
+MindShift canon and governs whether state-changing actions are permitted to exist
+before execution.
+
+Canonical attribution: **ContinuityOS is a Continufy product, built on MindShift research.**
+
+---
+
 ## Core Terms
 
 ### Authority

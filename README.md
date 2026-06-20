@@ -299,6 +299,17 @@ MindShift remains the canon and research umbrella; ContinuityOS is the runtime
 substrate. ContinuityOS governs whether state-changing actions are permitted to
 exist before execution occurs.
 
+Brand hierarchy:
+
+```text
+Continufy     → Company / parent brand
+MindShift     → Research & cognition canon
+ContinuityOS  → Trusted action platform / product
+```
+
+**ContinuityOS is a Continufy product, built on MindShift research.** Continufy is
+the company; MindShift is the research canon; ContinuityOS is the product runtime.
+
 Execution gate:
 
 ```text

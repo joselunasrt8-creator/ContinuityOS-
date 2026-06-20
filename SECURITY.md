@@ -16,6 +16,7 @@ ContinuityOS is evolving rapidly and security support applies only to actively m
 
 ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
 
+Continufy is the company / parent brand.
 MindShift remains the canon and research umbrella.
 ContinuityOS is the runtime substrate.
 
