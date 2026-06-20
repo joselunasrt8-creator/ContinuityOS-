@@ -20,11 +20,16 @@
 #
 # Requires: gh (authenticated with repo scope) and jq.
 #
-# Note on access: reading branch protection requires admin on the target repo.
-# For an unaffiliated candidate you will usually NOT have admin, so the honest
-# outcome is "NO_ACCESS -> HOLD (confirm with the maintainer)". That is expected
-# and is itself useful signal — it tells you the protected-main question has to be
-# asked in the outreach rather than verified beforehand.
+# Note on access: reading classic branch protection requires admin on the target
+# repo. For an unaffiliated candidate you will usually NOT have admin, so the
+# honest outcome is "NO_ACCESS -> ASK_IN_OUTREACH": proceed with the draft and
+# raise the protected-branch question in-thread. The probe also checks repository
+# rulesets (repos/<repo>/rules/branches/<branch>), which can enforce required
+# checks even when classic protection is absent — so a 404 from the classic
+# endpoint is never treated as "unprotected" on its own.
+#
+# column(1) is optional: if it is not installed the rows are printed tab-separated
+# instead, so the script never exits without a verdict.
 
 set -uo pipefail
 
@@ -56,12 +61,12 @@ fi
 
 # ---- probe ------------------------------------------------------------------
 # States map to the candidates.md rubric "Protected main" signal:
-#   PROTECTED_REQUIRED  -> +2   required checks already enforced
-#   PROTECTED_NO_REQUIRED -> +1 branch rules, no required checks (gate = first)
-#   UNPROTECTED         ->  0   no protection; needs protected main first
-#   NO_ACCESS / ERROR   ->  ?   cannot verify from here -> ask the maintainer
+#   PROTECTED_REQUIRED / RULESET_REQUIRED   -> +2  required checks already enforced
+#   PROTECTED_NO_REQUIRED / RULESET_PROTECTED -> +1 protected, gate = first/added check
+#   UNPROTECTED        ->  0   no classic protection AND no ruleset; needs one first
+#   NO_ACCESS / UNKNOWN -> ?   cannot verify -> proceed, ask the maintainer in-thread
 verdict_for() {
-  local repo="$1" out rc checks n
+  local repo="$1" out rc checks n rules rrc
 
   if ! gh api "repos/$repo" >/dev/null 2>&1; then
     printf '%s\t%s\t%s\n' "$repo" "UNREACHABLE" "HOLD — repo not found or no access"
@@ -69,34 +74,50 @@ verdict_for() {
   fi
 
   out="$(gh api "repos/$repo/branches/$BRANCH/protection" 2>&1)"; rc=$?
-  if [[ $rc -ne 0 ]]; then
-    if grep -qiE 'administ|must be an admin|403' <<<"$out"; then
-      printf '%s\t%s\t%s\n' "$repo" "NO_ACCESS(?)" \
-        "HOLD — need admin to read protection; ask the maintainer in outreach"
-    elif grep -qiE 'not protected|Not Found|404' <<<"$out"; then
-      printf '%s\t%s\t%s\n' "$repo" "UNPROTECTED(0)" \
-        "HOLD — no protection on '$BRANCH'; gate needs a protected branch first (heavier ask)"
+  if [[ $rc -eq 0 ]]; then
+    # classic branch protection exists — are required status checks configured?
+    checks="$(gh api "repos/$repo/branches/$BRANCH/protection/required_status_checks" 2>/dev/null)"
+    n="$(jq -r '.contexts // [] | length' <<<"${checks:-}" 2>/dev/null || echo 0)"
+    if [[ "${n:-0}" -gt 0 ]]; then
+      printf '%s\t%s\t%s\n' "$repo" "PROTECTED_REQUIRED+$n(+2)" \
+        "OUTREACH — strong: '$BRANCH' already enforces $n required check(s); gate slots in"
     else
-      printf '%s\t%s\t%s\n' "$repo" "ERROR(?)" "HOLD — $(head -n1 <<<"$out" | cut -c1-60)"
+      printf '%s\t%s\t%s\n' "$repo" "PROTECTED_NO_REQUIRED(+1)" \
+        "OUTREACH — gate becomes the first required check on '$BRANCH'"
     fi
     return
   fi
 
-  # protected — are there required status checks?
-  checks="$(gh api "repos/$repo/branches/$BRANCH/protection/required_status_checks" 2>/dev/null)"
-  if [[ -z "$checks" ]]; then
-    printf '%s\t%s\t%s\n' "$repo" "PROTECTED_NO_REQUIRED(+1)" \
-      "OUTREACH — clean story: attribution gate becomes the FIRST required check"
+  # classic protection unreadable due to permissions -> proceed, ask in-thread
+  if grep -qiE 'administ|must be an admin|403' <<<"$out"; then
+    printf '%s\t%s\t%s\n' "$repo" "NO_ACCESS(?)" \
+      "ASK_IN_OUTREACH — no admin to read protection; raise the protected-'$BRANCH' question in the draft"
     return
   fi
-  n="$(jq -r '.contexts // [] | length' <<<"$checks" 2>/dev/null || echo 0)"
-  if [[ "${n:-0}" -gt 0 ]]; then
-    printf '%s\t%s\t%s\n' "$repo" "PROTECTED_REQUIRED+$n(+2)" \
-      "OUTREACH — strong: '$BRANCH' already enforces $n required check(s); gate slots in"
-  else
-    printf '%s\t%s\t%s\n' "$repo" "PROTECTED_NO_REQUIRED(+1)" \
-      "OUTREACH — gate becomes the first required check on '$BRANCH'"
+
+  # classic protection absent -> a repository ruleset may still govern this branch
+  if grep -qiE 'not protected|Not Found|404' <<<"$out"; then
+    rules="$(gh api "repos/$repo/rules/branches/$BRANCH" 2>/dev/null)"; rrc=$?
+    if [[ $rrc -eq 0 && -n "$rules" ]]; then
+      if jq -e 'any(.[]?; .type == "required_status_checks")' <<<"$rules" >/dev/null 2>&1; then
+        printf '%s\t%s\t%s\n' "$repo" "RULESET_REQUIRED(+2)" \
+          "OUTREACH — strong: a ruleset enforces required checks on '$BRANCH'; gate slots in"
+      elif [[ "$(jq -r 'length' <<<"$rules" 2>/dev/null || echo 0)" -gt 0 ]]; then
+        printf '%s\t%s\t%s\n' "$repo" "RULESET_PROTECTED(+1)" \
+          "OUTREACH — '$BRANCH' is governed by a ruleset; gate can be added as a required check"
+      else
+        printf '%s\t%s\t%s\n' "$repo" "UNPROTECTED(0)" \
+          "HOLD — no classic protection or ruleset on '$BRANCH'; needs branch protection first"
+      fi
+    else
+      # rulesets unreadable too -> don't over-claim "unprotected"
+      printf '%s\t%s\t%s\n' "$repo" "UNKNOWN(?)" \
+        "ASK_IN_OUTREACH — classic protection absent, rulesets unreadable; confirm with the maintainer"
+    fi
+    return
   fi
+
+  printf '%s\t%s\t%s\n' "$repo" "ERROR(?)" "HOLD — $(head -n1 <<<"$out" | cut -c1-60)"
 }
 
 # ---- run + render -----------------------------------------------------------
@@ -104,17 +125,20 @@ printf 'agent-attribution-gate — candidate verification (branch: %s)\n\n' "$BR
 {
   printf 'REPO\tSTATE\tVERDICT\n'
   for repo in "${candidates[@]}"; do verdict_for "$repo"; done
-} | column -t -s $'\t'
+} | if command -v column >/dev/null 2>&1; then column -t -s $'\t'; else cat; fi
 
 cat <<'EOF'
 
 legend:
-  PROTECTED_REQUIRED (+2) -> OUTREACH allowed (strongest fit)
-  PROTECTED_NO_REQUIRED (+1) -> OUTREACH allowed (gate = first required check)
-  UNPROTECTED (0)        -> HOLD (maintainer must enable branch protection first)
-  NO_ACCESS / ERROR (?)  -> HOLD (cannot verify; raise it in the outreach itself)
+  PROTECTED_REQUIRED / RULESET_REQUIRED (+2)     -> OUTREACH (strongest fit)
+  PROTECTED_NO_REQUIRED / RULESET_PROTECTED (+1) -> OUTREACH (gate = first/added required check)
+  NO_ACCESS / UNKNOWN (?)                        -> ASK_IN_OUTREACH (proceed; raise the
+                                                    protected-branch question in the draft)
+  UNPROTECTED (0)                                -> HOLD (needs branch protection or a ruleset first)
+  UNREACHABLE / ERROR                            -> HOLD (cannot proceed)
 
-next: for any OUTREACH row, send the matching draft from
-      agent-attribution-gate-outreach-drafts.md, then record the result back in
-      the candidate table. This script never sends anything.
+next: send the matching draft from agent-attribution-gate-outreach-drafts.md for any
+      OUTREACH or ASK_IN_OUTREACH row — for ASK_IN_OUTREACH the draft's protected-branch
+      question does the verification in-thread — then record the result back in the
+      candidate table. This script never sends anything (no writes, no PRs, no outreach).
 EOF
