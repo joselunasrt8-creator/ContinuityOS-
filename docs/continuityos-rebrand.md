@@ -19,6 +19,27 @@ This aligns project language with external positioning:
 
 The repository now uses ContinuityOS-first naming for runtime surfaces while preserving MindShift references for canon lineage, ontology, and research origin.
 
+## 2.5) Company layer (Continufy)
+
+The ecosystem has three brand layers, not two. The 2026-06-20 branding audit
+([`docs/branding/CONTINUFY_REBRANDING_AUDIT_AND_MIGRATION_PLAN.md`](branding/CONTINUFY_REBRANDING_AUDIT_AND_MIGRATION_PLAN.md))
+adds **Continufy** as the company / parent brand above the existing research and
+product layers:
+
+- **Continufy** — Company / parent brand (the owning entity).
+- **MindShift** — Research & cognition canon (research layer).
+- **ContinuityOS** — Trusted action platform / product (runtime substrate).
+
+Canonical attribution string:
+
+> **ContinuityOS is a Continufy product, built on MindShift research.**
+
+Continufy is introduced **additively**: it does not rename ContinuityOS or
+MindShift, and it does not create or rename any repository. It is, in this pass,
+an attribution and governance layer expressed in documentation prose. Company
+repositories (`continufy`, `continufy-brand`, `continufy-website`) and any
+domain remain deferred behind explicit governance approval.
+
 ## 3) Runtime naming map
 
 Preferred runtime-facing naming:

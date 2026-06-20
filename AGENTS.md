@@ -6,6 +6,8 @@
 
 MindShift is a Cloudflare Worker (with D1 database) implementing an Execution Ontology Infrastructure — a governance framework that enforces legitimacy checks before state-changing execution occurs. The canonical runtime flow is: `/session → /continuity → /authority → /compile → /validate → /execute → /proof`.
 
+> Brand context: **ContinuityOS** is the product runtime described here; **MindShift** is the research canon it derives from; **Continufy** is the company. The deployed Cloudflare Worker/D1 keep the historical `mindshift-demo*` names (see [`IDENTITY_RESIDUE_AUDIT.md`](IDENTITY_RESIDUE_AUDIT.md)) — those are deploy identifiers, not brand surfaces, and are intentionally left unchanged.
+
 ### Running the dev server
 
 1. Ensure `.dev.vars` exists with `API_KEY=<any-non-empty-string>` for local mutation endpoints.
