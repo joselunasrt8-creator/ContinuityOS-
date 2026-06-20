@@ -1,0 +1,115 @@
+name: continuity-agent-attribution-gate (report-only)
+# Day-0 TRIAL of the ContinuityOS attribution gate. Same signal as the
+# enforcing gate, but this check NEVER blocks a merge: it only reports what the
+# enforcing version WOULD do, on your own real PRs, with zero merge risk.
+#
+# Why a trial first: making a check required on a protected branch is a trust
+# decision. This file lets you make it on evidence instead of faith. Install it,
+# watch it classify your real agent-lane PRs for a few days, then upgrade to the
+# blocking gate (examples/continuity-agent-attribution-gate.yml) when you're
+# ready. The only change to upgrade is the final step (see UPGRADE note below).
+#
+# What it does: on an agent lane (claude/**, codex/**, ...), it computes whether
+# the PR is authoritatively attributed AGENT_AUTHORED and writes VALID / NULL /
+# neutral to the job summary. It always exits 0, so it can never block a merge
+# and does NOT need to be a required check during the trial.
+#
+# The signal still comes from the published action (continuity-merge-guard@v0.3.0),
+# which only EMITS the attribution classification. This workflow chooses to read
+# it. That dependency is the point — see ADOPT_AGENT_ATTRIBUTION_GATE.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  agent-attribution-gate-report-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Harvest commit trailers
+        id: trailers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+          TRAILERS="$(git log "${BASE_SHA}..${HEAD_SHA}" --no-merges \
+            --pretty=format:'%(trailers:only=true,unfold=true)' 2>/dev/null \
+            | grep -iE '^(Agent-Authored-By|Agent-Assisted-By)[[:space:]]*:' | sort -u || true)"
+          {
+            echo "value<<TRAILERS_EOF"
+            echo "$TRAILERS"
+            echo "TRAILERS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0
+        id: merge-guard
+        continue-on-error: true
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          actor: ${{ github.event.pull_request.user.login }}
+          pr-author: ${{ github.event.pull_request.user.login }}
+          head-ref: ${{ github.event.pull_request.head.ref }}
+          pr-body: ${{ github.event.pull_request.body }}
+          pr-labels: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          commit-trailers: ${{ steps.trailers.outputs.value }}
+
+      - name: Report what the gate WOULD do (never blocks)
+        # UPGRADE: when you're ready to enforce, delete this step and paste in the
+        # "Enforce AGENT_AUTHORED on the agent lane" step from
+        # examples/continuity-agent-attribution-gate.yml. That is the only change.
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          CLASSIFICATION: ${{ steps.merge-guard.outputs.attribution_classification }}
+          STATUS: ${{ steps.merge-guard.outputs.attribution_status }}
+        run: |
+          set -euo pipefail
+          case "$HEAD_REF" in
+            claude/*|codex/*|cursor/*|devin/*|copilot/*) AGENT_LANE=true ;;
+            *) AGENT_LANE=false ;;
+          esac
+
+          if [ "$AGENT_LANE" != "true" ]; then
+            VERDICT="NEUTRAL"
+            DETAIL="Non-agent lane — the enforcing gate would pass neutrally (human PRs are never blocked)."
+          elif [ "$CLASSIFICATION" = "AGENT_AUTHORED" ]; then
+            VERDICT="VALID"
+            DETAIL="Agent-lane PR is authoritatively attributed AGENT_AUTHORED — the enforcing gate would PASS."
+          else
+            VERDICT="NULL"
+            DETAIL="Agent-lane PR is not authoritatively attributed AGENT_AUTHORED (got: ${CLASSIFICATION:-<none>}) — the enforcing gate WOULD BLOCK this merge. Add an 'Agent-Authored-By:' commit trailer, an 'agent-authored' PR label, or a PR-body attribution block."
+          fi
+
+          {
+            echo "### ContinuityOS attribution gate — report-only (trial)"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| head_ref | \`${HEAD_REF}\` |"
+            echo "| agent_lane | ${AGENT_LANE} |"
+            echo "| attribution_classification | ${CLASSIFICATION:-<none>} |"
+            echo "| attribution_status | ${STATUS:-<none>} |"
+            echo "| would_be_verdict | **${VERDICT}** |"
+            echo ""
+            echo "${DETAIL}"
+            echo ""
+            echo "_This check is non-blocking. It reports what the enforcing gate would do. When the verdicts look right on your real PRs, upgrade to \`continuity-agent-attribution-gate.yml\` and make it a required check._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "would_be_verdict=${VERDICT}"
+          echo "${DETAIL}"
+          # Always succeed — a trial can never block a merge.
+          exit 0
