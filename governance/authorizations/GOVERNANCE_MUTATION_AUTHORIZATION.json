@@ -1,30 +1,28 @@
 {
-  "gma_id": "GMA-claude/continuityos-workflow-topology-1rcgfa-27625285484",
-  "decision_id": "4ca6278791b17150475ab13f050b6797e41c57ca881869ecd71b3bb79940f584",
-  "continuity_id": "376026f5e7e4d1d7c013efb2607665b9bf801cb558913ad35519bcbafbd0f6b5",
-  "session_id": "9d00c8fe772e96846976a1a0bb1911bd717605f6e5afce841616b01cd3214b28",
-  "validated_object_hash": "c58d880398e576d1aa873a746a3c1cf8e18e36a15be1e928906aa88c58f245d5",
-  "governed_files_hash": "bd1fccfb4731a060033bb6adfc9f4547fd9523083468bea3c80b81829e089b14",
+  "gma_id": "GMA-claude/merge-proof-lineage-observer-27892510586",
+  "decision_id": "94c217842f5f1a4f8068c59668502e117f77e819b4a76551003c4afcd5420079",
+  "continuity_id": "da1e07e4d6fddb6985d89a975a7f323099c0f852cc5b05c39c096d4bae1342e4",
+  "session_id": "435c6fce54df4197b217657ed1af5b8892266d9c6d0aad92ff91b085fadcd2af",
+  "validated_object_hash": "954c3697f6ef69759a63130299c6ecbd5d39ba49a08d159af8f3ffb936698bf7",
+  "governed_files_hash": "be9edf823fea0c433e4b0434fcfdc89509d317092ef4e5497514d15e98f97cbe",
   "governed_files": [
-    ".github/workflows/continuity-merge-guard.yml",
-    "governance/merge-legitimacy/AGENT_ATTRIBUTION_POLICY.json"
+    ".github/workflows/lineage-eligibility-observer.yml"
   ],
   "mutation_classes": [
-    "governance_mutation",
     "workflow_mutation"
   ],
   "gm_control_class": "GOVERNANCE_CONTAINED",
   "issuance_method": "LOCAL_DETERMINISTIC",
   "canonical_lifecycle_executed": false,
   "canonical_lifecycle_note": "V1 local-deterministic model. External runtime lifecycle (/session → /continuity → /authority → /compile) is SEQUENCED for post-V1. governed_files_hash provides repo-verifiable content binding. Owner workflow_dispatch provides explicit authorization.",
-  "intent": "Harvest Agent-Authored-By/Agent-Assisted-By commit trailers into Merge Guard attribution (continuity-merge-guard.yml) and mark commit-trailer harvesting implemented in AGENT_ATTRIBUTION_POLICY.json. Conservative key set, harvest-only; non-blocking; canonical_hash unchanged. ",
+  "intent": "Authorize read-only execution-lineage CI observer workflow (lineage-eligibility-observer.yml)",
   "authorized_by": "joselunasrt8-creator",
   "authority_lineage_bound": true,
   "repo": "joselunasrt8-creator/ContinuityOS-",
-  "branch": "claude/continuityos-workflow-topology-1rcgfa",
-  "head_sha": "57a0676e841de7811c279ded2a905dff01d4b708",
-  "workflow_run_id": "27625285484",
-  "created_at": "2026-06-16T14:35:07Z",
-  "expires_at": "2027-06-16T14:35:07Z",
+  "branch": "claude/merge-proof-lineage-observer",
+  "head_sha": "4efe360b7080447f8beff8e741c7ffafb13e331a",
+  "workflow_run_id": "27892510586",
+  "created_at": "2026-06-21T03:41:56Z",
+  "expires_at": "2027-06-21T03:41:56Z",
   "status": "GMA_VALID"
 }

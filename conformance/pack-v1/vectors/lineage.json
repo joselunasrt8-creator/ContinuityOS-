@@ -1,0 +1,15 @@
+{
+  "suite_id": "LINEAGE",
+  "non_operative": true,
+  "observability_only": true,
+  "runtime_mutation_capable": false,
+  "description": "Execution-lineage substrate: an append-only, tamper-evident hash chain that orders execution-eligibility carries. Fail-closed on fork, gap, duplicate, or tamper.",
+  "vectors": [
+    { "vector_id": "LINEAGE-01", "check_type": "proof_lineage_inheritance", "scenario": "valid_chain", "expected": "VALID", "message": "valid chain: each link inherits the prior head — VALID" },
+    { "vector_id": "LINEAGE-02", "check_type": "proof_lineage_inheritance", "scenario": "forked_parent", "expected": "NULL", "expected_reason": "PARENT_MISMATCH", "message": "forked parent ≠ head — NULL" },
+    { "vector_id": "LINEAGE-03", "check_type": "proof_lineage_inheritance", "scenario": "sequence_gap", "expected": "NULL", "expected_reason": "SEQUENCE_GAP", "message": "sequence skips head+1 — NULL" },
+    { "vector_id": "LINEAGE-04", "check_type": "proof_lineage_inheritance", "scenario": "duplicate_link", "expected": "NULL", "expected_reason": "DUPLICATE_LINK_HASH", "message": "duplicate link replayed — NULL" },
+    { "vector_id": "LINEAGE-05", "check_type": "proof_lineage_inheritance", "scenario": "mutated_prior", "expected": "NULL", "expected_reason": "MUTATED_PRIOR_LINK", "message": "tampered prior link — NULL" },
+    { "vector_id": "LINEAGE-06", "check_type": "proof_lineage_inheritance", "scenario": "tampered_revocation", "expected": "NULL", "expected_reason": "MUTATED_PRIOR_LINK", "message": "tampered hash-bound revocation field (status/revoked_at) — NULL" }
+  ]
+}

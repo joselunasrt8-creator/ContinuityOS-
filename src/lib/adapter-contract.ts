@@ -24,6 +24,7 @@
 //   - Return partial proof on failure (any failure condition → NULL)
 
 import { canonicalize, sha256Hex } from '../canonical.js'
+import { classifyExecutionEligibility } from '../../runtime/lineage/executionEligibility.mjs'
 
 // ── Adapter-Targeted AEO ───────────────────────────────────────────────────────
 // Structural minimum any AEO must satisfy to be routed to an adapter.
@@ -87,6 +88,33 @@ export type AdapterProofReceipt = {
   readonly execution_result: "EXECUTED"      // only emitted when execution fully succeeded
   readonly creates_authority: false          // structural invariant — never configurable
   readonly emitted_at: string
+  // Continuity binding — present only when the AEO declared a lineage. Because these
+  // fields enter the receipt body, receipt_id (a hash of the body) BINDS the lineage
+  // head the run inherited. Proof binds lineage; it never creates authority.
+  readonly continuity_id?: string
+  readonly parent_continuity_id?: string
+  readonly parent_executed_object_hash?: string
+  readonly lineage_eligibility?: "ELIGIBLE"
+}
+
+// The prior run's terminal state on a lineage (the chain head the gate inherits).
+export type EligibilityCarry = {
+  readonly continuity_id: string
+  readonly parent_continuity_id?: string
+  readonly validated_object_hash: string
+  readonly executed_object_hash: string
+  readonly proof_hash?: string
+  readonly status?: string
+  readonly expires_at?: string
+  readonly revoked_at?: string
+}
+
+// Continuity context supplied by the caller (read from the registry) so the boundary
+// stays pure: it consults this context, it does not perform I/O.
+export type ContinuityGateContext = {
+  readonly prior: EligibilityCarry | null
+  readonly consumed_nonces?: readonly string[]
+  readonly now?: string
 }
 
 // ── Null Result ────────────────────────────────────────────────────────────────
@@ -105,11 +133,17 @@ export type AdapterNullReason =
   | "EVIDENCE_MISSING_EXECUTED_AT"    // evidence.executed_at was blank or missing
   | "EVIDENCE_SURFACE_MISMATCH"       // evidence.adapter_surface ≠ AEO.target.system
   | "EVIDENCE_ADAPTER_SPECIFIC_NULL"  // evidence.adapter_specific was null or not a plain record
+  | "NULL_CONTINUITY_CONTEXT"         // AEO declared a lineage but no continuity context was supplied
+  | "EXECUTION_NOT_ELIGIBLE"          // continuity gate returned NULL — run does not inherit the lineage head
+  | "STORED_CHAIN_INVALID"            // persisted lineage chain is tampered/malformed — refuse to execute on it
 
 export type AdapterNullResult = {
   readonly execution_result: "NULL"
   readonly null_reason: AdapterNullReason
   readonly creates_authority: false
+  // Present for EXECUTION_NOT_ELIGIBLE (gate reasons) or STORED_CHAIN_INVALID
+  // (chain-verification reasons) — the fail-closed detail, for diagnosis.
+  readonly lineage_null_reasons?: readonly string[]
 }
 
 export type AdapterExecutionOutcome =
@@ -198,13 +232,18 @@ export function executeWithAdapter(
   validated_object_hash: string | null | undefined,
   executor: AdapterContract | null | undefined,
   emitted_at: string | null | undefined,
+  continuity?: ContinuityGateContext | null,
 ): AdapterExecutionOutcome {
-  const nullResult = (reason: AdapterNullReason): AdapterExecutionOutcome => ({
+  const nullResult = (
+    reason: AdapterNullReason,
+    lineage_null_reasons?: readonly string[],
+  ): AdapterExecutionOutcome => ({
     ok: false,
     null_result: Object.freeze({
       execution_result: "NULL" as const,
       null_reason: reason,
       creates_authority: false as const,
+      ...(lineage_null_reasons ? { lineage_null_reasons: Object.freeze([...lineage_null_reasons]) } : {}),
     }),
   })
 
@@ -223,6 +262,46 @@ export function executeWithAdapter(
   // The executor is NOT called if the hash does not match.
   const recomputed = computeAdapterAEOHash(aeo)
   if (recomputed !== validated_object_hash) return nullResult("OBJECT_HASH_MISMATCH")
+
+  // ── Execution-eligibility continuity gate (runtime law) ──────────────────────
+  // When the AEO declares continuity (validation.lineage_key), execution is admitted
+  // ONLY IF this run inherits the prior run's executed object on the lineage. The
+  // gate narrows only: it can withhold execution (executor never called), never
+  // create authority. Standalone AEOs (no lineage_key) are unaffected.
+  let lineageBinding: {
+    continuity_id: string
+    parent_continuity_id: string
+    parent_executed_object_hash: string
+    lineage_eligibility: "ELIGIBLE"
+  } | null = null
+  const lineageKey = isNonBlankString(aeo.validation.lineage_key)
+    ? (aeo.validation.lineage_key as string).trim()
+    : ""
+  if (lineageKey) {
+    if (!continuity) return nullResult("NULL_CONTINUITY_CONTEXT")
+    const current = {
+      lineage_key: lineageKey,
+      continuity_id: aeo.validation.continuity_id,
+      parent_continuity_id: aeo.validation.parent_continuity_id,
+      parent_executed_object_hash: aeo.validation.parent_executed_object_hash,
+      validated_object_hash,
+      nonce: aeo.validation.replay_nonce,
+    }
+    const decision = classifyExecutionEligibility(continuity.prior ?? null, current, {
+      now: continuity.now,
+      consumed_nonces: continuity.consumed_nonces ? [...continuity.consumed_nonces] : [],
+    })
+    if (decision.eligibility !== "ELIGIBLE") {
+      // Fail-closed: executor is NEVER called when the run does not inherit the head.
+      return nullResult("EXECUTION_NOT_ELIGIBLE", decision.null_reasons)
+    }
+    lineageBinding = {
+      continuity_id: String(aeo.validation.continuity_id ?? ""),
+      parent_continuity_id: String(aeo.validation.parent_continuity_id ?? ""),
+      parent_executed_object_hash: String(aeo.validation.parent_executed_object_hash ?? ""),
+      lineage_eligibility: "ELIGIBLE",
+    }
+  }
 
   // Delegate to adapter — pass exact AEO and read-only context, nothing more.
   const evidence = executor.execute(aeo, {
@@ -249,6 +328,8 @@ export function executeWithAdapter(
     execution_result: "EXECUTED" as const,
     creates_authority: false as const,
     emitted_at,
+    // Bind the inherited lineage head into the proof (only when continuity was declared).
+    ...(lineageBinding ?? {}),
   }
   const receipt_id = "sha256:" + sha256Hex(canonicalize(receiptBody))
   const receipt: AdapterProofReceipt = Object.freeze({ receipt_id, ...receiptBody })
