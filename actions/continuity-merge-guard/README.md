@@ -116,6 +116,8 @@ Example `MERGE_GUARD_PROOF.json`:
 }
 ```
 
+For outside-owner adoption evidence, use the [External Dependency Proof Checklist](EXTERNAL_DEPENDENCY_PROOF_CHECKLIST.md).
+
 ## Install (2 minutes)
 
 Add a workflow to the consuming repo:
