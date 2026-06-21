@@ -28,7 +28,11 @@ const ENTRY_TYPES = new Set(['execution_lineage_entry', 'proof_entry'])
 const REQUIRED_LINK_FIELDS = ['lineage_key', 'sequence_number', 'parent_link_hash', 'link_hash']
 
 // Registry-level fail-closed reasons (distinct from substrate NULL_REASONS).
-export const REGISTRY_NULL_REASONS = Object.freeze(['MALFORMED_REGISTRY_LINE', 'STORED_CHAIN_INVALID'])
+export const REGISTRY_NULL_REASONS = Object.freeze([
+  'MALFORMED_REGISTRY_LINE',
+  'STORED_CHAIN_INVALID',
+  'MISSING_LINEAGE_KEY',
+])
 
 // A line that is not parseable, or is chain-shaped but missing link identity, is
 // CORRUPTION/TAMPER — never silently skipped (that would hide a dropped link).
@@ -205,6 +209,20 @@ export function verifyRegistryChain(registryPath, lineageKey) {
 // fail-closed (nothing is appended on top of a broken chain).
 export function admitRun(registryPath, current, options = {}) {
   const lineageKey = str(current.lineage_key)
+
+  // A lineage entry's chain identity IS its lineage_key. A blank key would write a
+  // record that this strict reader then rejects as `missing lineage_key`, self-
+  // poisoning the registry into MALFORMED_REGISTRY_LINE on the next verify. Reject
+  // before appending (fail-closed; no lock needed to refuse bad input).
+  if (!lineageKey) {
+    return {
+      eligibility: 'NULL',
+      null_reasons: ['MISSING_LINEAGE_KEY'],
+      creates_authority: false,
+      widens_eligibility: false,
+      appended: false,
+    }
+  }
 
   return withRegistryLock(registryPath, () => {
     const chain = verifyRegistryChain(registryPath, lineageKey)

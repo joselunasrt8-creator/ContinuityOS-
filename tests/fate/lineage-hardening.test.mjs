@@ -242,6 +242,24 @@ test('proof-registry: a proof_entry log without link_hash verifies VALID (record
   assert.equal(readEntries(registry, undefined).length, 0) // no lineage links present
 })
 
+test('admitRun: a blank lineage_key is rejected before append (no self-poisoning)', () => {
+  const registry = freshRegistry()
+  // A genesis-eligible run, but with a blank lineage_key — must be refused, not
+  // written as a record the strict reader would later flag MALFORMED.
+  const res = admitRun(registry, {
+    lineage_key: '', continuity_id: 'c0', parent_continuity_id: '',
+    parent_executed_object_hash: GENESIS_EXECUTION_STATE.executed_object_hash,
+    validated_object_hash: 'obj0', executed_object_hash: 'obj0', nonce: 'n0',
+  }, { now: NOW })
+
+  assert.equal(res.appended, false)
+  assert.equal(res.eligibility, 'NULL')
+  assert.equal(res.null_reasons.includes('MISSING_LINEAGE_KEY'), true)
+  // The registry is not poisoned: it still verifies and the strict reader is happy.
+  assert.equal(verifyRegistryChain(registry, '').result, 'VALID')
+  assert.doesNotThrow(() => readEntries(registry))
+})
+
 // ── P1.4 — per-registry advisory lock (race protection) ──────────────────────────
 
 test('lock: withRegistryLock is reentrant within a process and releases cleanly', () => {
