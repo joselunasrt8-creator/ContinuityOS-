@@ -20,6 +20,7 @@ Enforcement proof (same-owner) ................. COMPLETE
 Adoption proof (independent) ................... OPEN  (0 outside installs)
 Dependency proof (same-owner) .................. COMPLETE
 Dependency proof (independent / outside-owner) . OPEN  ← the only open metric
+Non-substitutable dependency primitive ......... ABSENT (current model)
 ```
 
 Matches the cooldown board ([#2173](https://github.com/joselunasrt8-creator/ContinuityOS-/issues/2173)):
@@ -28,6 +29,22 @@ Matches the cooldown board ([#2173](https://github.com/joselunasrt8-creator/Cont
 **Bottleneck:** distribution / trust-boundary, **not** engineering. The wedge and
 its install kit are built and proven same-owner; the only missing evidence is one
 unaffiliated maintainer answering *"my merge path is worse without it."*
+
+**Primitive finding (evidence, not speculation).** The Primitive Gate research
+([#2184](https://github.com/joselunasrt8-creator/ContinuityOS-/issues/2184),
+[`PRIMITIVE_GATE_EVALUATION.md`](PRIMITIVE_GATE_EVALUATION.md), merged) returned
+`NO_QUALIFYING_PRIMITIVE_EXISTS_UNDER_CURRENT_CONTINUITYOS_MODEL`:
+
+```text
+Continuity primitive ... ✓ proven
+Dependency primitive ... ✗ absent under the current model
+```
+
+This **confirms** the bottleneck rather than relocating it: ContinuityOS has no
+continuity guarantee a foreign consumer cannot reproduce, so the path to
+independent dependency is adoption across a real trust boundary — not another
+architecture-research question. Independent (outside-owner) dependency remains
+the unresolved scarce resource.
 
 ---
 
