@@ -45,6 +45,7 @@ export const GENESIS_EXECUTION_STATE = Object.freeze({
 
 export const ELIGIBILITY_NULL_REASONS = Object.freeze([
   'UNVALIDATED_CURRENT',
+  'CURRENT_INVARIANT_BROKEN',
   'PRIOR_INVARIANT_BROKEN',
   'UNINHERITED_EXECUTED_STATE',
   'BROKEN_CONTINUITY',
@@ -96,6 +97,14 @@ export function classifyExecutionEligibility(prior, current, options = {}) {
   // No valid object -> nothing happens.
   if (!str(cur.validated_object_hash)) null_reasons.push('UNVALIDATED_CURRENT')
 
+  // The CURRENT run must itself hold validated == executed. The carry that this
+  // run will persist becomes the next run's inheritance base, so an asserted
+  // executed object that diverges from the validated object would seed a broken
+  // base. Enforced (not assumed) whenever the run asserts an executed object.
+  if (str(cur.executed_object_hash) && str(cur.executed_object_hash) !== str(cur.validated_object_hash)) {
+    null_reasons.push('CURRENT_INVARIANT_BROKEN')
+  }
+
   // The prior run must itself have held validated == executed, or its state is
   // not a legitimate base to inherit.
   if (str(priorState.validated_object_hash) !== str(priorState.executed_object_hash)) {
@@ -141,8 +150,11 @@ export function eligibilityCarry(current) {
     continuity_id: str(cur.continuity_id),
     parent_continuity_id: str(cur.parent_continuity_id),
     validated_object_hash: str(cur.validated_object_hash),
-    // validated == executed (the invariant the run must have held to be here)
-    executed_object_hash: str(cur.executed_object_hash ?? cur.validated_object_hash),
+    // validated == executed (the invariant the run must have held to be here). A
+    // BLANK executed hash is coerced to the validated hash (|| not ??) so a carry
+    // with validated != executed can never be persisted as the next run's base — a
+    // non-blank divergent executed is rejected earlier by CURRENT_INVARIANT_BROKEN.
+    executed_object_hash: str(cur.executed_object_hash) || str(cur.validated_object_hash),
     proof_hash: str(cur.proof_hash),
     status: str(cur.status || 'ACTIVE'),
     expires_at: str(cur.expires_at),

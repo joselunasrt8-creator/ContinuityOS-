@@ -165,12 +165,16 @@ function assertSuiteHeader(suite) {
 // Self-contained: uses the inlined canonicalize/sha256Hex above (no runtime dep).
 // ─────────────────────────────────────────────────────────────────────────────
 const LINEAGE_GENESIS = sha256Hex(canonicalize({ genesis: true, chain: 'CONTINUITY_PROOF_CHAIN' }))
-const LINEAGE_FIELDS = ['lineage_key', 'sequence_number', 'parent_link_hash', 'continuity_id', 'parent_continuity_id', 'validated_object_hash', 'executed_object_hash', 'proof_hash', 'timestamp']
+// Replay (nonce) + revocation/expiry (status, expires_at, revoked_at) are bound
+// into the link hash so tampering them on a persisted link is tamper-evident.
+const LINEAGE_FIELDS = ['lineage_key', 'sequence_number', 'parent_link_hash', 'continuity_id', 'parent_continuity_id', 'validated_object_hash', 'executed_object_hash', 'proof_hash', 'timestamp', 'nonce', 'status', 'expires_at', 'revoked_at']
 
 function lineageLinkHash(link) {
   const pre = {}
   for (const f of LINEAGE_FIELDS) {
-    pre[f] = f === 'sequence_number' ? Number(link.sequence_number) : String(link[f] ?? '')
+    if (f === 'sequence_number') pre[f] = Number(link.sequence_number)
+    else if (f === 'status') pre[f] = String(link.status ?? '') || 'ACTIVE'
+    else pre[f] = String(link[f] ?? '')
   }
   return sha256Hex(canonicalize(pre))
 }
@@ -186,6 +190,10 @@ function lineageLink(input, head) {
     executed_object_hash: String(input.executed_object_hash ?? ''),
     proof_hash: String(input.proof_hash ?? ''),
     timestamp: String(input.timestamp ?? ''),
+    nonce: String(input.nonce ?? ''),
+    status: String(input.status ?? '') || 'ACTIVE',
+    expires_at: String(input.expires_at ?? ''),
+    revoked_at: String(input.revoked_at ?? ''),
   }
   return { ...core, link_hash: lineageLinkHash(core) }
 }
@@ -254,6 +262,13 @@ function lineageScenario(name) {
       chain[1] = { ...chain[1], executed_object_hash: 'tampered' }
       return chain
     }
+    case 'tampered_revocation': {
+      // Flip a hash-bound revocation field on a persisted link WITHOUT recomputing
+      // its link_hash — proves status/revoked_at/nonce are now tamper-evident.
+      const chain = build(3)
+      chain[1] = { ...chain[1], status: 'REVOKED', revoked_at: '2026-01-01T00:00:00Z' }
+      return chain
+    }
     default: return build(1)
   }
 }
@@ -281,6 +296,7 @@ function eligClassify(prior, current, opts = {}) {
   const cur = current && typeof current === 'object' ? current : {}
   const reasons = []
   if (!ELIG_S(cur.validated_object_hash)) reasons.push('UNVALIDATED_CURRENT')
+  if (ELIG_S(cur.executed_object_hash) && ELIG_S(cur.executed_object_hash) !== ELIG_S(cur.validated_object_hash)) reasons.push('CURRENT_INVARIANT_BROKEN')
   if (ELIG_S(p.validated_object_hash) !== ELIG_S(p.executed_object_hash)) reasons.push('PRIOR_INVARIANT_BROKEN')
   if (ELIG_S(cur.parent_executed_object_hash) !== ELIG_S(p.executed_object_hash)) reasons.push('UNINHERITED_EXECUTED_STATE')
   if (ELIG_S(cur.parent_continuity_id) !== ELIG_S(p.continuity_id)) reasons.push('BROKEN_CONTINUITY')
@@ -303,6 +319,7 @@ function eligScenario(name) {
     case 'expired': return { prior: { ...prior, expires_at: '2000-01-01T00:00:00Z' }, current, opts: { now } }
     case 'replayed': return { prior, current, opts: { now, consumed_nonces: ['n2'] } }
     case 'unvalidated': return { prior, current: { ...current, validated_object_hash: '' }, opts: { now } }
+    case 'current_invariant': return { prior, current: { ...current, executed_object_hash: 'DIVERGENT' }, opts: { now } }
     default: return { prior, current, opts: { now } }
   }
 }
