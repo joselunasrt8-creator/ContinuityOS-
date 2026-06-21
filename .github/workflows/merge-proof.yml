@@ -29,6 +29,43 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Require intact execution-lineage evidence (observer gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # CONSUME the observer (read-only verifyRegistryChain): the merge path REQUIRES
+          # the runtime-produced lineage evidence to be intact. Fail-closed — a tampered /
+          # forked / malformed / broken / gapped / duplicated chain BLOCKS merge-proof
+          # generation. This never classifies or creates eligibility, never appends, and
+          # mints no authority (Runtime creates -> Proof binds -> Observer verifies ->
+          # merge-proof REQUIRES observed evidence; CI never creates eligibility). The
+          # observation file is written even on NULL (before the non-zero exit) so the
+          # record/upload steps below capture a fail-closed result too.
+          node cli/index.mjs lineage observe runtime/lineage/execution_lineage_registry.jsonl --out lineage_observation.json
+
+      - name: Record lineage observation (evidence, non-authoritative)
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Execution-lineage observation (merge-path gate)"
+            echo ""
+            echo "merge-proof REQUIRES intact runtime-produced lineage evidence. This step"
+            echo "verifies it (read-only) and creates no eligibility or authority."
+            echo ""
+            echo '```json'
+            cat lineage_observation.json 2>/dev/null || echo '{ "verification_status": "ERROR", "note": "observation not produced" }'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload lineage observation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-proof-lineage-observation
+          path: lineage_observation.json
+          retention-days: 90
+
       - name: Compute reviewer legitimacy
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

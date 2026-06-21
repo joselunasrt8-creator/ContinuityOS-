@@ -203,3 +203,25 @@ a governance-critical pipeline — the same staging as primitive → enforcement
 
 Observer verification: `tests/fate/lineage-observer.test.mjs` (intact VALID mints nothing; multi-link
 head bound; tamper/malformed/fork fail closed; read-only / never appends).
+
+## Merge-path integration (the law becomes load-bearing)
+
+After the observer proved it reads the law correctly in isolation, `merge-proof.yml` now **consumes**
+it: a required, fail-closed step (`Require intact execution-lineage evidence (observer gate)`) runs
+`mindshift lineage observe` over the committed registry immediately after checkout. A tampered /
+forked / malformed / broken chain **blocks merge-proof generation** — the runtime law is now
+load-bearing inside the merge path, not merely a standalone check. The observation is recorded to the
+job summary and uploaded as a `merge-proof-lineage-observation` artifact.
+
+The boundary is preserved exactly:
+
+```
+Runtime creates ELIGIBLE | NULL  →  Proof binds lineage head  →  Observer verifies evidence  →
+merge-proof REQUIRES observed evidence  →  CI never creates eligibility
+```
+
+merge-proof **consumes** the observation (read-only `verifyRegistryChain`); it never calls the gate,
+never classifies or creates eligibility, never appends, and mints no authority. This is the gate-only
+first step — the observation is required and recorded as evidence, **without** changing the committed
+merge-proof entry schema. Binding the observation into the proof entry itself (so the proof ledger
+persists the dependence) is a deliberate follow-up.
