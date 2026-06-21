@@ -3,6 +3,8 @@
  *
  * Runtime execution-lineage visibility surface.
  *   verify       Verify an append-only execution-lineage registry chain (fail-closed)
+ *   observe      CI observer: verify evidence is intact + emit attributable observation
+ *   head         Show the current inherited eligibility carry (or GENESIS)
  *   eligibility  Classify a candidate run against the registry head (ELIGIBLE | NULL)
  *
  * mode: observability_only
@@ -12,6 +14,7 @@
  */
 
 import { readJsonFile, requireArg } from "../lib/io.mjs"
+import { writeFileSync } from "node:fs"
 import { printJson, printLine, printError } from "../lib/output.mjs"
 import {
   headCarry,
@@ -19,6 +22,7 @@ import {
   verifyRegistryChain,
 } from "../../runtime/lineage/proofChainRegistry.mjs"
 import { classifyExecutionEligibility } from "../../runtime/lineage/executionEligibility.mjs"
+import { observeRegistry } from "../../runtime/lineage/observeRegistry.mjs"
 
 const USAGE = `
 mindshift lineage <subcommand> [options]
@@ -27,6 +31,11 @@ Subcommands:
   verify       <registry.jsonl> [--lineage-key <key>]
                Verify the append-only chain integrity (fail-closed). Reports
                tamper/fork/gap/duplicate and malformed-line detection.
+  observe      <registry.jsonl> [--lineage-key <key>] [--out <file.json>]
+               CI observer: re-verify the runtime-produced lineage evidence is
+               intact and emit an attributable observation (verification_status,
+               head_link_hash, registry_length, verified_at). Observes, never
+               decides — creates no eligibility/authority. Exits non-zero unless VALID.
   head         <registry.jsonl> --lineage-key <key>
                Show the current inherited eligibility carry (the chain head a
                next run must inherit), or GENESIS for an empty lineage.
@@ -64,6 +73,18 @@ export async function run(args) {
       ...res,
     })
     if (res.result !== "VALID") process.exitCode = 1
+    return
+  }
+
+  if (sub === "observe") {
+    const registry = requireArg(args, 1, "registry.jsonl")
+    const lineageKey = flag(args, "--lineage-key")
+    const out = flag(args, "--out")
+    const observation = observeRegistry(registry, { lineage_key: lineageKey })
+    if (out) writeFileSync(out, JSON.stringify(observation, null, 2) + "\n")
+    printJson(observation)
+    // Fail closed: CI requires the runtime-produced evidence to be intact.
+    if (!observation.intact) process.exitCode = 1
     return
   }
 
