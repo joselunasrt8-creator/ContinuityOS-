@@ -172,3 +172,34 @@ eligibility can never be reconstructed from corrupted state. Each item is a fail
 Hardening verification: `tests/fate/lineage-hardening.test.mjs` (tamper each hash-bound field →
 `MUTATED_PRIOR_LINK`; malformed-line fail-closed; stored-chain-before-append; current-invariant;
 lock reentrancy/exclusion/stale-reclaim) and conformance vectors `LINEAGE-06`, `ELIG-09`.
+
+## CI observation (the first consumer)
+
+The runtime **creates** eligibility; the proof **binds** the lineage head; the registry **stores**
+the evidence. The next layer is a CI **observer** that *verifies* that evidence — and nothing more:
+
+```
+Runtime creates ELIGIBLE | NULL  →  Proof binds lineage head  →
+Registry stores evidence  →  Observer VERIFIES evidence  →  CI requires success
+```
+
+`.github/workflows/lineage-eligibility-observer.yml` is a standalone, **read-only, fail-closed**
+job. It runs `mindshift lineage observe` (→ `runtime/lineage/observeRegistry.mjs` → the same
+`verifyRegistryChain` the runtime uses before it trusts a head) over the committed execution-lineage
+registry and answers exactly one question: **"Is the runtime-produced lineage evidence still
+intact?"** `VALID` → pass; `MALFORMED_REGISTRY_LINE` / `MUTATED_PRIOR_LINK` / `PARENT_MISMATCH` /
+`SEQUENCE_GAP` / `DUPLICATE_LINK_HASH` / `STORED_CHAIN_INVALID` → fail the required check.
+
+The observer **observes; it does not decide.** It never classifies or creates eligibility (it does
+not call the gate), never appends, and mints no authority — `creates_authority` and
+`creates_eligibility` are structural `false`, asserted in CI. It records an attributable observation
+(`verification_status`, `head_link_hash`, `registry_length`, `verified_at`) to the job summary and
+uploads it as an artifact, so the observation itself is evidence without minting anything.
+
+This is deliberately a **separate** surface, not a step inside the merge-gating `merge-proof.yml`:
+the observer first proves it can read the law correctly, before the law's signal is integrated into
+a governance-critical pipeline — the same staging as primitive → enforcement → hardening →
+**observation** → integration.
+
+Observer verification: `tests/fate/lineage-observer.test.mjs` (intact VALID mints nothing; multi-link
+head bound; tamper/malformed/fork fail closed; read-only / never appends).
