@@ -21,12 +21,17 @@
 // link_hash is computed over an EXPLICIT field set that EXCLUDES link_hash
 // itself (same discipline as buildEntryHash hashing Omit<…,'entry_hash'>).
 // The payload carries the EXECUTION-ELIGIBILITY CARRY — the terminal runtime
-// state of a run — so the chain head is the prior run's eligibility carry:
+// state of a run — so the chain head is the prior run's eligibility carry. The
+// replay (nonce) and revocation/expiry (status, expires_at, revoked_at) fields
+// are BOUND into the link_hash: tampering them on a persisted link breaks the
+// recompute (MUTATED_PRIOR_LINK), so a stored carry cannot be silently revived,
+// re-expired, or have its nonce swapped without failing the chain:
 //
 //   link_hash = sha256(canonicalize({
 //     lineage_key, sequence_number, parent_link_hash,
 //     continuity_id, parent_continuity_id,
 //     validated_object_hash, executed_object_hash, proof_hash, timestamp,
+//     nonce, status, expires_at, revoked_at,
 //   }))
 //
 // Minimum chain invariant for a lineage_key K:
@@ -59,16 +64,36 @@ const LINK_HASH_FIELDS = [
   'executed_object_hash',
   'proof_hash',
   'timestamp',
+  // Replay + revocation/expiry state is bound into identity so it is tamper-evident.
+  'nonce',
+  'status',
+  'expires_at',
+  'revoked_at',
 ]
+
+// Default the revocation/replay fields so a link omitting them hashes the SAME as
+// an explicit ACTIVE/empty carry — the on-disk record and the recompute must agree.
+function withCarryDefaults(o) {
+  return {
+    ...o,
+    nonce: str(o.nonce),
+    status: str(o.status) || 'ACTIVE',
+    expires_at: str(o.expires_at),
+    revoked_at: str(o.revoked_at),
+  }
+}
 
 function str(v) {
   return typeof v === 'string' ? v : v === undefined || v === null ? '' : String(v)
 }
 
-// Deterministic link_hash over the explicit field set (self-excluding).
+// Deterministic link_hash over the explicit field set (self-excluding). Carry
+// defaults are applied so an absent status hashes identically to an explicit
+// 'ACTIVE' — the on-disk record and the in-memory link must agree byte for byte.
 export function computeLinkHash(link) {
+  const src = withCarryDefaults(link)
   const preimage = LINK_HASH_FIELDS.reduce((o, f) => {
-    o[f] = f === 'sequence_number' ? Number(link.sequence_number) : str(link[f])
+    o[f] = f === 'sequence_number' ? Number(src.sequence_number) : str(src[f])
     return o
   }, {})
   return sha256Hex(canonicalize(preimage))
@@ -91,6 +116,11 @@ export function linkProof(input, head) {
     executed_object_hash: str(input.executed_object_hash),
     proof_hash: str(input.proof_hash),
     timestamp: str(input.timestamp),
+    // Replay + revocation/expiry state — bound into link_hash (tamper-evident).
+    nonce: str(input.nonce),
+    status: str(input.status) || 'ACTIVE',
+    expires_at: str(input.expires_at),
+    revoked_at: str(input.revoked_at),
     mutation_allowed: false,
   }
   return Object.freeze({ ...core, link_hash: computeLinkHash(core) })

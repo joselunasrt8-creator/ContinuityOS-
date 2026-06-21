@@ -2641,6 +2641,28 @@
       "non_authoritative": true
     },
     {
+      "surface_id": "workflow:lineage-eligibility-observer.yml",
+      "surface_type": "github_workflow",
+      "source_file": ".github/workflows/lineage-eligibility-observer.yml",
+      "entrypoint": "workflow_dispatch",
+      "mutation_capability": false,
+      "execution_capability": false,
+      "deployment_capability": false,
+      "authority_required": "pull_request_governance",
+      "aeo_required": false,
+      "validation_required": false,
+      "proof_required": false,
+      "replay_semantics": "pull_request_event_replay_neutral",
+      "drift_observable": true,
+      "proof_bound": false,
+      "governance_addressable": true,
+      "canonical_boundary_status": "NON_DEPLOY_OR_PREPARATION",
+      "bypass_risk": "none",
+      "containment_status": "NON_DEPLOY_OR_EVIDENCE_ONLY",
+      "evidence_only": true,
+      "non_authoritative": true
+    },
+    {
       "surface_id": "workflow:merge-governance-check.yml",
       "surface_type": "github_workflow",
       "source_file": ".github/workflows/merge-governance-check.yml",

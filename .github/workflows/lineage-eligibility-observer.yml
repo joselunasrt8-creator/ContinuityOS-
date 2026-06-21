@@ -1,0 +1,107 @@
+name: lineage-eligibility-observer
+# owner: runtime execution-lineage law (#2186 gate + #2188 hardening)
+# role: OBSERVER — CI observes the runtime law; it does not create it.
+#
+# Topology this preserves:
+#   Runtime creates ELIGIBLE | NULL  ->  Proof binds lineage head  ->
+#   Registry stores evidence  ->  Observer VERIFIES evidence  ->  CI requires success
+#
+# This job is READ-ONLY and fail-closed. It re-verifies the runtime-produced
+# execution-lineage registry chain and records the observation as attributable
+# evidence. It NEVER classifies or creates eligibility, NEVER appends to the
+# registry, NEVER mints authority. A tampered / forked / malformed / broken /
+# gapped / duplicated chain fails the required check.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'runtime/lineage/**'
+      - 'cli/commands/lineage.mjs'
+      - 'src/canonical.js'
+      - '.github/workflows/lineage-eligibility-observer.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'runtime/lineage/**'
+      - 'cli/commands/lineage.mjs'
+      - 'src/canonical.js'
+      - '.github/workflows/lineage-eligibility-observer.yml'
+  workflow_dispatch:
+
+# Minimal permissions: read-only. No deployment, no mutation, no authority.
+permissions:
+  contents: read
+
+jobs:
+  observe-execution-lineage:
+    name: Observe execution-lineage registry (read-only, fail-closed)
+    runs-on: ubuntu-latest
+
+    env:
+      REGISTRY: runtime/lineage/execution_lineage_registry.jsonl
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Observe registry integrity (fail-closed)
+        id: observe
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Self-contained: the verify chain depends only on node: builtins and
+          # src/canonical.js, so no install is required. The observation file is
+          # written even on NULL (before the non-zero exit) so the summary/artifact
+          # steps below can record a fail-closed result too.
+          node cli/index.mjs lineage observe "$REGISTRY" --out lineage_observation.json
+
+      - name: Record observation to job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Execution-lineage observation"
+            echo ""
+            echo "Observer role: **verifies** runtime-produced evidence — creates no eligibility/authority."
+            echo ""
+            echo '```json'
+            cat lineage_observation.json 2>/dev/null || echo '{ "verification_status": "ERROR", "note": "observation not produced" }'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Assert observer boundaries (observes, never decides)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f lineage_observation.json ]]; then
+            echo "Observation artifact missing — observer fails closed."
+            exit 1
+          fi
+          python3 -c "
+          import json, sys
+          with open('lineage_observation.json') as f:
+            o = json.load(f)
+          assert o.get('mode') == 'observability_only',  'mode must be observability_only'
+          assert o.get('creates_authority') == False,    'observer must create no authority'
+          assert o.get('creates_eligibility') == False,  'observer must create no eligibility'
+          assert o.get('object_type') == 'ExecutionLineageObservation', 'unexpected object_type'
+          print('Observer boundaries preserved: status=%s length=%s head=%s'
+                % (o.get('verification_status'), o.get('registry_length'), o.get('head_link_hash')))
+          "
+
+      - name: Upload observation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-lineage-observation
+          path: lineage_observation.json
+          retention-days: 90
