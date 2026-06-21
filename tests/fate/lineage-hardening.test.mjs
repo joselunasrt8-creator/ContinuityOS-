@@ -102,6 +102,24 @@ test('malformed: an unparseable registry line → verifyRegistryChain NULL (MALF
   assert.equal(res.null_reasons.includes('MALFORMED_REGISTRY_LINE'), true)
 })
 
+test('malformed: a genesis sequence_number tampered 0 -> null is MALFORMED (not VALID)', () => {
+  const registry = freshRegistry()
+  seedChain(registry)
+  // Number(null) === 0, so a naive coercion would accept this and leave the hash
+  // unchanged — it must instead fail closed on the raw non-integer value.
+  tamperFirstEntry(registry, (e) => ({ ...e, sequence_number: null }))
+  const res = verifyRegistryChain(registry, KEY)
+  assert.equal(res.result, 'NULL')
+  assert.equal(res.null_reasons.includes('MALFORMED_REGISTRY_LINE'), true)
+})
+
+test('malformed: a sequence_number tampered to "0" (string) is MALFORMED', () => {
+  const registry = freshRegistry()
+  seedChain(registry)
+  tamperFirstEntry(registry, (e) => ({ ...e, sequence_number: '0' }))
+  assert.equal(verifyRegistryChain(registry, KEY).null_reasons.includes('MALFORMED_REGISTRY_LINE'), true)
+})
+
 test('malformed: a chain-shaped line missing link_hash → verifyRegistryChain NULL', () => {
   const registry = freshRegistry()
   seedChain(registry)
@@ -286,8 +304,31 @@ test('lock: different path spellings of the same registry share ONE lock (canoni
   assert.equal(isLockHeld(registry), false)
 })
 
-test('lock: an async fn is refused (sync-only critical section) and the lock is released', () => {
+test('lock: a native async fn is refused WITHOUT running its body (never invoked)', () => {
   const registry = freshRegistry()
-  assert.throws(() => withRegistryLock(registry, async () => 1), /synchronous/)
-  assert.equal(isLockHeld(registry), false) // released despite the refusal
+  let ran = false
+  const asyncFn = async () => {
+    ran = true // must never execute — rejection happens before invocation
+    return 1
+  }
+  assert.throws(() => withRegistryLock(registry, asyncFn), /synchronous/)
+  assert.equal(ran, false) // body never ran, so nothing leaks outside the lock
+  assert.equal(isLockHeld(registry), false)
+})
+
+test('lock: dead-holder reclaim renames atomically and never leaves the canonical lock dangling', () => {
+  const registry = freshRegistry()
+  const lockPath = registry + '.lock'
+  const fd = openSync(lockPath, 'wx')
+  writeSync(fd, JSON.stringify({ pid: 2147483646, host: hostname(), at: '2000-01-01T00:00:00Z' }))
+  closeSync(fd)
+
+  let heldDuring = false
+  const out = withRegistryLock(registry, () => {
+    heldDuring = existsSync(lockPath) // a fresh live lock is held during the body
+    return 'ok'
+  })
+  assert.equal(out, 'ok')
+  assert.equal(heldDuring, true)
+  assert.equal(existsSync(lockPath), false) // released cleanly
 })

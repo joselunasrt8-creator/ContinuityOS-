@@ -24,7 +24,7 @@
 //     is tracked by simple call-stack depth. An async `fn` is refused — process-
 //     wide depth cannot isolate independent concurrent async callers.
 
-import { openSync, closeSync, existsSync, readFileSync, writeSync, unlinkSync, realpathSync } from 'node:fs'
+import { openSync, closeSync, existsSync, readFileSync, writeSync, unlinkSync, renameSync, realpathSync } from 'node:fs'
 import { resolve, dirname, basename, join } from 'node:path'
 import { hostname } from 'node:os'
 
@@ -105,12 +105,22 @@ function acquire(lockPath, { timeoutMs }) {
       return { reentrant: false }
     } catch (err) {
       if (err && err.code !== 'EEXIST') throw err
-      // Reclaim ONLY a lock whose holder is provably dead (crashed without release).
+      // Reclaim ONLY a lock whose holder is provably dead (crashed without release),
+      // and do it ATOMICALLY: rename the stale file to a private name. Only one
+      // waiter can win the rename of a given inode — losers get ENOENT and re-loop.
+      // The winner then removes its OWN renamed file, so it can NEVER unlink the
+      // canonical path and thereby delete a fresh live lock created in the interim.
       if (holderProvablyDead(lockPath)) {
+        const claimed = `${lockPath}.dead.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`
         try {
-          unlinkSync(lockPath)
+          renameSync(lockPath, claimed)
         } catch {
-          /* another worker reclaimed it first — retry */
+          continue // another waiter won the reclaim, or the path changed — re-evaluate
+        }
+        try {
+          unlinkSync(claimed)
+        } catch {
+          /* our private file — best-effort cleanup */
         }
         continue
       }
@@ -149,6 +159,18 @@ function release(lockPath, token) {
 // acquired. An async fn is refused so the protected region can never outlive the
 // hold (which would also defeat the process-wide reentrancy counter).
 export function withRegistryLock(registryPath, fn, options = {}) {
+  if (typeof fn !== 'function') {
+    throw new TypeError('withRegistryLock requires a function')
+  }
+  // Reject a native async fn BEFORE acquiring/invoking it: its body would start
+  // running and then CONTINUE outside the lock after we release, defeating the
+  // fail-closed guarantee. (A plain fn that still returns a thenable is caught by
+  // the post-call backstop below, after its synchronous body has already run under
+  // the lock.)
+  if (fn.constructor && fn.constructor.name === 'AsyncFunction') {
+    throw new Error('withRegistryLock requires a synchronous fn (received an async function)')
+  }
+
   const lockPath = canonicalLockPath(registryPath)
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 

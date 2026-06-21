@@ -60,7 +60,10 @@ function chainEntryDefect(o) {
   if (!ENTRY_TYPES.has(o._record_type)) return `unrecognized _record_type "${str(o._record_type)}" on a link-shaped line`
   for (const f of REQUIRED_LINK_FIELDS) {
     if (f === 'sequence_number') {
-      if (!Number.isInteger(Number(o[f]))) return `non-integer sequence_number`
+      // Require the RAW value to be an integer primitive — Number(null)/Number('')
+      // both coerce to 0, which would let a genesis seq 0 be edited to null/"" with
+      // an unchanged recomputed hash and still pass as VALID.
+      if (typeof o[f] !== 'number' || !Number.isInteger(o[f])) return `non-integer sequence_number`
     } else if (!str(o[f])) {
       return `missing ${f}`
     }
