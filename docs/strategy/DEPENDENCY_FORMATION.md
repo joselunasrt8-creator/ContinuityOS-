@@ -31,6 +31,8 @@ dependency proof, not the final frontier.
 
 ## Highest-leverage controllable work
 
+Cooldown execution queue: [`COOLDOWN_DEPENDENCY_WORK_QUEUE.md`](./COOLDOWN_DEPENDENCY_WORK_QUEUE.md).
+
 External pilot acquisition, treated as a **packaging / dependency-conversion**
 exercise, not an architecture exercise:
 
