@@ -31,7 +31,13 @@ export const GITHUB_ISSUE_COMMENT_PROOF_FIELDS = [
   'target_issue',
   'comment_id',
   'comment_url',
+  'proposed_action_hash',
   'action_hash',
+  'executed_at',
+  'validation_result',
+  'execution_result',
+  'replay_nonce_status_after_success',
+  'proof_emitted_at',
   'timestamp',
   'result',
   'execution_evidence_hash',
@@ -143,7 +149,7 @@ export type GitHubIssueCommentValidationContext = {
 }
 
 export type GitHubIssueCommentExecutionEvidence = {
-  readonly comment_id?: string
+  readonly comment_id: string
   readonly comment_url: string
   readonly executed_at: string
 }
@@ -171,13 +177,18 @@ export type GitHubIssueCommentExecutionProof = {
     readonly repo: string
     readonly issue_number: number
   }
-  readonly comment_id?: string
+  readonly comment_id: string
   readonly comment_url: string
+  readonly proposed_action_hash: string
   readonly action_hash: string
+  readonly executed_at: string
   readonly timestamp: string
+  readonly validation_result: 'VALID'
   readonly result: 'EXECUTED'
   readonly execution_evidence_hash: string
   readonly execution_result: 'EXECUTED'
+  readonly replay_nonce_status_after_success: 'CONSUMED'
+  readonly proof_emitted_at: string
   readonly creates_authority: false
   readonly emitted_at: string
 }
@@ -190,6 +201,7 @@ export type GitHubIssueCommentExecuteInput = {
   readonly executor: GitHubIssueCommentExecutor
   readonly emitted_at: string
   readonly consumed_action_hashes?: ReadonlySet<string>
+  readonly consumed_replay_nonces?: { has(value: string): boolean, add(value: string): unknown }
   readonly persistProof?: (proof: GitHubIssueCommentExecutionProof) => void
 }
 
@@ -225,6 +237,10 @@ function equalsStringArray(value: unknown, expected: readonly string[]): value i
 
 export function computeGitHubIssueCommentAEOHash(aeo: GitHubIssueCommentAEO): string {
   return `sha256:${sha256Hex(canonicalize(aeo))}`
+}
+
+export function computeGitHubIssueCommentProposedActionHash(atao: GitHubIssueCommentATAO): string {
+  return `sha256:${sha256Hex(canonicalize(atao.proposed_action))}`
 }
 
 export function computeGitHubIssueCommentActionHash(aeo: GitHubIssueCommentAEO): string {
@@ -434,6 +450,8 @@ export function executeGitHubIssueComment(
   if (executedObjectHash !== input.validated_object_hash) return null
 
   const actionHash = computeGitHubIssueCommentActionHash(input.aeo)
+  const proposedActionHash = computeGitHubIssueCommentProposedActionHash(input.atao)
+  if (input.consumed_replay_nonces?.has(input.aeo.validation.replay_nonce)) return null
   if (input.consumed_action_hashes?.has(actionHash)) return null
 
   const evidence = input.executor({
@@ -443,7 +461,7 @@ export function executeGitHubIssueComment(
     body: input.aeo.target.body,
   })
   if (!evidence) return null
-  if (evidence.comment_id !== undefined && !isNonBlankString(evidence.comment_id)) return null
+  if (!isNonBlankString(evidence.comment_id)) return null
   if (!isNonBlankString(evidence.comment_url)) return null
   if (!isNonBlankString(evidence.executed_at)) return null
 
@@ -463,18 +481,24 @@ export function executeGitHubIssueComment(
       repo: input.aeo.target.repo,
       issue_number: input.aeo.target.issue_number,
     }),
-    ...(evidence.comment_id === undefined ? {} : { comment_id: evidence.comment_id }),
+    comment_id: evidence.comment_id,
     comment_url: evidence.comment_url,
+    proposed_action_hash: proposedActionHash,
     action_hash: actionHash,
+    executed_at: evidence.executed_at,
     timestamp: input.emitted_at,
+    validation_result: 'VALID' as const,
     result: 'EXECUTED' as const,
     execution_evidence_hash: evidenceHash,
     execution_result: 'EXECUTED' as const,
+    replay_nonce_status_after_success: 'CONSUMED' as const,
+    proof_emitted_at: input.emitted_at,
     creates_authority: false as const,
     emitted_at: input.emitted_at,
   })
   const proof_id = `sha256:${sha256Hex(canonicalize(proofBody))}`
   const proof = Object.freeze({ proof_id, ...proofBody })
+  input.consumed_replay_nonces?.add(input.aeo.validation.replay_nonce)
   input.persistProof?.(proof)
   return proof
 }

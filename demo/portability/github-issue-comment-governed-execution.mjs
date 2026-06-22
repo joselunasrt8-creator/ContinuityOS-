@@ -138,15 +138,17 @@ function runValid({ model, consumedReplayNonces }) {
   const proof = executeGitHubIssueComment({
     aeo,
     validated_object_hash: validatedHash,
+    validation_result: validation,
     atao,
     executor,
     emitted_at: '2026-06-10T00:00:01.000Z',
+    consumed_replay_nonces: consumedReplayNonces,
   })
   assert.notEqual(proof, null)
   assert.equal(proof.validated_object_hash, proof.executed_object_hash)
   assert.equal(executor.calls.length, 1)
 
-  consumedReplayNonces.add(binding.replay_nonce)
+  assert.equal(consumedReplayNonces.has(binding.replay_nonce), true)
 
   return {
     status: 'EXECUTED',
@@ -157,6 +159,10 @@ function runValid({ model, consumedReplayNonces }) {
     validated_object_hash: proof.validated_object_hash,
     executed_object_hash: proof.executed_object_hash,
     exact_object_preserved: proof.validated_object_hash === proof.executed_object_hash,
+    proposed_action_hash: proof.proposed_action_hash,
+    validation_result: proof.validation_result,
+    execution_result: proof.execution_result,
+    replay_nonce_status_after_success: proof.replay_nonce_status_after_success,
     comment_id: proof.comment_id,
     comment_url: proof.comment_url,
     executor_calls: executor.calls.length,
