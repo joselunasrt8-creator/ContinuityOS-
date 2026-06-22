@@ -116,3 +116,7 @@ runs:
         name: MERGE_GUARD_PROOF
         path: MERGE_GUARD_PROOF.json
         if-no-files-found: ignore
+
+branding:
+  icon: shield
+  color: blue
