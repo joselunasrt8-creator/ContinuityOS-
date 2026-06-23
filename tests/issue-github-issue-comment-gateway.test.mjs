@@ -13,6 +13,7 @@ const {
   compileGitHubIssueCommentAEO,
   computeGitHubIssueCommentAEOHash,
   computeGitHubIssueCommentActionHash,
+  computeGitHubIssueCommentProposedActionHash,
   executeGitHubIssueComment,
   validateGitHubIssueCommentAEO,
   GITHUB_ISSUE_COMMENT_PROOF_FIELDS,
@@ -200,9 +201,14 @@ test('execution proof emits only after comment execution evidence exists and pro
   assert.equal(proof.target_action, 'comment_issue')
   assert.deepEqual(proof.target_issue, { owner: 'example-owner', repo: 'example-repo', issue_number: 42 })
   assert.equal(proof.comment_id, 'comment-123')
+  assert.equal(proof.proposed_action_hash, computeGitHubIssueCommentProposedActionHash(atao))
   assert.equal(proof.action_hash, computeGitHubIssueCommentActionHash(aeo))
+  assert.equal(proof.executed_at, '2026-06-04T00:01:00.000Z')
   assert.equal(proof.timestamp, '2026-06-04T00:02:00.000Z')
+  assert.equal(proof.validation_result, 'VALID')
   assert.equal(proof.result, 'EXECUTED')
+  assert.equal(proof.replay_nonce_status_after_success, 'CONSUMED')
+  assert.equal(proof.proof_emitted_at, '2026-06-04T00:02:00.000Z')
   assert.equal(persisted.length, 1)
   assert.deepEqual(persisted[0], proof)
   assert.match(proof.execution_evidence_hash, /^sha256:[0-9a-f]{64}$/)
@@ -214,12 +220,16 @@ test('execution proof emits only after comment execution evidence exists and pro
     'comment_url',
     'creates_authority',
     'emitted_at',
+    'executed_at',
     'executed_object_hash',
     'execution_evidence_hash',
     'execution_result',
     'issue_number',
     'owner',
+    'proof_emitted_at',
     'proof_id',
+    'proposed_action_hash',
+    'replay_nonce_status_after_success',
     'repo',
     'result',
     'target_action',
@@ -227,6 +237,7 @@ test('execution proof emits only after comment execution evidence exists and pro
     'target_surface',
     'timestamp',
     'validated_object_hash',
+    'validation_result',
   ])
 })
 
@@ -318,6 +329,37 @@ test('execution boundary rejects replayed action hash before posting', () => {
   assert.equal(executor.calls.length, 0)
 })
 
+test('successful execution consumes replay nonce and reused nonce posts no duplicate', () => {
+  const { atao, aeo } = makeAEO()
+  const validatedHash = computeGitHubIssueCommentAEOHash(aeo)
+  const consumedReplayNonces = new Set()
+  const executorA = makeExecutor({ comment_id: 'comment-first' })
+  const proof = executeGitHubIssueComment({
+    aeo,
+    validated_object_hash: validatedHash,
+    validation_result: 'VALID',
+    atao,
+    executor: executorA,
+    emitted_at: '2026-06-04T00:02:00.000Z',
+    consumed_replay_nonces: consumedReplayNonces,
+  })
+  assert.notEqual(proof, null)
+  assert.equal(consumedReplayNonces.has(aeo.validation.replay_nonce), true)
+  const executorB = makeExecutor({ comment_id: 'comment-second' })
+  const replayProof = executeGitHubIssueComment({
+    aeo,
+    validated_object_hash: validatedHash,
+    validation_result: 'VALID',
+    atao,
+    executor: executorB,
+    emitted_at: '2026-06-04T00:03:00.000Z',
+    consumed_replay_nonces: consumedReplayNonces,
+  })
+  assert.equal(replayProof, null)
+  assert.equal(executorA.calls.length, 1)
+  assert.equal(executorB.calls.length, 0)
+})
+
 test('execution proof remains deterministic for the same action evidence and timestamp', () => {
   const { atao, aeo } = makeAEO()
   const validatedHash = computeGitHubIssueCommentAEOHash(aeo)
@@ -337,25 +379,21 @@ test('execution proof remains deterministic for the same action evidence and tim
   assert.deepEqual(proofA, proofB)
 })
 
-test('proof persists without comment id when executor evidence omits it', () => {
+test('proof is not emitted when executor evidence omits required comment id', () => {
   const { atao, aeo } = makeAEO()
   const validatedHash = computeGitHubIssueCommentAEOHash(aeo)
   const persisted = []
+  const executor = makeExecutor({ comment_id: undefined })
   const proof = executeGitHubIssueComment({
     aeo,
     validated_object_hash: validatedHash,
     validation_result: 'VALID',
     atao,
-    executor: makeExecutor({ comment_id: undefined }),
+    executor,
     emitted_at: '2026-06-04T00:02:00.000Z',
     persistProof: (entry) => persisted.push(entry),
   })
-  assert.notEqual(proof, null)
-  assert.equal(Object.hasOwn(proof, 'comment_id'), false)
-  assert.equal(persisted.length, 1)
-  assert.equal(persisted[0].aeo_hash, validatedHash)
-  assert.deepEqual(persisted[0].target_issue, { owner: 'example-owner', repo: 'example-repo', issue_number: 42 })
-  assert.equal(persisted[0].action_hash, computeGitHubIssueCommentActionHash(aeo))
-  assert.equal(persisted[0].timestamp, '2026-06-04T00:02:00.000Z')
-  assert.equal(persisted[0].result, 'EXECUTED')
+  assert.equal(proof, null)
+  assert.equal(executor.calls.length, 1)
+  assert.equal(persisted.length, 0)
 })
