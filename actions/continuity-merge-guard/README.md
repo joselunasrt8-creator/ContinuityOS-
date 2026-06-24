@@ -221,15 +221,21 @@ untouched. On an agent lane (`claude/*`, `codex/*`, `cursor/*`, `devin/*`,
 `copilot/*`), a PR must be authoritatively attributed `AGENT_AUTHORED` or the check
 fails closed.
 
-1. Copy [`examples/continuity-agent-attribution-gate.yml`](./examples/continuity-agent-attribution-gate.yml)
-   into your repo's `.github/workflows/` (pinned to `@v0.3.0`, the Agent Identity
-   attribution surface).
-2. In repo settings → Branches → branch protection rule for `main`, add the
-   required status check named **exactly** `agent-attribution-gate` (the job name;
-   not `continuity-agent-attribution-gate / agent-attribution-gate`).
-3. Attribute agent PRs with any one authoritative signal: an `Agent-Authored-By:`
+1. Start with the report-only workflow in
+   [`examples/continuity-agent-attribution-gate.report-only.yml`](./examples/continuity-agent-attribution-gate.report-only.yml)
+   to see `VALID` / `NULL` / neutral verdicts without blocking merges.
+2. After the trial verdicts match maintainer intent, copy the one-file enforcing
+   workflow from [`examples/continuity-agent-attribution-gate.yml`](./examples/continuity-agent-attribution-gate.yml)
+   into `.github/workflows/`.
+3. In repo settings → Branches → branch protection rule for `main`, add the
+   required status check named **exactly** `agent-attribution-gate` (the job id;
+   not the workflow grouping label `continuity-agent-attribution-gate / agent-attribution-gate`).
+4. Attribute agent PRs with any one authoritative signal: an `Agent-Authored-By:`
    commit trailer (most durable), an `agent-authored` PR label, or a PR-body
    attribution block.
+5. Capture one attributed agent-lane PR that passes (`VALID`), one under-attributed
+   agent-lane PR that blocks (`NULL`), the `MERGE_GUARD_PROOF` artifact/run URL,
+   and the maintainer's removal-test answer.
 
 Full step-by-step walkthrough, expected pass/blocked/neutral outcomes, lane
 customization, and verification: [`ADOPT_AGENT_ATTRIBUTION_GATE.md`](./ADOPT_AGENT_ATTRIBUTION_GATE.md).
@@ -246,12 +252,14 @@ customization, and verification: [`ADOPT_AGENT_ATTRIBUTION_GATE.md`](./ADOPT_AGE
 - `@v0.2.0` — planned pinned tag for the agent-authored workflow-policy
   validator surface. Use this, once tagged, for load-bearing consumers that
   need `author-kind` and `require-agent-authored` proof fields.
-- `@v0.3.0` — planned pinned tag for the **Agent Identity attribution surface**:
+- `@v0.3.0` — pinned release reference for the **Agent Identity attribution surface**:
   the action emits `attribution_status`, `attribution_classification`,
   `actor_kind`, and `attribution_evidence_hash` (driven by the authoritative
-  `pr-labels` / `pr-body` / `commit-trailers` signals). Use this, once tagged,
-  for consumers that make the attribution classification load-bearing — e.g. an
-  agent-lane gate that requires `AGENT_AUTHORED`. The attribution outputs are
+  `pr-labels` / `pr-body` / `commit-trailers` signals). Use this for consumers
+  that make the attribution classification load-bearing — e.g. an agent-lane
+  gate that requires `AGENT_AUTHORED`. Before asking an outside maintainer to
+  install, verify that the `v0.3.0` tag resolves publicly; do not substitute
+  `@main` for a required check in an outside-owner proof. The attribution outputs are
   metadata, not authority: they never alter `result` or `canonical_hash`, so a
   `@v0.1.0` consumer that only reads `result` is unaffected by moving to
   `@v0.3.0`. `continuityos-sandbox` pins this tag for its
