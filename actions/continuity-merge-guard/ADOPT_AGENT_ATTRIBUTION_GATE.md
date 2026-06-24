@@ -145,6 +145,22 @@ jobs:
           exit 1
 ```
 
+## Step 1a — One-file copy/paste checklist
+
+Before asking an outside maintainer to install, keep the copy/paste surface to one
+file and verify these five lines survived unchanged:
+
+- `uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`
+- `permissions: contents: read`
+- `jobs.agent-attribution-gate` as the job id for the enforcing workflow
+- the agent-lane `case` prefixes match the maintainer's agent branches
+- the final enforcing step exits `1` when an agent-lane PR is not `AGENT_AUTHORED`
+
+Do **not** ask the maintainer to make the check required during the trial. The
+report-only workflow's job id is `agent-attribution-gate-report-only`; making
+`agent-attribution-gate` required before installing the enforcing workflow leaves
+GitHub waiting for a check that never appears.
+
 ## Step 2 — Make it required
 
 In **Settings → Branches → branch protection rule for `main`**:
@@ -231,3 +247,21 @@ see `continuityos-sandbox`'s `BREAK_GLASS.md`.
 
 That pass / blocked / neutral triple is the proof that the gate is load-bearing in
 your repo.
+
+## Outside-owner proof capture
+
+For the first independent maintainer, capture only the dependency loop evidence:
+
+| Evidence | What to capture |
+|---|---|
+| Maintainer fit | Active outside-owned repo, real AI/agent PR flow, review/merge discipline, and branch-protection access. |
+| Trial signal | Report-only workflow run URL showing at least one real agent-lane `VALID` or `NULL` would-be verdict. |
+| Required check | Branch-protection evidence showing the exact required check `agent-attribution-gate`. |
+| First VALID | PR URL and workflow run URL where an attributed agent-lane PR passes and is mergeable. |
+| First NULL | PR URL and workflow run URL where an under-attributed agent-lane PR is blocked by the required check. |
+| Proof artifact | `MERGE_GUARD_PROOF` artifact or job-summary proof from each run. |
+| Removal test | Maintainer answer to: “If this check were removed, would your agent-authorship workflow become worse? How?” |
+
+Stop there. Do not add new policy, ontology, or review requirements to the first
+outside-owner proof; the dependency claim is only that removing this required
+agent-authorship check makes the maintainer's workflow worse.

@@ -2,96 +2,147 @@
 
 ## 1. Purpose
 
-Use this checklist in an outside-owner repository to prove whether ContinuityOS Merge Guard is an external workflow dependency, not just a pilot run.
+Use this checklist with one outside-owner maintainer to prove whether the
+ContinuityOS **agent-attribution-gate** has become an external workflow
+dependency, not just a pilot run.
 
-Pilot evidence ≠ dependency proof. Pilot evidence means the check ran. Dependency proof means removal worsens an external workflow.
+Pilot evidence means the check ran. Dependency proof means removing the required
+check makes the maintainer's agent-authorship workflow worse.
 
-## 2. What this proves
+## 2. Maintainer fit
 
-This proves an independent maintainer can install the existing Merge Guard action, configure the required check named exactly `merge-guard`, produce one `VALID` mergeable PR, produce one `NULL` blocked PR, capture the resulting proof, and state whether removing the required check worsens their workflow.
+Choose one qualified outside maintainer before optimizing anything else:
 
-## 3. What this does not prove
+- active outside-owned repository
+- uses AI/agent-generated pull requests or agent-session branches
+- already has review/merge discipline for protected branches
+- has access to change branch protection and required status checks
 
-This does not prove diff validation, review validation, final merge commit validation, automatic human/agent authorship detection, or any authority beyond the existing Merge Guard identity and explicit author-policy check.
+If those are not true, stop. The first proof depends on a real maintainer with a
+real agent-authorship problem, not on broader architecture.
 
-## 4. Install Merge Guard
+## 3. Install path
 
-In the outside-owner repository, add a pull request workflow that uses the existing action:
+### Stage 0 — Report-only trial first
 
-```yaml
-name: continuity-merge-guard
+Ask the maintainer to copy exactly one file first:
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [main]
-
-jobs:
-  merge-guard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@main
-        id: merge-guard
-        with:
-          repo: ${{ github.repository }}
-          pr-number: ${{ github.event.pull_request.number }}
-          head-sha: ${{ github.event.pull_request.head.sha }}
-          base-sha: ${{ github.event.pull_request.base.sha }}
-          actor: ${{ github.event.pull_request.user.login }}
+```text
+actions/continuity-merge-guard/examples/continuity-agent-attribution-gate.report-only.yml
+→ .github/workflows/continuity-agent-attribution-gate.report-only.yml
 ```
 
-## 5. Configure protected branch required check
+This trial uses
+`joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`,
+reports `VALID` / `NULL` / neutral in the job summary, and always exits 0. Do not
+make it required.
 
-In the outside-owner repository, configure branch protection for the target branch and add the required status check named exactly `merge-guard`.
+### Stage 1 — Enforcing one-file workflow
 
-Capture screenshot or text proof that `merge-guard` is required before running the evidence loop.
+After the trial verdicts match maintainer intent, ask the maintainer to copy the
+enforcing workflow:
 
-## 6. Evidence Loop
+```text
+actions/continuity-merge-guard/examples/continuity-agent-attribution-gate.yml
+→ .github/workflows/continuity-agent-attribution-gate.yml
+```
 
-### PR A: VALID / mergeable
+The enforcing workflow must keep these install-critical lines:
 
-1. Open a normal pull request with complete Merge Guard inputs.
-2. Confirm the `merge-guard` required check passes with result `VALID`.
-3. Confirm the PR is mergeable with the required check enabled.
-4. Download or capture the `MERGE_GUARD_PROOF.json` artifact for this run.
+- action reference:
+  `joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`
+- job id: `agent-attribution-gate`
+- permission: `contents: read`
+- agent-lane branch prefixes matching the maintainer's AI PR branches
 
-### PR B: NULL / blocked
+Do not use `@main` for outside-owner dependency proof. Before outreach, verify
+that the `v0.3.0` tag resolves publicly; if it does not, fix the release/tag
+before asking an outside maintainer to install.
 
-1. Open or update a separate pull request so Merge Guard returns `NULL` without changing Merge Guard code.
-2. Confirm the `merge-guard` required check fails or blocks merge eligibility.
-3. Confirm the PR cannot be merged while `merge-guard` is required.
-4. Download or capture the `MERGE_GUARD_PROOF.json` artifact for this run.
+## 4. Required check configuration
 
-## 7. Required Evidence
+Only after Stage 1 is installed, configure branch protection on the target branch
+and add the required status check named exactly:
 
-Collect the following evidence from the outside-owner repository:
+```text
+agent-attribution-gate
+```
 
-- workflow URL for the installed Merge Guard run
-- `MERGE_GUARD_PROOF.json` from PR A and PR B
-- screenshot or text proof that `merge-guard` is configured as a required check
-- blocked NULL PR evidence showing PR B is not mergeable while `merge-guard` is required
-- maintainer statement answering the Removal Test question below
+That is the job id and the check-run name GitHub reports. Do not require the
+workflow grouping label:
 
-## 8. Removal Test
+```text
+continuity-agent-attribution-gate / agent-attribution-gate
+```
 
-The maintainer must answer:
+Capture screenshot or text/API proof that `agent-attribution-gate` is required
+before running the evidence loop.
 
-> What becomes worse if this required check is removed?
+## 5. Evidence loop
 
-A useful answer identifies a concrete workflow, gate, review expectation, release rule, or operational habit that becomes weaker, less deterministic, or more manual without the required `merge-guard` check.
+### PR A — VALID / mergeable
 
-## 9. Success Criteria
+1. Open or update an agent-lane PR, such as `claude/*` or `codex/*`.
+2. Add one authoritative `AGENT_AUTHORED` signal:
+   - `Agent-Authored-By: <agent-id>` commit trailer, or
+   - `agent-authored` PR label, or
+   - PR-body attribution block.
+3. Confirm the required `agent-attribution-gate` check passes.
+4. Confirm the PR is mergeable while the required check is enabled.
+5. Capture the workflow run URL and the `MERGE_GUARD_PROOF` artifact/job summary.
+
+### PR B — NULL / blocked
+
+1. Open or update an agent-lane PR without any authoritative `AGENT_AUTHORED`
+   signal, or with conflicting authoritative signals.
+2. Confirm the required `agent-attribution-gate` check fails.
+3. Confirm GitHub blocks merge while `agent-attribution-gate` is required.
+4. Capture the workflow run URL and the `MERGE_GUARD_PROOF` artifact/job summary.
+5. Optional repair proof: add the missing attribution and show the same PR moves
+   from blocked `NULL` to passing `VALID`.
+
+## 6. Required evidence packet
+
+Collect only these artifacts from the outside-owner repository:
+
+- outside repo URL and maintainer contact/role
+- report-only trial run URL
+- enforcing workflow URL or commit URL
+- branch-protection evidence showing exact required check `agent-attribution-gate`
+- PR A URL: attributed agent-lane PR, `VALID`, mergeable
+- PR B URL: under-attributed or conflicting agent-lane PR, `NULL`, blocked
+- `MERGE_GUARD_PROOF` artifact/job-summary evidence for PR A and PR B
+- maintainer removal-test answer
+
+## 7. Removal test
+
+Ask exactly:
+
+> If this check were removed, would your agent-authorship workflow become worse?
+> How?
+
+A dependency-forming answer identifies a concrete degradation, such as agent PRs
+being able to merge without declared authorship, maintainers returning to manual
+AI-authorship policing, or branch protection no longer encoding the repository's
+agent contribution rule.
+
+## 8. Success criteria
 
 The external dependency proof succeeds only when all of the following are true:
 
 - the repository is owned or maintained outside ContinuityOS
-- the existing Merge Guard action is installed without runtime changes
-- the protected branch requires the check named exactly `merge-guard`
-- PR A produces `VALID` evidence and remains mergeable
-- PR B produces `NULL` evidence and is blocked by the required check
-- both PRs provide `MERGE_GUARD_PROOF.json`
-- the maintainer states whether removal worsens their workflow
+- the maintainer first saw a report-only verdict before accepting enforcement
+- the existing action is installed at `@v0.3.0` without runtime changes
+- the protected branch requires the check named exactly `agent-attribution-gate`
+- one attributed agent-lane PR passes and is mergeable (`VALID`)
+- one under-attributed/conflicting agent-lane PR is blocked (`NULL`)
+- both outcomes provide proof artifacts or job-summary proof
+- the maintainer answers the removal-test question
 
-## 10. Non-Goals
+## 9. Non-goals
 
-This checklist does not create new authority, expand canon, change action behavior, change validator logic, change proof artifact shape, claim diff validation, claim review validation, claim final merge commit validation, or claim automatic human/agent authorship detection.
+This checklist does not create new authority, expand canon, change action
+behavior, change validator logic, change proof artifact shape, claim diff
+validation, claim review validation, claim final merge commit validation, or add
+new governance layers. It only proves whether the current issue-comment / PR
+attribution wedge becomes worse to remove for one outside maintainer.
