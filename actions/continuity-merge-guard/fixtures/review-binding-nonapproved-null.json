@@ -1,0 +1,20 @@
+{
+  "description": "Supplied review binding fails closed unless review state is APPROVED",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2204",
+    "head_sha": "5555555555555555555555555555555555555555",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "review_state": "COMMENTED",
+    "review_commit_sha": "5555555555555555555555555555555555555555"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": ["review_state"],
+  "expected_null_reasons": ["REVIEW_APPROVAL_REQUIRED"],
+  "expected_require_review_binding": "false",
+  "expected_review_binding_required": false,
+  "expected_review_state": "COMMENTED",
+  "expected_review_commit_sha": "5555555555555555555555555555555555555555"
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Required caller-supplied review binding is APPROVED and bound to head_sha",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2201",
+    "head_sha": "1111111111111111111111111111111111111111",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "require_review_binding": "true",
+    "review_state": "APPROVED",
+    "review_commit_sha": "1111111111111111111111111111111111111111",
+    "review_author": "maintainer-login"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": [],
+  "expected_null_reasons": [],
+  "expected_require_review_binding": "true",
+  "expected_review_binding_required": true,
+  "expected_review_state": "APPROVED",
+  "expected_review_commit_sha": "1111111111111111111111111111111111111111",
+  "expected_review_author": "maintainer-login"
+}

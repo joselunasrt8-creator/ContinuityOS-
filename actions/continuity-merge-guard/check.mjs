@@ -36,7 +36,9 @@ const REQUIRED_FIELDS = ['repo', 'pr_number', 'head_sha', 'base_sha', 'actor']
 const AUTHOR_KINDS = ['agent', 'human', 'unknown']
 const REQUIRE_AGENT_VALUES = ['true', 'false']
 const REQUIRE_DIFF_VALUES = ['true', 'false']
+const REQUIRE_REVIEW_VALUES = ['true', 'false']
 const SHA256_BINDING_RE = /^sha256:[0-9a-f]{64}$/
+const GIT_SHA_RE = /^[0-9a-f]{40}$/
 
 function normalizeString(v) {
   return typeof v === 'string' ? v.trim() : ''
@@ -57,11 +59,28 @@ function normalizeRequireDiffBinding(v) {
   return required
 }
 
+function normalizeRequireReviewBinding(v) {
+  const required = normalizeString(v).toLowerCase() || 'false'
+  return required
+}
+
 function normalizeChangedFilesHash(v) {
   return normalizeString(v).toLowerCase()
 }
 
 function normalizeChangedFilesCount(v) {
+  return normalizeString(v)
+}
+
+function normalizeReviewState(v) {
+  return normalizeString(v).toUpperCase()
+}
+
+function normalizeReviewCommitSha(v) {
+  return normalizeString(v).toLowerCase()
+}
+
+function normalizeReviewAuthor(v) {
   return normalizeString(v)
 }
 
@@ -80,11 +99,16 @@ export function evaluate(input) {
   const require_diff_binding = normalizeRequireDiffBinding(input.require_diff_binding)
   const changed_files_hash = normalizeChangedFilesHash(input.changed_files_hash)
   const changed_files_count = normalizeChangedFilesCount(input.changed_files_count)
+  const require_review_binding = normalizeRequireReviewBinding(input.require_review_binding)
+  const review_state = normalizeReviewState(input.review_state)
+  const review_commit_sha = normalizeReviewCommitSha(input.review_commit_sha)
+  const review_author = normalizeReviewAuthor(input.review_author)
 
   const invalid_fields = []
   if (!AUTHOR_KINDS.includes(author_kind)) invalid_fields.push('author_kind')
   if (!REQUIRE_AGENT_VALUES.includes(require_agent_authored)) invalid_fields.push('require_agent_authored')
   if (!REQUIRE_DIFF_VALUES.includes(require_diff_binding)) invalid_fields.push('require_diff_binding')
+  if (!REQUIRE_REVIEW_VALUES.includes(require_review_binding)) invalid_fields.push('require_review_binding')
 
   const null_reasons = []
   if (missing_fields.length > 0) null_reasons.push('MISSING_REQUIRED_FIELD')
@@ -112,6 +136,29 @@ export function evaluate(input) {
   if ((diff_binding_required || diff_binding_supplied) && !isNonNegativeIntegerString(changed_files_count)) {
     if (!null_reasons.includes('INVALID_DIFF_BINDING')) null_reasons.push('INVALID_DIFF_BINDING')
     if (!invalid_fields.includes('changed_files_count')) invalid_fields.push('changed_files_count')
+  }
+
+  const review_binding_required = require_review_binding === 'true'
+  const review_binding_supplied = review_state !== '' || review_commit_sha !== '' || review_author !== ''
+  const review_binding = {
+    review_state: review_state || null,
+    review_commit_sha: review_commit_sha || null,
+    review_author: review_author || null,
+    binding_mode: 'caller_supplied_v1',
+  }
+  if (review_binding_required && !review_binding_supplied) {
+    null_reasons.push('REVIEW_BINDING_REQUIRED')
+  }
+  if ((review_binding_required || review_binding_supplied) && review_state !== 'APPROVED') {
+    null_reasons.push('REVIEW_APPROVAL_REQUIRED')
+    if (!invalid_fields.includes('review_state')) invalid_fields.push('review_state')
+  }
+  if ((review_binding_required || review_binding_supplied) && !GIT_SHA_RE.test(review_commit_sha)) {
+    if (!null_reasons.includes('INVALID_REVIEW_BINDING')) null_reasons.push('INVALID_REVIEW_BINDING')
+    if (!invalid_fields.includes('review_commit_sha')) invalid_fields.push('review_commit_sha')
+  }
+  if ((review_binding_required || review_binding_supplied) && GIT_SHA_RE.test(review_commit_sha) && review_commit_sha !== normalizeReviewCommitSha(input.head_sha)) {
+    null_reasons.push('REVIEW_COMMIT_MISMATCH')
   }
 
   // Agent Identity (Phase 1): descriptive attribution, computed from available
@@ -144,6 +191,10 @@ export function evaluate(input) {
     canonical_payload.require_diff_binding = require_diff_binding
     canonical_payload.diff_binding = diff_binding
   }
+  if (review_binding_required || review_binding_supplied) {
+    canonical_payload.require_review_binding = require_review_binding
+    canonical_payload.review_binding = review_binding
+  }
 
   const canonical_hash = sha256Hex(canonicalize(canonical_payload))
   const result = null_reasons.length === 0 ? 'VALID' : 'NULL'
@@ -165,6 +216,9 @@ export function evaluate(input) {
     require_diff_binding,
     diff_binding_required,
     diff_binding,
+    require_review_binding,
+    review_binding_required,
+    review_binding,
     null_reasons,
     actor_attribution: attribution.actor_attribution,
     attribution_classification: attribution.attribution_classification,
@@ -196,6 +250,10 @@ function main() {
     require_diff_binding: process.env.MERGE_GUARD_REQUIRE_DIFF_BINDING || '',
     changed_files_hash: process.env.MERGE_GUARD_CHANGED_FILES_HASH || '',
     changed_files_count: process.env.MERGE_GUARD_CHANGED_FILES_COUNT || '',
+    require_review_binding: process.env.MERGE_GUARD_REQUIRE_REVIEW_BINDING || '',
+    review_state: process.env.MERGE_GUARD_REVIEW_STATE || '',
+    review_commit_sha: process.env.MERGE_GUARD_REVIEW_COMMIT_SHA || '',
+    review_author: process.env.MERGE_GUARD_REVIEW_AUTHOR || '',
   }
 
   const decision = evaluate(input)
@@ -215,6 +273,9 @@ function main() {
     require_diff_binding: decision.require_diff_binding,
     diff_binding_required: decision.diff_binding_required,
     diff_binding: decision.diff_binding,
+    require_review_binding: decision.require_review_binding,
+    review_binding_required: decision.review_binding_required,
+    review_binding: decision.review_binding,
     null_reasons: decision.null_reasons,
     actor_attribution: decision.actor_attribution,
     attribution_classification: decision.attribution_classification,
@@ -236,6 +297,11 @@ function main() {
   console.log(`diff_binding_required=${decision.diff_binding_required}`)
   console.log(`changed_files_hash=${decision.diff_binding.changed_files_hash || ''}`)
   console.log(`changed_files_count=${decision.diff_binding.changed_files_count ?? ''}`)
+  console.log(`require_review_binding=${decision.require_review_binding}`)
+  console.log(`review_binding_required=${decision.review_binding_required}`)
+  console.log(`review_state=${decision.review_binding.review_state || ''}`)
+  console.log(`review_commit_sha=${decision.review_binding.review_commit_sha || ''}`)
+  console.log(`review_author=${decision.review_binding.review_author || ''}`)
   console.log(`attribution_status=${decision.attribution_status}`)
   console.log(`attribution_classification=${decision.attribution_classification}`)
   console.log(`actor_kind=${decision.actor_attribution.actor_kind}`)
@@ -260,6 +326,10 @@ function main() {
     appendFileSync(githubOutput, `require_diff_binding=${decision.require_diff_binding}\n`)
     appendFileSync(githubOutput, `changed_files_hash=${decision.diff_binding.changed_files_hash || ''}\n`)
     appendFileSync(githubOutput, `changed_files_count=${decision.diff_binding.changed_files_count ?? ''}\n`)
+    appendFileSync(githubOutput, `require_review_binding=${decision.require_review_binding}\n`)
+    appendFileSync(githubOutput, `review_state=${decision.review_binding.review_state || ''}\n`)
+    appendFileSync(githubOutput, `review_commit_sha=${decision.review_binding.review_commit_sha || ''}\n`)
+    appendFileSync(githubOutput, `review_author=${decision.review_binding.review_author || ''}\n`)
     appendFileSync(githubOutput, `attribution_status=${decision.attribution_status}\n`)
     appendFileSync(githubOutput, `attribution_classification=${decision.attribution_classification}\n`)
     appendFileSync(githubOutput, `actor_kind=${decision.actor_attribution.actor_kind}\n`)
@@ -280,6 +350,11 @@ function main() {
       `diff_binding_required: \`${decision.diff_binding_required}\``,
       `changed_files_hash: \`${decision.diff_binding.changed_files_hash || 'none'}\``,
       `changed_files_count: \`${decision.diff_binding.changed_files_count ?? 'none'}\``,
+      `require_review_binding: \`${decision.require_review_binding}\``,
+      `review_binding_required: \`${decision.review_binding_required}\``,
+      `review_state: \`${decision.review_binding.review_state || 'none'}\``,
+      `review_commit_sha: \`${decision.review_binding.review_commit_sha || 'none'}\``,
+      `review_author: \`${decision.review_binding.review_author || 'none'}\``,
       `attribution_status: \`${decision.attribution_status}\``,
       `attribution_classification: \`${decision.attribution_classification}\``,
       `actor_kind: \`${decision.actor_attribution.actor_kind}\``,

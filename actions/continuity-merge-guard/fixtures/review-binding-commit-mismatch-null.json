@@ -1,0 +1,20 @@
+{
+  "description": "Review binding fails closed when approved review commit does not match head_sha",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2203",
+    "head_sha": "3333333333333333333333333333333333333333",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "review_state": "APPROVED",
+    "review_commit_sha": "4444444444444444444444444444444444444444"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": [],
+  "expected_null_reasons": ["REVIEW_COMMIT_MISMATCH"],
+  "expected_require_review_binding": "false",
+  "expected_review_binding_required": false,
+  "expected_review_state": "APPROVED",
+  "expected_review_commit_sha": "4444444444444444444444444444444444444444"
+}

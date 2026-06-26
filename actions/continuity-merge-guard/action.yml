@@ -66,6 +66,22 @@ inputs:
     description: 'Non-negative count of changed files represented by changed-files-hash'
     required: false
     default: ''
+  require-review-binding:
+    description: "Set to 'true' to require caller-supplied approving review evidence bound to head-sha"
+    required: false
+    default: 'false'
+  review-state:
+    description: "Caller-supplied review state; must be 'APPROVED' when review binding is required or supplied"
+    required: false
+    default: ''
+  review-commit-sha:
+    description: 'Caller-supplied review commit SHA; must equal head-sha when review binding is required or supplied'
+    required: false
+    default: ''
+  review-author:
+    description: 'Optional caller-supplied approving review actor/login recorded in the proof'
+    required: false
+    default: ''
 
 outputs:
   result:
@@ -107,6 +123,18 @@ outputs:
   changed_files_count:
     description: 'Caller-supplied changed-files count recorded in the proof'
     value: ${{ steps.merge-guard.outputs.changed_files_count }}
+  require_review_binding:
+    description: "Normalized review binding requirement: 'true' or 'false'"
+    value: ${{ steps.merge-guard.outputs.require_review_binding }}
+  review_state:
+    description: 'Caller-supplied review state recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.review_state }}
+  review_commit_sha:
+    description: 'Caller-supplied review commit SHA recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.review_commit_sha }}
+  review_author:
+    description: 'Optional caller-supplied approving review actor/login recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.review_author }}
 
 runs:
   using: 'composite'
@@ -131,6 +159,10 @@ runs:
         MERGE_GUARD_REQUIRE_DIFF_BINDING: ${{ inputs.require-diff-binding }}
         MERGE_GUARD_CHANGED_FILES_HASH: ${{ inputs.changed-files-hash }}
         MERGE_GUARD_CHANGED_FILES_COUNT: ${{ inputs.changed-files-count }}
+        MERGE_GUARD_REQUIRE_REVIEW_BINDING: ${{ inputs.require-review-binding }}
+        MERGE_GUARD_REVIEW_STATE: ${{ inputs.review-state }}
+        MERGE_GUARD_REVIEW_COMMIT_SHA: ${{ inputs.review-commit-sha }}
+        MERGE_GUARD_REVIEW_AUTHOR: ${{ inputs.review-author }}
       run: node "${{ github.action_path }}/check.mjs"
 
     - name: Upload merge guard proof

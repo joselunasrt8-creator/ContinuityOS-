@@ -56,6 +56,10 @@ Each run produces:
 - `require_diff_binding`: normalized `true` / `false` diff-evidence policy
 - `changed_files_hash`: optional caller-supplied `sha256:<hex>` changed-files/diff evidence hash
 - `changed_files_count`: optional non-negative changed-files count represented by `changed_files_hash`
+- `require_review_binding`: normalized `true` / `false` review-evidence policy
+- `review_state`: optional caller-supplied review state; must be `APPROVED` when supplied or required
+- `review_commit_sha`: optional caller-supplied review commit SHA; must match `head_sha` when supplied or required
+- `review_author`: optional caller-supplied approving review actor/login
 
 The proof is written to the job's step summary and uploaded as a workflow
 artifact named `MERGE_GUARD_PROOF`, so it is visible directly on the PR
@@ -110,6 +114,13 @@ Example `MERGE_GUARD_PROOF.json`:
       "changed_files_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "changed_files_count": 3,
       "binding_mode": "caller_supplied_v1"
+    },
+    "require_review_binding": "true",
+    "review_binding": {
+      "review_state": "APPROVED",
+      "review_commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "review_author": "maintainer-login",
+      "binding_mode": "caller_supplied_v1"
     }
   },
   "canonical_hash": "...",
@@ -124,6 +135,14 @@ Example `MERGE_GUARD_PROOF.json`:
   "diff_binding": {
     "changed_files_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "changed_files_count": 3,
+    "binding_mode": "caller_supplied_v1"
+  },
+  "require_review_binding": "true",
+  "review_binding_required": true,
+  "review_binding": {
+    "review_state": "APPROVED",
+    "review_commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "review_author": "maintainer-login",
     "binding_mode": "caller_supplied_v1"
   },
   "null_reasons": [],
@@ -148,6 +167,23 @@ When diff binding is required, missing or malformed evidence returns `NULL`
 with `DIFF_BINDING_REQUIRED` and/or `INVALID_DIFF_BINDING`. When omitted,
 legacy identity-only consumers keep the v1 canonical payload shape; no hidden
 checkout, review, or GitHub API state is introduced.
+
+### Review binding — caller-supplied v1
+
+Merge Guard can also bind the proof to explicit review evidence without calling
+the GitHub API or deciding which platform review is authoritative. Set
+`require-review-binding: 'true'` and pass:
+
+- `review-state`: must be `APPROVED`.
+- `review-commit-sha`: must equal the checked `head-sha`.
+- `review-author`: optional reviewer actor/login recorded in the proof.
+
+When review binding is required, missing evidence returns `NULL` with
+`REVIEW_BINDING_REQUIRED`. Supplied non-approval evidence returns
+`REVIEW_APPROVAL_REQUIRED`; malformed commit evidence returns
+`INVALID_REVIEW_BINDING`; an approval bound to any commit other than `head-sha`
+returns `REVIEW_COMMIT_MISMATCH`. Omitted review evidence keeps the legacy
+identity/diff payload shape and does not introduce hidden platform authority.
 
 ## Install (2 minutes)
 
@@ -334,8 +370,10 @@ determinism.
 
 Deferred to keep v1 minimal and installable in 2 minutes:
 
-- **Review binding** — require an approving review with
-  `commit_id == head_sha`.
+- **Review binding** — caller-supplied approving review evidence binding is
+  implemented as `require-review-binding` + `review-state` /
+  `review-commit-sha` / `review-author`. Automatic platform review discovery
+  remains deferred.
 - **Diff binding** — caller-supplied changed-files evidence binding is
   implemented as `require-diff-binding` + `changed-files-hash` /
   `changed-files-count`. Self-computed tree/diff binding remains deferred.

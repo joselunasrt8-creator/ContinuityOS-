@@ -91,6 +91,31 @@ for (const file of readdirSync(fixturesDir).sort()) {
     continue
   }
 
+  if (fixture.expected_require_review_binding && decision.require_review_binding !== fixture.expected_require_review_binding) {
+    recordFail(file, `expected require_review_binding ${fixture.expected_require_review_binding}, got ${decision.require_review_binding}`)
+    continue
+  }
+
+  if ('expected_review_binding_required' in fixture && decision.review_binding_required !== fixture.expected_review_binding_required) {
+    recordFail(file, `expected review_binding_required ${fixture.expected_review_binding_required}, got ${decision.review_binding_required}`)
+    continue
+  }
+
+  if (fixture.expected_review_state && decision.review_binding.review_state !== fixture.expected_review_state) {
+    recordFail(file, `expected review_state ${fixture.expected_review_state}, got ${decision.review_binding.review_state}`)
+    continue
+  }
+
+  if (fixture.expected_review_commit_sha && decision.review_binding.review_commit_sha !== fixture.expected_review_commit_sha) {
+    recordFail(file, `expected review_commit_sha ${fixture.expected_review_commit_sha}, got ${decision.review_binding.review_commit_sha}`)
+    continue
+  }
+
+  if (fixture.expected_review_author && decision.review_binding.review_author !== fixture.expected_review_author) {
+    recordFail(file, `expected review_author ${fixture.expected_review_author}, got ${decision.review_binding.review_author}`)
+    continue
+  }
+
   // Agent Identity (Phase 1) — every decision must carry a well-formed
   // attribution object recorded for the proof.
   const attr = decision.actor_attribution

@@ -1,0 +1,17 @@
+{
+  "description": "Required review binding fails closed when approval evidence is absent",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2202",
+    "head_sha": "2222222222222222222222222222222222222222",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "require_review_binding": "true"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": ["review_state", "review_commit_sha"],
+  "expected_null_reasons": ["REVIEW_BINDING_REQUIRED", "REVIEW_APPROVAL_REQUIRED", "INVALID_REVIEW_BINDING"],
+  "expected_require_review_binding": "true",
+  "expected_review_binding_required": true
+}
