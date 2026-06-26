@@ -371,6 +371,29 @@ and `canonical_hash` are unaffected by a `v0.1.0` → `v0.1.1` move. See
 `continuityos-sandbox`'s `VERSION_UPGRADE.md` for the continuity
 assessment.
 
+### Automatic classification guardrail
+
+Automatic agent/human classification is deliberately **not** implemented in
+Merge Guard. The current action records caller-supplied and workflow-supplied
+attribution evidence, but it does not decide which platform actor, label,
+branch, app, bot, or commit metadata source is authoritative for declaring
+authorship.
+
+That boundary is intentional: automatic classification would change who the
+system trusts to declare authorship. It must not be added as "just another
+field" or heuristic. A future implementation requires an explicit authority
+model that defines:
+
+- which external identity surfaces are trusted;
+- who is allowed to assert `AGENT_AUTHORED`, `AGENT_ASSISTED`, or
+  `HUMAN_AUTHORED`;
+- how conflicts fail closed;
+- how the authority model is versioned and proof-bound; and
+- how existing consumers remain backward-compatible.
+
+Until that model exists, attribution remains explicit evidence, not inferred
+authority.
+
 ### Known external consumers
 
 - [`joselunasrt8-creator/continuityos-sandbox`](https://github.com/joselunasrt8-creator/continuityos-sandbox) —
@@ -412,7 +435,9 @@ Deferred to keep v1 minimal and installable in 2 minutes:
   implemented as `require-merge-commit-binding` + `merge-commit-sha` /
   `merged-at`. Registry persistence and workflow-owned merge proof generation
   remain separate.
-- **Automatic agent classification** — derive agent/human classification from trusted platform evidence instead of requiring callers to pass `author-kind`.
+- **Automatic agent classification** — deferred until an explicit authority
+  model defines trusted identity surfaces, allowed authorship declarants,
+  conflict handling, versioning, proof binding, and backward compatibility.
 - **Policy binding** — org-level policy packs and templates.
 - **Merge proof generation** — workflow-owned persistence in the spirit of
   `merge-proof.yml`.
