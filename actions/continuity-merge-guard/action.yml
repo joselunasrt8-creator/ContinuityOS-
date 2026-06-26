@@ -54,6 +54,18 @@ inputs:
     description: 'Optional human operator id behind an agent-authored PR'
     required: false
     default: ''
+  require-diff-binding:
+    description: "Set to 'true' to require caller-supplied changed-files hash/count binding"
+    required: false
+    default: 'false'
+  changed-files-hash:
+    description: "sha256:<hex> hash of the canonical changed-files/diff evidence supplied by the caller"
+    required: false
+    default: ''
+  changed-files-count:
+    description: 'Non-negative count of changed files represented by changed-files-hash'
+    required: false
+    default: ''
 
 outputs:
   result:
@@ -86,6 +98,15 @@ outputs:
   attribution_evidence_hash:
     description: 'sha256 of the canonicalized attribution evidence array'
     value: ${{ steps.merge-guard.outputs.attribution_evidence_hash }}
+  require_diff_binding:
+    description: "Normalized diff binding requirement: 'true' or 'false'"
+    value: ${{ steps.merge-guard.outputs.require_diff_binding }}
+  changed_files_hash:
+    description: 'Caller-supplied changed-files evidence hash recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.changed_files_hash }}
+  changed_files_count:
+    description: 'Caller-supplied changed-files count recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.changed_files_count }}
 
 runs:
   using: 'composite'
@@ -107,6 +128,9 @@ runs:
         MERGE_GUARD_PR_LABELS: ${{ inputs.pr-labels }}
         MERGE_GUARD_COMMIT_TRAILERS: ${{ inputs.commit-trailers }}
         MERGE_GUARD_OPERATOR_ID: ${{ inputs.operator-id }}
+        MERGE_GUARD_REQUIRE_DIFF_BINDING: ${{ inputs.require-diff-binding }}
+        MERGE_GUARD_CHANGED_FILES_HASH: ${{ inputs.changed-files-hash }}
+        MERGE_GUARD_CHANGED_FILES_COUNT: ${{ inputs.changed-files-count }}
       run: node "${{ github.action_path }}/check.mjs"
 
     - name: Upload merge guard proof

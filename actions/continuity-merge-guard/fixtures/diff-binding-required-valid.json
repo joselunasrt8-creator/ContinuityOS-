@@ -1,0 +1,25 @@
+{
+  "description": "Required caller-supplied diff binding is complete and proof-bound",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2101",
+    "head_sha": "e1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "author_kind": "agent",
+    "require_agent_authored": "true",
+    "require_diff_binding": "true",
+    "changed_files_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "changed_files_count": "3"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": [],
+  "expected_null_reasons": [],
+  "expected_author_kind": "agent",
+  "expected_require_agent_authored": "true",
+  "expected_require_diff_binding": "true",
+  "expected_diff_binding_required": true,
+  "expected_changed_files_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_changed_files_count": 3
+}

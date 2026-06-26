@@ -53,6 +53,9 @@ Each run produces:
 - `attribution_classification`: `AGENT_AUTHORED`, `AGENT_ASSISTED`, `HUMAN_AUTHORED`, or `UNKNOWN`
 - `actor_kind`: normalized actor kind `human` / `agent` / `bot` / `unknown`
 - `attribution_evidence_hash`: sha256 of the canonicalized attribution evidence
+- `require_diff_binding`: normalized `true` / `false` diff-evidence policy
+- `changed_files_hash`: optional caller-supplied `sha256:<hex>` changed-files/diff evidence hash
+- `changed_files_count`: optional non-negative changed-files count represented by `changed_files_hash`
 
 The proof is written to the job's step summary and uploaded as a workflow
 artifact named `MERGE_GUARD_PROOF`, so it is visible directly on the PR
@@ -101,7 +104,13 @@ Example `MERGE_GUARD_PROOF.json`:
     "base_sha": "0123456789abcdef0123456789abcdef01234567",
     "actor": "some-contributor",
     "author_kind": "agent",
-    "require_agent_authored": "true"
+    "require_agent_authored": "true",
+    "require_diff_binding": "true",
+    "diff_binding": {
+      "changed_files_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "changed_files_count": 3,
+      "binding_mode": "caller_supplied_v1"
+    }
   },
   "canonical_hash": "...",
   "result": "VALID",
@@ -110,6 +119,13 @@ Example `MERGE_GUARD_PROOF.json`:
   "author_kind": "agent",
   "require_agent_authored": "true",
   "agent_author_required": true,
+  "require_diff_binding": "true",
+  "diff_binding_required": true,
+  "diff_binding": {
+    "changed_files_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "changed_files_count": 3,
+    "binding_mode": "caller_supplied_v1"
+  },
   "null_reasons": [],
   "generated_at": "2026-06-10T00:00:00.000Z",
   "record_type": "MERGE_GUARD_PROOF"
@@ -117,6 +133,21 @@ Example `MERGE_GUARD_PROOF.json`:
 ```
 
 For outside-owner adoption evidence, use the [External Dependency Proof Checklist](EXTERNAL_DEPENDENCY_PROOF_CHECKLIST.md).
+
+### Diff binding — caller-supplied v1
+
+Merge Guard can now bind the proof to explicit changed-files evidence without
+calling the GitHub API or inferring authority. Set `require-diff-binding:
+'true'` and pass both:
+
+- `changed-files-hash`: a `sha256:<hex>` digest of the caller's canonical
+  changed-files/diff evidence.
+- `changed-files-count`: the non-negative count represented by that evidence.
+
+When diff binding is required, missing or malformed evidence returns `NULL`
+with `DIFF_BINDING_REQUIRED` and/or `INVALID_DIFF_BINDING`. When omitted,
+legacy identity-only consumers keep the v1 canonical payload shape; no hidden
+checkout, review, or GitHub API state is introduced.
 
 ## Install (2 minutes)
 
@@ -305,8 +336,9 @@ Deferred to keep v1 minimal and installable in 2 minutes:
 
 - **Review binding** — require an approving review with
   `commit_id == head_sha`.
-- **Diff binding** — bind the proof to the changed files / tree, not just
-  the commit identity.
+- **Diff binding** — caller-supplied changed-files evidence binding is
+  implemented as `require-diff-binding` + `changed-files-hash` /
+  `changed-files-count`. Self-computed tree/diff binding remains deferred.
 - **Automatic agent classification** — derive agent/human classification from trusted platform evidence instead of requiring callers to pass `author-kind`.
 - **Policy binding** — org-level policy packs and templates.
 - **Merge commit binding** — extend the proof past merge to the resulting

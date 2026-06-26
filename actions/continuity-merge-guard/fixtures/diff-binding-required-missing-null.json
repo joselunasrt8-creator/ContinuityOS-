@@ -1,0 +1,18 @@
+{
+  "description": "Required diff binding fails closed when changed-files evidence is absent",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2102",
+    "head_sha": "f1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "require_diff_binding": "true"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": ["changed_files_hash", "changed_files_count"],
+  "expected_null_reasons": ["DIFF_BINDING_REQUIRED", "INVALID_DIFF_BINDING"],
+  "expected_require_diff_binding": "true",
+  "expected_diff_binding_required": true,
+  "expected_changed_files_count": null
+}

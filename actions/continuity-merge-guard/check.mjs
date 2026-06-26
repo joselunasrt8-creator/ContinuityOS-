@@ -35,6 +35,8 @@ export { canonicalize, sha256Hex }
 const REQUIRED_FIELDS = ['repo', 'pr_number', 'head_sha', 'base_sha', 'actor']
 const AUTHOR_KINDS = ['agent', 'human', 'unknown']
 const REQUIRE_AGENT_VALUES = ['true', 'false']
+const REQUIRE_DIFF_VALUES = ['true', 'false']
+const SHA256_BINDING_RE = /^sha256:[0-9a-f]{64}$/
 
 function normalizeString(v) {
   return typeof v === 'string' ? v.trim() : ''
@@ -50,6 +52,23 @@ function normalizeRequireAgentAuthored(v) {
   return required
 }
 
+function normalizeRequireDiffBinding(v) {
+  const required = normalizeString(v).toLowerCase() || 'false'
+  return required
+}
+
+function normalizeChangedFilesHash(v) {
+  return normalizeString(v).toLowerCase()
+}
+
+function normalizeChangedFilesCount(v) {
+  return normalizeString(v)
+}
+
+function isNonNegativeIntegerString(v) {
+  return /^(0|[1-9][0-9]*)$/.test(v)
+}
+
 export function evaluate(input) {
   const missing_fields = REQUIRED_FIELDS.filter(f => {
     const v = input[f]
@@ -58,10 +77,14 @@ export function evaluate(input) {
 
   const author_kind = normalizeAuthorKind(input.author_kind)
   const require_agent_authored = normalizeRequireAgentAuthored(input.require_agent_authored)
+  const require_diff_binding = normalizeRequireDiffBinding(input.require_diff_binding)
+  const changed_files_hash = normalizeChangedFilesHash(input.changed_files_hash)
+  const changed_files_count = normalizeChangedFilesCount(input.changed_files_count)
 
   const invalid_fields = []
   if (!AUTHOR_KINDS.includes(author_kind)) invalid_fields.push('author_kind')
   if (!REQUIRE_AGENT_VALUES.includes(require_agent_authored)) invalid_fields.push('require_agent_authored')
+  if (!REQUIRE_DIFF_VALUES.includes(require_diff_binding)) invalid_fields.push('require_diff_binding')
 
   const null_reasons = []
   if (missing_fields.length > 0) null_reasons.push('MISSING_REQUIRED_FIELD')
@@ -70,6 +93,25 @@ export function evaluate(input) {
   const agent_author_required = require_agent_authored === 'true'
   if (agent_author_required && author_kind !== 'agent') {
     null_reasons.push('AGENT_AUTHOR_REQUIRED')
+  }
+
+  const diff_binding_required = require_diff_binding === 'true'
+  const diff_binding_supplied = changed_files_hash !== '' || changed_files_count !== ''
+  const diff_binding = {
+    changed_files_hash: changed_files_hash || null,
+    changed_files_count: changed_files_count === '' ? null : Number(changed_files_count),
+    binding_mode: 'caller_supplied_v1',
+  }
+  if (diff_binding_required && !diff_binding_supplied) {
+    null_reasons.push('DIFF_BINDING_REQUIRED')
+  }
+  if ((diff_binding_required || diff_binding_supplied) && !SHA256_BINDING_RE.test(changed_files_hash)) {
+    null_reasons.push('INVALID_DIFF_BINDING')
+    if (!invalid_fields.includes('changed_files_hash')) invalid_fields.push('changed_files_hash')
+  }
+  if ((diff_binding_required || diff_binding_supplied) && !isNonNegativeIntegerString(changed_files_count)) {
+    if (!null_reasons.includes('INVALID_DIFF_BINDING')) null_reasons.push('INVALID_DIFF_BINDING')
+    if (!invalid_fields.includes('changed_files_count')) invalid_fields.push('changed_files_count')
   }
 
   // Agent Identity (Phase 1): descriptive attribution, computed from available
@@ -98,6 +140,10 @@ export function evaluate(input) {
   }, {})
   canonical_payload.author_kind = author_kind
   canonical_payload.require_agent_authored = require_agent_authored
+  if (diff_binding_required || diff_binding_supplied) {
+    canonical_payload.require_diff_binding = require_diff_binding
+    canonical_payload.diff_binding = diff_binding
+  }
 
   const canonical_hash = sha256Hex(canonicalize(canonical_payload))
   const result = null_reasons.length === 0 ? 'VALID' : 'NULL'
@@ -116,6 +162,9 @@ export function evaluate(input) {
     author_kind,
     require_agent_authored,
     agent_author_required,
+    require_diff_binding,
+    diff_binding_required,
+    diff_binding,
     null_reasons,
     actor_attribution: attribution.actor_attribution,
     attribution_classification: attribution.attribution_classification,
@@ -144,6 +193,9 @@ function main() {
     pr_labels: process.env.MERGE_GUARD_PR_LABELS || '',
     commit_trailers: process.env.MERGE_GUARD_COMMIT_TRAILERS || '',
     operator_id: process.env.MERGE_GUARD_OPERATOR_ID || '',
+    require_diff_binding: process.env.MERGE_GUARD_REQUIRE_DIFF_BINDING || '',
+    changed_files_hash: process.env.MERGE_GUARD_CHANGED_FILES_HASH || '',
+    changed_files_count: process.env.MERGE_GUARD_CHANGED_FILES_COUNT || '',
   }
 
   const decision = evaluate(input)
@@ -160,6 +212,9 @@ function main() {
     author_kind: decision.author_kind,
     require_agent_authored: decision.require_agent_authored,
     agent_author_required: decision.agent_author_required,
+    require_diff_binding: decision.require_diff_binding,
+    diff_binding_required: decision.diff_binding_required,
+    diff_binding: decision.diff_binding,
     null_reasons: decision.null_reasons,
     actor_attribution: decision.actor_attribution,
     attribution_classification: decision.attribution_classification,
@@ -177,6 +232,10 @@ function main() {
   console.log(`canonical_hash=${decision.canonical_hash}`)
   console.log(`author_kind=${decision.author_kind}`)
   console.log(`require_agent_authored=${decision.require_agent_authored}`)
+  console.log(`require_diff_binding=${decision.require_diff_binding}`)
+  console.log(`diff_binding_required=${decision.diff_binding_required}`)
+  console.log(`changed_files_hash=${decision.diff_binding.changed_files_hash || ''}`)
+  console.log(`changed_files_count=${decision.diff_binding.changed_files_count ?? ''}`)
   console.log(`attribution_status=${decision.attribution_status}`)
   console.log(`attribution_classification=${decision.attribution_classification}`)
   console.log(`actor_kind=${decision.actor_attribution.actor_kind}`)
@@ -198,6 +257,9 @@ function main() {
     appendFileSync(githubOutput, `proof_url=${proofPath}\n`)
     appendFileSync(githubOutput, `author_kind=${decision.author_kind}\n`)
     appendFileSync(githubOutput, `null_reasons=${decision.null_reasons.join(',')}\n`)
+    appendFileSync(githubOutput, `require_diff_binding=${decision.require_diff_binding}\n`)
+    appendFileSync(githubOutput, `changed_files_hash=${decision.diff_binding.changed_files_hash || ''}\n`)
+    appendFileSync(githubOutput, `changed_files_count=${decision.diff_binding.changed_files_count ?? ''}\n`)
     appendFileSync(githubOutput, `attribution_status=${decision.attribution_status}\n`)
     appendFileSync(githubOutput, `attribution_classification=${decision.attribution_classification}\n`)
     appendFileSync(githubOutput, `actor_kind=${decision.actor_attribution.actor_kind}\n`)
@@ -214,6 +276,10 @@ function main() {
       `proof_hash: \`${decision.canonical_hash}\``,
       `author_kind: \`${decision.author_kind}\``,
       `require_agent_authored: \`${decision.require_agent_authored}\``,
+      `require_diff_binding: \`${decision.require_diff_binding}\``,
+      `diff_binding_required: \`${decision.diff_binding_required}\``,
+      `changed_files_hash: \`${decision.diff_binding.changed_files_hash || 'none'}\``,
+      `changed_files_count: \`${decision.diff_binding.changed_files_count ?? 'none'}\``,
       `attribution_status: \`${decision.attribution_status}\``,
       `attribution_classification: \`${decision.attribution_classification}\``,
       `actor_kind: \`${decision.actor_attribution.actor_kind}\``,

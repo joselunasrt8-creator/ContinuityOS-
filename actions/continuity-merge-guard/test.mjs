@@ -71,6 +71,26 @@ for (const file of readdirSync(fixturesDir).sort()) {
     continue
   }
 
+  if (fixture.expected_require_diff_binding && decision.require_diff_binding !== fixture.expected_require_diff_binding) {
+    recordFail(file, `expected require_diff_binding ${fixture.expected_require_diff_binding}, got ${decision.require_diff_binding}`)
+    continue
+  }
+
+  if ('expected_diff_binding_required' in fixture && decision.diff_binding_required !== fixture.expected_diff_binding_required) {
+    recordFail(file, `expected diff_binding_required ${fixture.expected_diff_binding_required}, got ${decision.diff_binding_required}`)
+    continue
+  }
+
+  if (fixture.expected_changed_files_hash && decision.diff_binding.changed_files_hash !== fixture.expected_changed_files_hash) {
+    recordFail(file, `expected changed_files_hash ${fixture.expected_changed_files_hash}, got ${decision.diff_binding.changed_files_hash}`)
+    continue
+  }
+
+  if ('expected_changed_files_count' in fixture && decision.diff_binding.changed_files_count !== fixture.expected_changed_files_count) {
+    recordFail(file, `expected changed_files_count ${fixture.expected_changed_files_count}, got ${decision.diff_binding.changed_files_count}`)
+    continue
+  }
+
   // Agent Identity (Phase 1) — every decision must carry a well-formed
   // attribution object recorded for the proof.
   const attr = decision.actor_attribution
