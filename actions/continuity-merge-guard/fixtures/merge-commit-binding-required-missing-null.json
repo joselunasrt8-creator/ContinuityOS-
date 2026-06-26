@@ -1,0 +1,17 @@
+{
+  "description": "Required merge commit binding fails closed when post-merge evidence is absent",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2302",
+    "head_sha": "8888888888888888888888888888888888888888",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "require_merge_commit_binding": "true"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": ["merge_commit_sha", "merged_at"],
+  "expected_null_reasons": ["MERGE_COMMIT_BINDING_REQUIRED", "INVALID_MERGE_COMMIT_BINDING"],
+  "expected_require_merge_commit_binding": "true",
+  "expected_merge_commit_binding_required": true
+}

@@ -37,6 +37,7 @@ const AUTHOR_KINDS = ['agent', 'human', 'unknown']
 const REQUIRE_AGENT_VALUES = ['true', 'false']
 const REQUIRE_DIFF_VALUES = ['true', 'false']
 const REQUIRE_REVIEW_VALUES = ['true', 'false']
+const REQUIRE_MERGE_COMMIT_VALUES = ['true', 'false']
 const SHA256_BINDING_RE = /^sha256:[0-9a-f]{64}$/
 const GIT_SHA_RE = /^[0-9a-f]{40}$/
 
@@ -64,6 +65,11 @@ function normalizeRequireReviewBinding(v) {
   return required
 }
 
+function normalizeRequireMergeCommitBinding(v) {
+  const required = normalizeString(v).toLowerCase() || 'false'
+  return required
+}
+
 function normalizeChangedFilesHash(v) {
   return normalizeString(v).toLowerCase()
 }
@@ -81,6 +87,14 @@ function normalizeReviewCommitSha(v) {
 }
 
 function normalizeReviewAuthor(v) {
+  return normalizeString(v)
+}
+
+function normalizeMergeCommitSha(v) {
+  return normalizeString(v).toLowerCase()
+}
+
+function normalizeMergedAt(v) {
   return normalizeString(v)
 }
 
@@ -103,12 +117,16 @@ export function evaluate(input) {
   const review_state = normalizeReviewState(input.review_state)
   const review_commit_sha = normalizeReviewCommitSha(input.review_commit_sha)
   const review_author = normalizeReviewAuthor(input.review_author)
+  const require_merge_commit_binding = normalizeRequireMergeCommitBinding(input.require_merge_commit_binding)
+  const merge_commit_sha = normalizeMergeCommitSha(input.merge_commit_sha)
+  const merged_at = normalizeMergedAt(input.merged_at)
 
   const invalid_fields = []
   if (!AUTHOR_KINDS.includes(author_kind)) invalid_fields.push('author_kind')
   if (!REQUIRE_AGENT_VALUES.includes(require_agent_authored)) invalid_fields.push('require_agent_authored')
   if (!REQUIRE_DIFF_VALUES.includes(require_diff_binding)) invalid_fields.push('require_diff_binding')
   if (!REQUIRE_REVIEW_VALUES.includes(require_review_binding)) invalid_fields.push('require_review_binding')
+  if (!REQUIRE_MERGE_COMMIT_VALUES.includes(require_merge_commit_binding)) invalid_fields.push('require_merge_commit_binding')
 
   const null_reasons = []
   if (missing_fields.length > 0) null_reasons.push('MISSING_REQUIRED_FIELD')
@@ -161,6 +179,25 @@ export function evaluate(input) {
     null_reasons.push('REVIEW_COMMIT_MISMATCH')
   }
 
+  const merge_commit_binding_required = require_merge_commit_binding === 'true'
+  const merge_commit_binding_supplied = merge_commit_sha !== '' || merged_at !== ''
+  const merge_commit_binding = {
+    merge_commit_sha: merge_commit_sha || null,
+    merged_at: merged_at || null,
+    binding_mode: 'caller_supplied_post_merge_v1',
+  }
+  if (merge_commit_binding_required && !merge_commit_binding_supplied) {
+    null_reasons.push('MERGE_COMMIT_BINDING_REQUIRED')
+  }
+  if ((merge_commit_binding_required || merge_commit_binding_supplied) && !GIT_SHA_RE.test(merge_commit_sha)) {
+    null_reasons.push('INVALID_MERGE_COMMIT_BINDING')
+    if (!invalid_fields.includes('merge_commit_sha')) invalid_fields.push('merge_commit_sha')
+  }
+  if ((merge_commit_binding_required || merge_commit_binding_supplied) && merged_at === '') {
+    if (!null_reasons.includes('INVALID_MERGE_COMMIT_BINDING')) null_reasons.push('INVALID_MERGE_COMMIT_BINDING')
+    if (!invalid_fields.includes('merged_at')) invalid_fields.push('merged_at')
+  }
+
   // Agent Identity (Phase 1): descriptive attribution, computed from available
   // PR/workflow metadata. Gate policy:
   //   identity_present   -> continue
@@ -195,6 +232,10 @@ export function evaluate(input) {
     canonical_payload.require_review_binding = require_review_binding
     canonical_payload.review_binding = review_binding
   }
+  if (merge_commit_binding_required || merge_commit_binding_supplied) {
+    canonical_payload.require_merge_commit_binding = require_merge_commit_binding
+    canonical_payload.merge_commit_binding = merge_commit_binding
+  }
 
   const canonical_hash = sha256Hex(canonicalize(canonical_payload))
   const result = null_reasons.length === 0 ? 'VALID' : 'NULL'
@@ -219,6 +260,9 @@ export function evaluate(input) {
     require_review_binding,
     review_binding_required,
     review_binding,
+    require_merge_commit_binding,
+    merge_commit_binding_required,
+    merge_commit_binding,
     null_reasons,
     actor_attribution: attribution.actor_attribution,
     attribution_classification: attribution.attribution_classification,
@@ -254,6 +298,9 @@ function main() {
     review_state: process.env.MERGE_GUARD_REVIEW_STATE || '',
     review_commit_sha: process.env.MERGE_GUARD_REVIEW_COMMIT_SHA || '',
     review_author: process.env.MERGE_GUARD_REVIEW_AUTHOR || '',
+    require_merge_commit_binding: process.env.MERGE_GUARD_REQUIRE_MERGE_COMMIT_BINDING || '',
+    merge_commit_sha: process.env.MERGE_GUARD_MERGE_COMMIT_SHA || '',
+    merged_at: process.env.MERGE_GUARD_MERGED_AT || '',
   }
 
   const decision = evaluate(input)
@@ -276,6 +323,9 @@ function main() {
     require_review_binding: decision.require_review_binding,
     review_binding_required: decision.review_binding_required,
     review_binding: decision.review_binding,
+    require_merge_commit_binding: decision.require_merge_commit_binding,
+    merge_commit_binding_required: decision.merge_commit_binding_required,
+    merge_commit_binding: decision.merge_commit_binding,
     null_reasons: decision.null_reasons,
     actor_attribution: decision.actor_attribution,
     attribution_classification: decision.attribution_classification,
@@ -302,6 +352,10 @@ function main() {
   console.log(`review_state=${decision.review_binding.review_state || ''}`)
   console.log(`review_commit_sha=${decision.review_binding.review_commit_sha || ''}`)
   console.log(`review_author=${decision.review_binding.review_author || ''}`)
+  console.log(`require_merge_commit_binding=${decision.require_merge_commit_binding}`)
+  console.log(`merge_commit_binding_required=${decision.merge_commit_binding_required}`)
+  console.log(`merge_commit_sha=${decision.merge_commit_binding.merge_commit_sha || ''}`)
+  console.log(`merged_at=${decision.merge_commit_binding.merged_at || ''}`)
   console.log(`attribution_status=${decision.attribution_status}`)
   console.log(`attribution_classification=${decision.attribution_classification}`)
   console.log(`actor_kind=${decision.actor_attribution.actor_kind}`)
@@ -330,6 +384,9 @@ function main() {
     appendFileSync(githubOutput, `review_state=${decision.review_binding.review_state || ''}\n`)
     appendFileSync(githubOutput, `review_commit_sha=${decision.review_binding.review_commit_sha || ''}\n`)
     appendFileSync(githubOutput, `review_author=${decision.review_binding.review_author || ''}\n`)
+    appendFileSync(githubOutput, `require_merge_commit_binding=${decision.require_merge_commit_binding}\n`)
+    appendFileSync(githubOutput, `merge_commit_sha=${decision.merge_commit_binding.merge_commit_sha || ''}\n`)
+    appendFileSync(githubOutput, `merged_at=${decision.merge_commit_binding.merged_at || ''}\n`)
     appendFileSync(githubOutput, `attribution_status=${decision.attribution_status}\n`)
     appendFileSync(githubOutput, `attribution_classification=${decision.attribution_classification}\n`)
     appendFileSync(githubOutput, `actor_kind=${decision.actor_attribution.actor_kind}\n`)
@@ -355,6 +412,10 @@ function main() {
       `review_state: \`${decision.review_binding.review_state || 'none'}\``,
       `review_commit_sha: \`${decision.review_binding.review_commit_sha || 'none'}\``,
       `review_author: \`${decision.review_binding.review_author || 'none'}\``,
+      `require_merge_commit_binding: \`${decision.require_merge_commit_binding}\``,
+      `merge_commit_binding_required: \`${decision.merge_commit_binding_required}\``,
+      `merge_commit_sha: \`${decision.merge_commit_binding.merge_commit_sha || 'none'}\``,
+      `merged_at: \`${decision.merge_commit_binding.merged_at || 'none'}\``,
       `attribution_status: \`${decision.attribution_status}\``,
       `attribution_classification: \`${decision.attribution_classification}\``,
       `actor_kind: \`${decision.actor_attribution.actor_kind}\``,

@@ -1,0 +1,21 @@
+{
+  "description": "Required caller-supplied merge commit binding is complete for post-merge lifecycle proof",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2301",
+    "head_sha": "6666666666666666666666666666666666666666",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "require_merge_commit_binding": "true",
+    "merge_commit_sha": "7777777777777777777777777777777777777777",
+    "merged_at": "2026-06-26T00:00:00Z"
+  },
+  "expected_result": "VALID",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": [],
+  "expected_null_reasons": [],
+  "expected_require_merge_commit_binding": "true",
+  "expected_merge_commit_binding_required": true,
+  "expected_merge_commit_sha": "7777777777777777777777777777777777777777",
+  "expected_merged_at": "2026-06-26T00:00:00Z"
+}

@@ -82,6 +82,18 @@ inputs:
     description: 'Optional caller-supplied approving review actor/login recorded in the proof'
     required: false
     default: ''
+  require-merge-commit-binding:
+    description: "Set to 'true' to require caller-supplied post-merge commit evidence"
+    required: false
+    default: 'false'
+  merge-commit-sha:
+    description: 'Caller-supplied post-merge commit SHA recorded in the proof'
+    required: false
+    default: ''
+  merged-at:
+    description: 'Caller-supplied merge timestamp recorded in the proof'
+    required: false
+    default: ''
 
 outputs:
   result:
@@ -135,6 +147,15 @@ outputs:
   review_author:
     description: 'Optional caller-supplied approving review actor/login recorded in the proof'
     value: ${{ steps.merge-guard.outputs.review_author }}
+  require_merge_commit_binding:
+    description: "Normalized merge commit binding requirement: 'true' or 'false'"
+    value: ${{ steps.merge-guard.outputs.require_merge_commit_binding }}
+  merge_commit_sha:
+    description: 'Caller-supplied post-merge commit SHA recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.merge_commit_sha }}
+  merged_at:
+    description: 'Caller-supplied merge timestamp recorded in the proof'
+    value: ${{ steps.merge-guard.outputs.merged_at }}
 
 runs:
   using: 'composite'
@@ -163,6 +184,9 @@ runs:
         MERGE_GUARD_REVIEW_STATE: ${{ inputs.review-state }}
         MERGE_GUARD_REVIEW_COMMIT_SHA: ${{ inputs.review-commit-sha }}
         MERGE_GUARD_REVIEW_AUTHOR: ${{ inputs.review-author }}
+        MERGE_GUARD_REQUIRE_MERGE_COMMIT_BINDING: ${{ inputs.require-merge-commit-binding }}
+        MERGE_GUARD_MERGE_COMMIT_SHA: ${{ inputs.merge-commit-sha }}
+        MERGE_GUARD_MERGED_AT: ${{ inputs.merged-at }}
       run: node "${{ github.action_path }}/check.mjs"
 
     - name: Upload merge guard proof

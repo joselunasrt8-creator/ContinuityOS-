@@ -116,6 +116,26 @@ for (const file of readdirSync(fixturesDir).sort()) {
     continue
   }
 
+  if (fixture.expected_require_merge_commit_binding && decision.require_merge_commit_binding !== fixture.expected_require_merge_commit_binding) {
+    recordFail(file, `expected require_merge_commit_binding ${fixture.expected_require_merge_commit_binding}, got ${decision.require_merge_commit_binding}`)
+    continue
+  }
+
+  if ('expected_merge_commit_binding_required' in fixture && decision.merge_commit_binding_required !== fixture.expected_merge_commit_binding_required) {
+    recordFail(file, `expected merge_commit_binding_required ${fixture.expected_merge_commit_binding_required}, got ${decision.merge_commit_binding_required}`)
+    continue
+  }
+
+  if (fixture.expected_merge_commit_sha && decision.merge_commit_binding.merge_commit_sha !== fixture.expected_merge_commit_sha) {
+    recordFail(file, `expected merge_commit_sha ${fixture.expected_merge_commit_sha}, got ${decision.merge_commit_binding.merge_commit_sha}`)
+    continue
+  }
+
+  if (fixture.expected_merged_at && decision.merge_commit_binding.merged_at !== fixture.expected_merged_at) {
+    recordFail(file, `expected merged_at ${fixture.expected_merged_at}, got ${decision.merge_commit_binding.merged_at}`)
+    continue
+  }
+
   // Agent Identity (Phase 1) — every decision must carry a well-formed
   // attribution object recorded for the proof.
   const attr = decision.actor_attribution

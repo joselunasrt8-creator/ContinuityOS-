@@ -1,0 +1,20 @@
+{
+  "description": "Supplied merge commit binding fails closed when merge commit SHA is malformed",
+  "input": {
+    "repo": "joselunasrt8-creator/mindshift-demo",
+    "pr_number": "2303",
+    "head_sha": "9999999999999999999999999999999999999999",
+    "base_sha": "0123456789abcdef0123456789abcdef01234567",
+    "actor": "agent-contributor",
+    "merge_commit_sha": "not-a-git-sha",
+    "merged_at": "2026-06-26T00:01:00Z"
+  },
+  "expected_result": "NULL",
+  "expected_missing_fields": [],
+  "expected_invalid_fields": ["merge_commit_sha"],
+  "expected_null_reasons": ["INVALID_MERGE_COMMIT_BINDING"],
+  "expected_require_merge_commit_binding": "false",
+  "expected_merge_commit_binding_required": false,
+  "expected_merge_commit_sha": "not-a-git-sha",
+  "expected_merged_at": "2026-06-26T00:01:00Z"
+}

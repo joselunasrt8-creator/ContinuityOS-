@@ -60,6 +60,9 @@ Each run produces:
 - `review_state`: optional caller-supplied review state; must be `APPROVED` when supplied or required
 - `review_commit_sha`: optional caller-supplied review commit SHA; must match `head_sha` when supplied or required
 - `review_author`: optional caller-supplied approving review actor/login
+- `require_merge_commit_binding`: normalized `true` / `false` post-merge evidence policy
+- `merge_commit_sha`: optional caller-supplied post-merge commit SHA
+- `merged_at`: optional caller-supplied merge timestamp
 
 The proof is written to the job's step summary and uploaded as a workflow
 artifact named `MERGE_GUARD_PROOF`, so it is visible directly on the PR
@@ -121,6 +124,12 @@ Example `MERGE_GUARD_PROOF.json`:
       "review_commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
       "review_author": "maintainer-login",
       "binding_mode": "caller_supplied_v1"
+    },
+    "require_merge_commit_binding": "true",
+    "merge_commit_binding": {
+      "merge_commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "merged_at": "2026-06-10T00:05:00.000Z",
+      "binding_mode": "caller_supplied_post_merge_v1"
     }
   },
   "canonical_hash": "...",
@@ -144,6 +153,13 @@ Example `MERGE_GUARD_PROOF.json`:
     "review_commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
     "review_author": "maintainer-login",
     "binding_mode": "caller_supplied_v1"
+  },
+  "require_merge_commit_binding": "true",
+  "merge_commit_binding_required": true,
+  "merge_commit_binding": {
+    "merge_commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "merged_at": "2026-06-10T00:05:00.000Z",
+    "binding_mode": "caller_supplied_post_merge_v1"
   },
   "null_reasons": [],
   "generated_at": "2026-06-10T00:00:00.000Z",
@@ -184,6 +200,21 @@ When review binding is required, missing evidence returns `NULL` with
 `INVALID_REVIEW_BINDING`; an approval bound to any commit other than `head-sha`
 returns `REVIEW_COMMIT_MISMATCH`. Omitted review evidence keeps the legacy
 identity/diff payload shape and does not introduce hidden platform authority.
+
+### Merge commit binding — caller-supplied post-merge v1
+
+For post-merge lifecycle checks, Merge Guard can bind the proof to explicit
+merge-result evidence without pushing to a registry or calling the GitHub API.
+Set `require-merge-commit-binding: 'true'` and pass:
+
+- `merge-commit-sha`: the resulting merge commit SHA.
+- `merged-at`: the merge timestamp supplied by the caller/workflow.
+
+When merge commit binding is required, missing evidence returns `NULL` with
+`MERGE_COMMIT_BINDING_REQUIRED`. Malformed or incomplete supplied evidence
+returns `INVALID_MERGE_COMMIT_BINDING`. Omitted merge commit evidence keeps the
+legacy pre-merge identity/diff/review payload shape; this is evidence binding
+only, not proof-registry persistence or merge authorization.
 
 ## Install (2 minutes)
 
@@ -377,9 +408,13 @@ Deferred to keep v1 minimal and installable in 2 minutes:
 - **Diff binding** — caller-supplied changed-files evidence binding is
   implemented as `require-diff-binding` + `changed-files-hash` /
   `changed-files-count`. Self-computed tree/diff binding remains deferred.
+- **Merge commit binding** — caller-supplied post-merge evidence binding is
+  implemented as `require-merge-commit-binding` + `merge-commit-sha` /
+  `merged-at`. Registry persistence and workflow-owned merge proof generation
+  remain separate.
 - **Automatic agent classification** — derive agent/human classification from trusted platform evidence instead of requiring callers to pass `author-kind`.
 - **Policy binding** — org-level policy packs and templates.
-- **Merge commit binding** — extend the proof past merge to the resulting
-  `merge_commit_sha`, in the spirit of `merge-proof.yml`.
+- **Merge proof generation** — workflow-owned persistence in the spirit of
+  `merge-proof.yml`.
 - **Registry persistence** — append-only proof registry via PR, following
   the pattern in `governance/merge-legitimacy/merge_proof_registry.jsonl`.
