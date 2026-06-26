@@ -45,6 +45,22 @@ function normalizeString(v) {
   return typeof v === 'string' ? v.trim() : ''
 }
 
+export function formatGitHubOutputRecord(name, value) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(`Invalid GitHub output name: ${name}`)
+  }
+
+  const text = value === undefined || value === null ? '' : String(value)
+  let delimiter = `MERGE_GUARD_OUTPUT_${sha256Hex(`${name}\0${text}`).slice(0, 16)}`
+  let suffix = 0
+  while (text.split(/\r?\n/).includes(delimiter)) {
+    suffix++
+    delimiter = `MERGE_GUARD_OUTPUT_${sha256Hex(`${name}\0${suffix}\0${text}`).slice(0, 16)}`
+  }
+
+  return `${name}<<${delimiter}\n${text}\n${delimiter}\n`
+}
+
 function normalizeAuthorKind(v) {
   const authorKind = normalizeString(v).toLowerCase() || 'unknown'
   return authorKind
@@ -371,26 +387,31 @@ function main() {
 
   const githubOutput = process.env.GITHUB_OUTPUT
   if (githubOutput) {
-    appendFileSync(githubOutput, `result=${decision.result}\n`)
-    appendFileSync(githubOutput, `proof_id=${decision.proof_id}\n`)
-    appendFileSync(githubOutput, `proof_hash=${decision.canonical_hash}\n`)
-    appendFileSync(githubOutput, `proof_url=${proofPath}\n`)
-    appendFileSync(githubOutput, `author_kind=${decision.author_kind}\n`)
-    appendFileSync(githubOutput, `null_reasons=${decision.null_reasons.join(',')}\n`)
-    appendFileSync(githubOutput, `require_diff_binding=${decision.require_diff_binding}\n`)
-    appendFileSync(githubOutput, `changed_files_hash=${decision.diff_binding.changed_files_hash || ''}\n`)
-    appendFileSync(githubOutput, `changed_files_count=${decision.diff_binding.changed_files_count ?? ''}\n`)
-    appendFileSync(githubOutput, `require_review_binding=${decision.require_review_binding}\n`)
-    appendFileSync(githubOutput, `review_state=${decision.review_binding.review_state || ''}\n`)
-    appendFileSync(githubOutput, `review_commit_sha=${decision.review_binding.review_commit_sha || ''}\n`)
-    appendFileSync(githubOutput, `review_author=${decision.review_binding.review_author || ''}\n`)
-    appendFileSync(githubOutput, `require_merge_commit_binding=${decision.require_merge_commit_binding}\n`)
-    appendFileSync(githubOutput, `merge_commit_sha=${decision.merge_commit_binding.merge_commit_sha || ''}\n`)
-    appendFileSync(githubOutput, `merged_at=${decision.merge_commit_binding.merged_at || ''}\n`)
-    appendFileSync(githubOutput, `attribution_status=${decision.attribution_status}\n`)
-    appendFileSync(githubOutput, `attribution_classification=${decision.attribution_classification}\n`)
-    appendFileSync(githubOutput, `actor_kind=${decision.actor_attribution.actor_kind}\n`)
-    appendFileSync(githubOutput, `attribution_evidence_hash=${decision.attribution_evidence_hash}\n`)
+    const outputs = {
+      result: decision.result,
+      proof_id: decision.proof_id,
+      proof_hash: decision.canonical_hash,
+      proof_url: proofPath,
+      author_kind: decision.author_kind,
+      null_reasons: decision.null_reasons.join(','),
+      require_diff_binding: decision.require_diff_binding,
+      changed_files_hash: decision.diff_binding.changed_files_hash || '',
+      changed_files_count: decision.diff_binding.changed_files_count ?? '',
+      require_review_binding: decision.require_review_binding,
+      review_state: decision.review_binding.review_state || '',
+      review_commit_sha: decision.review_binding.review_commit_sha || '',
+      review_author: decision.review_binding.review_author || '',
+      require_merge_commit_binding: decision.require_merge_commit_binding,
+      merge_commit_sha: decision.merge_commit_binding.merge_commit_sha || '',
+      merged_at: decision.merge_commit_binding.merged_at || '',
+      attribution_status: decision.attribution_status,
+      attribution_classification: decision.attribution_classification,
+      actor_kind: decision.actor_attribution.actor_kind,
+      attribution_evidence_hash: decision.attribution_evidence_hash,
+    }
+    for (const [name, value] of Object.entries(outputs)) {
+      appendFileSync(githubOutput, formatGitHubOutputRecord(name, value))
+    }
   }
 
   const githubStepSummary = process.env.GITHUB_STEP_SUMMARY

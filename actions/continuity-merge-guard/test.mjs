@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { evaluate } from './check.mjs'
+import { evaluate, formatGitHubOutputRecord } from './check.mjs'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const fixturesDir = join(dir, 'fixtures')
@@ -22,6 +22,61 @@ function recordPass(name, message) {
 function recordFail(name, message) {
   failCount++
   console.error(`  ${name} FAIL — ${message}`)
+}
+
+
+function parseSingleGitHubOutputRecord(record) {
+  const lines = record.split('\n')
+  const headerMatch = lines[0].match(/^([A-Za-z_][A-Za-z0-9_]*)<<(.+)$/)
+  if (!headerMatch) return null
+  const [, name, delimiter] = headerMatch
+  const endIndex = lines.indexOf(delimiter, 1)
+  if (endIndex === -1) return null
+  return {
+    name,
+    value: lines.slice(1, endIndex).join('\n'),
+    trailing: lines.slice(endIndex + 1).filter(Boolean),
+  }
+}
+
+function runGitHubOutputEscapingGuard() {
+  const callerSuppliedOutputNames = [
+    'changed_files_hash',
+    'changed_files_count',
+    'review_state',
+    'review_commit_sha',
+    'review_author',
+    'merge_commit_sha',
+    'merged_at',
+  ]
+  const injectedValue = 'maintainer-login\nspoofed_output=spoofed-value\nanother<<EOF\nspoofed\nEOF'
+
+  for (const outputName of callerSuppliedOutputNames) {
+    const record = formatGitHubOutputRecord(outputName, injectedValue)
+    const parsed = parseSingleGitHubOutputRecord(record)
+    if (!parsed) {
+      recordFail('GITHUB_OUTPUT_ESCAPING', `${outputName} was not emitted as a multiline GitHub output record`)
+      return
+    }
+    if (parsed.name !== outputName) {
+      recordFail('GITHUB_OUTPUT_ESCAPING', `expected output ${outputName}, got ${parsed.name}`)
+      return
+    }
+    if (parsed.value !== injectedValue) {
+      recordFail('GITHUB_OUTPUT_ESCAPING', `${outputName} did not preserve the caller-supplied value inside the output frame`)
+      return
+    }
+    if (parsed.trailing.length > 0) {
+      recordFail('GITHUB_OUTPUT_ESCAPING', `${outputName} emitted trailing records outside the output frame: ${parsed.trailing.join(',')}`)
+      return
+    }
+    if (record.startsWith(`${outputName}=${injectedValue}`)) {
+      recordFail('GITHUB_OUTPUT_ESCAPING', `${outputName} used unsafe name=value output framing`)
+      return
+    }
+  }
+
+  recordPass('GITHUB_OUTPUT_ESCAPING', 'caller-supplied multiline output values are delimiter-framed for every caller-supplied output')
 }
 
 console.log('=== ContinuityOS Merge Guard — conformance test ===\n')
@@ -178,6 +233,8 @@ for (const file of readdirSync(fixturesDir).sort()) {
 
   recordPass(file, fixture.description)
 }
+
+runGitHubOutputEscapingGuard()
 
 const total = passCount + failCount
 console.log(`\nTotal: ${total}  |  PASS: ${passCount}  |  FAIL: ${failCount}`)
