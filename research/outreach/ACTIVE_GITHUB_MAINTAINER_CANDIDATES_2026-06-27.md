@@ -32,6 +32,16 @@ Primary public evidence consulted:
 - Microsoft AutoGen repository and discussions establish active agent-framework relevance, but the repository page also states maintenance mode; therefore AutoGen candidates are treated cautiously. Sources: <https://github.com/microsoft/autogen>, <https://github.com/microsoft/autogen/pulls>, <https://github.com/microsoft/autogen/discussions/7165>.
 - Recent ecosystem risk context was used only for relevance calibration: reports on Copilot coding-agent PR-tip controversy, AutoGen Studio local-control vulnerabilities, and LangChain/LangGraph security issues. Sources: Windows Central, TechRadar, and GitHub project pages surfaced in search on 2026-06-27.
 
+
+## Authority tiering model
+
+This list intentionally separates *activity relevance* from *project authority*. A candidate can be highly relevant to Merge Guard without being confirmed as someone who can merge, release, or set branch-protection policy. Outreach should therefore use these tiers instead of treating every row as an equivalent maintainer lead:
+
+- **Tier 1 — Verified maintainers or repository owners with recent activity:** recent public activity plus ownership, maintainer identity, release responsibility, or repository-owner status is visible or strongly established. These are the best direct pilot asks.
+- **Tier 2 — Collaborators/reviewers with evidence of maintenance work:** recent public activity plus collaborator/member labels, repeated repo maintenance work, CI/docs/security upkeep, or review/triage-like behavior is visible. These are good routing asks and possible pilot sponsors, but authority should still be confirmed before assuming they can install a required check.
+- **Tier 3 — High-quality contributors with unverified merge authority:** recent relevant contribution is visible, but merge/release/branch-protection authority is not confirmed. These are not primary decision-maker leads; use them for discovery, referral, and workflow-pain validation only.
+- **Unqualified / revalidation required:** target repo or ecosystem is relevant, but a specific human maintainer and last-90-day maintainer action were not verified. Do not contact as a candidate until resolved.
+
 ## Fresh ranked candidate table
 
 | Rank | Name | GitHub | Repo | Ecosystem | Last Active Evidence | Activity Type | Contact Path | Why Relevant | Outreach Score |
@@ -86,6 +96,53 @@ Primary public evidence consulted:
 | 48 | OpenTelemetry maintainer | `open-telemetry/*` human maintainer TBD | OpenTelemetry | DevTools/governance | Active target; exact human maintainer evidence required | TBD | GitHub issues/discussions | Large governance-heavy project; relevance via CI trust and attribution, but AI-agent fit weaker | 4 |
 | 49 | Cloudflare Workers maintainer | `cloudflare/workers-sdk` human maintainer TBD | Cloudflare Workers | DevTools | Active target; exact recent maintainer event required | TBD | GitHub issues/discussions | ContinuityOS runtime context aligns, but outreach target must be verified | 4 |
 | 50 | Terraform provider maintainer | `hashicorp/terraform-provider-*` human maintainer TBD | Terraform providers | DevTools/infra | Active target; exact recent maintainer event required | TBD | GitHub issues/discussions | Protected-branch and CI governance fit; AI-agent relevance uncertain until repo workflow checked | 4 |
+
+
+## Outreach tiers
+
+### Tier 1 — Verified maintainers or repository owners with recent activity
+
+Use these for direct, concise pilot outreach because their authority is owner/maintainer-level or close enough to justify a direct evaluation ask. Still revalidate the exact contact path immediately before sending.
+
+1. `paul-gauthier` — Aider repository owner/maintainer context; direct AI coding-agent governance fit.
+2. `saoudrizwan` — visible Cline contributor/maintainer-context activity and direct agent-governance relevance.
+3. `abeatrix` — visible Cline collaborator activity; direct coding-agent workflow relevance.
+4. `sestinj` — repeated Continue maintenance/security dependency activity in the active coding-agent repo.
+5. `nick-hollon-lc` — repeated LangChain integration maintenance activity; strong framework-governance fit.
+
+### Tier 2 — Collaborators/reviewers with evidence of maintenance work
+
+Use these for pilot-routing asks, review-flow discovery, and GitHub Action evaluation if they confirm install authority.
+
+- `robinnewhouse`
+- `johnwschoi`
+- `arafatkatze`
+- `dominiccooney`
+- `Manpreet2298`
+- `maxpaulus43`
+- `Sarthak816`
+- `warmjademe`
+- `zied-jlassi`
+- `sbryngelson`
+- `davidmyriel`
+- `vishxrad`
+
+### Tier 3 — High-quality active contributors with unverified merge authority
+
+Use these for discovery, referrals, and pain validation. Do not frame them as maintainers unless same-day verification confirms maintainer/reviewer authority.
+
+- `ArnavGarg7`
+- `drewpoling2`
+- `vicksiyi`
+- `danielgonzagat`
+- `secondspass`
+- `mthamil107`
+- `sanjibani`
+- `minh2416294`
+
+### Unqualified / revalidation required before outreach
+
+Rows 26-50 remain useful search targets, but they should not be treated as production outreach leads until the exact human maintainer, public contact path, and last-90-day maintainer action are confirmed.
 
 ## Top 25 highest-quality candidates
 
@@ -160,7 +217,9 @@ These candidates have the lowest-friction first contact path: comment on their r
 
 Use the least intrusive channel first. Do not post generic product pitches into active PRs.
 
-- Candidates 1-25: GitHub profile contact if present; otherwise a concise, relevant GitHub issue/discussion in the project asking whether maintainers would evaluate a required PR-identity check for AI-authored PRs.
+- **Tier 1:** GitHub profile contact if present; otherwise a concise, relevant GitHub issue/discussion asking whether maintainers would evaluate a required PR-identity check for AI-authored PRs.
+- **Tier 2:** Ask whether they are the right maintainer/reviewer to route a lightweight GitHub Action evaluation; avoid assuming branch-protection authority.
+- **Tier 3:** Ask discovery/referral questions only; do not describe them as maintainers unless same-day verification confirms project authority.
 - Security-adjacent candidates (`zied-jlassi`, `impartshadow`, `Sarthak816`): start from the safety/security framing, not generic marketing.
 - Documentation/integration candidates (`sbryngelson`, `davidmyriel`, `vishxrad`, `mthamil107`, `sanjibani`): ask for routing to the maintainer who owns contribution governance if they are not the right person.
 - Large-org candidates (`microsoft/*`, `actions/*`, `docker/*`, `hashicorp/*`, `cloudflare/*`): use public issue/discussion channels only after identifying the correct human maintainer from a recent review/merge event.
@@ -181,8 +240,11 @@ Use the least intrusive channel first. Do not post generic product pitches into 
 ## Totals and readiness
 
 - Total candidates found/listed: 50.
-- Total qualified for careful outreach now: 25.
+- Total qualified for careful outreach now: 25, split by authority tier rather than treated as uniformly maintainer-authorized.
+- Tier 1 direct pilot candidates: 5.
+- Tier 2 collaborator/reviewer routing candidates: 12.
+- Tier 3 active contributor discovery/referral candidates: 8.
 - Total possible but requires revalidation or better authority evidence: 25.
 - Total explicitly rejected/removed categories: 8 categories.
 - Strongest first 10: `saoudrizwan`, `abeatrix`, `paul-gauthier`, `sestinj`, `nick-hollon-lc`, `robinnewhouse`, `ArnavGarg7`, `johnwschoi`, `arafatkatze`, `dominiccooney`.
-- Outreach-ready: partially. The top 25 are ready for careful, personalized, non-spam outreach after one final same-day click-through verification of contact path and recent activity. Rows 26-50 are not ready for direct outreach until a specific human maintainer and last-90-day maintainer action are confirmed.
+- Outreach-ready: partially. Tier 1 is ready for careful, personalized pilot outreach after one final same-day click-through verification of contact path and recent activity. Tier 2 is ready for routing/discovery outreach, not assumed install authority. Tier 3 is ready only for workflow-pain discovery or referral. Rows 26-50 are not ready for direct outreach until a specific human maintainer and last-90-day maintainer action are confirmed.
