@@ -170,6 +170,46 @@ These ambiguities block broad implementation. They do not block this documentati
 | Reconciliation | Concepts for drift, stale visibility, and convergence | Cross-tenant topology and registry settlement logic | Public language remains evidence-oriented; private layer remains governed |
 | Agent gateways | Public concept of governed agent execution | Actual admission control for tools, deployments, and agents | No public artifact may become a hidden execution capability |
 
+### 11.1 Proposed Separation Boundary
+
+The recommended separation is **protocol-public, operations-private**. OpenContinuity should be public as a vocabulary, conformance, and proof-claim layer. ContinuityOS commercial infrastructure should remain private wherever it can admit execution, encode tenant policy, expose registry topology, or reveal operational reconciliation behavior.
+
+Public OpenContinuity may include:
+
+- invariant vocabulary and glossary terms;
+- legitimacy envelope schemas that are safe without tenant secrets;
+- conformance vectors and deterministic expected outcomes;
+- reference examples that cannot execute against production infrastructure;
+- public proof claim formats with redacted or synthetic topology identifiers;
+- adoption guides for CI checks, badges, and external dependency formation;
+- statements of non-authority, including that public conformance does not grant private runtime access.
+
+Private ContinuityOS / Continufy infrastructure should include:
+
+- tenant policy definitions, allowlists, deny rules, and authority binding logic;
+- API keys, secrets, credentials, deployment configuration, and Cloudflare/D1 operational state;
+- production registry contents, lineage indexes, proof storage, and reconciliation telemetry;
+- gateway admission control for tools, agents, deployments, and customer-specific automations;
+- causal clock implementation details when they expose topology, timing, or partition behavior;
+- customer integrations, enforcement policies, audit trails, and incident/break-glass procedures;
+- commercial packaging, billing, support operations, and customer-specific SLAs.
+
+Repository recommendation:
+
+| Repository | Visibility | Contents | Must not contain | Rationale |
+|---|---|---|---|---|
+| `opencontinuity` | Public | Protocol vocabulary, schemas, conformance vectors, badge rules, examples, non-authority docs | Secrets, tenant policy, production registry topology, execution gateways | Enables adoption without exposing authority surfaces |
+| `continuityos` or `continuityos-platform` | Private | Runtime gateways, policy engine, registry adapters, tenant reconciliation, deployment operations | Public-only claims that imply automatic authorization | Keeps execution-adjacent capability governed and commercially bounded |
+| Current canon/archive repo | Private by default until extraction is deliberate | Research canon, historical docs, implementation residue, migration planning | Unreviewed public protocol promises | Prevents accidental exposure of mixed public/private ontology and runtime surfaces |
+
+This does **not** require an immediate repo split during cooldown. The safe sequence is:
+
+1. tag public-candidate materials in the current repo;
+2. redact or syntheticize any topology, tenant, credential, or operational details;
+3. extract only stable protocol/conformance artifacts into a new public `opencontinuity` repo;
+4. keep execution gateways, registry integrations, policy internals, and customer operations in a private ContinuityOS platform repo;
+5. publish public artifacts only after they are explicitly reviewed as non-authoritative and non-executable.
+
 ## 12. Offering Readiness Map
 
 | Offering | Readiness | Evidence of readiness | Blocking gap | Cooldown action |
