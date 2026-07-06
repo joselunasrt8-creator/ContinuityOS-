@@ -1,5 +1,12 @@
 # ContinuityOS
 
+<p align="center">
+  <img
+    src="figures/continuityos-runtime-banner.png"
+    alt="ContinuityOS runtime flow: validate, govern, execute, prove"
+    width="100%">
+</p>
+
 ![ContinuityOS runtime overview](figures/continuityos-runtime.svg)
 
 ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
