@@ -7,8 +7,6 @@
     width="100%">
 </p>
 
-![ContinuityOS runtime overview](figures/continuityos-runtime.svg)
-
 ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
 
 This repository contains a Cloudflare Worker and D1-backed runtime, conformance harnesses, portable demos, and governance artifacts for validating state-changing actions before execution. It exists to make execution-capable AI and automation systems fail closed: an action is executed only when the exact proposed object is valid, authorized, unused, policy-compliant, replay-safe, topology-visible, reconcilable, epoch-valid, and convergence-valid.
