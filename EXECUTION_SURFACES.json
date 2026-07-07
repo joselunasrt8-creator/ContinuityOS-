@@ -20,8 +20,33 @@
       "mutation_type": "deployment",
       "risk_class": "P3",
       "classification": "state_changing_execution_surface",
-      "capabilities": ["governed deploy", "proof persistence"],
-      "required_controls": ["ACTIVE authority", "VALID exact AEO", "unused invocation_nonce", "proof persistence"]
+      "capabilities": [
+        "governed deploy",
+        "proof persistence"
+      ],
+      "required_controls": [
+        "ACTIVE authority",
+        "VALID exact AEO",
+        "unused invocation_nonce",
+        "proof persistence"
+      ],
+      "mutation_capable": true,
+      "execution_capable": true,
+      "deployment_capable": true,
+      "replay_semantics": "single_use_invocation_nonce_required",
+      "authority_requirements": [
+        "ACTIVE authority",
+        "VALID exact AEO"
+      ],
+      "proof_requirements": [
+        "proof persistence"
+      ],
+      "validation_requirements": [
+        "validated_object_hash must match compiled and executed object"
+      ],
+      "governance_addressability": "governed deployment workflow",
+      "evidence_only": false,
+      "canonical_boundary_classification": "deployment_execution_boundary"
     },
     {
       "surface_id": "github_prepare_governed_deploy_workflow",
@@ -29,8 +54,32 @@
       "mutation_type": "authority_preparation",
       "risk_class": "P2",
       "classification": "execution_adjacent_mutation_surface",
-      "capabilities": ["session creation", "authority creation", "compile"],
-      "required_controls": ["explicit workflow_dispatch only", "valid worker URL and API key"]
+      "capabilities": [
+        "session creation",
+        "authority creation",
+        "compile"
+      ],
+      "required_controls": [
+        "explicit workflow_dispatch only",
+        "valid worker URL and API key"
+      ],
+      "mutation_capable": true,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "prepares nonce; downstream deployment enforces single use",
+      "authority_requirements": [
+        "explicit workflow_dispatch",
+        "runtime API key"
+      ],
+      "proof_requirements": [
+        "compile output and downstream proof lineage"
+      ],
+      "validation_requirements": [
+        "session, continuity, authority, and compile must succeed"
+      ],
+      "governance_addressability": "deployment preparation workflow",
+      "evidence_only": false,
+      "canonical_boundary_classification": "authority_preparation_boundary"
     },
     {
       "surface_id": "cloudflare_worker_runtime_router",
@@ -38,8 +87,31 @@
       "mutation_type": "runtime_execution",
       "risk_class": "P3",
       "classification": "runtime_boundary_surface",
-      "capabilities": ["D1 registry writes", "runtime lifecycle"],
-      "required_controls": ["VALID exact AEO", "replay protection", "proof capture"]
+      "capabilities": [
+        "D1 registry writes",
+        "runtime lifecycle"
+      ],
+      "required_controls": [
+        "VALID exact AEO",
+        "replay protection",
+        "proof capture"
+      ],
+      "mutation_capable": true,
+      "execution_capable": true,
+      "deployment_capable": false,
+      "replay_semantics": "runtime replay protection and proof capture required",
+      "authority_requirements": [
+        "VALID exact AEO"
+      ],
+      "proof_requirements": [
+        "proof capture"
+      ],
+      "validation_requirements": [
+        "VALID exact AEO and route contract validation"
+      ],
+      "governance_addressability": "runtime router",
+      "evidence_only": false,
+      "canonical_boundary_classification": "runtime_execution_boundary"
     },
     {
       "surface_id": "d1_schema_and_migrations",
@@ -52,7 +124,11 @@
       "production_apply_path": "governed_workflow_only",
       "raw_production_apply": "DENIED",
       "bypass_response": "UNBOUND_DATABASE_WRITE -> NULL",
-      "capabilities": ["D1 registry writes", "schema evolution", "legitimacy column mutation"],
+      "capabilities": [
+        "D1 registry writes",
+        "schema evolution",
+        "legitimacy column mutation"
+      ],
       "required_controls": [
         "migration chain integrity",
         "canonical schema match",
@@ -79,7 +155,23 @@
         "proof_registry.workflow_run_id UNIQUE",
         "continuity_registry.continuity_hash UNIQUE",
         "invocation_registry PRIMARY_KEY(decision_id, validated_object_hash, invocation_nonce)"
-      ]
+      ],
+      "mutation_capable": true,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "migration chain integrity; no execution eligibility by itself",
+      "authority_requirements": [
+        "governed workflow or explicit governance evidence"
+      ],
+      "proof_requirements": [
+        "schema integrity evidence; creates no proof finality"
+      ],
+      "validation_requirements": [
+        "canonical schema match and legitimacy column preservation"
+      ],
+      "governance_addressability": "D1 schema and migrations",
+      "evidence_only": false,
+      "canonical_boundary_classification": "infrastructure_mutation_boundary"
     },
     {
       "surface_id": "package_manager_scripts",
@@ -87,8 +179,29 @@
       "mutation_type": "script_execution",
       "risk_class": "P1",
       "classification": "execution_adjacent_mutation_surface",
-      "capabilities": ["npm script execution"],
-      "required_controls": ["deploy script disabled", "governed workflow only"]
+      "capabilities": [
+        "npm script execution"
+      ],
+      "required_controls": [
+        "deploy script disabled",
+        "governed workflow only"
+      ],
+      "mutation_capable": true,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "direct deploy script fails closed; governed workflow required",
+      "authority_requirements": [
+        "governed workflow only"
+      ],
+      "proof_requirements": [
+        "none; execution-adjacent only"
+      ],
+      "validation_requirements": [
+        "deploy script disabled guard"
+      ],
+      "governance_addressability": "package scripts",
+      "evidence_only": false,
+      "canonical_boundary_classification": "local_script_execution_boundary"
     },
     {
       "surface_id": "wrangler_configuration",
@@ -96,8 +209,29 @@
       "mutation_type": "deploy_configuration",
       "risk_class": "P2",
       "classification": "execution_adjacent_mutation_surface",
-      "capabilities": ["wrangler deploy configuration"],
-      "required_controls": ["no direct wrangler deploy", "governed workflow only"]
+      "capabilities": [
+        "wrangler deploy configuration"
+      ],
+      "required_controls": [
+        "no direct wrangler deploy",
+        "governed workflow only"
+      ],
+      "mutation_capable": true,
+      "execution_capable": false,
+      "deployment_capable": true,
+      "replay_semantics": "configuration is deploy-capable only through governed workflow",
+      "authority_requirements": [
+        "governed workflow only"
+      ],
+      "proof_requirements": [
+        "none; deploy configuration only"
+      ],
+      "validation_requirements": [
+        "no direct wrangler deploy"
+      ],
+      "governance_addressability": "wrangler deployment configuration",
+      "evidence_only": false,
+      "canonical_boundary_classification": "deployment_configuration_boundary"
     },
     {
       "surface_id": "legacy_demo_entrypoints",
@@ -105,8 +239,29 @@
       "mutation_type": "legacy_execution",
       "risk_class": "P1",
       "classification": "legacy_surface",
-      "capabilities": ["legacy runtime invocation"],
-      "required_controls": ["not production-capable", "demo only"]
+      "capabilities": [
+        "legacy runtime invocation"
+      ],
+      "required_controls": [
+        "not production-capable",
+        "demo only"
+      ],
+      "mutation_capable": false,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "demo-only; not production capable",
+      "authority_requirements": [
+        "none; demo only"
+      ],
+      "proof_requirements": [
+        "none"
+      ],
+      "validation_requirements": [
+        "not production-capable"
+      ],
+      "governance_addressability": "legacy demo entrypoint",
+      "evidence_only": false,
+      "canonical_boundary_classification": "legacy_demo_boundary"
     },
     {
       "surface_id": "static_demo_webhook_objects",
@@ -114,8 +269,29 @@
       "mutation_type": "webhook_demo",
       "risk_class": "P1",
       "classification": "demo_surface",
-      "capabilities": ["transfer_webhook intent"],
-      "required_controls": ["demo only", "not production-capable"]
+      "capabilities": [
+        "transfer_webhook intent"
+      ],
+      "required_controls": [
+        "demo only",
+        "not production-capable"
+      ],
+      "mutation_capable": false,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "demo-only static intent object; not production capable",
+      "authority_requirements": [
+        "none; demo only"
+      ],
+      "proof_requirements": [
+        "none"
+      ],
+      "validation_requirements": [
+        "not production-capable"
+      ],
+      "governance_addressability": "static demo webhook object",
+      "evidence_only": false,
+      "canonical_boundary_classification": "demo_webhook_boundary"
     },
     {
       "surface_id": "github_production_deploy",
@@ -128,7 +304,24 @@
         "VALID exact AEO",
         "unused invocation_nonce",
         "proof persistence"
-      ]
+      ],
+      "mutation_capable": true,
+      "execution_capable": true,
+      "deployment_capable": true,
+      "replay_semantics": "single_use_invocation_nonce_required",
+      "authority_requirements": [
+        "ACTIVE authority",
+        "VALID exact AEO"
+      ],
+      "proof_requirements": [
+        "proof persistence"
+      ],
+      "validation_requirements": [
+        "validated_object_hash must match compiled and executed object"
+      ],
+      "governance_addressability": "governance runtime deployment projection",
+      "evidence_only": false,
+      "canonical_boundary_classification": "deployment_execution_boundary"
     },
     {
       "surface_id": "prepare_governed_deploy",
@@ -145,7 +338,24 @@
         "authority creation must bind matching decision_id and continuity_id",
         "compile must return validated_object_hash",
         "generated invocation_nonce must be single-use downstream"
-      ]
+      ],
+      "mutation_capable": true,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "prepares nonce; downstream deployment enforces single use",
+      "authority_requirements": [
+        "explicit workflow_dispatch",
+        "valid worker URL and API key"
+      ],
+      "proof_requirements": [
+        "compile output and downstream proof lineage"
+      ],
+      "validation_requirements": [
+        "session, continuity, authority, and compile must succeed"
+      ],
+      "governance_addressability": "governance runtime deployment-preparation projection",
+      "evidence_only": false,
+      "canonical_boundary_classification": "authority_preparation_boundary"
     },
     {
       "surface_id": "runtime_execute_route",
@@ -173,7 +383,23 @@
         "/reconcile/schedule",
         "/reconcile/report",
         "/reconcile/drift"
-      ]
+      ],
+      "mutation_capable": true,
+      "execution_capable": true,
+      "deployment_capable": false,
+      "replay_semantics": "runtime replay protection and proof capture required",
+      "authority_requirements": [
+        "VALID exact AEO"
+      ],
+      "proof_requirements": [
+        "proof capture"
+      ],
+      "validation_requirements": [
+        "canonical executable routes must enforce route contracts"
+      ],
+      "governance_addressability": "canonical runtime route projection",
+      "evidence_only": false,
+      "canonical_boundary_classification": "runtime_execution_boundary"
     },
     {
       "surface_id": "runtime_closure_inventory",
@@ -183,7 +409,22 @@
       "proof_type": "closure_audit_hash",
       "risk_class": "P0",
       "evidence_only": true,
-      "non_authoritative": true
+      "non_authoritative": true,
+      "mutation_capable": false,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "replay-neutral evidence only",
+      "authority_requirements": [
+        "none; cannot authorize execution"
+      ],
+      "proof_requirements": [
+        "closure_audit_hash"
+      ],
+      "validation_requirements": [
+        "classification only"
+      ],
+      "governance_addressability": "runtime closure inventory",
+      "canonical_boundary_classification": "evidence_only_observability_boundary"
     },
     {
       "surface_id": "database_write_surface_inventory",
@@ -193,7 +434,22 @@
       "proof_type": "closure_audit_hash",
       "risk_class": "P0",
       "evidence_only": true,
-      "non_authoritative": true
+      "non_authoritative": true,
+      "mutation_capable": false,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "replay-neutral evidence only",
+      "authority_requirements": [
+        "none; cannot authorize execution"
+      ],
+      "proof_requirements": [
+        "closure_audit_hash"
+      ],
+      "validation_requirements": [
+        "classification only"
+      ],
+      "governance_addressability": "database write surface inventory",
+      "canonical_boundary_classification": "evidence_only_database_boundary"
     },
     {
       "surface_id": "workflow_package_deploy_inventory",
@@ -203,7 +459,22 @@
       "proof_type": "closure_audit_hash",
       "risk_class": "P0",
       "evidence_only": true,
-      "non_authoritative": true
+      "non_authoritative": true,
+      "mutation_capable": false,
+      "execution_capable": false,
+      "deployment_capable": false,
+      "replay_semantics": "replay-neutral evidence only",
+      "authority_requirements": [
+        "none; cannot authorize execution"
+      ],
+      "proof_requirements": [
+        "closure_audit_hash"
+      ],
+      "validation_requirements": [
+        "classification only"
+      ],
+      "governance_addressability": "workflow/package deploy inventory",
+      "canonical_boundary_classification": "evidence_only_cicd_boundary"
     }
   ],
   "canonical_executable_routes": [
