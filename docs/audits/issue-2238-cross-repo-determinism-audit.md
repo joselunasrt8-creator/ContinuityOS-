@@ -6,7 +6,7 @@ Determine whether Issue #2238 (`SYS-001 — Determinism Contract Missing (Cross-
 
 ## Scope boundary
 
-This audit covers runtime, canonical serialization, replay, authority, proof, validation, conformance, execution surface registry, ecosystem boundary semantics, GitHub Actions, portability, federation, Merge Guard, and external repository integrations.
+This audit covers runtime, canonical serialization, replay, authority, proof, validation, conformance, execution surface registry, ecosystem boundary semantics, GitHub Actions, portability, federation, and Merge Guard. Cross-repository scope is limited to deterministic evidence equivalence, not adoption or dependency formation.
 
 This audit does **not** redesign runtime architecture, introduce a parallel determinism mechanism, widen authority, add replay restoration, or mutate any execution path.
 
@@ -37,7 +37,7 @@ No replay state is consumed, restored, or rewritten by this audit. The remaining
 
 ## Proof requirements
 
-Closure of #2238 requires repository evidence for internal determinism and independent cross-repository evidence showing that the same canonical objects, replay decisions, proof projections, validation classifications, execution outcomes, conformance results, portability bundles, and Merge Guard decisions remain stable outside this repository.
+Closure of #2238 requires repository evidence for internal determinism and cross-repository evidence showing that two repositories independently execute the same deterministic artifacts and produce equivalent deterministic evidence. Repository ownership, maintainer independence, adoption status, dependency formation, trust-building, and real-world usage are out of scope for #2238 and remain Issue #2145 concerns.
 
 ## Validation requirements
 
@@ -49,7 +49,7 @@ Minimum validation for this audit artifact:
 
 ## Unresolved ambiguity
 
-The repository contains internal deterministic mechanisms and portable conformance artifacts, but this audit found **INSUFFICIENT EVIDENCE** that independent external repositories have run and published matching deterministic artifacts. That absence is a verification gap, not proof that the internal runtime lacks determinism.
+The repository contains internal deterministic mechanisms and portable conformance artifacts, but this audit found **INSUFFICIENT EVIDENCE** that a second repository has executed the same deterministic artifacts and produced equivalent deterministic evidence. That absence is a verification gap, not proof that the internal runtime lacks determinism, and it is not an adoption/dependency-formation gap.
 
 ---
 
@@ -79,20 +79,19 @@ The repository already enforces deterministic execution internally. #2238 should
 
 | Cross-repository behavior | Status | Repository evidence | Missing evidence before closure |
 |---|---:|---|---|
-| Identical canonical hashes | PARTIAL | Deterministic legitimacy vectors include canonical forms and expected SHA-256 values; Merge Guard has a deterministic hash fixture and self-contained canonicalization. | At least one independent repository must run the same pack/action and publish matching canonical hashes for the same vectors or fixtures. |
-| Identical replay behavior | PARTIAL | Conformance pack includes consumed nonce and resurrection-attempt replay checks; runtime lineage tracks consumed nonces. | External repository evidence must show replay NULL behavior matches locally without consuming or restoring local runtime state. |
-| Identical proof generation/projection | PARTIAL | Proof CLI is observability-only; portability demos emit proof receipts internally; conformance pack checks append-only proof state. | External repository evidence must show matching proof projection/receipt classification. If external pack is evidence-only and does not generate production proofs, closure criteria should say “proof projection,” not “proof generation.” |
-| Identical validation decisions | PARTIAL | Conformance runner verifies exact-object and federation vectors; pack-v1 validator checks valid/mutated/missing-key objects. | Independent run logs must show the same VALID/NULL classifications. |
-| Identical execution outcomes | PARTIAL | Portability demos show VALID / replay-NULL / policy-NULL outcomes for filesystem write and GitHub issue comment surfaces. | Independent repository must demonstrate matching outcomes for a portable non-production or governed local surface, or explicitly mark production execution as NOT APPLICABLE. |
-| Identical conformance results | PARTIAL | `conformance/pack-v1/README.md` defines external install and expected pass signals; `conformance/runner.mjs` validates internal suites. | External repository must publish `PACK_V1_CONFORMANCE_COMPLETE` and `CONFORMANCE_EVIDENCE_OBSERVED` output or equivalent structured evidence. |
-| Deterministic portability bundles | PARTIAL | Demo portability docs and conformance pack provide copyable, zero-dependency external paths. | Bundle identity/hash and external run output are not yet recorded from an independent repo. |
-| Deterministic Merge Guard behavior | PARTIAL | Merge Guard action has copyable self-contained canonicalization and deterministic fixture tests; action output includes `proof_hash`. | Independent repository must pin the action or copied directory and publish matching `VALID`/`NULL` decisions and canonical hashes. |
-| Federation boundary behavior | PARTIAL | Federation suite requires remote authority claims to be quarantined and local validation to remain required. | Independent repository must show remote evidence is observed without becoming local execution authority. |
-| External repository integration | PARTIAL | Adoption and dependency-formation docs identify candidate/external dependency signals. | **INSUFFICIENT EVIDENCE** of an unaffiliated repository publishing deterministic artifacts sufficient to close #2238. |
+| Identical canonical hashes for the same deterministic vectors | PARTIAL | Deterministic legitimacy vectors include canonical forms and expected SHA-256 values; Merge Guard has a deterministic hash fixture and self-contained canonicalization. | Populate evidence from two repositories showing the same vector IDs or fixture names produce identical canonical hashes. |
+| Identical `VALID`/`NULL` validation classifications | PARTIAL | Conformance runner verifies exact-object and federation vectors; pack-v1 validator checks valid/mutated/missing-key objects. | Populate evidence from two repositories showing the same deterministic artifacts produce identical validation classifications. |
+| Identical replay decision for a representative replay vector | PARTIAL | Conformance pack includes consumed nonce and resurrection-attempt replay checks; runtime lineage tracks consumed nonces. | Populate evidence from two repositories showing the same representative replay vector produces the same replay decision without consuming or restoring runtime state. |
+| Identical Merge Guard or conformance proof hash for the same fixture | PARTIAL | Merge Guard action has copyable self-contained canonicalization and deterministic fixture tests; action output includes `proof_hash`; conformance vectors contain expected hashes. | Populate evidence from two repositories showing the same fixture produces the same Merge Guard `proof_hash` or conformance proof/evidence hash. |
+| Identical proof generation/projection beyond deterministic proof/evidence hash | NOT APPLICABLE | Proof CLI is observability-only; conformance evidence is sufficient for #2238 when hash equivalence is shown. | Not required by #2238. |
+| Identical execution outcomes | NOT APPLICABLE | Portability demos show internal VALID / replay-NULL / policy-NULL behavior, but #2238 closure is deterministic evidence equivalence, not production usage. | Not required by #2238 unless the issue is explicitly revised. |
+| Deterministic portability bundles | NOT APPLICABLE | Demo portability docs and conformance pack provide copyable paths, but bundle adoption is not a #2238 closure condition. | Not required by #2238; keep portability/adoption expansion outside this issue. |
+| Federation boundary behavior beyond deterministic validation classification | NOT APPLICABLE | Federation suite requires remote authority claims to be quarantined and local validation to remain required. | Not required by #2238 beyond the same deterministic `VALID`/`NULL` classification evidence. |
+| External repository adoption, dependency formation, independent maintainer proof, trust-building, or real-world usage | NOT APPLICABLE | These are dependency/adoption concerns, not determinism measurements. | Belongs to Issue #2145, not #2238. |
 
 ### Cross-repository audit conclusion
 
-Cross-repository determinism is not missing as a mechanism; it is missing as independently published evidence. The issue has been reduced to a bounded verification problem.
+Cross-repository determinism is not missing as a mechanism; it is missing as populated two-repository deterministic evidence. The issue has been reduced to a bounded verification problem. Repository ownership is irrelevant; equivalence of deterministic outputs is the measurement.
 
 ---
 
@@ -100,9 +99,9 @@ Cross-repository determinism is not missing as a mechanism; it is missing as ind
 
 Only the following gaps are truly missing for #2238:
 
-1. **External evidence capture gap** — No repository-local artifact records an independent external repository run with matching canonical hashes, replay classifications, proof projections, validation decisions, conformance output, portability behavior, and Merge Guard result.
-2. **Closure matrix gap** — No single issue-specific closure matrix maps each #2238 claim to `COMPLETE`, `PARTIAL`, `MISSING`, or `NOT APPLICABLE` with evidence links and explicit `INSUFFICIENT EVIDENCE` entries.
-3. **Candidate closure criteria gap** — Closure criteria need to distinguish internal determinism completion from cross-repository proof completion.
+1. **Two-repository evidence population gap** — No repository-local artifact records two repositories executing the same deterministic artifacts and producing equivalent deterministic evidence.
+2. **Evidence population gap, not matrix creation gap** — This document already contains an Internal Determinism Matrix and a Cross-Repository Determinism Matrix. The remaining gap is population of external evidence, not creation of another matrix.
+3. **Candidate closure criteria gap** — Closure criteria need to distinguish internal determinism completion from deterministic cross-repository evidence equivalence, while excluding adoption, dependency formation, trust-building, independent maintainer proof, and real-world usage.
 
 Not missing for #2238:
 
@@ -121,17 +120,14 @@ Not missing for #2238:
 ## 4. Minimal implementation plan
 
 1. Keep this audit as the issue-compression artifact.
-2. Capture one independent external repository conformance run using `conformance/pack-v1`:
-   - commit hash of this repository or pack copy source
-   - external repository URL/commit
-   - command output containing `PACK_V1_CONFORMANCE_COMPLETE` and `CONFORMANCE_EVIDENCE_OBSERVED`
-   - generated `conformance-pack-v1-evidence.json`
-3. Capture one independent Merge Guard run:
-   - external workflow file or pinned action reference
-   - `MERGE_GUARD_PROOF.json`
-   - `result`, `proof_id`, and `canonical_hash`/`proof_hash`
-4. Capture one portability or non-production governed execution run, or explicitly classify production execution as `NOT APPLICABLE` if the external repository only adopts conformance/Merge Guard evidence.
-5. Add the external evidence artifact under `evidence/` or `docs/audits/` without modifying runtime behavior.
+2. Execute the same deterministic vector/fixture set in this repository and one second repository, regardless of repository ownership.
+3. Record the minimum deterministic evidence from both repositories:
+   - identical canonical hashes for the same deterministic vectors
+   - identical `VALID`/`NULL` validation classifications
+   - identical replay decision for one representative replay vector
+   - identical Merge Guard or conformance proof hash for the same fixture
+4. Mark execution outcomes, portability bundles, federation behavior, adoption signals, and dependency formation as `NOT APPLICABLE` unless #2238 explicitly requires them.
+5. Add the two-repository deterministic evidence artifact under `evidence/` or `docs/audits/` without modifying runtime behavior.
 6. Re-run `npm run conformance`, `node actions/continuity-merge-guard/test.mjs`, and `git diff --check`.
 
 ---
@@ -141,9 +137,12 @@ Not missing for #2238:
 #2238 can close when all of the following are true:
 
 - Internal determinism remains `COMPLETE` for canonical identity, deterministic hashing, exact-object validation/execution parity, replay safety, proof lineage, execution ordering, append-only registries, execution surface governance, ecosystem boundary semantics, conformance enforcement, and internal CI reproducibility.
-- At least one independent repository publishes matching conformance evidence for deterministic vectors and replay/proof/validation classifications.
-- At least one independent repository publishes deterministic Merge Guard evidence with stable canonical hash/proof hash for the same fixture or PR context.
-- Any external execution/portability claim is either evidenced with deterministic VALID/NULL outcomes or explicitly marked `NOT APPLICABLE` because the external repository adopted only evidence-only conformance/Merge Guard checks.
+- Two repositories independently execute the same deterministic artifacts and produce equivalent deterministic evidence; repository ownership is irrelevant.
+- The two-repository evidence contains identical canonical hashes for the same deterministic vectors.
+- The two-repository evidence contains identical `VALID`/`NULL` validation classifications.
+- The two-repository evidence contains an identical replay decision for a representative replay vector.
+- The two-repository evidence contains an identical Merge Guard or conformance proof hash for the same fixture.
+- Execution outcomes, portability bundles, federation behavior, adoption signals, dependency formation, trust-building, independent maintainer proof, and real-world usage remain `NOT APPLICABLE` for #2238 unless a future issue revision explicitly adds them.
 - Remote evidence remains non-authoritative; no closure evidence claims distributed finality, portable authority, or local execution legitimacy without local validation.
 
 ---
@@ -152,6 +151,6 @@ Not missing for #2238:
 
 **IMPLEMENT THEN CLOSE**
 
-Interpretation: do not implement new runtime determinism. Implement only the minimum cross-repository evidence capture needed to prove already-implemented deterministic behavior across repository boundaries, then close #2238.
+Interpretation: do not implement new runtime determinism. Populate only the minimum two-repository deterministic evidence needed to prove already-implemented deterministic behavior across repository boundaries, then close #2238.
 
-If no independent external repository evidence can be produced, keep #2238 open but relabel/narrow it as a bounded cross-repository verification issue, not a missing internal determinism contract.
+If two-repository deterministic evidence cannot be produced yet, keep #2238 open as a bounded cross-repository verification issue. Do not expand #2238 into Issue #2145 dependency formation, adoption, independent maintainer, trust-building, or real-world usage work.
