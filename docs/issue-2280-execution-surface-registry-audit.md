@@ -62,7 +62,7 @@ Before this slice, the registry already identified surfaces but did not specify 
 
 ## 4. Missing tests only
 
-A targeted test now fails if any surface in `EXECUTION_SURFACES.json` lacks the required #2280 metadata fields or if evidence-only surfaces are marked mutation/execution/deployment capable.
+A targeted metadata-completeness test now fails if any surface in `EXECUTION_SURFACES.json` lacks the required surface-contract fields, if evidence-only surfaces are marked mutation/execution/deployment capable, or if basic capability metadata omits governance/proof/validation evidence. It is not a full semantic validator for every registry relationship.
 
 ## 5. Missing documentation only
 
@@ -91,4 +91,4 @@ Candidate compression: narrow #2280 to "canonical registry exists; close after u
 
 IMPLEMENT THEN CLOSE.
 
-The repository already contained the canonical execution surface registry. The only missing closure evidence was uniform required metadata plus a targeted validation test. That has been added without changing runtime behavior or introducing a second registry.
+The repository already contained the canonical execution surface registry. The only missing closure evidence was uniform required metadata plus a targeted metadata-completeness test. Issue disposition remains in this audit document, not in the canonical registry. That has been added without changing runtime behavior or introducing a second registry.

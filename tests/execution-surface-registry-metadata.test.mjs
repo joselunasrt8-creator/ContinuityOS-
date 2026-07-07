@@ -19,7 +19,18 @@ const requiredMetadata = [
 
 test('canonical execution surface registry carries required issue 2280 metadata on every surface', () => {
   assert.equal(registry.canonical_source_path, 'EXECUTION_SURFACES.json')
-  assert.deepEqual(registry.issue_2280_completion_evidence.required_metadata, requiredMetadata)
+  assert.deepEqual(requiredMetadata, [
+    'mutation_capable',
+    'execution_capable',
+    'deployment_capable',
+    'replay_semantics',
+    'authority_requirements',
+    'proof_requirements',
+    'validation_requirements',
+    'governance_addressability',
+    'evidence_only',
+    'canonical_boundary_classification',
+  ])
 
   for (const surface of registry.surfaces) {
     for (const field of requiredMetadata) {
@@ -36,6 +47,22 @@ test('canonical execution surface registry carries required issue 2280 metadata 
     assert.ok(Array.isArray(surface.authority_requirements))
     assert.ok(Array.isArray(surface.proof_requirements))
     assert.ok(Array.isArray(surface.validation_requirements))
+  }
+})
+
+
+test('capability metadata preserves basic governance and proof consistency', () => {
+  for (const surface of registry.surfaces) {
+    if (surface.deployment_capable) {
+      assert.notEqual(surface.governance_addressability.trim(), '', `${surface.surface_id} must be addressable`)
+      assert.equal(surface.validation_requirements.length > 0, true, `${surface.surface_id} must declare validation requirements`)
+    }
+
+    if (surface.execution_capable) {
+      assert.equal(surface.evidence_only, false, `${surface.surface_id} cannot be evidence-only while executable`)
+      assert.equal(surface.authority_requirements.length > 0, true, `${surface.surface_id} must declare authority requirements`)
+      assert.equal(surface.proof_requirements.length > 0, true, `${surface.surface_id} must declare proof requirements`)
+    }
   }
 })
 

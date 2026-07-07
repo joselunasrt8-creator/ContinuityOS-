@@ -523,22 +523,5 @@
     "unclassified_mutation_response": "UNDECLARED_MUTATION_SURFACE -> NULL",
     "evidence_only": true,
     "non_authoritative": true
-  },
-  "issue_2280_completion_evidence": {
-    "status": "IMPLEMENT_THEN_CLOSE",
-    "finding": "Canonical registry exists; this change adds missing per-surface metadata required to prove completeness without creating a second registry.",
-    "audit_artifact": "docs/issue-2280-execution-surface-registry-audit.md",
-    "required_metadata": [
-      "mutation_capable",
-      "execution_capable",
-      "deployment_capable",
-      "replay_semantics",
-      "authority_requirements",
-      "proof_requirements",
-      "validation_requirements",
-      "governance_addressability",
-      "evidence_only",
-      "canonical_boundary_classification"
-    ]
   }
 }
