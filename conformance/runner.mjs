@@ -75,6 +75,36 @@ function verifyAppendOnlyMigration(suite) {
   assert.match(migration, /BEFORE DELETE ON federated_checkpoint_registry/)
 }
 
+
+const CONF_CICD_CHECK_IDS = [
+  'CONF-CICD-01', 'CONF-CICD-02', 'CONF-CICD-03', 'CONF-CICD-04', 'CONF-CICD-05',
+  'CONF-CICD-06', 'CONF-CICD-07', 'CONF-CICD-08', 'CONF-CICD-09', 'CONF-CICD-10',
+  'CONF-CICD-11', 'CONF-CICD-12', 'CONF-CICD-13', 'CONF-CICD-14', 'CONF-CICD-15',
+]
+
+function verifyCicdStage1Suite(suite) {
+  assert.equal(suite.suite_id, 'cicd_stage1_conformance_v1', 'stage1 suite id must remain canonical')
+  assert.equal(suite.runtime_mutation_capable, false, `${suite.suite_id} must be incapable of runtime mutation`)
+  assert.equal(suite.replay_neutral, true, `${suite.suite_id} must be replay-neutral`)
+  assert.equal(suite.non_operative, true, `${suite.suite_id} must be non-operative`)
+  assert.equal(suite.surface, 'github_governed_deploy_workflow', `${suite.suite_id} must remain bound to governed deploy surface`)
+
+  const presentIds = new Set(suite.checks.map((c) => c.check_id))
+  for (const id of CONF_CICD_CHECK_IDS) {
+    if (!presentIds.has(id)) failClosed(`stage1 suite missing check ${id}`)
+  }
+  assert.equal(suite.checks.length, CONF_CICD_CHECK_IDS.length, 'stage1 suite must have exactly 15 checks')
+
+  for (const check of suite.checks) {
+    if (!check.check_id) failClosed('stage1 check missing check_id')
+    if (!check.label) failClosed(`${check.check_id} missing label`)
+    if (!check.description) failClosed(`${check.check_id} missing description`)
+    if (!check.expected_result) failClosed(`${check.check_id} missing expected_result`)
+    if (check.expected_result === 'GLOBAL_VALID') failClosed(`${check.check_id} must not expect GLOBAL_VALID`)
+    if (check.fixture && !existsSync(join(root, check.fixture))) failClosed(`${check.check_id} fixture not found: ${check.fixture}`)
+  }
+}
+
 const CONF_DIST_CHECK_IDS = [
   'CONF-DIST-01', 'CONF-DIST-02', 'CONF-DIST-03', 'CONF-DIST-04', 'CONF-DIST-05',
   'CONF-DIST-06', 'CONF-DIST-07', 'CONF-DIST-08', 'CONF-DIST-09', 'CONF-DIST-10',
@@ -212,10 +242,14 @@ try {
   verifySuites(bundle, suites)
   verifyAppendOnlyMigration(suites.at(-1))
 
+  const stage1Suite = readJson('conformance/suites/cicd-stage1-conformance.json')
+  verifyCicdStage1Suite(stage1Suite)
+
   const stage2Suite = readJson('conformance/suites/stage2-distributed-legitimacy-conformance.json')
   verifyStage2Suite(stage2Suite)
 
   console.log('CONFORMANCE_EVIDENCE_OBSERVED')
+  console.log(`STAGE1_CONF_CICD_COVERAGE: ${CONF_CICD_CHECK_IDS.join(', ')} — all declared`)
   console.log(`STAGE2_CONF_DIST_COVERAGE: ${STAGE2_CHECK_IDS.join(', ')} — all IMPLEMENTED`)
   verifyStage2ConformanceSuite(stage2Suite)
 

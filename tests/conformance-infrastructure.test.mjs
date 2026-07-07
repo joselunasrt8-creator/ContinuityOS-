@@ -70,3 +70,13 @@ test('conformance runner verifies all deterministic suites', () => {
   const output = execFileSync(process.execPath, ['conformance/runner.mjs'], { cwd: process.cwd(), encoding: 'utf8' })
   assert.match(output, /CONFORMANCE_EVIDENCE_OBSERVED/)
 })
+
+
+test('canonical conformance runner is load-bearing in CI', () => {
+  const workflow = readFileSync(join(process.cwd(), '.github/workflows/canonical-conformance.yml'), 'utf8')
+  assert.match(workflow, /name: canonical-conformance/)
+  assert.match(workflow, /pull_request:/)
+  assert.match(workflow, /permissions:\n\s+contents: read/)
+  assert.match(workflow, /npm ci/)
+  assert.match(workflow, /npm run conformance/)
+})

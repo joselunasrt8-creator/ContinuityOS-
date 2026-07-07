@@ -1,0 +1,36 @@
+name: canonical-conformance
+# Issue #2282 — End-to-End Legitimacy Pipeline Conformance Suite.
+# Runs the canonical conformance runner, not only the portable external pack.
+# Evidence-only: no deployment, no runtime authority, no registry mutation.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-conformance:
+    name: Canonical conformance suite (npm run conformance)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run conformance
+        run: npm run conformance
