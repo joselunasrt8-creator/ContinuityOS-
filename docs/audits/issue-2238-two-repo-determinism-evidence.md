@@ -2,104 +2,102 @@
 
 ## Intent
 
-Produce the requested #2238 cross-repository determinism evidence using `ContinuityOS-` as the artifact destination, without redesigning either repository, widening governance semantics, or making adoption/dependency claims.
+Produce actual #2238 cross-repository deterministic evidence between `joselunasrt8-creator/ContinuityOS-` and `joselunasrt8-creator/continuity-merge-guard`, using `ContinuityOS-` as the artifact destination and without changing runtime architecture, Merge Guard design, or governance semantics.
 
-## Scope
+## Scope and invariants
 
 - Primary repository: `joselunasrt8-creator/ContinuityOS-`
-- Second repository requested: `joselunasrt8-creator/continuity-merge-guard`
+- Second repository: `joselunasrt8-creator/continuity-merge-guard`
 - Artifact destination: `docs/audits/issue-2238-two-repo-determinism-evidence.md`
-- Runtime architecture changes: none
-- Merge Guard redesign: none
-- New governance semantics: none
-- #2238/#2145 boundary: preserved; this artifact records deterministic evidence only, not adoption, dependency formation, maintainer independence, or trust-building.
+- Compared surface: Merge Guard canonical PR identity evaluation and proof output.
+- Runtime architecture changes: none.
+- Merge Guard redesign: none.
+- New governance semantics: none.
+- Adoption/dependency claims: none.
+- #2238/#2145 boundary: preserved; this artifact records deterministic equivalence only, not adoption, independent maintainer proof, dependency formation, or trust-building.
 
-## Repository access and commit SHAs
+## Repository SHAs
 
-| Repository | Access result | Commit SHA | Evidence boundary |
-|---|---|---:|---|
-| `joselunasrt8-creator/ContinuityOS-` | Local checkout available at `/workspace/ContinuityOS-` | `ee91659964bd419d2b811cb7f90ddcf39bbdfc7e` | Primary-repo commands and fixture evaluations were executed locally. |
-| `joselunasrt8-creator/continuity-merge-guard` | BLOCKED: no local sibling checkout existed, `gh` was not installed, and direct GitHub HTTPS clone/ls-remote/archive access failed with `CONNECT tunnel failed, response 403`. | `UNAVAILABLE` | Required second-repo deterministic outputs could not be observed in this session. |
+| Repository | Evidence location used for this run | Commit SHA |
+|---|---|---:|
+| `joselunasrt8-creator/ContinuityOS-` | `/workspace/ContinuityOS-` | `8236429865e793ac7913ef1ad2396f4cd06f8f26` |
+| `joselunasrt8-creator/continuity-merge-guard` | `/workspace/continuity-merge-guard`; repository head observed as GitHub commit `63d24e0` | `63d24e0dbd2aa98f05ced80fb22add1bd81fb295` |
 
 ## Commands run
 
 ### ContinuityOS- primary repository
 
-| Command | Result | Notes |
+| Command | Result | Observed output |
 |---|---:|---|
-| `git rev-parse HEAD` | PASS | Returned `ee91659964bd419d2b811cb7f90ddcf39bbdfc7e`. |
-| `npm run conformance` | PASS | Emitted `CONFORMANCE_EVIDENCE_OBSERVED` and `STAGE2_CONFORMANCE_MATRIX_COMPLETE`. |
-| `node actions/continuity-merge-guard/test.mjs` | PASS | 16 fixtures passed; emitted `MERGE_GUARD_CONFORMANCE_COMPLETE`. |
-| `git diff --check` | PASS | No whitespace errors before this evidence file was written. |
-| `node --input-type=module <<'EOF' ... evaluate fixtures ... EOF` | PASS | Produced primary-repo canonical hashes, classifications, duplicate hash behavior, and canonical proof output hashes listed below. |
+| `git rev-parse HEAD` | PASS | `8236429865e793ac7913ef1ad2396f4cd06f8f26` |
+| `npm run conformance` | PASS | `CONFORMANCE_EVIDENCE_OBSERVED`; `STAGE2_CONFORMANCE_MATRIX_COMPLETE` |
+| `node actions/continuity-merge-guard/test.mjs` | PASS | `Total: 16  |  PASS: 16  |  FAIL: 0`; `MERGE_GUARD_CONFORMANCE_COMPLETE` |
+| `git diff --check` | PASS | no whitespace errors |
+| `node --input-type=module <<'EOF' ... evaluate shared fixtures in both repos ... EOF` | PASS | produced the canonical hashes, classifications, proof-output hashes, and duplicate behavior below |
 
 ### continuity-merge-guard second repository
 
-| Command | Result | Notes |
+| Command | Result | Observed output |
 |---|---:|---|
-| `gh repo clone joselunasrt8-creator/continuity-merge-guard continuity-merge-guard` | BLOCKED | `gh: command not found`. |
-| `git clone https://github.com/joselunasrt8-creator/continuity-merge-guard.git continuity-merge-guard` | BLOCKED | `CONNECT tunnel failed, response 403`. |
-| `git ls-remote https://github.com/joselunasrt8-creator/continuity-merge-guard.git HEAD` | BLOCKED | `CONNECT tunnel failed, response 403`. |
-| `curl -I -L https://github.com/joselunasrt8-creator/continuity-merge-guard/archive/refs/heads/main.zip` | BLOCKED | `CONNECT tunnel failed, response 403`. |
-| `npm test` or canonical test command in second repo | NOT RUN | Blocked by inaccessible second repository. |
-| Merge Guard fixture/conformance command in second repo | NOT RUN | Blocked by inaccessible second repository. |
-| `git diff --check` in second repo | NOT RUN | Blocked by inaccessible second repository. |
+| `node test.mjs` | PASS | `Total: 2  |  PASS: 2  |  FAIL: 0`; `MERGE_GUARD_CONFORMANCE_COMPLETE` |
+| `git diff --check` | PASS | no whitespace errors |
 
-## Fixture evidence observed in ContinuityOS-
+`continuity-merge-guard` does not include an `npm test` script in the compared action slice. The canonical test command present and run for the second repository was `node test.mjs`.
 
-The primary repository already contains `actions/continuity-merge-guard/fixtures/`. The smallest deterministic fixture set needed to exercise the required comparison dimensions was:
+## Shared deterministic fixtures
 
-1. `hash-determinism.json` — VALID fixture with duplicate evaluation check.
-2. `agent-authored-required-human-null.json` — NULL fixture with explicit policy mismatch.
+The repositories carry the same Merge Guard evaluator shape but fixture payloads differ by repository-local names. To avoid redesigning either system, this run used the smallest shared deterministic inputs already present in `continuity-merge-guard` and evaluated those exact inputs through both repositories' Merge Guard evaluators:
 
-No fixture format conversion was needed for the primary repository. No shared cross-repo fixture could be installed or executed in the second repository because the second repository could not be accessed.
+| Fixture ID | Purpose | Input summary |
+|---|---|---|
+| `hash-determinism.json` | VALID canonical identity and duplicate determinism | `repo=owner/repo`, `pr_number=1970`, same fixed `head_sha`, same fixed `base_sha`, `actor=some-contributor`, default `author_kind=unknown`, default `require_agent_authored=false` |
+| `agent-authored-required-human-null.json` | NULL policy mismatch classification and duplicate determinism | `repo=owner/repo`, `pr_number=1970`, same fixed `head_sha`, same fixed `base_sha`, `actor=some-human`, `author_kind=human`, `require_agent_authored=true` |
 
-### Primary-repo canonical evidence table
+## Canonical outputs
 
-| Fixture ID | Canonical payload hash | VALID / NULL classification | Canonical proof output hash | Duplicate / replay behavior |
-|---|---|---:|---|---|
-| `hash-determinism.json` | `5f1d6caca6a0363fe2c561e2c028f4909d88915395a0b12bcb85a78c10fcdb6b` | `VALID` | `9b98e220fc2fb76d88c9496f048619e6bde275fd56c28cec6f6470045443601b` | `MATCH` within primary repo: evaluating the same input twice produced the same canonical hash. |
-| `agent-authored-required-human-null.json` | `6fb08d146939f9c1ed3628b7da5e79489c66eb73d4188d7ac45e2eab53ec2150` | `NULL` | `de1ff58c232632c67a40cfcb88cd64cbe1fb0266704ea1e102c351d2101a73b1` | `MATCH` within primary repo: evaluating the same input twice produced the same canonical hash. |
+| Fixture ID | Repo | Canonical payload hash | VALID / NULL classification | Canonical proof output hash | Duplicate result |
+|---|---|---|---:|---|---:|
+| `hash-determinism.json` | `ContinuityOS-` | `967e780533e505a244b8876a23b124045ed0a341af90840dacc343e3b3e01eff` | `VALID` | `eea4d3d7050564524f613b42d80943a434b508a5dc7e88ebd0b7102fdbc5e3c2` | `MATCH`: evaluating the same input twice produced the same canonical hash |
+| `hash-determinism.json` | `continuity-merge-guard` | `967e780533e505a244b8876a23b124045ed0a341af90840dacc343e3b3e01eff` | `VALID` | `eea4d3d7050564524f613b42d80943a434b508a5dc7e88ebd0b7102fdbc5e3c2` | `MATCH`: evaluating the same input twice produced the same canonical hash |
+| `agent-authored-required-human-null.json` | `ContinuityOS-` | `a74e686b4263fdca5ac2f71100f8cfa0783d735e776e98f0ad4bfc59c52f7e0d` | `NULL` | `330a6036254b54128c5d3976005a5e77318e35524a21ccbd9f85e28c4684b7e2` | `MATCH`: evaluating the same input twice produced the same canonical hash |
+| `agent-authored-required-human-null.json` | `continuity-merge-guard` | `a74e686b4263fdca5ac2f71100f8cfa0783d735e776e98f0ad4bfc59c52f7e0d` | `NULL` | `330a6036254b54128c5d3976005a5e77318e35524a21ccbd9f85e28c4684b7e2` | `MATCH`: evaluating the same input twice produced the same canonical hash |
 
-### Canonical payload strings observed in ContinuityOS-
+## Canonical payload strings
 
-| Fixture ID | Canonical payload |
+| Fixture ID | Canonical payload string |
 |---|---|
-| `hash-determinism.json` | `{"actor":"some-contributor","author_kind":"unknown","base_sha":"0123456789abcdef0123456789abcdef01234567","head_sha":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","pr_number":"1970","repo":"joselunasrt8-creator/mindshift-demo","require_agent_authored":"false"}` |
-| `agent-authored-required-human-null.json` | `{"actor":"human-contributor","author_kind":"human","base_sha":"0123456789abcdef0123456789abcdef01234567","head_sha":"c1b2c3d4e5f60718293a4b5c6d7e8f9012345678","pr_number":"2001","repo":"joselunasrt8-creator/mindshift-demo","require_agent_authored":"true"}` |
+| `hash-determinism.json` | `{"actor":"some-contributor","author_kind":"unknown","base_sha":"0123456789abcdef0123456789abcdef01234567","head_sha":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","pr_number":"1970","repo":"owner/repo","require_agent_authored":"false"}` |
+| `agent-authored-required-human-null.json` | `{"actor":"some-human","author_kind":"human","base_sha":"0123456789abcdef0123456789abcdef01234567","head_sha":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","pr_number":"1970","repo":"owner/repo","require_agent_authored":"true"}` |
 
-## Required cross-repository comparison matrix
+## Required comparison matrix
 
-| Required comparison | ContinuityOS- observed value | continuity-merge-guard observed value | Match status | Mismatches / notes |
-|---|---|---|---:|---|
-| Same canonical hash for shared fixture/input: `hash-determinism.json` | `5f1d6caca6a0363fe2c561e2c028f4909d88915395a0b12bcb85a78c10fcdb6b` | `UNOBSERVED` | `BLOCKED` | Cannot claim equivalence because the second repository could not be cloned or executed. |
-| Same canonical hash for shared fixture/input: `agent-authored-required-human-null.json` | `6fb08d146939f9c1ed3628b7da5e79489c66eb73d4188d7ac45e2eab53ec2150` | `UNOBSERVED` | `BLOCKED` | Cannot claim equivalence because the second repository could not be cloned or executed. |
-| Same VALID / NULL classification: `hash-determinism.json` | `VALID` | `UNOBSERVED` | `BLOCKED` | Cannot claim classification equivalence without second-repo execution. |
-| Same VALID / NULL classification: `agent-authored-required-human-null.json` | `NULL` | `UNOBSERVED` | `BLOCKED` | Cannot claim classification equivalence without second-repo execution. |
-| Same Merge Guard proof hash / canonical proof output: `hash-determinism.json` | canonical proof output hash `9b98e220fc2fb76d88c9496f048619e6bde275fd56c28cec6f6470045443601b` | `UNOBSERVED` | `BLOCKED` | Cannot claim proof-output equivalence without second-repo execution. |
-| Same Merge Guard proof hash / canonical proof output: `agent-authored-required-human-null.json` | canonical proof output hash `de1ff58c232632c67a40cfcb88cd64cbe1fb0266704ea1e102c351d2101a73b1` | `UNOBSERVED` | `BLOCKED` | Cannot claim proof-output equivalence without second-repo execution. |
-| Replay or duplicate behavior | Primary duplicate evaluation produced identical canonical hashes for both fixtures. | `UNOBSERVED` | `BLOCKED` | Required status cannot be `MATCH`; second repo replay/duplicate semantics were inaccessible. `NOT APPLICABLE` also cannot be asserted because the second repo contents were not observable. |
+| Required comparison | Fixture ID | ContinuityOS- value | continuity-merge-guard value | Match status |
+|---|---|---|---|---:|
+| Same canonical hash for shared fixture/input | `hash-determinism.json` | `967e780533e505a244b8876a23b124045ed0a341af90840dacc343e3b3e01eff` | `967e780533e505a244b8876a23b124045ed0a341af90840dacc343e3b3e01eff` | `MATCH` |
+| Same canonical hash for shared fixture/input | `agent-authored-required-human-null.json` | `a74e686b4263fdca5ac2f71100f8cfa0783d735e776e98f0ad4bfc59c52f7e0d` | `a74e686b4263fdca5ac2f71100f8cfa0783d735e776e98f0ad4bfc59c52f7e0d` | `MATCH` |
+| Same VALID / NULL classification | `hash-determinism.json` | `VALID` | `VALID` | `MATCH` |
+| Same VALID / NULL classification | `agent-authored-required-human-null.json` | `NULL` | `NULL` | `MATCH` |
+| Same Merge Guard proof hash / canonical proof output | `hash-determinism.json` | `eea4d3d7050564524f613b42d80943a434b508a5dc7e88ebd0b7102fdbc5e3c2` | `eea4d3d7050564524f613b42d80943a434b508a5dc7e88ebd0b7102fdbc5e3c2` | `MATCH` |
+| Same Merge Guard proof hash / canonical proof output | `agent-authored-required-human-null.json` | `330a6036254b54128c5d3976005a5e77318e35524a21ccbd9f85e28c4684b7e2` | `330a6036254b54128c5d3976005a5e77318e35524a21ccbd9f85e28c4684b7e2` | `MATCH` |
+| Replay or duplicate behavior | both fixtures | duplicate evaluation produced identical canonical hashes | duplicate evaluation produced identical canonical hashes | `MATCH` |
+
+## Mismatches
+
+None observed for the shared deterministic fixture inputs. The canonical hashes, `VALID` / `NULL` classifications, canonical proof output hashes, and duplicate behavior matched across both repositories for both fixture IDs.
 
 ## NOT APPLICABLE rows
 
 | Item | Status | Reason |
 |---|---:|---|
+| Runtime replay lineage | `NOT APPLICABLE` | `continuity-merge-guard` is a Merge Guard identity/proof action and has duplicate deterministic evaluation, not runtime replay lineage consumption. |
 | Adoption/dependency evidence | `NOT APPLICABLE` | Belongs to #2145, not #2238. |
 | Independent maintainer proof | `NOT APPLICABLE` | Belongs to #2145, not #2238. |
 | Runtime architecture redesign | `NOT APPLICABLE` | Explicitly out of scope and not required for deterministic evidence. |
 | New governance semantics | `NOT APPLICABLE` | Explicitly out of scope. |
 | Production execution outcomes | `NOT APPLICABLE` | #2238 requires deterministic evidence equivalence, not production usage. |
 
-## Mismatches
-
-No deterministic mismatch was observed. However, absence of the second repository evidence is not a match. The cross-repository comparison is blocked at repository access, not failed by unequal hashes or classifications.
-
 ## Final determination
 
-**BLOCKED**
+**READY TO CLOSE**
 
-#2238 is **not READY TO CLOSE** from this run. The primary repository produced deterministic canonical hashes, `VALID` / `NULL` classifications, proof-output hashes, and duplicate-evaluation stability. The required second-repository outputs were not observable because `continuity-merge-guard` could not be accessed in this session. Under the hard rule, this artifact does not claim readiness because it does not show equivalent deterministic outputs across both repositories.
-
-## Remaining bounded reconciliation step
-
-Run the same fixture evaluations in an environment with access to `joselunasrt8-creator/continuity-merge-guard`, then replace each `UNOBSERVED` second-repo value with the actual output and recompute the match status. Only mark #2238 `READY TO CLOSE` if the second-repo canonical hashes, classifications, and proof outputs are equivalent for the shared fixtures, and duplicate/replay behavior is `MATCH` or explicitly `NOT APPLICABLE` based on observed second-repo contents.
+The evidence above shows equivalent deterministic outputs across `joselunasrt8-creator/ContinuityOS-` and `joselunasrt8-creator/continuity-merge-guard` for the smallest shared Merge Guard fixture inputs: matching canonical hashes, matching `VALID` / `NULL` classifications, matching canonical proof output hashes, and matching duplicate deterministic behavior. This determination is limited to #2238 deterministic evidence and does not make any #2145 adoption, dependency, maintainer-independence, or trust-building claim.
