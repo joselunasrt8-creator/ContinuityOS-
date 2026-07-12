@@ -26,7 +26,7 @@ Substitution-resistant ≠ Dependency-forming
 
 ```text
 Abundant  → architecture proof, execution proof, governance proof, demonstration proof
-          → every current guarantee (Continuity Merge Guard) is reproducible by
+          → every current guarantee (Continuity StateGate) is reproducible by
             a flat file + a local script
 Scarce    → a guarantee a consumer CANNOT reproduce, and loses if the producer disappears
 Question  → what is the smallest continuity guarantee that is non-trivially-substitutable

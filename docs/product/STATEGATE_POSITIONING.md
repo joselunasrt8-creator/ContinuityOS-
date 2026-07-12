@@ -1,12 +1,12 @@
-# ContinuityOS Merge Guard — Positioning
+# ContinuityOS StateGate — Positioning
 
 ## 1. One-sentence positioning
 
-ContinuityOS Merge Guard is a required legitimacy check for AI-authored PRs.
+ContinuityOS StateGate is a required legitimacy check for AI-authored PRs.
 
 ## 2. Three-sentence explanation
 
-Merge Guard is a small, portable GitHub Action that canonicalizes a pull
+StateGate is a small, portable GitHub Action that canonicalizes a pull
 request's identity — `{repo, pr_number, head_sha, base_sha, actor}` plus an
 explicit author policy — into a deterministic `VALID` or `NULL` result and a
 persisted proof artifact (`MERGE_GUARD_PROOF.json`). Add it as a required
@@ -19,7 +19,7 @@ that accounted for before merge?*
 ## 3. First-user value prop
 
 If your repository already accepts AI-authored or AI-assisted PRs against a
-protected branch, Merge Guard gives you the one thing your current setup is
+protected branch, StateGate gives you the one thing your current setup is
 missing: a required, automated, fail-closed signal that the PR's identity
 (repo, PR number, head/base SHAs, actor, and declared author policy) is
 exactly what was validated — with a reproducible proof artifact you can point
@@ -50,7 +50,7 @@ you review or merge.
 None of these answer the question: *if this PR's identity object doesn't
 match what was reviewed, is merge automatically blocked, with proof?*
 
-## 6. Failure mode without Merge Guard
+## 6. Failure mode without StateGate
 
 An AI-authored PR can merge with no required, fail-closed check that its
 `{repo, pr_number, head_sha, base_sha, actor}` identity is exactly what was
@@ -59,7 +59,7 @@ merges." For repos where AI agents regularly open PRs, this is the specific
 gap that makes the workflow feel ungoverned even when humans are reviewing
 every diff.
 
-## 7. Why Merge Guard is load-bearing
+## 7. Why StateGate is load-bearing
 
 - It runs as a **required status check** — a `NULL` result blocks merge,
   fail-closed, the same way a failing test does.
@@ -74,7 +74,7 @@ every diff.
   check in the merge path. Everything else in a typical setup (CI, human
   review) checks content, not identity.
 
-## 8. What Merge Guard is NOT
+## 8. What StateGate is NOT
 
 - Not a replacement for code review, CI, CODEOWNERS, or branch protection —
   it sits alongside them.
@@ -83,7 +83,7 @@ every diff.
   identity object against the canonical PR state.
 - Not a full distributed-legitimacy or autonomous-org governance platform.
 
-Merge Guard does **not** claim:
+StateGate does **not** claim:
 
 - Distributed proof finality
 - Global legitimacy convergence
@@ -95,7 +95,7 @@ Merge Guard does **not** claim:
 It claims only the wedge: **AI-authored/assisted PR → required legitimacy
 check → VALID/NULL → proof artifact → merge-eligibility signal.**
 
-## 9. Comparison: existing mechanisms vs. Merge Guard
+## 9. Comparison: existing mechanisms vs. StateGate
 
 | Mechanism | Verifies PR identity at merge time? | Fail-closed? | Persisted proof artifact? |
 |---|---|---|---|
@@ -103,12 +103,12 @@ check → VALID/NULL → proof artifact → merge-eligibility signal.**
 | CODEOWNERS | No | No | No |
 | Branch protection (alone) | No | N/A | No |
 | Human review | No (implicit trust) | No | No |
-| **Merge Guard** | **Yes** | **Yes** | **Yes** |
+| **StateGate** | **Yes** | **Yes** | **Yes** |
 
 ## 10. Bounded relationship to ContinuityOS
 
-Merge Guard is published from the ContinuityOS repository, but it is a
+StateGate is published from the ContinuityOS repository, but it is a
 standalone GitHub Action with one required check and one proof artifact.
-Installing Merge Guard does not require adopting, running, or trusting any
+Installing StateGate does not require adopting, running, or trusting any
 other part of ContinuityOS, and this document makes no claims about
-ContinuityOS beyond Merge Guard itself.
+ContinuityOS beyond StateGate itself.

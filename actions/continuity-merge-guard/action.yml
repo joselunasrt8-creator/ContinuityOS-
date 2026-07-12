@@ -1,4 +1,4 @@
-name: 'ContinuityOS Merge Guard'
+name: 'ContinuityOS StateGate'
 description: >
   Smallest-release legitimacy check for a pull request: builds a canonical
   object-identity payload {repo, pr_number, head_sha, base_sha, actor}

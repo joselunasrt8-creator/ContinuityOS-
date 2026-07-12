@@ -80,8 +80,8 @@ A single retained outside "yes" closes **Independent Dependency Proof**.
 
 | Wedge | Mechanism | Status |
 |---|---|---|
-| **Agent Attribution Gate** (primary) | `agent-attribution-gate` workflow consumes `joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`, which emits `attribution_classification`; required check passes `AGENT_AUTHORED`, fails `UNKNOWN` (fail-closed) on agent lanes; human PRs pass neutrally | Proven same-owner; **outside-owner OPEN** |
-| Merge Guard (identity) | `merge-guard` required check; VALID/NULL on `{repo, pr_number, head_sha, base_sha, actor}` | Proven same-owner; weaker degradation, deprioritized |
+| **Agent Attribution Gate** (primary) | `agent-attribution-gate` workflow consumes `joselunasrt8-creator/stategate@v1`, which emits `attribution_classification`; required check passes `AGENT_AUTHORED`, fails `UNKNOWN` (fail-closed) on agent lanes; human PRs pass neutrally | Proven same-owner; **outside-owner OPEN** |
+| StateGate (identity) | `merge-guard` required check; VALID/NULL on `{repo, pr_number, head_sha, base_sha, actor}` | Proven same-owner; weaker degradation, deprioritized |
 
 Install path (what an outside maintainer copies):
 [`actions/continuity-merge-guard/ADOPT_AGENT_ATTRIBUTION_GATE.md`](./actions/continuity-merge-guard/ADOPT_AGENT_ATTRIBUTION_GATE.md)
@@ -96,7 +96,7 @@ Install path (what an outside maintainer copies):
 | Evidence | Where | Result |
 |---|---|---|
 | Attribution gate load-bearing on a single branch (UNKNOWN→blocked, then AGENT_AUTHORED→merged) | `continuityos-sandbox/ATTRIBUTION_DEPENDENCY_PROOF.md` (PR #24) | `ATTRIBUTION_ENFORCEMENT_CONFIRMED` |
-| Merge Guard required-check, VALID→mergeable / NULL→blocked | `continuityos-sandbox/EXTERNAL_DEPENDENCY_PROOF.md`, `NULL_ENFORCEMENT_PROOF.md` (PRs #8/#9) | `EXTERNAL_DEPENDENCY_CONFIRMED` |
+| StateGate required-check, VALID→mergeable / NULL→blocked | `continuityos-sandbox/EXTERNAL_DEPENDENCY_PROOF.md`, `NULL_ENFORCEMENT_PROOF.md` (PRs #8/#9) | `EXTERNAL_DEPENDENCY_CONFIRMED` |
 | Operator chose to retain | `continuityos-sandbox/RETENTION_SIGNAL.md` | `RETAIN` |
 
 > Scope: every row above is **same-owner**. It proves the gate enforces correctly
@@ -107,7 +107,7 @@ Install path (what an outside maintainer copies):
 
 | Evidence needed | Status |
 |---|---|
-| Outside repo references `...@v0.3.0` with `agent-attribution-gate` | not yet |
+| Outside repo references `joselunasrt8-creator/stategate@v1` with `agent-attribution-gate` | not yet |
 | Outside admin sets it as a required check on their protected branch | not yet |
 | Real agent-lane PR blocked for missing attribution on their repo | not yet |
 | Same PR merges after attribution added | not yet |

@@ -1,5 +1,5 @@
 ---
-name: 'Merge Guard Validation '
+name: 'StateGate Validation '
 about: Describe this issue template's purpose here.
 title: ''
 labels: ''
@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 Title:
-Merge Guard Validation
+StateGate Validation
 
 Fields:
 - Repository

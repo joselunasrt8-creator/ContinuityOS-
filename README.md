@@ -20,7 +20,7 @@ Use these paths to evaluate the runtime without reading the full repository firs
 | Demo | Purpose | Command | More information |
 | --- | --- | --- | --- |
 | Governed Filesystem Demo | Shows the existing `POST /gateway/tool/filesystem-write` route enforcing validation before a local filesystem mutation. | `npm install`<br>`npm run demo` | [`demo/portability/README.md`](demo/portability/README.md), [`docs/issues/first-installable-path.md`](docs/issues/first-installable-path.md) |
-| Merge Guard | Provides a packaged GitHub Action that checks a pull request identity object and optional author policy, then returns `VALID` or `NULL` with a proof artifact. | See workflow example below. | [`actions/continuity-merge-guard/README.md`](actions/continuity-merge-guard/README.md) |
+| StateGate | Provides a packaged GitHub Action that checks a pull request identity object and optional author policy, then returns `VALID` or `NULL` with a proof artifact. | See workflow example below. | [`actions/continuity-merge-guard/README.md`](actions/continuity-merge-guard/README.md) |
 | LangChain Integration | Wires the same governed filesystem route into a LangChain `DynamicStructuredTool`; the tool itself contains no filesystem-write logic. | `npm run demo:langchain` | [`demo/integrations/langchain/README.md`](demo/integrations/langchain/README.md), [`governed-filesystem-tool.mjs`](demo/integrations/langchain/governed-filesystem-tool.mjs) |
 | GitHub Portability Demo | Applies the same execution contract to a second mutation surface: creating a GitHub issue comment. | `npm run demo:portability:github` | [`demo/portability/README.md`](demo/portability/README.md#portability-second-mutation-surface-github-issue-comment) |
 
@@ -41,12 +41,12 @@ Replay NULL  → no new proof, no new lineage
 Policy NULL  → fails closed, no proof, no lineage
 ```
 
-### Merge Guard
+### StateGate
 
 A second installable wedge: a packaged GitHub Action that checks a pull request's identity object (`repo`, `pr_number`, `head_sha`, `base_sha`, `actor`) plus optional explicit author policy (`author-kind`, `require-agent-authored`), hashes it, and returns `VALID` or `NULL` (fail-closed) with a proof artifact — designed to be added as a required status check.
 
 ```yaml
-- uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0
+- uses: joselunasrt8-creator/stategate@v1
   with:
     repo: ${{ github.repository }}
     pr-number: ${{ github.event.pull_request.number }}
@@ -55,11 +55,16 @@ A second installable wedge: a packaged GitHub Action that checks a pull request'
     actor: ${{ github.event.pull_request.user.login }}
 ```
 
-`@v0.1.0` is the published, pinnable version. `@main` remains usable for exploration but is not recommended once a consumer treats the result as load-bearing (a required status check).
+`@v1` is the published, pinnable StateGate version. Use a pinned version for any consumer that treats the result as load-bearing (a required status check).
+
+
+#### Compatibility
+
+StateGate intentionally preserves several machine-readable legacy `MERGE_GUARD_*` identifiers, including proof artifact names, proof record types, proof IDs, and existing required-check names such as `merge-guard`. These are replay, proof-compatibility, and integration surfaces rather than public branding. They remain unchanged until a future versioned migration explicitly sequences replacement identifiers without breaking existing proofs, branch protection, or downstream consumers.
 
 #### Live external consumer
 
-[`joselunasrt8-creator/continuityos-sandbox`](https://github.com/joselunasrt8-creator/continuityos-sandbox) installs Merge Guard at `@v0.1.0` and has made `merge-guard` a **required** status check on its `main` branch — `LOAD-BEARING_ACTIVE`. Real PRs in that repo have exercised both outcomes: a `VALID` result allows merge, and a `NULL` result reports `failure` and leaves the PR `blocked`. See that repo's `LOAD_BEARING_READINESS.md` and `NULL_ENFORCEMENT_PROOF.md` for the evidence.
+[`joselunasrt8-creator/continuityos-sandbox`](https://github.com/joselunasrt8-creator/continuityos-sandbox) historically installed the predecessor action at `@v0.1.0` and made `merge-guard` a **required** status check on its `main` branch — `LOAD-BEARING_ACTIVE`. Real PRs in that repo have exercised both outcomes: a `VALID` result allows merge, and a `NULL` result reports `failure` and leaves the PR `blocked`. See that repo's `LOAD_BEARING_READINESS.md` and `NULL_ENFORCEMENT_PROOF.md` for the evidence.
 
 ---
 
@@ -163,7 +168,7 @@ ContinuityOS does not replace intelligence. It enforces legitimacy before execut
 | `demo/` | Governed execution demos, portability examples, and integration examples. |
 | `runtime/` | Runtime-facing implementation area where present in the repository topology. |
 | `gateway/` | Gateway-facing execution boundary area where present in the repository topology. |
-| `actions/` | Installable GitHub Actions, including Continuity Merge Guard. |
+| `actions/` | Installable GitHub Actions, including Continuity StateGate. |
 | `docs/` | Canon, implementation plans, semantics, audits, and adoption documentation. |
 | `conformance/` | Portable conformance packs, vectors, suites, and evidence artifacts. |
 | `cli/` | Command-line entry points and SDK helpers. |

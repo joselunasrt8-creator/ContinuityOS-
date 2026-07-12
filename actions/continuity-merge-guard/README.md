@@ -1,4 +1,4 @@
-# ContinuityOS Merge Guard
+# ContinuityOS StateGate
 
 A packaged, portable GitHub Action implementing the smallest installable
 ContinuityOS dependency wedge:
@@ -25,7 +25,7 @@ This proves the PR identity object and explicit author-policy scope are
 **complete, canonicalized, hashed, and proof-bound** before merge eligibility:
 
 ```
-validated_object == merge_guard_object
+validated_object == stategate_object
 ```
 
 That is the entire claim. v1 does **not** validate:
@@ -38,6 +38,11 @@ That is the entire claim. v1 does **not** validate:
 Those are deliberately deferred — see [v2](#v2-not-yet-built) below. v1 is
 a legitimacy check on object identity, not a review system, agent
 classifier, or policy engine.
+
+
+## Compatibility
+
+StateGate intentionally preserves several machine-readable legacy `MERGE_GUARD_*` identifiers for replay safety, proof compatibility, and existing integrations. This includes the `MERGE_GUARD_PROOF` artifact name and filename, `MERGE_GUARD-*` proof IDs, the `MERGE_GUARD_PROOF` record type, `MERGE_GUARD_*` environment variables, conformance sentinels, and existing required-check names such as `merge-guard` / `agent-merge-guard`. These identifiers are compatibility surfaces, not public branding, and are intentionally preserved until a future versioned migration sequences replacement identifiers and downstream branch-protection changes.
 
 ## Output
 
@@ -60,7 +65,7 @@ check run — the proof is the product.
 
 ### Agent Identity (Phase 1)
 
-The Merge Guard also records a descriptive **actor attribution** object, derived
+StateGate also records a descriptive **actor attribution** object, derived
 from optional PR/workflow metadata (`pr-body`, `pr-labels`, `head-ref`,
 `commit-trailers`, ...). Attribution is metadata, not authority: it never enters
 the canonical identity payload (so `proof_hash` is unchanged and backward
@@ -134,7 +139,7 @@ jobs:
   merge-guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0
+      - uses: joselunasrt8-creator/stategate@v1
         id: merge-guard
         with:
           repo: ${{ github.repository }}
@@ -157,7 +162,7 @@ Once required, ContinuityOS becomes part of the operational definition of
 ```
 Agent-authored PR
  ↓
-ContinuityOS Merge Guard: VALID or NULL
+ContinuityOS StateGate: VALID or NULL
  ↓
 Merge allowed | Merge blocked
 ```
@@ -173,7 +178,7 @@ needed by #2001:
 ```text
 Agent-authored PR
  ↓
-ContinuityOS Merge Guard: VALID or NULL
+ContinuityOS StateGate: VALID or NULL
  ↓
 protected branch required check: pass or fail
  ↓
@@ -196,7 +201,7 @@ jobs:
   agent-merge-guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@main
+      - uses: joselunasrt8-creator/stategate@v1
         id: merge-guard
         with:
           repo: ${{ github.repository }}
@@ -242,45 +247,23 @@ customization, and verification: [`ADOPT_AGENT_ATTRIBUTION_GATE.md`](./ADOPT_AGE
 
 ### Version reference
 
-- `@v0.1.0` — pinned, stable identity-only validator surface. Recommended for any
-  consumer that treats the current identity-only Merge Guard result as
-  load-bearing (a required status check), so that a changed result can only
-  come from a changed PR object, never from a changed validator implementation.
-- `@main` — current agent-authored workflow-policy validator surface for
-  consumers evaluating `author-kind` and `require-agent-authored` before a
-  release tag is cut. Do not leave `@main` as a permanent load-bearing ref.
-- `@v0.2.0` — planned pinned tag for the agent-authored workflow-policy
-  validator surface. Use this, once tagged, for load-bearing consumers that
-  need `author-kind` and `require-agent-authored` proof fields.
-- `@v0.3.0` — pinned release reference for the **Agent Identity attribution surface**:
-  the action emits `attribution_status`, `attribution_classification`,
-  `actor_kind`, and `attribution_evidence_hash` (driven by the authoritative
-  `pr-labels` / `pr-body` / `commit-trailers` signals). Use this for consumers
-  that make the attribution classification load-bearing — e.g. an agent-lane
-  gate that requires `AGENT_AUTHORED`. Before asking an outside maintainer to
-  install, verify that the `v0.3.0` tag resolves publicly; do not substitute
-  `@main` for a required check in an outside-owner proof. The attribution outputs are
-  metadata, not authority: they never alter `result` or `canonical_hash`, so a
-  `@v0.1.0` consumer that only reads `result` is unaffected by moving to
-  `@v0.3.0`. `continuityos-sandbox` pins this tag for its
-  `agent-attribution-gate` (see that repo's `ATTRIBUTION_DEPENDENCY_PROOF.md`).
-
-A `v0.1.1` tag is planned at the current `main` HEAD (the commit that
-fixed this README's stale `mindshift-demo` install path). Relative to
-`v0.1.0`, only this README changes — `action.yml`, `check.mjs`,
-`test.mjs`, and `fixtures/` are byte-identical, so `result`, `proof_id`,
-and `canonical_hash` are unaffected by a `v0.1.0` → `v0.1.1` move. See
-`continuityos-sandbox`'s `VERSION_UPGRADE.md` for the continuity
-assessment.
+- `@v1` — current public StateGate release reference for installation examples.
+  Use this pinned tag for load-bearing consumers so a changed result can only
+  come from a changed PR object or an explicit future version migration, never
+  from an unpinned validator implementation.
+- Legacy `@v0.x` tags belonged to the pre-StateGate public identity. Those tags
+  remain historical compatibility evidence for existing consumers, but current
+  installation documentation should use `joselunasrt8-creator/stategate@v1`.
 
 ### Known external consumers
 
 - [`joselunasrt8-creator/continuityos-sandbox`](https://github.com/joselunasrt8-creator/continuityos-sandbox) —
-  pins `@v0.1.0`; `merge-guard` is a **required** status check on `main`
-  (`LOAD-BEARING_ACTIVE`). See that repo's `LOAD_BEARING_READINESS.md`,
-  `NULL_ENFORCEMENT_PROOF.md`, and `EXTERNAL_DEPENDENCY_PROOF.md` for the
-  install path, required-check configuration, and proof that real PRs'
-  merge eligibility depends on the Merge Guard result.
+  historically pinned the predecessor action at `@v0.1.0`; `merge-guard` is a
+  **required** status check on `main` (`LOAD-BEARING_ACTIVE`). See that repo's
+  `LOAD_BEARING_READINESS.md`, `NULL_ENFORCEMENT_PROOF.md`, and
+  `EXTERNAL_DEPENDENCY_PROOF.md` for the historical install path,
+  required-check configuration, and proof that real PRs' merge eligibility
+  depends on the StateGate-compatible result.
 
 ## Portability
 

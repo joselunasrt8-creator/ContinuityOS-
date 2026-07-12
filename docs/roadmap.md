@@ -11,7 +11,7 @@ directly it moves an external owner along: Research → Demo → Sandbox → Pil
 
 ## P0 — Prove external dependency
 
-- **External Dependency** — get a repo outside this org to depend on Merge Guard as a
+- **External Dependency** — get a repo outside this org to depend on StateGate as a
   required check, and keep depending on it.
 - **Sandbox** — `continuityos-sandbox` as the external-validation surface (install,
   return, break-if-removed).

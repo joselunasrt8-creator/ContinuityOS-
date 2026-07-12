@@ -13,7 +13,7 @@ branch the check passes neutrally, so human PRs are never blocked for missing
 attribution.
 
 The enforcement lives in *your* workflow. The published action
-[`continuity-merge-guard@v0.3.0`](./README.md) stays non-blocking and only *emits*
+[`stategate@v1`](./README.md) stays non-blocking and only *emits*
 the attribution classification from authoritative signals (commit trailer, PR
 label, or PR-body block). Your workflow chooses to depend on that signal — that
 dependency is the point.
@@ -44,7 +44,7 @@ trust the behavior, skip to Step 1.
 
 Copy [`examples/continuity-agent-attribution-gate.report-only.yml`](./examples/continuity-agent-attribution-gate.report-only.yml)
 into your repository at `.github/workflows/continuity-agent-attribution-gate.report-only.yml`.
-It uses the same `continuity-merge-guard@v0.3.0` signal as the enforcing gate, but
+It uses the same `stategate@v1` signal as the enforcing gate, but
 its final step only *reports* the verdict and always exits 0. Open or re-push a
 `claude/*` PR and read the **report-only (trial)** block in the check's job
 summary: it tells you whether the enforcing gate would have passed or blocked,
@@ -104,7 +104,7 @@ jobs:
             echo "TRAILERS_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0
+      - uses: joselunasrt8-creator/stategate@v1
         id: merge-guard
         continue-on-error: true
         with:
@@ -150,7 +150,7 @@ jobs:
 Before asking an outside maintainer to install, keep the copy/paste surface to one
 file and verify these five lines survived unchanged:
 
-- `uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`
+- `uses: joselunasrt8-creator/stategate@v1`
 - `permissions: contents: read`
 - `jobs.agent-attribution-gate` as the job id for the enforcing workflow
 - the agent-lane `case` prefixes match the maintainer's agent branches
@@ -223,11 +223,11 @@ esac
 
 ## Version pinning
 
-The snippet pins `@v0.3.0`. Pin a release tag so a changed result can only come
+The snippet pins `@v1`. Pin a release tag so a changed result can only come
 from a changed PR, never from a changed validator implementation. The attribution
 outputs are metadata, not authority: they never alter `result` or `canonical_hash`,
 so a consumer that previously read only `result` is unaffected by moving to
-`@v0.3.0`. Do **not** leave `@main` as a permanent load-bearing reference. See the
+`@v1`. Do **not** leave `@main` as a permanent load-bearing reference. See the
 [Version reference](./README.md#version-reference) in the action README.
 
 ## Break-glass

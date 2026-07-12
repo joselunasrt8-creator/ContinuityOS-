@@ -23,7 +23,7 @@ will decide it *must* be present for a PR to remain mergeable.
 Outside-owner dependency proof
 ```
 
-An **unaffiliated** repository makes ContinuityOS Merge Guard a required status
+An **unaffiliated** repository makes ContinuityOS StateGate a required status
 check on a protected branch and reports it as load-bearing — keeping it enabled
 because removal would make its workflow worse. Current proof
 (`continuityos-sandbox`) is real but **same-owner**, i.e. controlled
@@ -37,7 +37,7 @@ External pilot acquisition, treated as a **packaging / dependency-conversion**
 exercise, not an architecture exercise:
 
 - Canonical, consistent public install path (remove stale `mindshift-demo`
-  snippets; converge on pinned `@v0.1.0`).
+  snippets; converge on pinned `@v1`).
 - Evidence visibility at the merge boundary (proof in the PR check run).
 - A clear required-check configuration story for an outside owner.
 
@@ -48,7 +48,7 @@ exercise, not an architecture exercise:
 - [ ] A real PR in that repo exercises both `VALID → mergeable` and
       `NULL → blocked` under the required check.
 - [ ] An independent operator reports that their merge workflow is materially
-      worse if Merge Guard is removed (retention signal).
+      worse if StateGate is removed (retention signal).
 
 ## Open question
 
@@ -62,7 +62,7 @@ merge-guard a required status check — and keep it?
 - Full research artifact:
   [`FROM_TOOL_TO_DEPENDENCY.md`](https://github.com/joselunasrt8-creator/continuityos-sandbox/blob/main/dependency-formation/FROM_TOOL_TO_DEPENDENCY.md)
   (sandbox).
-- Merge Guard action:
+- StateGate action:
   [`actions/continuity-merge-guard/README.md`](../../actions/continuity-merge-guard/README.md).
 - Sandbox dependency evidence:
   `continuityos-sandbox` → `DEPENDENCY_ASSESSMENT.md`,

@@ -8,7 +8,7 @@ name: continuity-agent-attribution-gate
 # missing attribution.
 #
 # Enforcement lives HERE, in your repo. The published action
-# (continuity-merge-guard@v0.3.0) stays non-blocking and only EMITS the
+# (stategate@v1) stays non-blocking and only EMITS the
 # attribution classification; this workflow chooses to depend on it. Remove the
 # action and this gate loses its only signal -> the agent lane can no longer
 # distinguish AGENT_AUTHORED from UNKNOWN.
@@ -60,7 +60,7 @@ jobs:
             echo "TRAILERS_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0
+      - uses: joselunasrt8-creator/stategate@v1
         id: merge-guard
         continue-on-error: true
         with:

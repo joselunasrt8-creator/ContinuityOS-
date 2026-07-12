@@ -15,7 +15,7 @@ name: continuity-agent-attribution-gate (report-only)
 # neutral to the job summary. It always exits 0, so it can never block a merge
 # and does NOT need to be a required check during the trial.
 #
-# The signal still comes from the published action (continuity-merge-guard@v0.3.0),
+# The signal still comes from the published action (stategate@v1),
 # which only EMITS the attribution classification. This workflow chooses to read
 # it. That dependency is the point — see ADOPT_AGENT_ATTRIBUTION_GATE.md.
 
@@ -61,7 +61,7 @@ jobs:
             echo "TRAILERS_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0
+      - uses: joselunasrt8-creator/stategate@v1
         id: merge-guard
         continue-on-error: true
         with:

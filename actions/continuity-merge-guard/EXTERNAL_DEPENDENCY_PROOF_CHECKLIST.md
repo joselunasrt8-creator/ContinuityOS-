@@ -33,7 +33,7 @@ actions/continuity-merge-guard/examples/continuity-agent-attribution-gate.report
 ```
 
 This trial uses
-`joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`,
+`joselunasrt8-creator/stategate@v1`,
 reports `VALID` / `NULL` / neutral in the job summary, and always exits 0. Do not
 make it required.
 
@@ -50,13 +50,13 @@ actions/continuity-merge-guard/examples/continuity-agent-attribution-gate.yml
 The enforcing workflow must keep these install-critical lines:
 
 - action reference:
-  `joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.3.0`
+  `joselunasrt8-creator/stategate@v1`
 - job id: `agent-attribution-gate`
 - permission: `contents: read`
 - agent-lane branch prefixes matching the maintainer's AI PR branches
 
 Do not use `@main` for outside-owner dependency proof. Before outreach, verify
-that the `v0.3.0` tag resolves publicly; if it does not, fix the release/tag
+that the `v1` tag resolves publicly; if it does not, fix the release/tag
 before asking an outside maintainer to install.
 
 ## 4. Required check configuration
@@ -132,7 +132,7 @@ The external dependency proof succeeds only when all of the following are true:
 
 - the repository is owned or maintained outside ContinuityOS
 - the maintainer first saw a report-only verdict before accepting enforcement
-- the existing action is installed at `@v0.3.0` without runtime changes
+- StateGate is installed at `@v1` without runtime changes
 - the protected branch requires the check named exactly `agent-attribution-gate`
 - one attributed agent-lane PR passes and is mergeable (`VALID`)
 - one under-attributed/conflicting agent-lane PR is blocked (`NULL`)
