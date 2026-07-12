@@ -44,9 +44,11 @@ Role: External consumer / adoption-proof environment. Intentionally separate
 from the ContinuityOS source repo. Installs and depends on ContinuityOS
 components as an external party.
 
-Installation:
+Historical installation evidence (pre-StateGate public identity): `joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0`.
+
+Current StateGate installation examples use:
 ```yaml
-- uses: joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard@v0.1.0
+- uses: joselunasrt8-creator/stategate@v1
 ```
 
 Required status check: `merge-guard` is a required check on `main` in
@@ -169,5 +171,5 @@ agent-authored PRs — depends on ContinuityOS.
 - `continuityos-sandbox/NULL_ENFORCEMENT_PROOF.md` — NULL path proof
 - `continuityos-sandbox/LOAD_BEARING_READINESS.md` — required-check readiness
 - `continuityos-sandbox/RETENTION_SIGNAL.md` — operator retention decision
-- `actions/continuity-merge-guard/README.md` — Merge Guard wedge documentation
+- `actions/continuity-merge-guard/README.md` — StateGate wedge documentation
 - `actions/continuity-merge-guard/check.mjs` — the action being depended on

@@ -23,5 +23,5 @@ Candidate
 
 The pilot succeeds only when an independent operator states:
 
-"Removing Merge Guard would make our workflow materially worse."
+"Removing StateGate would make our workflow materially worse."
 

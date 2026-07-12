@@ -3,7 +3,7 @@
 ## Why this exists
 
 ContinuityOS primitives were **stateless**: they evaluate current-run inputs and hash them, but
-carry no *verified state across a run boundary*. The Merge Guard proves enforcement; it does not
+carry no *verified state across a run boundary*. StateGate proves enforcement; it does not
 prove continuity.
 
 A first compression of that research produced a **proof-lineage** primitive — an append-only chain

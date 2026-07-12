@@ -1,8 +1,8 @@
-# ContinuityOS Merge Guard Marketplace Audit
+# ContinuityOS StateGate Marketplace Audit
 
 Audit date: 2026-06-22
 
-Audited standalone repository: `joselunasrt8-creator/continuity-merge-guard`
+Audited standalone repository: `joselunasrt8-creator/stategate`
 
 Canonical source: `joselunasrt8-creator/ContinuityOS-/actions/continuity-merge-guard/`
 
@@ -21,7 +21,7 @@ execution, proof generation, canonicalization, hashes of evaluated payloads, or
 
 ## Preserved invariants
 
-- `validated_object == merge_guard_object` remains unchanged.
+- `validated_object == stategate_object` remains unchanged.
 - The canonical object-identity payload remains `{repo, pr_number, head_sha,
   base_sha, actor, author_kind, require_agent_authored}`.
 - Attribution remains descriptive metadata and does not enter the canonical

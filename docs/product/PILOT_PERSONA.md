@@ -1,4 +1,4 @@
-# ContinuityOS Merge Guard — Pilot Persona
+# ContinuityOS StateGate — Pilot Persona
 
 ## 1. Exact operator profile
 
@@ -29,7 +29,7 @@ A qualifying pilot repository has:
 - A small-to-medium team where adding a required check is a single decision,
   not a multi-team change-management process.
 
-## 3. Current workflow (before Merge Guard)
+## 3. Current workflow (before StateGate)
 
 Agent opens PR → CI runs (tests/lint) → a human reviews the diff → a human
 merges. There is no automated identity/provenance check; "is this the PR I
@@ -49,8 +49,8 @@ One of:
 
 ## 5. Smallest acceptable installation path
 
-1. Add the `continuity-merge-guard` action to a workflow file, pinned to
-   `@v0.1.0` (per the action README's "Install (2 minutes)" snippet).
+1. Add the `joselunasrt8-creator/stategate` action to a workflow file, pinned to
+   `@v1` (per the action README's "Install (2 minutes)" snippet).
 2. Configure one policy: `require-agent-authored: 'true'` if the goal is to
    gate agent-authored PRs specifically (required check name becomes
    `agent-merge-guard`); otherwise the default `merge-guard` check covers all
@@ -67,7 +67,7 @@ One of:
 
 - `time_to_install`: target under 2 minutes, matching the action README.
 - `first_VALID_check_time` and `first_NULL_check_time` both observed.
-- At least one agent-authored PR checked by Merge Guard.
+- At least one agent-authored PR checked by StateGate.
 - A proof artifact (`MERGE_GUARD_PROOF.json`) generated and inspectable.
 - `false_block_count == 0` — no legitimate PR incorrectly blocked.
 - `override_count` tracked (0 expected in steady state; non-zero is a signal
@@ -78,14 +78,14 @@ One of:
 - The required check is retained, not disabled, after the first month.
 - Repeat usage across multiple PRs, not a one-off trial.
 - The team reports improved confidence in agent PRs during manual review.
-- "Agent PRs require Merge Guard `VALID` before merge" becomes a stated team
+- "Agent PRs require StateGate `VALID` before merge" becomes a stated team
   policy (written down somewhere — README, CONTRIBUTING, or team norms doc).
 
 ## 8. Dependency criteria — the #2001 test
 
 The question to put directly to the pilot operator after 30 days:
 
-> "If Merge Guard were removed or disabled tomorrow, what becomes worse in
+> "If StateGate were removed or disabled tomorrow, what becomes worse in
 > your workflow?"
 
 The candidate answer this pilot is meant to validate: *"We would lose the
@@ -101,7 +101,7 @@ and chooses to keep the check required after having experienced both a
 
 - The team doesn't use protected branches or required status checks at all —
   no integration point exists.
-- The team has no AI-authored PRs — there is no pain for Merge Guard to
+- The team has no AI-authored PRs — there is no pain for StateGate to
   address.
 - "VALID/NULL" is perceived as redundant with existing CI (the positioning
   doc must preempt this by clarifying identity vs. content checks).

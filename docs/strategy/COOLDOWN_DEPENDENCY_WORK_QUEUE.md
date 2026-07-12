@@ -44,7 +44,7 @@ theory, or broad runtime mutation, it is out of scope for cooldown dependency wo
 |---|---|---|
 | Attribution conformance tests | Narrow test additions for existing attribution classifications | No new policy semantics unless explicitly scoped |
 | Dependency tracker maintenance | Status-only updates when evidence exists | Leave outside-owner rows empty until a real install exists |
-| Merge Guard documentation consistency | Copy/path/version consistency patches | Do not change runtime guard behavior |
+| StateGate documentation consistency | Copy/path/version consistency patches | Do not change runtime guard behavior |
 | Standing-authority operational analysis | Read-only analysis of existing authority surfaces | No authority widening or execution-path mutation |
 
 ## Avoid during cooldown
