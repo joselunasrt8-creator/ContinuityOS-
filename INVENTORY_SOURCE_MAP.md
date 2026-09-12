@@ -54,14 +54,28 @@ All enforcement consumers now read the root canonical file. `EXECUTION_SURFACES_
 | File | Classification | Operative status |
 |---|---|---|
 | `EXECUTION_SURFACES.json` | **canonical source (`ROOT_CANONICAL`)** | Sole enforcement authority |
-| `governance/runtime/EXECUTION_SURFACES.json` | compatibility copy | Non-operative; retained for its legacy schema |
-| `runtime/surfaces/EXECUTION_SURFACES.json` | generated projection | Evidence-only topology projection; not authority |
-| `runtime/execution_surfaces.json` | compatibility copy | Non-operative issue-342 schema |
-| `governance/execution_surfaces.json` | retired artifact | Retained, but prohibited as an enforcement input |
-| `governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json` | generated projection | Validation-bundle export; not authority |
-| `PHASE3_EXECUTION_SURFACE_INVENTORY.json` | historical evidence | Phase-closure evidence; not current authority |
+| `governance/runtime/EXECUTION_SURFACES.json` | `COMPATIBILITY_COPY` | Non-operative; retained for its legacy schema |
+| `runtime/surfaces/EXECUTION_SURFACES.json` | `GENERATED_PROJECTION` | Evidence-only topology projection; not authority |
+| `runtime/execution_surfaces.json` | `COMPATIBILITY_COPY` | Non-operative issue-342 schema |
+| `governance/execution_surfaces.json` | `RETIRED_ARTIFACT` | Retained, but prohibited as an enforcement input |
+| `governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json` | `GENERATED_PROJECTION` | Validation-bundle export; not authority |
+| `PHASE3_EXECUTION_SURFACE_INVENTORY.json` | `HISTORICAL_EVIDENCE` | Phase-closure evidence; not current authority |
 
 The inventories remain semantically different. This reconciliation does **not** merge, union, or silently mutate their surface arrays. Any future semantic convergence requires a separate governed change. Declared canonical authority is therefore distinguished from operative consumption, and generated projection is explicitly distinguished from independent authority.
+
+### Producer / consumer map
+
+| Artifact | Producer or maintenance method | Current first-party consumers | Enforcement status |
+|---|---|---|---|
+| `EXECUTION_SURFACES.json` | Governed manual registry updates; no repository generator writes it | runtime discovery (`src/lib/runtime-discovery-adapter.ts`); governance workflows (`constitutional-integrity.yml`, `merge-governance-check.yml`); audit regeneration (`scripts/regenerate-governance-artifacts.mjs`); execution-surface, runtime-governance, migration, boundary, and FATE tests enumerated in `EXECUTION_SURFACES_LINEAGE.json` | Sole operative source |
+| `governance/runtime/EXECUTION_SURFACES.json` | Manual legacy-schema compatibility projection | Presence/shape compatibility test; governance artifact registries and historical reports | Non-operative |
+| `runtime/surfaces/EXECUTION_SURFACES.json` | Historical issue-838 topology projection | Topology-manifest hash test and `runtime/topology/topology_manifest.json` | Non-operative projection consumer explicitly allowlisted |
+| `runtime/execution_surfaces.json` | Manual issue-342 compatibility projection | Governance artifact registries and historical inventory text | Non-operative |
+| `governance/execution_surfaces.json` | No current producer; retained constitutional-history artifact | Governance artifact registries only | Retired; no enforcement consumption |
+| `governance/mindshift-validation-bundle/governance/EXECUTION_SURFACES.json` | Historical validation-bundle field projection; no current generator | Bundle/ownership registries and preservation documentation | Non-operative generated projection |
+| `PHASE3_EXECUTION_SURFACE_INVENTORY.json` | Phase 3 closure audit | Phase closure matrix and archival/assessment documentation | Historical evidence |
+
+The topology manifest and canonical object/ownership registries *reference* derivatives to preserve topology and disposition; those registry references do not consume a derivative as execution authority. Documentation records status but cannot create enforcement authority. Validation of this map does not itself grant execution eligibility.
 
 ## Family 2 — BYPASS_PATHS
 
@@ -152,7 +166,7 @@ Summary for all confirmed runtime consumers:
 
 -----
 
-## Split-Source Problem Statement (GAP-004 Blocker)
+## Resolved Split-Source Problem Statement (GAP-004 remains open)
 
 ```text
 merge-governance-check.yml
@@ -161,18 +175,10 @@ merge-governance-check.yml
 src/index.ts
 → EXECUTION_SURFACES.json (root canonical, v1.0)
 
-These files have diverged.
-No single file is authoritative for both consumers.
-Surface exhaustiveness cannot be verified against a split ground truth.
-GAP-004 closure requires convergence to a single canonical source.
+The prior consumers referenced divergent inventories. They now converge on the root authority without changing any inventory's surface content. This source reconciliation removes the split ground truth only; it does not establish execution-surface exhaustiveness or close GAP-004.
 ```
 
-Resolution path (Slice 2 — separate bounded implementation object):
-
-- Determine which file is source-of-truth (likely `runtime/surfaces/` given it is the more complete, versioned, generated artifact)
-- Update `src/index.ts` to load from the same source as `merge-governance-check.yml`
-- Or: produce a single merged canonical file and update both consumers
-- Constraint: do not alter surface content without explicit governance scope
+Resolution: Slice 2 selected `ROOT_CANONICAL`. Semantic reconciliation among the divergent derivatives remains a separate governed follow-up; source convergence is not silent inventory mutation.
 
 -----
 
