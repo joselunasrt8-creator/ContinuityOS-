@@ -7,9 +7,13 @@
     width="100%">
 </p>
 
-ContinuityOS is distributed legitimacy infrastructure for execution-capable systems.
+ContinuityOS is legitimacy infrastructure for execution-capable systems.
 
-This repository contains a Cloudflare Worker and D1-backed runtime, conformance harnesses, portable demos, and governance artifacts for validating state-changing actions before execution. It exists to make execution-capable AI and automation systems fail closed: an action is executed only when the exact proposed object is valid, authorized, unused, policy-compliant, replay-safe, topology-visible, reconcilable, epoch-valid, and convergence-valid.
+Its core purpose is to decide whether an exact proposed state-changing action is currently eligible to execute, fail closed when required legitimacy conditions are not satisfied, preserve exact-object identity across the boundary, and emit proof and lineage after successful execution.
+
+This repository contains a Cloudflare Worker and D1-backed runtime, conformance harnesses, portable demos, and governance artifacts for validating state-changing actions before execution.
+
+The current implementation demonstrates bounded runtime properties on specific execution surfaces. Broader distributed-legitimacy semantics in this repository remain architecture and conformance claims unless and until exercised on the corresponding real runtime path.
 
 ---
 
@@ -57,7 +61,6 @@ A second installable wedge: a packaged GitHub Action that checks a pull request'
 
 `@v1` is the published, pinnable StateGate version. Use a pinned version for any consumer that treats the result as load-bearing (a required status check).
 
-
 #### Compatibility
 
 StateGate intentionally preserves several machine-readable legacy `MERGE_GUARD_*` identifiers, including proof artifact names, proof record types, proof IDs, and existing required-check names such as `merge-guard`. These are replay, proof-compatibility, and integration surfaces rather than public branding. They remain unchanged until a future versioned migration explicitly sequences replacement identifiers without breaking existing proofs, branch protection, or downstream consumers.
@@ -70,21 +73,25 @@ StateGate intentionally preserves several machine-readable legacy `MERGE_GUARD_*
 
 ## What is ContinuityOS?
 
-AI systems can generate proposed actions. ContinuityOS validates those actions before execution, permits execution only for valid objects, and emits proof only after successful execution.
+AI systems and automation can generate proposed actions. ContinuityOS sits at the execution-legitimacy boundary and asks a narrower question:
+
+> Does this exact proposed action currently possess the required legitimacy to execute?
+
+The minimal runtime shape is:
 
 ```text
-Intent
-↓
-Validation
-↓
+Execution Candidate
+        ↓
 Authority
-↓
-Execution
-↓
-Proof
+        ↓
+Execution Eligibility
+        ↓
+Execution Boundary
+        ↓
+Proof + Reconciliation
 ```
 
-A proposed action is only executed if it passes validation. If validation fails — for example because of a replayed nonce or denied path — nothing executes and nothing is recorded.
+A proposed action is not executable merely because it is intelligent, useful, syntactically valid, or policy-shaped. It must satisfy the applicable legitimacy conditions for the exact object and current state.
 
 ### Canonical runtime flow
 
@@ -119,23 +126,31 @@ All state-changing execution surfaces are expected to route through this lifecyc
 > Replay<br>
 > → `NULL`
 
+These invariants define the intended execution boundary. Whether every claimed predicate is operational on every surface is an empirical question and must be demonstrated per surface.
+
 ---
 
 ## Runtime Architecture
 
 ```text
-Agent
-↓
+Agent / Automation
+        ↓
+Exact Execution Candidate
+        ↓
 ContinuityOS Runtime
-↓
+        ↓
 ┌────────────┬───────────┬────────┬────────┬────────┐
 │ Validation │ Authority │ Replay │ Policy │ Proof  │
 └────────────┴───────────┴────────┴────────┴────────┘
-↓
+        ↓
+Execution Eligibility
+        ↓
 Execution Surface
+        ↓
+Proof + Reconciliation
 ```
 
-Execution gate:
+Candidate execution gate:
 
 ```text
 VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID
@@ -143,7 +158,37 @@ VALID ∧ AUTHORIZED ∧ UNUSED ∧ POLICY_VALID
 ∧ RECONCILABLE ∧ EPOCH_VALID ∧ CONVERGENCE_VALID
 ```
 
-ContinuityOS does not replace intelligence. It enforces legitimacy before execution.
+Where a required predicate is not yet represented canonically or exercised on the selected surface, ContinuityOS must fail closed or return a bounded blocker rather than infer legitimacy.
+
+ContinuityOS does not replace intelligence. It governs execution eligibility.
+
+---
+
+## Demonstrated vs Candidate Capabilities
+
+### Demonstrated in this repository
+
+The repository includes concrete evidence for bounded behaviors including:
+
+- exact-object preservation on the governed filesystem demo;
+- replay rejection on the governed filesystem demo;
+- policy-based rejection on the governed filesystem demo;
+- proof and lineage emission after successful execution;
+- a second mutation surface using the GitHub issue-comment portability demo;
+- deterministic StateGate validation for exact pull request state.
+
+### Candidate / broader architecture
+
+The repository also contains semantics and conformance work for broader legitimacy concerns including:
+
+- distributed authority;
+- topology visibility;
+- reconciliation;
+- causal/epoch validity;
+- convergence semantics;
+- multi-surface lifecycle enforcement.
+
+Those concepts should not be interpreted as fully operational merely because they are documented, modeled, or covered by static/conformance fixtures. Runtime support must be demonstrated on the exact effect path where the claim is made.
 
 ---
 
@@ -151,13 +196,13 @@ ContinuityOS does not replace intelligence. It enforces legitimacy before execut
 
 - deterministic validation
 - exact-object execution
-- exact-object discipline
 - replay resistance
 - fail-closed behavior
 - proof persistence
-- non-bypassable execution boundaries
+- non-bypassable execution boundaries where operationally enforced
 - authority integrity
 - continuity lineage
+- evidence before architectural promotion
 
 ---
 
@@ -193,24 +238,30 @@ ContinuityOS does not replace intelligence. It enforces legitimacy before execut
 
 ---
 
-## Product Positioning
+## Position in Continufy
+
+ContinuityOS is the legitimacy and execution-boundary project within the broader Continufy research and engineering program.
+
+It is not derived from MindShift, and MindShift does not confer legitimacy on ContinuityOS. The repositories have separate responsibilities:
 
 ```text
-Continufy
-│
-├── MindShift
-│   Understand systems
-│
-├── SYNAPSE
-│   Analyze systems
-│
-└── ContinuityOS
-    Govern execution
+LLM Layer
+→ capability
+
+MindShift
+→ context / cognition governance
+→ candidate models and intent candidates
+
+ContinuityOS
+→ legitimacy infrastructure
+→ execution eligibility
+→ execution boundary
+→ proof / reconciliation
 ```
 
-ContinuityOS is the runtime infrastructure project derived from the MindShift canon. MindShift remains the canon and research umbrella; ContinuityOS is the runtime substrate. ContinuityOS governs whether state-changing actions are permitted to exist before execution occurs.
+SYNAPSE may provide structural evidence where relevant, but it is not a mandatory runtime dependency. MindShift may improve candidate context or cognition, but it does not authorize execution. Continufy provides the umbrella/business direction, not runtime authority.
 
-MindShift discovered the canon. ContinuityOS operationalizes it.
+The production topology should be treated as evidence-dependent. A component belongs on the runtime path only if repeated execution demonstrates that it adds necessary value at that boundary.
 
 ---
 
@@ -405,4 +456,4 @@ execution dependency
 governance dependency
 ```
 
-Install-base expansion starts when external systems depend on your governance vocabulary before they depend on your runtime. This repository is the first external proof that legitimacy observability infrastructure is portable — demonstrating governance vocabulary can become an external dependency surface before runtime adoption occurs.
+Install-base expansion begins when external systems materially depend on ContinuityOS for a real workflow or execution boundary. Conformance portability, demos, and same-owner integrations are useful evidence, but they are not by themselves independent external adoption or economic value.
