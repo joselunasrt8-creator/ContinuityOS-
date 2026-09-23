@@ -34,10 +34,10 @@
   "devDependencies": {
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
-    "wrangler": "^4.93.1"
+    "wrangler": "^4.125.0"
   },
   "dependencies": {
     "@langchain/core": "^1.1.48",
